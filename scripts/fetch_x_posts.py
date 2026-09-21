@@ -31,7 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = ROOT / "data" / "warehouse" / "x_posts.db"
 
-PARSER_VERSION = "v1-regex"
+PARSER_VERSION = "v2-regex"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS x_posts (
@@ -81,6 +81,12 @@ def _connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(DB_PATH))
     con.executescript(SCHEMA)
+    # migrations douces (ALTER echoue proprement si la colonne existe deja)
+    for col in ("tp_price", "sl_price"):
+        try:
+            con.execute(f"ALTER TABLE x_calls ADD COLUMN {col} REAL")
+        except sqlite3.OperationalError:
+            pass
     return con
 
 
@@ -155,10 +161,36 @@ def cmd_ingest_json(path: str, query: str) -> int:
 
 
 _DIRECTION = r"\b(long|short|bullish|bearish|achat|vente|achete|vend)\b"
-_PRICE = r"(?:@|at\b|a\s|à\s|entr[ée]e\s)(\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d+)?)([kKmM])?\b"
+_PRICE = r"(?:@|at\b|a\s|à\s|entr[ée]e|entry)\s?(\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d+)?)([kKmM])?\b"
+_NUM = r"(\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d+)?)([kKmM])?"
+_TP_RE = r"(?:\btp\s*\d?\b|\btake\s?profit\b|\btarget\b|\bobjectif\b|\bcible\b)\s*(?:[:=])?\s*" + _NUM
+_SL_RE = r"(?:\bsl\b|\bstop\s*(?:loss)?\b|\binval(?:idation)?\b)\s*(?:[:=])?\s*" + _NUM
 # horodatage X relatif ou date courte — unité précise, sinon le motif glouton
 # avalerait le texte suivant ("Il y a 17 minutes Today $BTC flipped…")
 TIME_RE = r"(Il y a \d+ (?:seconde|minute|heure|jour|semaine)s?|\d{1,2} \w{3,5}\.?(?: \d{4})?)"
+
+
+def _price_from(m: "re.Match") -> float | None:
+    """Convertit une capture de prix : milliers FR (espace/virgule/point), k/m.
+
+    Un prix illisible retourne None — jamais de crash, jamais de valeur
+    inventee : sans prix fiable, le call reste direction-only.
+    """
+    try:
+        raw = m.group(1).replace(" ", "")
+        if "," in raw and "." in raw:
+            if raw.rfind(",") > raw.rfind("."):
+                raw = raw.replace(".", "").replace(",", ".")
+            else:
+                raw = raw.replace(",", "")
+        elif "," in raw:
+            raw = raw.replace(",", "") if re.fullmatch(r"\d{1,3}(,\d{3})+", raw) \
+                else raw.replace(",", ".")
+        elif re.fullmatch(r"\d{1,3}(\.\d{3})+", raw):
+            raw = raw.replace(".", "")
+        return float(raw) * {"k": 1e3, "m": 1e6}.get((m.group(2) or "").lower(), 1.0)
+    except (ValueError, AttributeError):
+        return None
 
 
 def _parse_calls(con: sqlite3.Connection) -> int:
@@ -195,16 +227,16 @@ def _parse_calls(con: sqlite3.Connection) -> int:
         entry_price = None
         horizon = None
         price_m = re.search(_PRICE, text, re.IGNORECASE)
-        if price_m:
-            raw_price = price_m.group(1).replace(" ", "")
-            # "83,000" = separateur de milliers, pas une decimale
-            if re.fullmatch(r"\d{1,3}(,\d{3})+", raw_price):
-                value = float(raw_price.replace(",", ""))
-            else:
-                value = float(raw_price.replace(",", "."))
-            mult = {"k": 1e3, "m": 1e6}.get((price_m.group(2) or "").lower(), 1.0)
-            entry_price = value * mult
+        parsed_entry = _price_from(price_m) if price_m else None
+        if parsed_entry:
+            entry_price = parsed_entry
             confidence = "high"
+        # v2 : TP/SL quand ils existent -> le registre rejoue le TRADE, pas
+        # seulement la direction. Absents = verdict par horizons.
+        tp_m = re.search(_TP_RE, text, re.IGNORECASE)
+        sl_m = re.search(_SL_RE, text, re.IGNORECASE)
+        tp_price = _price_from(tp_m) if tp_m else None
+        sl_price = _price_from(sl_m) if sl_m else None
         if re.search(r"\b(daily|4h|1h|15m|intraday|day)\b", text, re.IGNORECASE):
             horizon = "intraday"
         elif re.search(r"\b(week|hebdo|swing|month)\b", text, re.IGNORECASE):
@@ -215,11 +247,11 @@ def _parse_calls(con: sqlite3.Connection) -> int:
             """
             INSERT OR IGNORE INTO x_calls
               (post_id, symbol, direction, entry_price, horizon, confidence,
-               parser_version, parsed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               parser_version, parsed_at, tp_price, sl_price)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (post_id, symbol, direction, entry_price, horizon, confidence,
-             PARSER_VERSION, now),
+             PARSER_VERSION, now, tp_price, sl_price),
         )
         calls += 1
     con.commit()

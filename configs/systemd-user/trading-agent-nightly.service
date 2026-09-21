@@ -27,4 +27,5 @@ ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/x
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest-searches.json --query nightly-searches
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_x_posts.py --parse-calls
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/score_x_calls.py --score
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/registre_board.py
 TimeoutStartSec=3600

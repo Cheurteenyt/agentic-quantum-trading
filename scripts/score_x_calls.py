@@ -50,6 +50,16 @@ CREATE TABLE IF NOT EXISTS x_call_scores (
 );
 """
 
+VERDICTS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS x_call_verdicts (
+    call_id        INTEGER PRIMARY KEY REFERENCES x_calls(call_id),
+    verdict        TEXT NOT NULL,
+    resolved_ts    TEXT,
+    engine_version TEXT NOT NULL,
+    scored_at      TEXT NOT NULL
+);
+"""
+
 MONTHS = {
     "janv": 1, "fevr": 2, "mars": 3, "avr": 4, "mai": 5, "juin": 6,
     "juil": 7, "aout": 8, "sept": 9, "oct": 10, "nov": 11, "dec": 12,
@@ -188,6 +198,7 @@ def score_all() -> dict:
              _utc_now(), ENGINE_VERSION),
         )
         scored_rows.append({
+            "call_id": call_id,
             "handle": handle, "symbol": sym, "direction": direction,
             "entry_declared": entry_declared, "entry": entry,
             "confidence": confidence, **rets,
@@ -202,6 +213,83 @@ def score_all() -> dict:
     stats["posts"] = posts_total
     stats["comptes"] = accounts_total
     return {"stats": stats, "rows": scored_rows}
+
+
+def _first_hit(bars, posted_ms: int, direction: str, tp: float, sl: float):
+    """Premier touch de TP ou SL sur les bougies reelles.
+
+    TP et SL touches dans la MEME bougie = indecis : connaitre l'ordre
+    intra-bougie est impossible, et deviner serait mentir.
+    """
+    for b in bars:
+        if b.ts <= posted_ms:
+            continue
+        if direction == "long":
+            hit_tp, hit_sl = b.high >= tp, b.low <= sl
+        else:
+            hit_tp, hit_sl = b.low <= tp, b.high >= sl
+        if hit_tp and hit_sl:
+            return "indecis", b.ts
+        if hit_tp:
+            return "win", b.ts
+        if hit_sl:
+            return "loss", b.ts
+    return "en_cours", None
+
+
+def trade_verdicts() -> dict:
+    """Verdicts 'replay du trade' pour les calls qui donnent TP et SL.
+
+    Un call avec TP/SL n'est plus une opinion directionnelle : c'est un
+    ordre qu'on rejoue bougie par bougie. Sans TP/SL, le verdict reste
+    horizons (retours directionnels).
+    """
+    con = _connect()
+    con.executescript(VERDICTS_SCHEMA)
+    kcon = init_klines_db()
+    rows = con.execute(
+        """
+        SELECT c.call_id, c.symbol, c.direction, c.tp_price, c.sl_price,
+               s.entry_resolved, s.posted_at
+        FROM x_calls c
+        LEFT JOIN x_call_scores s ON s.call_id = c.call_id
+        WHERE c.parser_version = (SELECT MAX(parser_version) FROM x_calls)
+          AND c.tp_price IS NOT NULL AND c.sl_price IS NOT NULL
+        """
+    ).fetchall()
+    counts: dict[str, int] = {}
+    for (call_id, sym, direction, tp, sl, entry_resolved, posted_at) in rows:
+        entry = entry_resolved
+        resolved_ts = None
+        if not entry or not posted_at:
+            verdict = "sans_entree"
+        elif direction == "long" and not (sl < entry < tp):
+            verdict = "incoherent"
+        elif direction == "short" and not (tp < entry < sl):
+            verdict = "incoherent"
+        else:
+            posted_iso = re.sub(r"\.\d+Z$", "Z", posted_at.strip())
+            posted_ms = int(
+                datetime.strptime(posted_iso, "%Y-%m-%dT%H:%M:%SZ")
+                .replace(tzinfo=timezone.utc).timestamp() * 1000
+            )
+            bars = load_bars(kcon, f"{sym.upper()}USDT", "1h")
+            verdict, hit_ts = _first_hit(bars, posted_ms, direction, tp, sl)
+            resolved_ts = (
+                datetime.fromtimestamp(hit_ts / 1000, tz=timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                )
+                if hit_ts else None
+            )
+        con.execute(
+            "INSERT OR REPLACE INTO x_call_verdicts VALUES (?,?,?,?,?)",
+            (call_id, verdict, resolved_ts, ENGINE_VERSION, _utc_now()),
+        )
+        counts[verdict] = counts.get(verdict, 0) + 1
+    con.commit()
+    con.close()
+    kcon.close()
+    return {"counts": counts}
 
 
 def _utc_now() -> str:
@@ -257,11 +345,26 @@ def write_report(result: dict) -> Path:
                 f"| {_fmt_pct(r['ret_7d'])} |"
             )
     n24 = sum(1 for r in rows if r["ret_24h"] is not None)
+    verdicts: dict[int, str] = {}
+    try:
+        vcon = _connect()
+        verdicts = dict(
+            vcon.execute("SELECT call_id, verdict FROM x_call_verdicts").fetchall()
+        )
+        vcon.close()
+    except Exception:
+        pass
+    vcounts: dict[str, int] = {}
+    for v in verdicts.values():
+        vcounts[v] = vcounts.get(v, 0) + 1
     lines += [
         "",
         "## Verdicts par compte",
         "",
         f"Calls avec verdict +24h disponible : {n24}.",
+        f"Verdicts trade (TP/SL rejoues) : "
+        + (", ".join(f"{k} {v}" for k, v in sorted(vcounts.items())) or "aucun")
+        + ".",
         "Les agregats par compte (hit rate, moyenne) restent MASQUES tant que",
         "ce nombre est sous 10 : un hit rate sur 2-3 calls, c'est se mentir",
         "avec un petit echantillon — exactement ce que le registre existe",
@@ -280,10 +383,12 @@ def main() -> int:
         p.print_help()
         return 2
     result = score_all()
+    tv = trade_verdicts()
     out = write_report(result)
     s = result["stats"]
     print(f"[registre] scores : {s['scored']} complets, {s['partiel']} en maturite, "
           f"{s['hors_univers'] + s['date_unparseable'] + s['pas_de_prix']} ignores")
+    print(f"[registre] verdicts trades : {tv['counts']}")
     print(f"[registre] rapport : {out}")
     return 0
 
