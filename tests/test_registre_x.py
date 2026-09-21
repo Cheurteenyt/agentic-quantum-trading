@@ -227,7 +227,8 @@ class TestDerived(RegistreDbTest):
             ((sym, n) for sym, day, n, *_ in self.con.execute(
                 "SELECT symbol, day, n FROM x_mentions"))
         )
-        self.assertEqual(men["BTC"], 2)
+        # d1 + d2 + d3 mentionnent tous $BTC ; $ETH une seule fois
+        self.assertEqual(men["BTC"], 3)
         self.assertEqual(men["ETH"], 1)
 
 
