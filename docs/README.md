@@ -31,7 +31,7 @@ Le pipeline est désormais **OPÉRATIONNEL** : la découverte (`nightly_campaign
 
 Plus `security/` — audits et accès réseau (Tailscale, ACL, threat models).
 
-## Les 3 règles anti-prolifération
+## Les 4 règles anti-prolifération
 
 Ce dossier est passé de 36 fichiers à 5. Pour que ça reste vrai :
 
@@ -41,6 +41,9 @@ Ce dossier est passé de 36 fichiers à 5. Pour que ça reste vrai :
    va dans `reports/`, horodaté. Jamais ici.
 3. **Pas de nouveau fichier à la racine de `docs/`.** Connaissance durable et
    rarement lue → `reference/`. Périmé mais à garder → `archive/`.
+4. **Plus jamais de doc HTML** (décision 2026-09-21) : les rapports visuels
+   sont produits en **PDF vectoriel** (via `scripts/html_to_pdf.py` ou rendu
+   HTML→PDF comme CE-001 v2) ; le markdown reste le format des docs vivants.
 
 ## Les dossiers
 

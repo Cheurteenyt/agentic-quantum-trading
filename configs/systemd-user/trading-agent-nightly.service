@@ -30,4 +30,5 @@ ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --parse-calls
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/score_x_calls.py --score
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/registre_board.py
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/html_to_pdf.py reports/registre-board.html
 TimeoutStartSec=3600
