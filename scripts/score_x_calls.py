@@ -159,8 +159,9 @@ def score_all() -> dict:
                  _utc_now(), ENGINE_VERSION),
             )
             continue
+        posted_iso = re.sub(r"\.\d+Z$", "Z", posted_at.strip())
         posted_ms = int(
-            datetime.strptime(posted_at, "%Y-%m-%dT%H:%M:%SZ")
+            datetime.strptime(posted_iso, "%Y-%m-%dT%H:%M:%SZ")
             .replace(tzinfo=timezone.utc).timestamp() * 1000
         )
         bars = load_bars(kcon, pair, "1h")
@@ -255,6 +256,17 @@ def write_report(result: dict) -> Path:
                 f"| {_fmt_pct(r['ret_1h'])} | {_fmt_pct(r['ret_24h'])} "
                 f"| {_fmt_pct(r['ret_7d'])} |"
             )
+    n24 = sum(1 for r in rows if r["ret_24h"] is not None)
+    lines += [
+        "",
+        "## Verdicts par compte",
+        "",
+        f"Calls avec verdict +24h disponible : {n24}.",
+        "Les agregats par compte (hit rate, moyenne) restent MASQUES tant que",
+        "ce nombre est sous 10 : un hit rate sur 2-3 calls, c'est se mentir",
+        "avec un petit echantillon — exactement ce que le registre existe",
+        "pour demasquer chez les autres.",
+    ]
     out = REPORTS / f"registre-honnetete-{now.replace(':', '').replace('-', '')}.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out

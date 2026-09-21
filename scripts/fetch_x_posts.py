@@ -155,7 +155,7 @@ def cmd_ingest_json(path: str, query: str) -> int:
 
 
 _DIRECTION = r"\b(long|short|bullish|bearish|achat|vente|achete|vend)\b"
-_PRICE = r"(?:@|at\b|a\s|à\s|entr[ée]e\s)(\d{2,6}(?:[.,]\d+)?)([kKmM])?\b"
+_PRICE = r"(?:@|at\b|a\s|à\s|entr[ée]e\s)(\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d+)?)([kKmM])?\b"
 # horodatage X relatif ou date courte — unité précise, sinon le motif glouton
 # avalerait le texte suivant ("Il y a 17 minutes Today $BTC flipped…")
 TIME_RE = r"(Il y a \d+ (?:seconde|minute|heure|jour|semaine)s?|\d{1,2} \w{3,5}\.?(?: \d{4})?)"
@@ -196,7 +196,12 @@ def _parse_calls(con: sqlite3.Connection) -> int:
         horizon = None
         price_m = re.search(_PRICE, text, re.IGNORECASE)
         if price_m:
-            value = float(price_m.group(1).replace(",", "."))
+            raw_price = price_m.group(1).replace(" ", "")
+            # "83,000" = separateur de milliers, pas une decimale
+            if re.fullmatch(r"\d{1,3}(,\d{3})+", raw_price):
+                value = float(raw_price.replace(",", ""))
+            else:
+                value = float(raw_price.replace(",", "."))
             mult = {"k": 1e3, "m": 1e6}.get((price_m.group(2) or "").lower(), 1.0)
             entry_price = value * mult
             confidence = "high"

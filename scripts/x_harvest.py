@@ -132,6 +132,67 @@ def harvest_profiles(handles: list[str], scrolls: int) -> int:
     return 0
 
 
+def goto_search(page, query: str) -> bool:
+    """Navigue vers une recherche live et verifie la stabilite (anti-rebond)."""
+    from urllib.parse import quote
+
+    url = f"https://x.com/search?q={quote(query)}&src=typed_query&f=live"
+    page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    page.wait_for_timeout(2600)
+    u1 = page.url
+    page.wait_for_timeout(1500)
+    u2 = page.url
+    return "/search" in u1 and "/search" in u2
+
+
+def harvest_searches(queries: list[str], scrolls: int) -> int:
+    """Peche aux calls : les recherches live regorgent de $CASHTAG + direction.
+
+    Les pages /search rebondissent plus vite que les profils (throttle) —
+    d'ou le meme abort apres 2 rebonds consecutifs.
+    """
+    from playwright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
+        return 1
+    out_posts: list[dict] = []
+    consecutive_bounces = 0
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        for query in queries:
+            if not goto_search(page, query):
+                consecutive_bounces += 1
+                print(f"[harvest] recherche {query!r} : rebond — saute")
+                if consecutive_bounces >= 2:
+                    print("[harvest] 2 rebonds consecutifs : abort")
+                    break
+                continue
+            consecutive_bounces = 0
+            for _ in range(scrolls):
+                page.mouse.wheel(0, 1600)
+                page.wait_for_timeout(1100)
+            posts = extract_articles(page)
+            posts = [dict(item, search_query=query) for item in posts]
+            print(f"[harvest] {query!r} : {len(posts)} posts")
+            out_posts.extend(posts)
+            if query != queries[-1]:
+                time.sleep(random.uniform(*PAUSE_RANGE_S))
+        ctx.close()
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = _now_utc().replace(":", "").replace("-", "")
+    out = OUT_DIR / f"registre-search-{ts}.json"
+    out.write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    (OUT_DIR / "latest-searches.json").write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    print(f"[harvest] total {len(out_posts)} posts -> {out}")
+    return 0
+
+
 def run_login() -> int:
     from patchright.sync_api import sync_playwright
 
@@ -181,6 +242,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Recolte headless des profils X (registre)")
     ap.add_argument("--login", action="store_true", help="connexion manuelle unique (fenetre visible)")
     ap.add_argument("--profiles", metavar="H1,H2", help="handles a recolter (sans @)")
+    ap.add_argument("--searches", metavar='"Q1,Q2"', help="recherches live a pecher (sans virgule dans une query)")
     ap.add_argument("--scrolls", type=int, default=1, help="scrolls par profil (1 scroll ≈ 4-6 posts)")
     ap.add_argument("--status", action="store_true", help="verifie la session du profil")
     args = ap.parse_args()
@@ -191,6 +253,9 @@ def main() -> int:
     if args.profiles:
         handles = [h.strip().lstrip("@") for h in args.profiles.split(",") if h.strip()]
         return harvest_profiles(handles, args.scrolls)
+    if args.searches:
+        queries = [q.strip() for q in args.searches.split(",") if q.strip()]
+        return harvest_searches(queries, args.scrolls)
     ap.print_help()
     return 2
 
