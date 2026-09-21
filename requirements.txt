@@ -29,3 +29,6 @@ typer>=0.9.0
 python-dotenv>=1.0.0
 eth-account>=0.13.0
 firecrawl>=4.0.0
+
+# Scraping (registre X + remplacement firecrawl prevu)
+scrapling[fetchers]>=0.4.15
