@@ -1,202 +1,206 @@
 #!/usr/bin/env python3
-"""Carry hedgé multi-venues — transformer le funding en rendement net.
+"""Carry intra-Aster — paires de perps qui se compensent (100 % Aster).
 
-Le scanner de funding RANGEOUE les extrêmes (MEME +88 %/an...). Ce script
-cherche la SECONDE JAMBE : pour chaque extrême, le prix perp Aster contre
-le prix SPOT de la même actif sur Binance (ccxt, endpoints publics, sans
-clé). Si le spot existe, un short perp Aster + long spot Binance =
-position neutre au prix qui ENCAISSE le funding, moins les coûts.
+Contrainte utilisateur (2026-09-21) : AUCUN trade sur un autre exchange.
+Donc pas de jambe spot Binance : le carry se construit DANS Aster :
 
-Calculs :
-  - basis = (perp - spot) / spot : le prix d'entrée du carry
-  - funding annuel (du cache nocturne)
-  - coût d'un aller-retour (hypothèses : taker Aster 5 bps/side,
-    taker Binance spot 10 bps/side — constantes à ajuster)
-  - funding quotidien net vs coût : le point mort en jours de détention
+  short le perp a funding tres positif (les shorts encaissent)
+  + long le perp a funding negatif (les longs encaissent)
+  = les deux jambes encaissent du funding, et le risque de prix ne porte
+    que sur l'ECART entre les deux actifs — pas sur le marche.
 
-Limites assumées (affichées dans le rapport) : le funding varie à chaque
-règlement (8h), le basis bouge (risque de unwind), la jambe spot n'existe
-pas pour les perps d'actions (INTC, GOOGL... -> exclus), les perps 1000x
-ont un multiplicateur implicite.
+La neutralite depend de la CORRELATION entre les deux jambes : mesuree
+sur les bougies 1h reelles (7 derniers jours, endpoint public Aster).
+
+  corr >= 0.70  -> quasi-neutre
+  0.40 - 0.70   -> correlation partielle (risque residuel reel)
+  < 0.40        -> pas un hedge, juste deux positions opposees
+
+Limites affichees : le funding varie a chaque reglement de 8 h, la
+correlation n'est pas une garantie (les crises cassent les correlations),
+deux jambes = deux gestions de marge.
 
     python scripts/carry_hedged.py
 """
 from __future__ import annotations
 
 import json
+import statistics
 import sys
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
-from scripts.funding_scanner import load_ranked, REPORTS
-
 CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / \
     "aster_public_funding_history_cache.json"
-ASTER_PREMIUM = "https://fapi.asterdex.com/fapi/v3/premiumIndex?symbol="
-ASTER_FAPI_PREFIX = "https://fapi.asterdex.com/fapi/"
-TAKER_ASTER_BPS = 5.0   # hypothese : taker 0.05 %/side
-TAKER_SPOT_BPS = 10.0   # hypothese : Binance spot taker 0.10 %/side
-TOP_N = 8
+REPORTS = ROOT / "reports"
+
+BASE_URL = "https://fapi.asterdex.com"
+USER_AGENT = "trading-agent-carry/1.0 (stdlib urllib)"
+BPS_PER_8H_TO_ANNUAL_PCT = 3 * 365 / 100
+N_SHORTS = 6          # meilleures jambes courtes (funding positif)
+N_LONGS = 4           # meilleures jambes longues (funding negatif)
+KLINE_LIMIT = 168     # 7 jours de bougies 1h
+CORR_QUASI_NEUTRE = 0.70
+CORR_PARTIELLE = 0.40
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _aster_mark(symbol: str) -> float | None:
-    import urllib.request
-
-    try:
-        with urllib.request.urlopen(ASTER_PREMIUM + symbol, timeout=10) as resp:
-            data = json.loads(resp.read())
-        return float(data.get("markPrice") or 0) or None
-    except Exception:
-        return None
+def _get_json(url: str):
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read())
 
 
-def _binance_spot(ex, symbol: str) -> float | None:
-    """Prix spot Binance via ccxt public. Les perps d'actions (INTC...)
-    n'ont pas de spot -> None."""
-    try:
-        base = symbol[:-4] if symbol.endswith("USDT") else symbol
-        for prefix in ("1000", "1M"):
-            if base.startswith(prefix):
-                base = base[len(prefix):]
-        ticker = ex.fetch_ticker(f"{base}/USDT")
-        price = ticker.get("last")
-        return float(price) if price else None
-    except Exception:
-        return None
+def _ann_pct(bps_per_8h: float | None) -> float | None:
+    return bps_per_8h * BPS_PER_8H_TO_ANNUAL_PCT if bps_per_8h else None
 
 
-def _funding_bps_per_8h(symbol: str) -> float | None:
+def funding_sides() -> tuple[list[dict], list[dict]]:
+    """Jambes courtes (funding positif, shorts encaissent) et longues
+    (funding negatif, longs encaissent), triees par annualise."""
     with CACHE.open(encoding="utf-8") as fh:
         cache = json.load(fh)
-    entry = cache.get("symbols", {}).get(symbol) or {}
-    return (entry.get("data") or {}).get("latest_funding_bps_per_8h")
+    shorts: list[dict] = []
+    longs: list[dict] = []
+    for sym, entry in cache.get("symbols", {}).items():
+        data = entry.get("data") or {}
+        ann = _ann_pct(data.get("latest_funding_bps_per_8h"))
+        if ann is None:
+            continue
+        row = {"symbol": sym, "ann": ann}
+        (shorts if ann > 0 else longs).append(row)
+    shorts.sort(key=lambda r: r["ann"], reverse=True)
+    longs.sort(key=lambda r: r["ann"])  # le plus negatif d'abord
+    return shorts[:N_SHORTS], longs[:N_LONGS]
 
 
-def analyse(top_n: int = TOP_N) -> list[dict]:
-    """Top extrêmes du scanner -> carry net si la seconde jambe existe."""
-    import ccxt
-
-    ex = ccxt.binance({"enableRateLimit": True})
-    rows = load_ranked()[:top_n]
-    out: list[dict] = []
-    for r in rows:
-        sym = r["symbol"]
-        perp = _aster_mark(sym)
-        spot = _binance_spot(ex, sym)
-        bps8h = _funding_bps_per_8h(sym)
-        funding_daily_pct = (bps8h or 0) * 3 / 100
-        round_trip_pct = (TAKER_ASTER_BPS * 2 + TAKER_SPOT_BPS) / 100
-        basis_pct = (
-            (perp - spot) / spot * 100 if perp and spot else None
+def hourly_returns(symbol: str) -> list[float] | None:
+    """Rendements horaires sur les 7 derniers jours (endpoint public Aster)."""
+    try:
+        raw = _get_json(
+            f"{BASE_URL}/fapi/v3/klines?symbol={symbol}&interval=1h"
+            f"&limit={KLINE_LIMIT}"
         )
-        # garde-fou : un basis absurde = actifs differents entre les deux
-        # venues (MEME d'Aster != MEME de Binance). Presenter un "hedge"
-        # sur ces paires serait offrir une perte garantie a l'utilisateur.
-        sane = basis_pct is not None and abs(basis_pct) <= 20
-        breakeven_days = (
-            round_trip_pct / funding_daily_pct
-            if funding_daily_pct > 0 and sane
-            else None
-        )
-        out.append({
-            "symbol": sym,
-            "latest_ann": r["latest_ann"],
-            "who_collects": r["who_collects"],
-            "perp": perp,
-            "spot": spot,
-            "basis_pct": basis_pct,
-            "hedgable": bool(perp and spot and sane),
-            "basis_incoherent": bool(basis_pct is not None and not sane),
-            "funding_daily_pct": funding_daily_pct,
-            "round_trip_pct": round_trip_pct,
-            "breakeven_days": breakeven_days,
-        })
-    return out
+        closes = [float(row[4]) for row in raw]
+        if len(closes) < 50:
+            return None
+        return [
+            (b - a) / a for a, b in zip(closes, closes[1:])
+        ]
+    except Exception:
+        return None
 
 
-def write_report(rows: list[dict]) -> Path:
+def pearson(xs: list[float], ys: list[float]) -> float | None:
+    n = min(len(xs), len(ys))
+    if n < 30:
+        return None
+    xs, ys = xs[-n:], ys[-n:]
+    mx, my = statistics.mean(xs), statistics.mean(ys)
+    cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    vx = sum((x - mx) ** 2 for x in xs) ** 0.5
+    vy = sum((y - my) ** 2 for y in ys) ** 0.5
+    if vx == 0 or vy == 0:
+        return None
+    return cov / (vx * vy)
+
+
+def build_pairs() -> list[dict]:
+    shorts, longs = funding_sides()
+    if not shorts or not longs:
+        return []
+    returns_cache: dict[str, list[float] | None] = {}
+    for row in shorts + longs:
+        returns_cache[row["symbol"]] = hourly_returns(row["symbol"])
+    pairs: list[dict] = []
+    for s in shorts:
+        for l in longs:
+            rs, rl = returns_cache.get(s["symbol"]), returns_cache.get(l["symbol"])
+            if not rs or not rl:
+                corr = None
+            else:
+                corr = pearson(rs, rl)
+            pairs.append({
+                "short_leg": s["symbol"],
+                "long_leg": l["symbol"],
+                "net_ann": s["ann"] + abs(l["ann"]),
+                "corr": corr,
+            })
+    pairs.sort(key=lambda p: (p["corr"] is not None and p["corr"] >= CORR_QUASI_NEUTRE,
+                              p["corr"] if p["corr"] is not None else 0,
+                              p["net_ann"]), reverse=True)
+    return pairs
+
+
+def _label(corr: float | None) -> str:
+    if corr is None:
+        return "correlation inconnue"
+    if corr >= CORR_QUASI_NEUTRE:
+        return "quasi-neutre"
+    if corr >= CORR_PARTIELLE:
+        return "correlation partielle"
+    return "pas un hedge"
+
+
+def write_report(pairs: list[dict], n_shorts: int, n_longs: int) -> Path:
     now = _utc_now()
-    hedgable = [r for r in rows if r["hedgable"]]
     lines = [
-        "# Carry hedgé — Aster perp vs Binance spot",
+        "# Carry intra-Aster — paires de perps qui se compensent",
         "",
-        f"Genere : {now} UTC — hypothèses de frais : Aster taker "
-        f"{TAKER_ASTER_BPS:g} bps/side, Binance spot taker {TAKER_SPOT_BPS:g} bps/side",
+        f"Genere : {now} UTC — 100 % Aster (contrainte utilisateur : aucun",
+        "autre exchange). Jambes : funding du DERNIER reglement, annualise.",
         "",
-        "Un carry hedgé = short perp Aster + long spot Binance (funding "
-        "positif). Position neutre au prix : l'argent vient du funding, pas "
-        "de la direction. Basis d'entrée non nul = P&L au unwind.",
+        f"Jambes courtes candidates : {n_shorts} | jambes longues : {n_longs}",
         "",
-        "| symbole | perp | spot | basis | funding/jour | aller-retour | point mort |",
-        "|---|---|---|---|---|---|---|",
+        "| short (encaisse) | long (encaisse) | carry net ann. | correlation | lecture |",
+        "|---|---|---|---|---|",
     ]
-    for r in hedgable:
-        if r["funding_daily_pct"] > 0:
-            structure = "short perp / long spot"
-            breakeven = f"{r['breakeven_days']:.1f} j"
-        else:
-            structure = "funding négatif : structure inversée"
-            breakeven = "n/a"
+    for p in pairs:
+        corr = f"{p['corr']:.2f}" if p["corr"] is not None else "?"
         lines.append(
-            f"| {r['symbol']} | {r['perp']:.4g} | {r['spot']:.4g} "
-            f"| {r['basis_pct']:+.2f} % | {r['funding_daily_pct']:.3f} % "
-            f"| {r['round_trip_pct']:.2f} % "
-            f"| {breakeven} ({structure}) |"
+            f"| {p['short_leg']} | {p['long_leg']} | {p['net_ann']:+.1f} % "
+            f"| {corr} | {_label(p['corr'])} |"
         )
-    skipped = [r["symbol"] for r in rows if not r["hedgable"]]
-    incoherent = [
-        (r["symbol"], r["basis_pct"]) for r in rows if r.get("basis_incoherent")
-    ]
-    if skipped:
-        lines += [
-            "",
-            f"Non hedgables (pas de spot Binance : perps d'actions ou "
-            f"multiplicateurs) : {', '.join(skipped)}",
-        ]
-    if incoherent:
-        lines += [
-            "",
-            "**Basis incohérent — actifs probablement différents entre les "
-            "deux venues, EXCLUS du carry :**",
-        ]
-        lines += [f"- {sym} : basis {basis:+.0f} %" for sym, basis in incoherent]
+    if not pairs:
+        lines.append("| — | — | — | — | aucune jambe long collectrice ce soir |")
     lines += [
         "",
-        "Limites assumées : le funding varie à chaque règlement de 8 h (le",
-        "+88 %/an d'hier peut être 20 % demain) ; le basis bouge ; le risque",
-        "de liquidation dépend du levier de la jambe perp. Le point mort est",
-        "le nombre de JOURS de détention pour payer les frais aller-retour",
-        "avec le funding — le risque de prix est couvert, pas éliminé.",
+        "## Regle de lecture",
+        "",
+        "Seules les paires 'quasi-neutres' (corr >= 0.70) se defendent comme",
+        "des carries. 'Correlation partielle' = du risque residuel reel.",
+        "'Pas un hedge' = deux paris opposes deguises en arbitrage.",
+        "Le funding varie a chaque reglement de 8 h ; les crises cassent les",
+        "correlations ; deux jambes = deux gestions de marge. Le carry range,",
+        "il ne conseille pas.",
     ]
-    out = REPORTS / f"carry-hedged-{now.replace(':', '').replace('-', '')}.md"
+    out = REPORTS / f"carry-intra-aster-{now.replace(':', '').replace('-', '')}.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    (REPORTS / "carry-hedged.md").write_text(
+    (REPORTS / "carry-intra-aster.md").write_text(
         "\n".join(lines) + "\n", encoding="utf-8"
     )
     return out
 
 
 def main() -> int:
-    rows = analyse()
-    out = write_report(rows)
-    print(f"[carry] {len(rows)} extrêmes analysés — rapport : {out}")
-    for r in rows:
-        if not r["hedgable"]:
-            reason = ("basis incohérent — actifs différents"
-                      if r.get("basis_incoherent") else "pas de spot")
-            print(f"  {r['symbol']:16} non hedgable ({reason})")
-            continue
-        be = (f"{r['breakeven_days']:.1f} j"
-              if r["breakeven_days"] is not None else "n/a (funding négatif)")
-        print(f"  {r['symbol']:16} basis {r['basis_pct']:+.2f} % | "
-              f"funding {r['funding_daily_pct']:.3f} %/jour | point mort {be}")
+    shorts, longs = funding_sides()
+    if not shorts or not longs:
+        print("[carry] pas de paire possible ce soir "
+              f"({len(shorts)} shorts / {len(longs)} longs collecteurs)",
+              file=sys.stderr)
+        return 1
+    pairs = build_pairs()
+    out = write_report(pairs, len(shorts), len(longs))
+    print(f"[carry] {len(pairs)} paires — rapport : {out}")
+    for p in pairs[:5]:
+        corr = f"{p['corr']:.2f}" if p["corr"] is not None else "?"
+        print(f"  short {p['short_leg']:16} + long {p['long_leg']:16} "
+              f"carry {p['net_ann']:+.1f} %/an | corr {corr} | {_label(p['corr'])}")
     return 0
 
 
