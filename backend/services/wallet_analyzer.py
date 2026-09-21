@@ -7,9 +7,10 @@ import time
 import urllib.request
 from typing import Any
 
-# # Config 
-_ETHERSCAN_KEY = "DRR64GZ1XFQ84Q21A3XGJ54MFUAR45YCMU"
-_COVALENT_KEY = "cqt_rQWpGhtQvdFjb4C37tfBxmvrd8vC"
+# Config — cles lues depuis l'environnement (backend/.env charge par main.py),
+# JAMAIS en dur dans le source (elles etaient ici avant le 2026-09-21, purgees).
+_ETHERSCAN_KEY = os.getenv("ETHERSCAN_API_KEY", "")
+_COVALENT_KEY = os.getenv("COVALENT_API_KEY", "")
 _COVALENT_CHAINID = {"bsc": "56", "eth": "1"}
 _ETHERSCAN_CHAINID = {"bsc": 56, "eth": 1}
 
