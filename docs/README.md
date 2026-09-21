@@ -51,7 +51,7 @@ Ce dossier est passé de 36 fichiers à 5. Pour que ça reste vrai :
   (API Aster, streams WS, historique de recherche, accès client, RAG, roadmap stratégie).
 - `archive/` — gelé, lecture seule. Contexte historique. **Ne pas utiliser
   comme source de décision.** Contient la suite Aster legacy (morte) et les
-  anciens rapports HTML.
+  anciens rapports (PDF, convertis le 2026-09-21).
 - `security/` — audits sécurité, ACL Tailscale, onboarding accès privé.
 
 ## État du projet en une ligne
