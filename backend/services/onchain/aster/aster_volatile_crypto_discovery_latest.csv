@@ -1,0 +1,17 @@
+volatility_verdict,volatility_score,symbol,base_asset,quote_asset,price_change_pct_24h,abs_price_change_pct_24h,quote_volume_24h,trade_count_24h,spread_bps,premium_bps,last_funding_rate,market_take_bound,min_notional,volatility_reasons,data_flags
+extreme_volatility_candidate,100.0,LABUSDT,LAB,USDT,33.282,33.282,56341246.66,313031,3.047644,-291.630314,-0.004132,0.10,5,,"large_mark_index_premium,high_funding_rate,wide_funding_cap_floor"
+extreme_volatility_candidate,79.351,ESPORTSUSDT,ESPORTS,USDT,29.45,29.45,2307213.61,18044,25.062657,34.932016,0.00117301,0.10,5,,"high_funding_rate,wide_funding_cap_floor"
+extreme_volatility_candidate,71.973,SKYAIUSDT,SKYAI,USDT,-22.07,22.07,8567872.03,41110,13.222266,3.104201,0.0001047,0.05,5,,wide_funding_cap_floor
+volatile_backtest_candidate,68.486,PIEVERSEUSDT,PIEVERSE,USDT,35.897,35.897,175721.19,994,13.890818,6.89618,1.25e-05,0.05,5,,wide_funding_cap_floor
+extreme_volatility_candidate,66.523,EDGEUSDT,EDGE,USDT,-46.275,46.275,455513.13,5467,15.239256,0.049344,1.25e-05,0.10,5,,wide_funding_cap_floor
+volatile_backtest_candidate,65.454,GUAUSDT,GUA,USDT,-16.41,16.41,12380614.6,93576,11.120035,15.568396,0.00020777,0.15,5,,wide_funding_cap_floor
+extreme_volatility_candidate,64.549,PORTALUSDT,PORTAL,USDT,-28.629,28.629,431047.24,5029,35.888234,-50.631538,-0.00022118,0.05,5,,"wide_spread,large_mark_index_premium,wide_funding_cap_floor"
+watchlist_candidate,59.87,COHRUSDT,COHR,USDT,19.65,19.65,62341.87,124,22.307424,2.863474,0.00230481,0.05,5,,"high_funding_rate,wide_funding_cap_floor"
+watchlist_candidate,59.454,HUSDT,H,USDT,-14.351,14.351,8786037.36,52565,16.869047,48.040988,5.009e-05,0.05,5,,wide_funding_cap_floor
+watchlist_candidate,54.36,USELESSUSDT,USELESS,USDT,32.589,32.589,118200.39,343,38.190955,0.049534,1.25e-05,0.05,5,,"wide_spread,wide_funding_cap_floor"
+watchlist_candidate,53.263,UPUSDT,UP,USDT,-10.942,10.942,593637.28,4331,2.942475,4.87132,-0.00033736,0.10,5,,wide_funding_cap_floor
+watchlist_candidate,52.995,NEARUSDT,NEAR,USDT,12.606,12.606,3424914.08,5902,7.518797,1.380995,0.0001,0.05,5,,wide_funding_cap_floor
+watchlist_candidate,51.414,PARTIUSDT,PARTI,USDT,15.114,15.114,171331.72,11760,18.497965,21.00743,1.494e-05,0.05,5,,wide_funding_cap_floor
+watchlist_candidate,51.213,ZECUSDT,ZEC,USDT,7.224,7.224,24787416.46,25855,0.17403,0.026152,1.25e-05,0.05,5,,wide_funding_cap_floor
+watchlist_candidate,50.765,FLNCUSDT,FLNC,USDT,16.502,16.502,472319.17,1022,24.125452,0.0,0.0,0.05,5,,wide_funding_cap_floor
+watchlist_candidate,50.533,CHIPUSDT,CHIP,USDT,14.849,14.849,367970.38,1557,18.514233,-19.998676,-9.471e-05,0.10,5,,wide_funding_cap_floor

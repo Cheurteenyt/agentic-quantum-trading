@@ -1,0 +1,37 @@
+// Core Equity tagged Tailscale policy.
+// Cleaner later version: tag the Core Equity machine as tag:core-server.
+//
+// Requirements before use:
+// 1. Paste this policy in Tailscale admin console > Access controls.
+// 2. From the Core Equity host, run:
+//    tailscale set --advertise-tags=tag:core-server
+// 3. Approve the tag if Tailscale asks.
+//
+// Replace client@example.com with each allowed client Tailscale login.
+
+{
+  "groups": {
+    "group:core-clients": [
+      "client@example.com"
+    ]
+  },
+
+  "tagOwners": {
+    "tag:core-server": ["autogroup:admin"]
+  },
+
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["autogroup:admin"],
+      "dst": ["*:*"]
+    },
+    {
+      "action": "accept",
+      "src": ["group:core-clients"],
+      "dst": ["tag:core-server:8000"]
+    }
+  ],
+
+  "ssh": []
+}

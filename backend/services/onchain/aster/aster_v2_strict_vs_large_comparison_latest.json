@@ -1,0 +1,47 @@
+{
+  "comparison_status": "blocked_missing_both_csv",
+  "generated_at": "2026-05-31T14:02:54.718674+00:00",
+  "inputs": {
+    "large_csv": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_aster_v2_v2.csv",
+    "large_output_tag": "aster_v2",
+    "max_rows_per_file": 50000,
+    "min_closed_trades": 6,
+    "strict_csv": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_aster_v2_strict_v2.csv",
+    "strict_output_tag": "aster_v2_strict"
+  },
+  "interpretation": {
+    "large_use": "Use large results as discovery only, especially when symbols are not strict-ready.",
+    "missing_strict_csv": "If strict_rows is 0, let the aster_v2_strict terminal finish at least one cycle.",
+    "strict_use": "Use strict results for cleaner forward/reality candidates."
+  },
+  "large_only_symbols": [],
+  "large_symbols_not_strict_ready": [],
+  "ok": false,
+  "safety": {
+    "would_call_external_api": false,
+    "would_send_wallet_transaction": false,
+    "would_trade": false,
+    "would_write_db": false,
+    "would_write_snapshot": true,
+    "writes_performed": 0
+  },
+  "source_policy": "local_csv_only_aster_v2_strict_vs_large",
+  "status": "blocked_missing_both_csv",
+  "strict_degraded": [],
+  "strict_improved": [],
+  "strict_only_symbols": [],
+  "summary": {
+    "common_lanes": 0,
+    "large_only_symbols": 0,
+    "large_rows": 0,
+    "large_rows_with_min_closed": 0,
+    "large_symbols_not_strict_ready": 0,
+    "strict_degraded_lanes": 0,
+    "strict_improved_lanes": 0,
+    "strict_only_symbols": 0,
+    "strict_rows": 0,
+    "strict_rows_with_min_closed": 0
+  },
+  "top_large": [],
+  "top_strict": []
+}

@@ -1,0 +1,371 @@
+{
+  "dry_run": true,
+  "generated_at": "2026-06-01T19:34:27.894597+00:00",
+  "naming_rules": [
+    "Une strat\u00e9gie backtest\u00e9e doit \u00eatre identifi\u00e9e par output_tag + symbol + interval + side + trigger_reference + execution_model + leverage.",
+    "Une strat\u00e9gie forward doit \u00eatre identifi\u00e9e par event_type ou strategy_id, jamais seulement par symbol.",
+    "Une lane promue doit \u00eatre valid\u00e9e en exact-lane: symbol + interval + side.",
+    "Les scripts archive/legacy peuvent rester pr\u00e9sents mais ne doivent pas \u00eatre lanc\u00e9s comme preuve actuelle."
+  ],
+  "ok": true,
+  "purpose": "canonical_registry_for_aster_backtest_and_forward_scripts",
+  "scripts": [
+    {
+      "artifacts": [
+        "paper_trading_strategy_discovery_<tag>_v2.csv",
+        "paper_trading_strategy_discovery_<tag>_latest.json",
+        "paper_trading_strategy_discovery_<tag>_progress_v2.csv"
+      ],
+      "canonical_command": "python -m services.onchain.aster.backtest_strategy_discovery --symbol-preset core --output-tag core_exchangeinfo --groups both",
+      "family_ids": [
+        "crypto_liquid_momentum",
+        "macro_commodity_slow_confirmation",
+        "equity_synth_slow_confirmation"
+      ],
+      "kind": "backtest_discovery",
+      "notes": "Runner principal. Les CSV v2_1 portent strategy_profile_id/profile_family/profile_key pour identifier chaque strat\u00e9gie exacte.",
+      "safe_to_run_afk": true,
+      "script": "backtest_strategy_discovery.py",
+      "status": "active_core",
+      "strategy_exactness": "parametric: output_tag + symbol_preset + search_mode + trigger_reference + execution_model + timeframe",
+      "writes": "CSV/JSON locaux uniquement"
+    },
+    {
+      "artifacts": [
+        "aster_v2_runner_plan_latest.json",
+        "paper_trading_strategy_discovery_aster_v2*_v2.csv"
+      ],
+      "canonical_command": "python -m services.onchain.aster.backtest_aster_v2 --groups both --output-tag aster_v2_exchangeinfo",
+      "family_ids": [
+        "crypto_liquid_momentum",
+        "priority_watchlist_exploration"
+      ],
+      "kind": "research_runner_wrapper",
+      "notes": "Utilise champions + watchlist prioris\u00e9e + univers public. Plus propre que relancer uniquement core fig\u00e9.",
+      "safe_to_run_afk": true,
+      "script": "backtest_aster_v2.py",
+      "status": "active_exploration",
+      "strategy_exactness": "wrapper around research/aster_v2_runner.py",
+      "writes": "CSV/JSON locaux uniquement"
+    },
+    {
+      "artifacts": [
+        "aster_priority_watchlist_backtest_plan_latest.json",
+        "paper_trading_strategy_discovery_priority_watchlist*_v2.csv"
+      ],
+      "canonical_command": "python -m services.onchain.aster.backtest_priority_watchlist --output-tag priority_watchlist",
+      "family_ids": [
+        "priority_watchlist_exploration"
+      ],
+      "kind": "research_runner_wrapper",
+      "notes": "Sert \u00e0 sortir du pi\u00e8ge des m\u00eames symboles. Les gagnants doivent \u00eatre revalid\u00e9s ailleurs.",
+      "safe_to_run_afk": true,
+      "script": "backtest_priority_watchlist.py",
+      "status": "active_exploration",
+      "strategy_exactness": "wrapper around research/priority_watchlist_backtest_runner.py",
+      "writes": "CSV/JSON locaux uniquement"
+    },
+    {
+      "artifacts": [
+        "paper_trading_multi_strategy_stateful_monitor.csv",
+        "paper_trading_multi_strategy_stateful_heartbeat.json"
+      ],
+      "canonical_command": "python -m services.onchain.aster.monitor_multi_strategy --strategies inj_tia_regime_filtered --run-forever --sleep-seconds 300 --forward-window-trades 1000 --persist",
+      "family_ids": [
+        "crypto_liquid_momentum"
+      ],
+      "kind": "forward_paper_monitor",
+      "notes": "A garder pour historique, mais ne doit pas surclasser promotion truth.",
+      "safe_to_run_afk": true,
+      "script": "monitor_multi_strategy.py",
+      "status": "legacy_watch",
+      "strategy_exactness": "strategy_id maps to fixed symbols, event_type, UTC regime and max holding profile",
+      "writes": "ledger paper-trading si --persist"
+    },
+    {
+      "artifacts": [
+        "paper_trading_optimized_longs_monitor.csv"
+      ],
+      "canonical_command": "python -m services.onchain.aster.monitor_optimized_longs --symbols INJUSDT,NEARUSDT,TIAUSDT --run-forever --sleep-seconds 300 --forward-window-trades 1000 --persist",
+      "family_ids": [
+        "crypto_liquid_momentum"
+      ],
+      "kind": "forward_paper_monitor",
+      "notes": "Runner historique. Utile pour continuit\u00e9 mais pas source finale de promotion.",
+      "safe_to_run_afk": true,
+      "script": "monitor_optimized_longs.py",
+      "status": "legacy_watch",
+      "strategy_exactness": "fixed optimized long breakout profiles from sandbox",
+      "writes": "ledger paper-trading si --persist"
+    },
+    {
+      "artifacts": [
+        "aster_promotion_ready_lanes_latest.json",
+        "paper_trading_strict_promotion_ready_forward_monitor.csv",
+        "docs/core-equity-aster-promotion-ready-lanes.html"
+      ],
+      "canonical_command": "python -m services.onchain.aster.aster_promotion_ready_lanes_report --strict-forward-cycle --run-forever --sleep-seconds 300 --forward-window-trades 1000 --persist",
+      "family_ids": [
+        "crypto_liquid_momentum",
+        "reporting_truth_layer"
+      ],
+      "kind": "promotion_and_forward_runner",
+      "notes": "Pont entre backtest et forward. La variante stricte est pr\u00e9f\u00e9r\u00e9e.",
+      "safe_to_run_afk": true,
+      "script": "aster_promotion_ready_lanes_report.py",
+      "status": "active_control",
+      "strategy_exactness": "exact lane = symbol + interval + side + strict/non-strict event_type",
+      "writes": "HTML/JSON report; ledger paper-trading seulement avec --persist forward-cycle"
+    },
+    {
+      "artifacts": [
+        "aster_strategy_truth_report_latest.json",
+        "docs/core-equity-aster-strategy-truth-report.html"
+      ],
+      "canonical_command": "python -m services.onchain.aster.aster_strategy_truth_report",
+      "family_ids": [
+        "reporting_truth_layer"
+      ],
+      "kind": "truth_report",
+      "notes": "\u00c0 g\u00e9n\u00e9rer avant toute d\u00e9cision. Lit net + latent, pas juste le PnL r\u00e9alis\u00e9.",
+      "safe_to_run_afk": false,
+      "script": "aster_strategy_truth_report.py",
+      "status": "active_control",
+      "strategy_exactness": "event_type-level truth from ledger",
+      "writes": "JSON/HTML report uniquement"
+    },
+    {
+      "artifacts": [
+        "aster_promotion_truth_report_latest.json",
+        "docs/core-equity-aster-promotion-truth-report.html"
+      ],
+      "canonical_command": "python -m services.onchain.aster.aster_promotion_truth_report",
+      "family_ids": [
+        "reporting_truth_layer"
+      ],
+      "kind": "strict_truth_report",
+      "notes": "Source finale actuelle pour ne pas confondre LAB 3h, LAB 5h, LAB 30m, etc.",
+      "safe_to_run_afk": false,
+      "script": "aster_promotion_truth_report.py",
+      "status": "active_control",
+      "strategy_exactness": "exact lane truth: symbol + interval + side",
+      "writes": "JSON/HTML report uniquement"
+    },
+    {
+      "artifacts": [
+        "aster_lane_promotion_scoring_latest.csv",
+        "docs/core-equity-aster-lane-promotion-scoring.html"
+      ],
+      "canonical_command": "python -m services.onchain.aster.aster_lane_promotion_scoring",
+      "family_ids": [
+        "reporting_truth_layer"
+      ],
+      "kind": "ranking_overlay",
+      "notes": "Donne une file d'attente propre: promote, watch, discovered, rejected.",
+      "safe_to_run_afk": false,
+      "script": "aster_lane_promotion_scoring.py",
+      "status": "active_control",
+      "strategy_exactness": "lane score with blockers and lifecycle",
+      "writes": "CSV/JSON/HTML report uniquement"
+    },
+    {
+      "artifacts": [
+        "aster_entry_microstructure_diagnostic_latest.json"
+      ],
+      "canonical_command": "python -m services.onchain.aster.aster_microstructure_replay_validator",
+      "family_ids": [
+        "reporting_truth_layer"
+      ],
+      "kind": "execution_quality_validator",
+      "notes": "Contr\u00f4le spread, gaps, volume r\u00e9el et nombre de trades. Ne cherche pas de strat\u00e9gie.",
+      "safe_to_run_afk": false,
+      "script": "aster_microstructure_replay_validator.py",
+      "status": "active_control",
+      "strategy_exactness": "validates fill plausibility for explicit symbol+interval+side lanes",
+      "writes": "JSON local uniquement"
+    },
+    {
+      "artifacts": [
+        "paper_trading_multi_strategy_monitor.csv",
+        "paper_trading_strategy_monitor.csv"
+      ],
+      "canonical_command": "not_recommended_currently",
+      "family_ids": [
+        "short_fade_archive"
+      ],
+      "kind": "legacy_experiment",
+      "notes": "Conserver comme historique. Ne pas m\u00e9langer avec les d\u00e9cisions actuelles.",
+      "safe_to_run_afk": false,
+      "script": "monitor_shorts.py",
+      "status": "archive",
+      "strategy_exactness": "multiple internal long/short experiments, not current promotion lane format",
+      "writes": "CSV locaux"
+    }
+  ],
+  "strategy_families": [
+    {
+      "decision_rule": "Peut passer en forward seulement si promotion truth exact-lane confirme la lane.",
+      "family_id": "crypto_liquid_momentum",
+      "known_symbols": [
+        "LABUSDT",
+        "INJUSDT",
+        "TIAUSDT",
+        "ASTERUSDT",
+        "HYPEUSDT"
+      ],
+      "main_scripts": [
+        "backtest_strategy_discovery.py",
+        "aster_promotion_ready_lanes_report.py"
+      ],
+      "purpose": "Recherche long sur crypto liquides avec confirmation mark/index, funding, exchangeInfo et forward paper.",
+      "status": "active",
+      "typical_presets": [
+        "core",
+        "aster_v2"
+      ],
+      "typical_timeframes": [
+        "30m",
+        "1h",
+        "2h",
+        "3h",
+        "5h"
+      ]
+    },
+    {
+      "decision_rule": "Reste exploration tant qu'il n'y a pas microstructure + forward paper s\u00e9par\u00e9s.",
+      "family_id": "macro_commodity_slow_confirmation",
+      "known_symbols": [
+        "XAUUSDT",
+        "XAGUSDT",
+        "CLUSDT",
+        "BZUSDT",
+        "CRCLUSDT",
+        "ORCLUSDT"
+      ],
+      "main_scripts": [
+        "backtest_strategy_discovery.py"
+      ],
+      "purpose": "Tester commodities/synth macro sur timeframes lents, sans les m\u00e9langer aux champions crypto.",
+      "status": "exploration",
+      "typical_presets": [
+        "macro",
+        "macro_equity"
+      ],
+      "typical_timeframes": [
+        "2h",
+        "3h",
+        "4h",
+        "5h",
+        "6h"
+      ]
+    },
+    {
+      "decision_rule": "Ne pas promouvoir si le meilleur r\u00e9sultat vient d'un sample faible ou d'une microstructure mince.",
+      "family_id": "equity_synth_slow_confirmation",
+      "known_symbols": [
+        "AAPLUSDT",
+        "TSLAUSDT",
+        "NVDAUSDT",
+        "MSFTUSDT",
+        "INTCUSDT",
+        "AMDUSDT"
+      ],
+      "main_scripts": [
+        "backtest_strategy_discovery.py"
+      ],
+      "purpose": "Tester actions synth\u00e9tiques Aster avec contraintes de liquidit\u00e9 plus strictes.",
+      "status": "exploration",
+      "typical_presets": [
+        "equities",
+        "macro_equity"
+      ],
+      "typical_timeframes": [
+        "1h",
+        "2h",
+        "3h",
+        "4h",
+        "5h",
+        "6h"
+      ]
+    },
+    {
+      "decision_rule": "Un candidat int\u00e9ressant doit \u00eatre r\u00e9inject\u00e9 dans promotion truth avant forward persistant.",
+      "family_id": "priority_watchlist_exploration",
+      "known_symbols": [
+        "dynamic_from_priority_watchlist"
+      ],
+      "main_scripts": [
+        "backtest_priority_watchlist.py",
+        "research/priority_watchlist_backtest_runner.py"
+      ],
+      "purpose": "Chercher de nouveaux actifs via l'univers public/WS au lieu de rester fig\u00e9 sur les m\u00eames paires.",
+      "status": "exploration",
+      "typical_presets": [
+        "priority_watchlist"
+      ],
+      "typical_timeframes": [
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "3h"
+      ]
+    },
+    {
+      "decision_rule": "Ne pas relancer comme source de d\u00e9cision actuelle sans nouveau protocole de v\u00e9rit\u00e9.",
+      "family_id": "short_fade_archive",
+      "known_symbols": [
+        "1000SATSUSDT",
+        "ORDIUSDT",
+        "WIFUSDT",
+        "PEPEUSDT"
+      ],
+      "main_scripts": [
+        "monitor_shorts.py",
+        "aster_paper_trading_sandbox.py"
+      ],
+      "purpose": "Ancienne hypoth\u00e8se short/fade sur anomalies order-flow. Utile comme preuve, pas comme runner actif principal.",
+      "status": "archive",
+      "typical_presets": [
+        "manual_symbols"
+      ],
+      "typical_timeframes": [
+        "trade_stream"
+      ]
+    },
+    {
+      "decision_rule": "Toujours lire cette couche avant de conclure qu'une strat\u00e9gie est bonne.",
+      "family_id": "reporting_truth_layer",
+      "known_symbols": [
+        "all_from_artifacts"
+      ],
+      "main_scripts": [
+        "aster_strategy_truth_report.py",
+        "aster_promotion_truth_report.py",
+        "aster_lane_promotion_scoring.py"
+      ],
+      "purpose": "Couche de v\u00e9rit\u00e9: lit les artefacts, ne backteste pas, et d\u00e9cide promote/watch/reject.",
+      "status": "control",
+      "typical_presets": [
+        "local_artifacts"
+      ],
+      "typical_timeframes": [
+        "not_applicable"
+      ]
+    }
+  ],
+  "summary": {
+    "current_decision_source": "aster_promotion_truth_report + aster_lane_promotion_scoring",
+    "registered_scripts": 11,
+    "script_status_counts": {
+      "active_control": 5,
+      "active_core": 1,
+      "active_exploration": 2,
+      "archive": 1,
+      "legacy_watch": 2
+    },
+    "strategy_families": 6
+  },
+  "would_write": false,
+  "writes_performed": 0
+}

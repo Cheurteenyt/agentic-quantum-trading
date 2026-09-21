@@ -1,0 +1,26 @@
+{
+  "csv_v2_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_smoke_execution_header_fix_v2.csv",
+  "current_batch": 1,
+  "failed_batches": 0,
+  "last_progress_at": "2026-06-02T20:08:55.436709+00:00",
+  "last_run_at": "2026-06-02T20:08:47.731442+00:00",
+  "mode": "discovery_progress",
+  "ok": true,
+  "output_tag": "smoke_execution_header_fix",
+  "phase": "completed",
+  "run_id": "strategy-discovery-20260602-200847",
+  "search_mode": "standard",
+  "tagged_json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_smoke_execution_header_fix_latest.json",
+  "top_unique_symbols": [
+    {
+      "best_tradable_leverage": 5.0,
+      "interval": "15m",
+      "profit_factor": 5.354181,
+      "roi_pct_on_paper_balance": 6.44774,
+      "symbol": "LABUSDT",
+      "win_rate": 0.823529
+    }
+  ],
+  "total_batches": 1,
+  "total_candidates": 1
+}

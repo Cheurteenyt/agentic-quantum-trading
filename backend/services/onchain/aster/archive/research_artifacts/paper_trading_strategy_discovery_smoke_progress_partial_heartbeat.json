@@ -1,0 +1,42 @@
+{
+  "csv_v2_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_smoke_progress_partial_v2.csv",
+  "current_batch": 6,
+  "failed_batches": 0,
+  "last_progress_at": "2026-06-01T03:39:47.898087+00:00",
+  "last_run_at": "2026-06-01T03:37:56.273763+00:00",
+  "mode": "discovery_progress",
+  "ok": true,
+  "output_tag": "smoke_progress_partial",
+  "phase": "completed",
+  "run_id": "strategy-discovery-20260601-033756",
+  "search_mode": "standard",
+  "tagged_json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_smoke_progress_partial_latest.json",
+  "top_unique_symbols": [
+    {
+      "best_tradable_leverage": 2.0,
+      "interval": "15m",
+      "profit_factor": 6.598781,
+      "roi_pct_on_paper_balance": 2.070755,
+      "symbol": "DRAMUSDT",
+      "win_rate": 0.833333
+    },
+    {
+      "best_tradable_leverage": 2.0,
+      "interval": "30m",
+      "profit_factor": 4.118165,
+      "roi_pct_on_paper_balance": 1.011869,
+      "symbol": "AMDUSDT",
+      "win_rate": 0.666667
+    },
+    {
+      "best_tradable_leverage": 2.0,
+      "interval": "15m",
+      "profit_factor": 1.587972,
+      "roi_pct_on_paper_balance": 0.351541,
+      "symbol": "MSTRUSDT",
+      "win_rate": 0.625
+    }
+  ],
+  "total_batches": 6,
+  "total_candidates": 9
+}

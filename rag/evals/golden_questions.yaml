@@ -1,0 +1,181 @@
+version: 1
+description: "Core Equity RAG retrieval regression set. Each question should retrieve at least one expected file."
+defaults:
+  top_k: 5
+  min_expected_hits: 1
+questions:
+  - id: arkham_coverage_metrics
+    domain: data
+    question: "Where are Arkham-style coverage metrics and chain coverage matrix computed?"
+    expected_paths:
+      - backend/routers/arkham.py
+
+  - id: onchain_admin_endpoints
+    domain: backend
+    question: "Which router exposes admin-only onchain label ingestion and seed ingestion endpoints?"
+    expected_paths:
+      - backend/routers/onchain.py
+
+  - id: label_ledger
+    domain: data
+    question: "Where is the label ledger built from Scrapling normalized files?"
+    expected_paths:
+      - backend/services/label_ledger.py
+
+  - id: derived_label_expansion
+    domain: data
+    question: "Where are derived labels expanded from onchain transactions and Scrapling transfers?"
+    expected_paths:
+      - backend/services/label_expansion.py
+
+  - id: seed_ingestion
+    domain: data
+    question: "Where is seed transaction ingestion implemented for high-confidence labelled wallets?"
+    expected_paths:
+      - backend/services/seed_ingestion.py
+
+  - id: onchain_engine
+    domain: data
+    question: "Where is RPC or explorer-backed onchain ingestion logic implemented?"
+    expected_paths:
+      - backend/services/onchain_engine.py
+
+  - id: wallet_analyzer_service
+    domain: data
+    question: "Where is backend wallet analysis logic implemented?"
+    expected_paths:
+      - backend/services/wallet_analyzer.py
+      - backend/services/alpha_wallets.py
+
+  - id: wallet_analyzer_ui
+    domain: frontend
+    question: "Which frontend component renders wallet analysis and token click behavior?"
+    expected_paths:
+      - frontend/src/components/WalletAnalyzer.tsx
+      - frontend/src/pages/AlphaLab.tsx
+
+  - id: alpha_lab_ui
+    domain: frontend
+    question: "Where is the Alpha Lab page and Arkham coverage dashboard UI implemented?"
+    expected_paths:
+      - frontend/src/pages/AlphaLab.tsx
+
+  - id: dashboard_ui
+    domain: frontend
+    question: "Where is the main dashboard watchlist and market overview page implemented?"
+    expected_paths:
+      - frontend/src/pages/Dashboard.tsx
+
+  - id: arkham_entity_page
+    domain: frontend
+    question: "Which frontend component renders the Arkham-like entity explorer page?"
+    expected_paths:
+      - frontend/src/components/layout/ArkhamEntityPage.tsx
+
+  - id: rag_project_memory
+    domain: memory
+    question: "Where is the durable Core Equity project state recorded for RAG?"
+    expected_paths:
+      - rag/memory/project_state.md
+
+  - id: agent_improvement_protocol
+    domain: memory
+    question: "Where is the controlled AI agent self-improvement protocol documented?"
+    expected_paths:
+      - rag/memory/agent_improvement_protocol.md
+
+  - id: rag_operating_playbook
+    domain: memory
+    question: "Where are daily RAG commands, Qdrant server mode and RTX 3070 settings documented?"
+    expected_paths:
+      - rag/memory/rag_operating_playbook.md
+
+  - id: rag_config
+    domain: memory
+    question: "Where are RAG chunk size, embeddings, Qdrant mode and ik_llama.cpp settings configured?"
+    expected_paths:
+      - rag/config/rag.yaml
+
+  - id: candidate_promotion_guard
+    domain: data
+    question: "Where is candidate label promotion guarded with dry_run, explicit IDs and admin token?"
+    expected_paths:
+      - backend/services/label_ledger.py
+      - backend/routers/onchain.py
+      - rag/memory/project_state.md
+
+  - id: alpha_admin_candidate_ui
+    domain: frontend
+    question: "Where does Alpha Lab show candidate label review, automation plan and dry-run promote controls?"
+    expected_paths:
+      - frontend/src/pages/AlphaLab.tsx
+
+  - id: rag_domain_config
+    domain: memory
+    question: "Where are RAG domains backend frontend data memory configured?"
+    expected_paths:
+      - rag/config/rag.yaml
+      - rag/memory/rag_operating_playbook.md
+
+  - id: generated_project_map
+    domain: memory
+    question: "Where is the Generated Project Map with the Frontend -> API -> Router -> Service -> Data operating map?"
+    expected_paths:
+      - rag/memory/generated_project_map.md
+      - rag/memory/project_state.md
+
+  - id: evidence_only_corroboration_guardrail
+    domain: data
+    question: "Which files explain that candidate corroboration jobs collect evidence bundles, log data_jobs and do not promote trusted labels?"
+    expected_paths:
+      - backend/services/onchain_engine.py
+      - backend/routers/onchain.py
+      - rag/memory/generated_project_map.md
+      - rag/memory/project_state.md
+
+  - id: token_discovery_downstream_state
+    domain: memory
+    question: "Where is the current token market discovery controlled promotion downstream handoff state recorded?"
+    expected_paths:
+      - rag/memory/current_automation_state.md
+      - rag/memory/project_state.md
+
+  - id: token_downstream_contract_backend
+    domain: backend
+    question: "Where are token market controlled promotion downstream insert contract and schema plan implemented?"
+    expected_paths:
+      - backend/services/onchain_engine.py
+      - backend/routers/onchain.py
+
+  - id: token_discovery_disabled_writes
+    domain: memory
+    question: "Where does the RAG memory say token discovery still creates no CEX label, DEX router evidence, mapping, wallet write, swap write, or client signal?"
+    expected_paths:
+      - rag/memory/current_automation_state.md
+      - rag/memory/project_state.md
+
+  - id: current_automation_snapshot
+    domain: memory
+    question: "Where is the short living snapshot for Core Equity current automation state?"
+    expected_paths:
+      - rag/memory/current_automation_state.md
+
+  - id: aster_rl_lane_policy
+    domain: aster
+    question: "Where is the Aster offline RL lane policy implemented?"
+    expected_paths:
+      - backend/services/onchain/aster/research/aster_rl_lane_policy.py
+
+  - id: aster_strategy_discovery
+    domain: aster
+    question: "Where is Aster strategy discovery and backtest search implemented?"
+    expected_paths:
+      - backend/services/onchain/aster/backtest_strategy_discovery.py
+
+  - id: aster_research_docs
+    domain: aster
+    question: "Which document summarizes the Aster research state, promotion guards and current lane quality?"
+    expected_paths:
+      - docs/core-equity-aster-current-state.html
+      - docs/core-equity-aster-research-consolidated-report.html
+      - docs/core-equity-aster-rl-lane-policy.html

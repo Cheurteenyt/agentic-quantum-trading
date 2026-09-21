@@ -1,0 +1,58 @@
+{
+  "csv_v2_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_core_progress_v2.csv",
+  "current_batch": 18,
+  "failed_batches": 0,
+  "last_progress_at": "2026-06-01T07:24:25.706744+00:00",
+  "last_run_at": "2026-06-01T03:40:59.955108+00:00",
+  "mode": "discovery_progress",
+  "ok": true,
+  "output_tag": "core_progress",
+  "phase": "completed",
+  "run_id": "strategy-discovery-20260601-034059",
+  "search_mode": "exploration",
+  "tagged_json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_core_progress_latest.json",
+  "top_unique_symbols": [
+    {
+      "best_tradable_leverage": 3.0,
+      "interval": "30m",
+      "profit_factor": 2.411576,
+      "roi_pct_on_paper_balance": 37.423991,
+      "symbol": "LABUSDT",
+      "win_rate": 0.604167
+    },
+    {
+      "best_tradable_leverage": 10.0,
+      "interval": "2h",
+      "profit_factor": 15.71854,
+      "roi_pct_on_paper_balance": 10.531505,
+      "symbol": "BOMEUSDT",
+      "win_rate": 0.875
+    },
+    {
+      "best_tradable_leverage": 5.0,
+      "interval": "15m",
+      "profit_factor": 14.453927,
+      "roi_pct_on_paper_balance": 7.883613,
+      "symbol": "INJUSDT",
+      "win_rate": 0.928571
+    },
+    {
+      "best_tradable_leverage": 10.0,
+      "interval": "3h",
+      "profit_factor": 13.39066,
+      "roi_pct_on_paper_balance": 5.003437,
+      "symbol": "JUPUSDT",
+      "win_rate": 0.888889
+    },
+    {
+      "best_tradable_leverage": 5.0,
+      "interval": "15m",
+      "profit_factor": 5.212803,
+      "roi_pct_on_paper_balance": 7.464043,
+      "symbol": "WLDUSDT",
+      "win_rate": 0.777778
+    }
+  ],
+  "total_batches": 18,
+  "total_candidates": 178
+}

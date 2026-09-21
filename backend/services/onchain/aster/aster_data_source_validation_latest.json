@@ -1,0 +1,1494 @@
+{
+  "base_url": "https://fapi.asterdex.com",
+  "dry_run": true,
+  "endpoint_health": {
+    "aggregate_trades": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "book_ticker": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "depth": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "exchange_info": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "funding_info": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "funding_rate": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "index_price_klines": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "index_references": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "klines": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "mark_price_klines": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "ping": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "premium_index": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "recent_trades": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "ticker_24h": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "ticker_price": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    },
+    "time": {
+      "ok_count": 3,
+      "status": "validated",
+      "total": 3
+    }
+  },
+  "failed_rows": [],
+  "generated_at": "2026-05-31T11:54:14.225101+00:00",
+  "interval": "1h",
+  "official_doc_url": "https://asterdex.github.io/aster-api-website/futures-v3/market-data/",
+  "ok": true,
+  "rows": [
+    {
+      "doc_status": "official_public",
+      "endpoint": "ping",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 324.54,
+      "params": {},
+      "path": "/fapi/v3/ping",
+      "rate_limit_headers": {},
+      "record_count": 0,
+      "sample_fields": [],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "connectivity_health"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "time",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 275.27,
+      "params": {},
+      "path": "/fapi/v3/time",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "1"
+      },
+      "record_count": 1,
+      "sample_fields": [
+        "serverTime"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "clock_drift_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "exchange_info",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 490.08,
+      "params": {},
+      "path": "/fapi/v3/exchangeInfo",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "2"
+      },
+      "record_count": 7,
+      "sample_fields": [
+        "assets",
+        "exchangeFilters",
+        "futuresType",
+        "rateLimits",
+        "serverTime",
+        "symbols",
+        "timezone"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "symbol_filters_and_execution_rules"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "ticker_24h",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 276.98,
+      "params": {
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/ticker/24hr",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "3"
+      },
+      "record_count": 16,
+      "sample_fields": [
+        "closeTime",
+        "count",
+        "firstId",
+        "highPrice",
+        "lastId",
+        "lastPrice",
+        "lastQty",
+        "lowPrice",
+        "openPrice",
+        "openTime",
+        "priceChange",
+        "priceChangePercent",
+        "quoteVolume",
+        "symbol",
+        "volume",
+        "weightedAvgPrice"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "volume_liquidity_gate"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "ticker_price",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 269.78,
+      "params": {
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/ticker/price",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "4"
+      },
+      "record_count": 3,
+      "sample_fields": [
+        "price",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "last_price_reference"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "book_ticker",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 271.83,
+      "params": {
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/ticker/bookTicker",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "5"
+      },
+      "record_count": 7,
+      "sample_fields": [
+        "askPrice",
+        "askQty",
+        "bidPrice",
+        "bidQty",
+        "lastUpdateId",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "best_bid_ask_spread_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "depth",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 271.95,
+      "params": {
+        "limit": 10,
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/depth",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "7"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "E",
+        "T",
+        "asks",
+        "bids",
+        "lastUpdateId"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "order_book_depth_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "recent_trades",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 262.93,
+      "params": {
+        "limit": 5,
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/trades",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "8"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "id",
+        "isBuyerMaker",
+        "price",
+        "qty",
+        "quoteQty",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "order_flow_replay"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "aggregate_trades",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 275.3,
+      "params": {
+        "limit": 5,
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/aggTrades",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "28"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "T",
+        "a",
+        "f",
+        "l",
+        "m",
+        "p",
+        "q"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "compressed_order_flow_replay"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 254.16,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/klines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "29"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "historical_backtest_bars"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "mark_price_klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 256.38,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/markPriceKlines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "30"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "liquidation_and_trigger_reference"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "index_price_klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 371.18,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "pair": "LABUSDT"
+      },
+      "path": "/fapi/v3/indexPriceKlines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "31"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "mark_index_divergence_filter"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "premium_index",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 266.82,
+      "params": {
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/premiumIndex",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "32"
+      },
+      "record_count": 8,
+      "sample_fields": [
+        "estimatedSettlePrice",
+        "indexPrice",
+        "interestRate",
+        "lastFundingRate",
+        "markPrice",
+        "nextFundingTime",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "live_mark_index_funding_snapshot"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "funding_rate",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 261.98,
+      "params": {
+        "limit": 5,
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/fundingRate",
+      "rate_limit_headers": {},
+      "record_count": 5,
+      "sample_fields": [
+        "fundingRate",
+        "fundingTime",
+        "symbol"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "funding_cost_history"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "funding_info",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 273.5,
+      "params": {
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/fundingInfo",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "33"
+      },
+      "record_count": 1,
+      "sample_fields": [
+        "fundingFeeCap",
+        "fundingFeeFloor",
+        "fundingIntervalHours",
+        "interestRate",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "funding_interval_caps"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "index_references",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 258.35,
+      "params": {
+        "symbol": "LABUSDT"
+      },
+      "path": "/fapi/v3/indexreferences",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "34"
+      },
+      "record_count": 3,
+      "sample_fields": [
+        "references",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "LABUSDT",
+      "usable_for_backtest": true,
+      "utility": "index_constituent_quality"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "ping",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 263.87,
+      "params": {},
+      "path": "/fapi/v3/ping",
+      "rate_limit_headers": {},
+      "record_count": 0,
+      "sample_fields": [],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "connectivity_health"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "time",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 258.43,
+      "params": {},
+      "path": "/fapi/v3/time",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "35"
+      },
+      "record_count": 1,
+      "sample_fields": [
+        "serverTime"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "clock_drift_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "exchange_info",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 709.62,
+      "params": {},
+      "path": "/fapi/v3/exchangeInfo",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "36"
+      },
+      "record_count": 7,
+      "sample_fields": [
+        "assets",
+        "exchangeFilters",
+        "futuresType",
+        "rateLimits",
+        "serverTime",
+        "symbols",
+        "timezone"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "symbol_filters_and_execution_rules"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "ticker_24h",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 273.12,
+      "params": {
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/ticker/24hr",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "37"
+      },
+      "record_count": 16,
+      "sample_fields": [
+        "closeTime",
+        "count",
+        "firstId",
+        "highPrice",
+        "lastId",
+        "lastPrice",
+        "lastQty",
+        "lowPrice",
+        "openPrice",
+        "openTime",
+        "priceChange",
+        "priceChangePercent",
+        "quoteVolume",
+        "symbol",
+        "volume",
+        "weightedAvgPrice"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "volume_liquidity_gate"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "ticker_price",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 254.01,
+      "params": {
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/ticker/price",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "38"
+      },
+      "record_count": 3,
+      "sample_fields": [
+        "price",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "last_price_reference"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "book_ticker",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 252.89,
+      "params": {
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/ticker/bookTicker",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "39"
+      },
+      "record_count": 7,
+      "sample_fields": [
+        "askPrice",
+        "askQty",
+        "bidPrice",
+        "bidQty",
+        "lastUpdateId",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "best_bid_ask_spread_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "depth",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 360.12,
+      "params": {
+        "limit": 10,
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/depth",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "41"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "E",
+        "T",
+        "asks",
+        "bids",
+        "lastUpdateId"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "order_book_depth_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "recent_trades",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 252.21,
+      "params": {
+        "limit": 5,
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/trades",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "42"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "id",
+        "isBuyerMaker",
+        "price",
+        "qty",
+        "quoteQty",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "order_flow_replay"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "aggregate_trades",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 254.14,
+      "params": {
+        "limit": 5,
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/aggTrades",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "62"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "T",
+        "a",
+        "f",
+        "l",
+        "m",
+        "p",
+        "q"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "compressed_order_flow_replay"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 268.47,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/klines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "63"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "historical_backtest_bars"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "mark_price_klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 277.52,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/markPriceKlines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "64"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "liquidation_and_trigger_reference"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "index_price_klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 253.35,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "pair": "INJUSDT"
+      },
+      "path": "/fapi/v3/indexPriceKlines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "65"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "mark_index_divergence_filter"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "premium_index",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 272.29,
+      "params": {
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/premiumIndex",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "66"
+      },
+      "record_count": 8,
+      "sample_fields": [
+        "estimatedSettlePrice",
+        "indexPrice",
+        "interestRate",
+        "lastFundingRate",
+        "markPrice",
+        "nextFundingTime",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "live_mark_index_funding_snapshot"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "funding_rate",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 282.62,
+      "params": {
+        "limit": 5,
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/fundingRate",
+      "rate_limit_headers": {},
+      "record_count": 5,
+      "sample_fields": [
+        "fundingRate",
+        "fundingTime",
+        "symbol"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "funding_cost_history"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "funding_info",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 253.6,
+      "params": {
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/fundingInfo",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "67"
+      },
+      "record_count": 1,
+      "sample_fields": [
+        "fundingFeeCap",
+        "fundingFeeFloor",
+        "fundingIntervalHours",
+        "interestRate",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "funding_interval_caps"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "index_references",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 269.98,
+      "params": {
+        "symbol": "INJUSDT"
+      },
+      "path": "/fapi/v3/indexreferences",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "68"
+      },
+      "record_count": 3,
+      "sample_fields": [
+        "references",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "INJUSDT",
+      "usable_for_backtest": true,
+      "utility": "index_constituent_quality"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "ping",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 264.75,
+      "params": {},
+      "path": "/fapi/v3/ping",
+      "rate_limit_headers": {},
+      "record_count": 0,
+      "sample_fields": [],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "connectivity_health"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "time",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 253.45,
+      "params": {},
+      "path": "/fapi/v3/time",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "69"
+      },
+      "record_count": 1,
+      "sample_fields": [
+        "serverTime"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "clock_drift_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "exchange_info",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 315.99,
+      "params": {},
+      "path": "/fapi/v3/exchangeInfo",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "70"
+      },
+      "record_count": 7,
+      "sample_fields": [
+        "assets",
+        "exchangeFilters",
+        "futuresType",
+        "rateLimits",
+        "serverTime",
+        "symbols",
+        "timezone"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "symbol_filters_and_execution_rules"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "ticker_24h",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 251.67,
+      "params": {
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/ticker/24hr",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "71"
+      },
+      "record_count": 16,
+      "sample_fields": [
+        "closeTime",
+        "count",
+        "firstId",
+        "highPrice",
+        "lastId",
+        "lastPrice",
+        "lastQty",
+        "lowPrice",
+        "openPrice",
+        "openTime",
+        "priceChange",
+        "priceChangePercent",
+        "quoteVolume",
+        "symbol",
+        "volume",
+        "weightedAvgPrice"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "volume_liquidity_gate"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "ticker_price",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 274.85,
+      "params": {
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/ticker/price",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "72"
+      },
+      "record_count": 3,
+      "sample_fields": [
+        "price",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "last_price_reference"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "book_ticker",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 265.01,
+      "params": {
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/ticker/bookTicker",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "73"
+      },
+      "record_count": 7,
+      "sample_fields": [
+        "askPrice",
+        "askQty",
+        "bidPrice",
+        "bidQty",
+        "lastUpdateId",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "best_bid_ask_spread_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "depth",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 253.07,
+      "params": {
+        "limit": 10,
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/depth",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "75"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "E",
+        "T",
+        "asks",
+        "bids",
+        "lastUpdateId"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "order_book_depth_guard"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "recent_trades",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 366.9,
+      "params": {
+        "limit": 5,
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/trades",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "76"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "id",
+        "isBuyerMaker",
+        "price",
+        "qty",
+        "quoteQty",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "order_flow_replay"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "aggregate_trades",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 432.34,
+      "params": {
+        "limit": 5,
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/aggTrades",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "96"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "T",
+        "a",
+        "f",
+        "l",
+        "m",
+        "p",
+        "q"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "compressed_order_flow_replay"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 371.86,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/klines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "97"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "historical_backtest_bars"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "mark_price_klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 267.7,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/markPriceKlines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "98"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "liquidation_and_trigger_reference"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "index_price_klines",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 344.26,
+      "params": {
+        "interval": "1h",
+        "limit": 5,
+        "pair": "BTCUSDT"
+      },
+      "path": "/fapi/v3/indexPriceKlines",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "99"
+      },
+      "record_count": 5,
+      "sample_fields": [
+        "list[0]",
+        "list[1]",
+        "list[2]",
+        "list[3]",
+        "list[4]",
+        "list[5]",
+        "list[6]",
+        "list[7]",
+        "list[8]",
+        "list[9]",
+        "list[10]",
+        "list[11]"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "mark_index_divergence_filter"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "premium_index",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 271.5,
+      "params": {
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/premiumIndex",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "100"
+      },
+      "record_count": 8,
+      "sample_fields": [
+        "estimatedSettlePrice",
+        "indexPrice",
+        "interestRate",
+        "lastFundingRate",
+        "markPrice",
+        "nextFundingTime",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "live_mark_index_funding_snapshot"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "funding_rate",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 262.77,
+      "params": {
+        "limit": 5,
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/fundingRate",
+      "rate_limit_headers": {},
+      "record_count": 5,
+      "sample_fields": [
+        "fundingRate",
+        "fundingTime",
+        "symbol"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "funding_cost_history"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "funding_info",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 276.0,
+      "params": {
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/fundingInfo",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "101"
+      },
+      "record_count": 1,
+      "sample_fields": [
+        "fundingFeeCap",
+        "fundingFeeFloor",
+        "fundingIntervalHours",
+        "interestRate",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "funding_interval_caps"
+    },
+    {
+      "doc_status": "official_public",
+      "endpoint": "index_references",
+      "error": null,
+      "fetch_status": "ok",
+      "http_status": 200,
+      "latency_ms": 266.86,
+      "params": {
+        "symbol": "BTCUSDT"
+      },
+      "path": "/fapi/v3/indexreferences",
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "112"
+      },
+      "record_count": 3,
+      "sample_fields": [
+        "references",
+        "symbol",
+        "time"
+      ],
+      "schema_ok": true,
+      "symbol": "BTCUSDT",
+      "usable_for_backtest": true,
+      "utility": "index_constituent_quality"
+    }
+  ],
+  "safety": {
+    "would_call_trade_endpoint": false,
+    "would_execute_trade": false,
+    "would_send_wallet_transaction": false,
+    "would_store_credentials": false,
+    "would_write": false,
+    "writes_performed": 0
+  },
+  "sample_limit": 5,
+  "source_policy": "official_public_rest_validation_only",
+  "status": "ready",
+  "summary": {
+    "endpoint_probes": 48,
+    "failed_endpoint_types": 0,
+    "failed_or_schema_mismatch": 0,
+    "partial_endpoint_types": 0,
+    "usable_for_backtest": 48,
+    "validated_endpoint_types": 16
+  },
+  "symbols": [
+    "LABUSDT",
+    "INJUSDT",
+    "BTCUSDT"
+  ]
+}

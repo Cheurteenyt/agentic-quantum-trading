@@ -1,0 +1,48 @@
+name: Core Equity Local Hybrid
+version: 0.0.1
+schema: v1
+
+models:
+  - name: Qwen Local ik_llama.cpp
+    provider: openai
+    model: qwen3.5-9b
+    apiBase: http://127.0.0.1:8080/v1
+    apiKey: local
+    roles:
+      - chat
+    defaultCompletionOptions:
+      temperature: 0.15
+      maxTokens: 4096
+
+  - name: Qwen Local ik Autocomplete
+    provider: openai
+    model: qwen3.5-9b
+    apiBase: http://127.0.0.1:8080/v1
+    apiKey: local
+    roles:
+      - autocomplete
+    autocompleteOptions:
+      debounceDelay: 450
+      maxPromptTokens: 2048
+      onlyMyCode: true
+    defaultCompletionOptions:
+      temperature: 0.05
+      maxTokens: 256
+
+context:
+  - provider: code
+  - provider: docs
+  - provider: diff
+  - provider: terminal
+  - provider: problems
+  - provider: folder
+
+rules:
+  - name: Core Equity Project Rules
+    rule: |
+      Work inside D:\trading-agent.
+      Preserve existing backend/frontend behavior unless explicitly changing it.
+      Do not expose secrets from .env files.
+      Prefer small, verified patches.
+      For Arkham/Alpha Lab data, always distinguish live data, cached data, heuristic data, and missing data.
+      Qwen Local is a read-only advisor. It may propose checks and hypotheses, but Codex is the only agent allowed to patch, apply, or make final engineering decisions.

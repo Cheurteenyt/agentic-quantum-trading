@@ -1,0 +1,105 @@
+{
+  "generated_at": "2026-05-31T17:55:02.061273+00:00",
+  "ok": true,
+  "ready_tags": [
+    "core_exchangeinfo",
+    "macro_equity_exchangeinfo"
+  ],
+  "recommended_next_action": "analyze_exchangeinfo_csv",
+  "rows": [
+    {
+      "best_row": {
+        "exchange_filter_verdict": "warning",
+        "exchange_info_status": "ok",
+        "interval": "5h",
+        "market_take_bound": "0.10",
+        "profit_factor": 3.605958,
+        "roi_pct_on_paper_balance": 16.125379,
+        "symbol": "LABUSDT",
+        "trigger_protect": "0.1000",
+        "win_rate": 0.708333
+      },
+      "candidates_so_far": 140,
+      "csv_exists": true,
+      "csv_last_write_utc": "2026-05-31T17:49:19.883922+00:00",
+      "csv_rows": 140,
+      "csv_size_bytes": 3325839,
+      "failures_so_far": null,
+      "heartbeat_last_progress_at": null,
+      "heartbeat_phase": null,
+      "heartbeat_progress": "-/-",
+      "status": "csv_ready",
+      "tag": "core_exchangeinfo"
+    },
+    {
+      "best_row": {
+        "exchange_filter_verdict": "warning",
+        "exchange_info_status": "ok",
+        "interval": "30m",
+        "market_take_bound": "0.02",
+        "profit_factor": 12.244824,
+        "roi_pct_on_paper_balance": 7.792693,
+        "symbol": "INTCUSDT",
+        "trigger_protect": "0.0200",
+        "win_rate": 0.9
+      },
+      "candidates_so_far": 120,
+      "csv_exists": true,
+      "csv_last_write_utc": "2026-05-31T17:44:25.970239+00:00",
+      "csv_rows": 120,
+      "csv_size_bytes": 2979691,
+      "failures_so_far": null,
+      "heartbeat_last_progress_at": null,
+      "heartbeat_phase": null,
+      "heartbeat_progress": "-/-",
+      "status": "csv_ready",
+      "tag": "macro_equity_exchangeinfo"
+    },
+    {
+      "best_row": {},
+      "candidates_so_far": null,
+      "csv_exists": false,
+      "csv_last_write_utc": null,
+      "csv_rows": 0,
+      "csv_size_bytes": 0,
+      "failures_so_far": 0,
+      "heartbeat_last_progress_at": "2026-05-31T17:29:24.149261+00:00",
+      "heartbeat_phase": "batch_started",
+      "heartbeat_progress": "1/8",
+      "status": "running_waiting_for_cycle_end",
+      "tag": "equities_explore_exchangeinfo"
+    },
+    {
+      "best_row": {},
+      "candidates_so_far": null,
+      "csv_exists": false,
+      "csv_last_write_utc": null,
+      "csv_rows": 0,
+      "csv_size_bytes": 0,
+      "failures_so_far": 0,
+      "heartbeat_last_progress_at": "2026-05-31T17:29:38.067801+00:00",
+      "heartbeat_phase": "batch_started",
+      "heartbeat_progress": "1/14",
+      "status": "running_waiting_for_cycle_end",
+      "tag": "aster_v2_exchangeinfo"
+    }
+  ],
+  "running_tags": [
+    "equities_explore_exchangeinfo",
+    "aster_v2_exchangeinfo"
+  ],
+  "safety": {
+    "would_call_external_api": false,
+    "would_trade": false,
+    "would_write_db": false,
+    "would_write_snapshot": true
+  },
+  "source_policy": "local_artifacts_only",
+  "status": "ready",
+  "summary": {
+    "csv_ready": 2,
+    "missing": 0,
+    "running_waiting_for_cycle_end": 2,
+    "tags_total": 4
+  }
+}

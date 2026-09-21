@@ -1,0 +1,49 @@
+{
+  "batch_reports": [
+    {
+      "batch_index": 1,
+      "status": "ready",
+      "summary": {
+        "symbols_tested": 1,
+        "ws_forward_ready": 0,
+        "ws_forward_risky": 1,
+        "ws_forward_watch": 0
+      },
+      "symbols": [
+        "INJUSDT"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-31T15:44:02.129077+00:00",
+  "merged_summary": {
+    "last_refresh_updated_symbols": 1,
+    "symbols_tested": 21,
+    "ws_forward_ready": 9,
+    "ws_forward_risky": 8,
+    "ws_forward_watch": 4
+  },
+  "ok": true,
+  "recommended_next_action": "run_aster_v2_strict_or_forward_candidates",
+  "refreshed_v2_preflight_summary": {
+    "backtest_ready": 13,
+    "blocked_data_quality": 0,
+    "needs_universe_refresh": 0,
+    "needs_ws_validation": 8,
+    "runnable_symbols": 21
+  },
+  "safety": {
+    "would_call_signed_endpoint": false,
+    "would_send_wallet_transaction": false,
+    "would_trade": false,
+    "would_write_db": false,
+    "would_write_snapshot": true,
+    "writes_performed": 2
+  },
+  "selected_symbols": [
+    "INJUSDT"
+  ],
+  "selection_mode": "needs_ws_validation",
+  "source_policy": "aster_v2_ws_preflight_refresh_merge",
+  "status": "ready",
+  "symbols_tested_this_run": 1
+}

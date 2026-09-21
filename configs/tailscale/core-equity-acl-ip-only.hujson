@@ -1,0 +1,33 @@
+// Core Equity minimal Tailscale policy.
+// Immediate version: no tags required, only your Core Equity host IP on TCP 8000.
+//
+// Replace client@example.com with each allowed client Tailscale login.
+// Paste this in Tailscale admin console > Access controls.
+//
+// Security intent:
+// - Clients can reach only http://100.114.51.121:8000
+// - Clients cannot reach SMB/RPC/Qdrant/llama-server/Windows services
+// - Owner/admin keeps broad access for maintenance
+
+{
+  "groups": {
+    "group:core-clients": [
+      "client@example.com"
+    ]
+  },
+
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["autogroup:admin"],
+      "dst": ["*:*"]
+    },
+    {
+      "action": "accept",
+      "src": ["group:core-clients"],
+      "dst": ["100.114.51.121:8000"]
+    }
+  ],
+
+  "ssh": []
+}

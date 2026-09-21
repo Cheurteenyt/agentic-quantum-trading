@@ -1,0 +1,576 @@
+{
+  "champions_tested": 10,
+  "dry_run": true,
+  "failures": [],
+  "generated_at": "2026-06-03T14:40:07.454472+00:00",
+  "methodology": "read_only_public_aggTrades_depth_fillability_check_for_backtest_champions",
+  "next_action": "promote_only_microstructure_ok_lanes_or_reduce_size_for_thin_liquidity",
+  "ok": true,
+  "rows": [
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 269.214,
+      "interval": "30m",
+      "metrics": {
+        "book": {
+          "best_ask": 15.07604,
+          "best_bid": 15.05202,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 2,
+          "mid_price": 15.06403,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 15.0763496179,
+          "simulated_slippage_bps": 8.178169,
+          "spread_bps": 15.945268,
+          "status": "ok",
+          "top10_ask_depth_usd": 3106.4457,
+          "top10_bid_depth_usd": 4854.1931,
+          "top10_depth_usd": 7960.6389,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 0.72,
+          "avg_trade_notional_usd": 214.377671,
+          "coverage_end": "2026-06-03T13:16:00.250000+00:00",
+          "coverage_start": "2026-06-03T13:10:01.100000+00:00",
+          "first_price": 15.14832,
+          "last_price": 14.61023,
+          "max_gap_seconds": 7.45,
+          "max_price": 15.15117,
+          "median_trade_notional_usd": 59.50362,
+          "min_price": 14.61023,
+          "p95_gap_seconds": 3.2,
+          "price_change_bps": -355.214308,
+          "quote_volume_usd": 107188.8357,
+          "trade_count": 500,
+          "window_seconds": 359.15
+        }
+      },
+      "side": "long",
+      "symbol": "LABUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 371.342,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "thin_liquidity",
+      "warnings": []
+    },
+    {
+      "blockers": [
+        "gap_risk",
+        "not_enough_trades"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 278.114,
+      "interval": "15m",
+      "metrics": {
+        "book": {
+          "best_ask": 6.737,
+          "best_bid": 6.728,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 1,
+          "mid_price": 6.7325,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 6.737,
+          "simulated_slippage_bps": 6.683996,
+          "spread_bps": 13.367991,
+          "status": "ok",
+          "top10_ask_depth_usd": 27189.4492,
+          "top10_bid_depth_usd": 22516.3967,
+          "top10_depth_usd": 49705.8459,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 97.948,
+          "avg_trade_notional_usd": 340.655604,
+          "coverage_end": "2026-06-03T14:37:14.500000+00:00",
+          "coverage_start": "2026-06-03T14:01:19.650000+00:00",
+          "first_price": 6.86,
+          "last_price": 6.724,
+          "max_gap_seconds": 398.35,
+          "max_price": 6.868,
+          "median_trade_notional_usd": 100.2246,
+          "min_price": 6.706,
+          "p95_gap_seconds": 310.45,
+          "price_change_bps": -198.250729,
+          "quote_volume_usd": 7835.0789,
+          "trade_count": 23,
+          "window_seconds": 2154.85
+        }
+      },
+      "side": "long",
+      "symbol": "INJUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 262.808,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "not_enough_trades",
+      "warnings": [
+        "elevated_p95_trade_gap"
+      ]
+    },
+    {
+      "blockers": [
+        "gap_risk",
+        "not_enough_trades"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 265.046,
+      "interval": "15m",
+      "metrics": {
+        "book": {
+          "best_ask": 113.39,
+          "best_bid": 113.32,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 1,
+          "mid_price": 113.35499999999999,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 113.39,
+          "simulated_slippage_bps": 3.087645,
+          "spread_bps": 6.17529,
+          "status": "ok",
+          "top10_ask_depth_usd": 20113.3053,
+          "top10_bid_depth_usd": 42894.2182,
+          "top10_depth_usd": 63007.5235,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 115.681,
+          "avg_trade_notional_usd": 1147.263886,
+          "coverage_end": "2026-06-03T14:36:58.700000+00:00",
+          "coverage_start": "2026-06-03T13:56:29.400000+00:00",
+          "first_price": 114.09,
+          "last_price": 113.31,
+          "max_gap_seconds": 654.35,
+          "max_price": 115.17,
+          "median_trade_notional_usd": 657.0525,
+          "min_price": 113.31,
+          "p95_gap_seconds": 435.8,
+          "price_change_bps": -68.367079,
+          "quote_volume_usd": 25239.8055,
+          "trade_count": 22,
+          "window_seconds": 2429.3
+        }
+      },
+      "side": "long",
+      "symbol": "INTCUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 268.554,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "not_enough_trades",
+      "warnings": [
+        "elevated_p95_trade_gap"
+      ]
+    },
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 252.347,
+      "interval": "15m",
+      "metrics": {
+        "book": {
+          "best_ask": 0.5226,
+          "best_bid": 0.5216,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 1,
+          "mid_price": 0.5221,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 0.5226,
+          "simulated_slippage_bps": 9.576709,
+          "spread_bps": 19.153419,
+          "status": "ok",
+          "top10_ask_depth_usd": 51120.1543,
+          "top10_bid_depth_usd": 41957.3841,
+          "top10_depth_usd": 93077.5384,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 10.704,
+          "avg_trade_notional_usd": 353.592014,
+          "coverage_end": "2026-06-03T14:40:00.150000+00:00",
+          "coverage_start": "2026-06-03T13:55:02.750000+00:00",
+          "first_price": 0.5276,
+          "last_price": 0.5225,
+          "max_gap_seconds": 107.118,
+          "max_price": 0.5304,
+          "median_trade_notional_usd": 20.1396,
+          "min_price": 0.5134,
+          "p95_gap_seconds": 43.45,
+          "price_change_bps": -96.664139,
+          "quote_volume_usd": 89458.7795,
+          "trade_count": 253,
+          "window_seconds": 2697.4
+        }
+      },
+      "side": "long",
+      "symbol": "WLDUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 258.481,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "thin_liquidity",
+      "warnings": []
+    },
+    {
+      "blockers": [],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 270.127,
+      "interval": "30m",
+      "metrics": {
+        "book": {
+          "best_ask": 72.399,
+          "best_bid": 72.375,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 2,
+          "mid_price": 72.387,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 72.3992180884,
+          "simulated_slippage_bps": 1.687884,
+          "spread_bps": 3.315512,
+          "status": "ok",
+          "top10_ask_depth_usd": 73844.7611,
+          "top10_bid_depth_usd": 121135.2637,
+          "top10_depth_usd": 194980.0248,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 1.33,
+          "avg_trade_notional_usd": 1424.299596,
+          "coverage_end": "2026-06-03T13:21:08.100000+00:00",
+          "coverage_start": "2026-06-03T13:10:04.300000+00:00",
+          "first_price": 73.287,
+          "last_price": 73.594,
+          "max_gap_seconds": 4.996,
+          "max_price": 74.127,
+          "median_trade_notional_usd": 384.521555,
+          "min_price": 73.238,
+          "p95_gap_seconds": 4.341,
+          "price_change_bps": 41.890103,
+          "quote_volume_usd": 712149.7978,
+          "trade_count": 500,
+          "window_seconds": 663.8
+        }
+      },
+      "side": "long",
+      "symbol": "HYPEUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 272.649,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "microstructure_ok",
+      "warnings": []
+    },
+    {
+      "blockers": [
+        "gap_risk"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 284.056,
+      "interval": "30m",
+      "metrics": {
+        "book": {
+          "best_ask": 95.39,
+          "best_bid": 95.35,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 1,
+          "mid_price": 95.37,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 95.39,
+          "simulated_slippage_bps": 2.097096,
+          "spread_bps": 4.194191,
+          "status": "ok",
+          "top10_ask_depth_usd": 58809.5756,
+          "top10_bid_depth_usd": 70240.3203,
+          "top10_depth_usd": 129049.8959,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 21.14,
+          "avg_trade_notional_usd": 911.987331,
+          "coverage_end": "2026-06-03T14:35:18.850000+00:00",
+          "coverage_start": "2026-06-03T13:11:06.500000+00:00",
+          "first_price": 99.53,
+          "last_price": 95.35,
+          "max_gap_seconds": 405.75,
+          "max_price": 99.82,
+          "median_trade_notional_usd": 201.3375,
+          "min_price": 95.07,
+          "p95_gap_seconds": 89.5,
+          "price_change_bps": -419.973877,
+          "quote_volume_usd": 218876.9595,
+          "trade_count": 240,
+          "window_seconds": 5052.35
+        }
+      },
+      "side": "long",
+      "symbol": "CRCLUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 275.258,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "gap_risk",
+      "warnings": [
+        "elevated_p95_trade_gap"
+      ]
+    },
+    {
+      "blockers": [
+        "gap_risk",
+        "not_enough_trades",
+        "thin_liquidity"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 260.465,
+      "interval": "30m",
+      "metrics": {
+        "book": {
+          "best_ask": 69.55,
+          "best_bid": 69.47,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 1,
+          "mid_price": 69.50999999999999,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 69.55,
+          "simulated_slippage_bps": 5.754568,
+          "spread_bps": 11.509135,
+          "status": "ok",
+          "top10_ask_depth_usd": 16696.7943,
+          "top10_bid_depth_usd": 6060.8323,
+          "top10_depth_usd": 22757.6266,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 108.618,
+          "avg_trade_notional_usd": 201.871415,
+          "coverage_end": "2026-06-03T14:04:34.645000+00:00",
+          "coverage_start": "2026-06-03T13:30:10.900000+00:00",
+          "first_price": 70.04,
+          "last_price": 67.94,
+          "max_gap_seconds": 917.795,
+          "max_price": 70.04,
+          "median_trade_notional_usd": 101.30505,
+          "min_price": 67.54,
+          "p95_gap_seconds": 663.95,
+          "price_change_bps": -299.828669,
+          "quote_volume_usd": 4037.4283,
+          "trade_count": 20,
+          "window_seconds": 2063.745
+        }
+      },
+      "side": "long",
+      "symbol": "DRAMUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 257.279,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "not_enough_trades",
+      "warnings": [
+        "elevated_p95_trade_gap"
+      ]
+    },
+    {
+      "blockers": [
+        "gap_risk",
+        "not_enough_trades",
+        "wide_spread"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 253.387,
+      "interval": "2h",
+      "metrics": {
+        "book": {
+          "best_ask": 0.2105,
+          "best_bid": 0.2096,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 1,
+          "mid_price": 0.21005000000000001,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 0.2105,
+          "simulated_slippage_bps": 21.423471,
+          "spread_bps": 42.846941,
+          "status": "ok",
+          "top10_ask_depth_usd": 9615.7862,
+          "top10_bid_depth_usd": 9345.1863,
+          "top10_depth_usd": 18960.9725,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 450.462,
+          "avg_trade_notional_usd": 560.792462,
+          "coverage_end": "2026-06-03T14:27:10+00:00",
+          "coverage_start": "2026-06-03T09:19:21.050000+00:00",
+          "first_price": 0.2034,
+          "last_price": 0.2093,
+          "max_gap_seconds": 3603.116,
+          "max_price": 0.2136,
+          "median_trade_notional_usd": 378.77245,
+          "min_price": 0.2034,
+          "p95_gap_seconds": 1525.45,
+          "price_change_bps": 290.06883,
+          "quote_volume_usd": 23553.2834,
+          "trade_count": 42,
+          "window_seconds": 18468.95
+        }
+      },
+      "side": "long",
+      "symbol": "JUPUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 263.084,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "not_enough_trades",
+      "warnings": [
+        "elevated_p95_trade_gap"
+      ]
+    },
+    {
+      "blockers": [
+        "gap_risk",
+        "not_enough_trades"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 260.752,
+      "interval": "15m",
+      "metrics": {
+        "book": {
+          "best_ask": 216.08,
+          "best_bid": 215.92,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 1,
+          "mid_price": 216.0,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 216.08,
+          "simulated_slippage_bps": 3.703704,
+          "spread_bps": 7.407407,
+          "status": "ok",
+          "top10_ask_depth_usd": 78804.0996,
+          "top10_bid_depth_usd": 40659.0793,
+          "top10_depth_usd": 119463.1789,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 73.229,
+          "avg_trade_notional_usd": 168.209078,
+          "coverage_end": "2026-06-03T14:35:25+00:00",
+          "coverage_start": "2026-06-03T13:57:34.900000+00:00",
+          "first_price": 217.53,
+          "last_price": 215.29,
+          "max_gap_seconds": 630.75,
+          "max_price": 217.6,
+          "median_trade_notional_usd": 97.3215,
+          "min_price": 215.29,
+          "p95_gap_seconds": 250.2,
+          "price_change_bps": -102.974302,
+          "quote_volume_usd": 5382.6905,
+          "trade_count": 32,
+          "window_seconds": 2270.1
+        }
+      },
+      "side": "long",
+      "symbol": "NVDAUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 276.358,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "not_enough_trades",
+      "warnings": [
+        "elevated_p95_trade_gap"
+      ]
+    },
+    {
+      "blockers": [
+        "gap_risk",
+        "not_enough_trades",
+        "wide_spread"
+      ],
+      "depth_fetch_status": "ok",
+      "depth_latency_ms": 259.129,
+      "interval": "2h",
+      "metrics": {
+        "book": {
+          "best_ask": 429.87,
+          "best_bid": 428.96,
+          "fillable_at_book_depth": true,
+          "levels_used_for_fill": 1,
+          "mid_price": 429.41499999999996,
+          "position_notional_usd": 100.0,
+          "simulated_fill_vwap": 429.87,
+          "simulated_slippage_bps": 10.595811,
+          "spread_bps": 21.191621,
+          "status": "ok",
+          "top10_ask_depth_usd": 21688.383,
+          "top10_bid_depth_usd": 64334.893,
+          "top10_depth_usd": 86023.276,
+          "unfilled_notional_usd": 0.0
+        },
+        "trades": {
+          "avg_gap_seconds": 716.02,
+          "avg_trade_notional_usd": 2505.28665,
+          "coverage_end": "2026-06-03T14:36:06.400000+00:00",
+          "coverage_start": "2026-06-03T11:37:06.100000+00:00",
+          "first_price": 442.49,
+          "last_price": 429.72,
+          "max_gap_seconds": 4373.15,
+          "max_price": 442.49,
+          "median_trade_notional_usd": 3059.9697,
+          "min_price": 429.72,
+          "p95_gap_seconds": 2291.2,
+          "price_change_bps": -288.594093,
+          "quote_volume_usd": 40084.5864,
+          "trade_count": 16,
+          "window_seconds": 10740.3
+        }
+      },
+      "side": "long",
+      "symbol": "MSFTUSDT",
+      "trade_fetch_status": "ok",
+      "trade_latency_ms": 256.751,
+      "trade_limit": 500,
+      "trade_source": "aggTrades",
+      "validation_bars": 3,
+      "verdict": "not_enough_trades",
+      "warnings": [
+        "elevated_p95_trade_gap"
+      ]
+    }
+  ],
+  "safety": {
+    "source_policy": "public_aster_rest_read_only",
+    "would_call_signed_endpoint": false,
+    "would_execute_trade": false,
+    "would_send_wallet_transaction": false,
+    "would_write": false,
+    "writes_performed": 0
+  },
+  "status": "ready",
+  "summary": {
+    "fetch_failures": 0,
+    "gap_risk": 1,
+    "microstructure_ok": 1,
+    "not_enough_trades": 6,
+    "thin_liquidity": 2
+  },
+  "thresholds": {
+    "max_gap_seconds": 120.0,
+    "max_slippage_bps": 25.0,
+    "max_spread_bps": 15.0,
+    "min_quote_volume_usd": 5000.0,
+    "min_trades": 50,
+    "position_notional_usd": 100.0
+  }
+}

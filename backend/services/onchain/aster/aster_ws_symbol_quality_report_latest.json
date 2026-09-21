@@ -1,0 +1,2761 @@
+{
+  "dry_run": true,
+  "failed_or_risky_rows": [
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.01329,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 6.377,
+        "best_bid": 6.372,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 7.258e-05,
+        "index_price": 6.38080019,
+        "last_price": 6.367,
+        "mark_price": 6.37299622,
+        "quote_volume_24h": 215502.7,
+        "trade_count_24h": 684
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "injusdt@aggTrade"
+        },
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 5561.08,
+          "status": "ok",
+          "stream": "injusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "injusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "INJUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream"
+      ],
+      "ws_quality_score": 52,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread",
+        "moderate_quote_volume"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 6.383,
+          "best_bid": 6.376,
+          "bid_levels": 5,
+          "final_update_id": 469683022297,
+          "first_update_id": 469683019958,
+          "spread_bps": 10.972647
+        },
+        "kline": {
+          "close": 6.367,
+          "closed": true,
+          "high": 6.367,
+          "interval": "1m",
+          "low": 6.367,
+          "open": 6.367,
+          "quote_volume": 50.2993,
+          "trade_count": 1
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 7.258e-05,
+          "index_price": 6.38080866,
+          "mark_price": 6.37300469,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2536.39,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 3
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.011351,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 465.02,
+        "best_bid": 464.21,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 464.79478175,
+        "last_price": 463.5,
+        "mark_price": 464.79478175,
+        "quote_volume_24h": 15509.52,
+        "trade_count_24h": 23
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "msftusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "msftusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "msftusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "MSFTUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 465.02,
+          "best_bid": 464.21,
+          "bid_levels": 5,
+          "final_update_id": 469651181115,
+          "first_update_id": 469651179242,
+          "spread_bps": 17.433789
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 464.79425414,
+          "mark_price": 464.79425414,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2974.54,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.016279,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 526.22,
+        "best_bid": 525.08,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 526.69481311,
+        "last_price": 526.12,
+        "mark_price": 526.69481311,
+        "quote_volume_24h": 33498.4,
+        "trade_count_24h": 110
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "amdusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "amdusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "amdusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "AMDUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 4,
+          "best_ask": 526.22,
+          "best_bid": 525.08,
+          "bid_levels": 5,
+          "final_update_id": 469651420236,
+          "first_update_id": 469651419680,
+          "spread_bps": 21.687435
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 526.69395572,
+          "mark_price": 526.69395572,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 3444.13,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.012268,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 66.05,
+        "best_bid": 65.86,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 65.99118878,
+        "last_price": 65.4,
+        "mark_price": 65.99118878,
+        "quote_volume_24h": 32471.48,
+        "trade_count_24h": 199
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "dramusdt@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "dramusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "dramusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "DRAMUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 66.05,
+          "best_bid": 65.86,
+          "bid_levels": 5,
+          "final_update_id": 469652159816,
+          "first_update_id": 469652157544,
+          "spread_bps": 28.80752
+        },
+        "kline": {
+          "close": 65.4,
+          "closed": true,
+          "high": 65.4,
+          "interval": "1m",
+          "low": 65.4,
+          "open": 65.4,
+          "quote_volume": 0.0,
+          "trade_count": 0
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 65.99110782,
+          "mark_price": 65.99110782,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2973.78,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 3
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.005642,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 640.69,
+        "best_bid": 638.69,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 639.22819648,
+        "last_price": 634.91,
+        "mark_price": 639.18002785,
+        "quote_volume_24h": 110405.99,
+        "trade_count_24h": 28
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "metausdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "metausdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "metausdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "METAUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "wide_ws_spread"
+      ],
+      "ws_quality_score": 40,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_quote_volume"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 640.73,
+          "best_bid": 638.69,
+          "bid_levels": 5,
+          "final_update_id": 469651242658,
+          "first_update_id": 469651241017,
+          "spread_bps": 31.88945
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 639.22783584,
+          "mark_price": 639.17966721,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2665.07,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.015117,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 112.83,
+        "best_bid": 112.81,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 112.83356511,
+        "last_price": 112.82,
+        "mark_price": 112.83356511,
+        "quote_volume_24h": 11170.16,
+        "trade_count_24h": 66
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "crclusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "crclusdt@kline_1m"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "crclusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "CRCLUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 35,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "moderate_ws_latency",
+        "missing_trade_rest_consistency",
+        "missing_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 0,
+          "best_ask": null,
+          "best_bid": null,
+          "bid_levels": 0,
+          "final_update_id": null,
+          "first_update_id": null,
+          "spread_bps": null
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 112.83339454,
+          "mark_price": 112.83339454,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 4080.27,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 1
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.000453,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 92.55,
+        "best_bid": 92.35,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 92.53854721,
+        "last_price": 92.17,
+        "mark_price": 92.49438468,
+        "quote_volume_24h": 8111.86,
+        "trade_count_24h": 20
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "bzusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "bzusdt@kline_1m"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "bzusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "BZUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 35,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "moderate_ws_latency",
+        "missing_trade_rest_consistency",
+        "missing_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 0,
+          "best_ask": null,
+          "best_bid": null,
+          "bid_levels": 0,
+          "final_update_id": null,
+          "first_update_id": null,
+          "spread_bps": null
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 92.53855703,
+          "mark_price": 92.49438887,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 4253.2,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 1
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.090599,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 115.75,
+        "best_bid": 115.54,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 115.68041333,
+        "last_price": 115.31,
+        "mark_price": 115.6994826,
+        "quote_volume_24h": 8645.53,
+        "trade_count_24h": 12
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "intcusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "intcusdt@kline_1m"
+        },
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 4861.84,
+          "status": "ok",
+          "stream": "intcusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "INTCUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 34,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "moderate_ws_latency",
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 115.75,
+          "best_bid": 115.54,
+          "bid_levels": 5,
+          "final_update_id": 469651083014,
+          "first_update_id": 469651081575,
+          "spread_bps": 18.159021
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 115.68015492,
+          "mark_price": 115.69843438,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 4503.24,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    }
+  ],
+  "generated_at": "2026-05-31T15:44:02.091215+00:00",
+  "last_merge": {
+    "updated_count": 1,
+    "updated_symbols": [
+      "INJUSDT"
+    ]
+  },
+  "ok": true,
+  "recommended_forward_symbols": [
+    "BTCUSDT",
+    "ASTERUSDT",
+    "BNBUSDT",
+    "ETHUSDT",
+    "HYPEUSDT",
+    "ETHUSD1",
+    "SOLUSDT",
+    "SOLUSD1",
+    "LABUSDT",
+    "XAGUSDT",
+    "CLUSDT",
+    "XAUUSDT",
+    "NVDAUSDT"
+  ],
+  "rows": [
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.000794,
+        "ws_trade_vs_rest_last_price_bps": 0.0
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 73937.3,
+        "best_bid": 73937.2,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 1.239e-05,
+        "index_price": 73975.23608696,
+        "last_price": 73937.2,
+        "mark_price": 73938.43123189,
+        "quote_volume_24h": 294450433.87,
+        "trade_count_24h": 61095
+      },
+      "stream_rows": [
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 2415.99,
+          "status": "ok",
+          "stream": "btcusdt@aggTrade"
+        },
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 2507.9,
+          "status": "ok",
+          "stream": "btcusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "btcusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "BTCUSDT",
+      "ws_quality_risks": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 73937.3,
+          "best_bid": 73937.2,
+          "bid_levels": 5,
+          "final_update_id": 469630649510,
+          "first_update_id": 469630649009,
+          "spread_bps": 0.013525
+        },
+        "kline": {
+          "close": 73937.2,
+          "closed": false,
+          "high": 73937.2,
+          "interval": "1m",
+          "low": 73937.1,
+          "open": 73937.2,
+          "quote_volume": 122144.1431,
+          "trade_count": 30
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 1.239e-05,
+          "index_price": 73975.24195652,
+          "mark_price": 73938.43710145,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 79219561,
+          "buyer_is_maker": false,
+          "event_time": 1780229929447,
+          "price": 73937.2,
+          "qty": 0.064,
+          "trade_time": 1780229929289
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2523.53,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.0,
+        "ws_trade_vs_rest_last_price_bps": 0.0
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 0.7338,
+        "best_bid": 0.7337,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": -0.00015319,
+        "index_price": 0.73422,
+        "last_price": 0.7337,
+        "mark_price": 0.73371133,
+        "quote_volume_24h": 351126549.52,
+        "trade_count_24h": 304276
+      },
+      "stream_rows": [
+        {
+          "status": "ok",
+          "stream": "asterusdt@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "asterusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "asterusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "ASTERUSDT",
+      "ws_quality_risks": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 0.7338,
+          "best_bid": 0.7337,
+          "bid_levels": 5,
+          "final_update_id": 469649680740,
+          "first_update_id": 469649680657,
+          "spread_bps": 1.362862
+        },
+        "kline": {
+          "close": 0.7337,
+          "closed": false,
+          "high": 0.7341,
+          "interval": "1m",
+          "low": 0.7334,
+          "open": 0.734,
+          "quote_volume": 54275.054651,
+          "trade_count": 119
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": -0.00015319,
+          "index_price": 0.73422,
+          "mark_price": 0.73371133,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 35579307,
+          "buyer_is_maker": true,
+          "event_time": 1780234955288,
+          "price": 0.7337,
+          "qty": 120.0,
+          "trade_time": 1780234955100
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 1842.69,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.137431,
+        "ws_trade_vs_rest_last_price_bps": -0.824584
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 727.69,
+        "best_bid": 727.63,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 727.64542548,
+        "last_price": 727.64,
+        "mark_price": 727.64,
+        "quote_volume_24h": 169748022.29,
+        "trade_count_24h": 73038
+      },
+      "stream_rows": [
+        {
+          "status": "ok",
+          "stream": "bnbusdt@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "bnbusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "bnbusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "BNBUSDT",
+      "ws_quality_risks": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 727.6,
+          "best_bid": 727.56,
+          "bid_levels": 5,
+          "final_update_id": 469649693174,
+          "first_update_id": 469649691599,
+          "spread_bps": 0.549768
+        },
+        "kline": {
+          "close": 727.58,
+          "closed": false,
+          "high": 728.38,
+          "interval": "1m",
+          "low": 727.55,
+          "open": 728.38,
+          "quote_volume": 42170.6824,
+          "trade_count": 31
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 727.64542548,
+          "mark_price": 727.63,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 15239171,
+          "buyer_is_maker": false,
+          "event_time": 1780234958078,
+          "price": 727.58,
+          "qty": 1.53,
+          "trade_time": 1780234958001
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 1914.44,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.004011,
+        "ws_trade_vs_rest_last_price_bps": 0.0
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 2021.39,
+        "best_bid": 2021.38,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 9.347e-05,
+        "index_price": 2022.42837838,
+        "last_price": 2021.38,
+        "mark_price": 2021.45652478,
+        "quote_volume_24h": 166165434.95,
+        "trade_count_24h": 46353
+      },
+      "stream_rows": [
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 1426.27,
+          "status": "ok",
+          "stream": "ethusdt@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "ethusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "ethusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "ETHUSDT",
+      "ws_quality_risks": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 2021.39,
+          "best_bid": 2021.38,
+          "bid_levels": 5,
+          "final_update_id": 469651284217,
+          "first_update_id": 469651282047,
+          "spread_bps": 0.049471
+        },
+        "kline": {
+          "close": 2021.38,
+          "closed": false,
+          "high": 2021.38,
+          "interval": "1m",
+          "low": 2021.38,
+          "open": 2021.38,
+          "quote_volume": 6949.50444,
+          "trade_count": 12
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 9.347e-05,
+          "index_price": 2022.42918919,
+          "mark_price": 2021.45733559,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 40723627,
+          "buyer_is_maker": false,
+          "event_time": 1780235366161,
+          "price": 2021.38,
+          "qty": 0.212,
+          "trade_time": 1780235366005
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 1881.96,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.0,
+        "ws_trade_vs_rest_last_price_bps": 0.146587
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 68.221,
+        "best_bid": 68.22,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": -0.00031063,
+        "index_price": 68.30828571,
+        "last_price": 68.219,
+        "mark_price": 68.22,
+        "quote_volume_24h": 73087710.9,
+        "trade_count_24h": 76927
+      },
+      "stream_rows": [
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 3336.93,
+          "status": "ok",
+          "stream": "hypeusdt@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "hypeusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "hypeusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "HYPEUSDT",
+      "ws_quality_risks": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 68.221,
+          "best_bid": 68.22,
+          "bid_levels": 5,
+          "final_update_id": 469651300364,
+          "first_update_id": 469651300208,
+          "spread_bps": 0.146584
+        },
+        "kline": {
+          "close": 68.22,
+          "closed": false,
+          "high": 68.22,
+          "interval": "1m",
+          "low": 68.184,
+          "open": 68.212,
+          "quote_volume": 4690.31926,
+          "trade_count": 15
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": -0.00031063,
+          "index_price": 68.30828571,
+          "mark_price": 68.22,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 13251645,
+          "buyer_is_maker": true,
+          "event_time": 1780235373032,
+          "price": 68.22,
+          "qty": 1.33,
+          "trade_time": 1780235372876
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2434.72,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.0,
+        "ws_trade_vs_rest_last_price_bps": -2.473044
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 2021.9,
+        "best_bid": 2021.8,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 4.47e-05,
+        "index_price": 2022.78363366,
+        "last_price": 2021.8,
+        "mark_price": 2021.8,
+        "quote_volume_24h": 30886479.85,
+        "trade_count_24h": 16230
+      },
+      "stream_rows": [
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 2837.64,
+          "status": "ok",
+          "stream": "ethusd1@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "ethusd1@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "ethusd1@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "ETHUSD1",
+      "ws_quality_risks": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 2021.9,
+          "best_bid": 2021.7,
+          "bid_levels": 5,
+          "final_update_id": 469651323930,
+          "first_update_id": 469651322194,
+          "spread_bps": 0.989218
+        },
+        "kline": {
+          "close": 2021.6,
+          "closed": false,
+          "high": 2021.8,
+          "interval": "1m",
+          "low": 2021.6,
+          "open": 2021.8,
+          "quote_volume": 11726.435,
+          "trade_count": 5
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 4.47e-05,
+          "index_price": 2022.774282,
+          "mark_price": 2021.8,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 2751885,
+          "buyer_is_maker": true,
+          "event_time": 1780235379323,
+          "price": 2021.3,
+          "qty": 0.005,
+          "trade_time": 1780235379250
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2372.04,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.433494,
+        "ws_trade_vs_rest_last_price_bps": 0.0
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 82.66,
+        "best_bid": 82.65,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0001,
+        "index_price": 82.70624815,
+        "last_price": 82.65,
+        "mark_price": 82.66334241,
+        "quote_volume_24h": 25526191.07,
+        "trade_count_24h": 35731
+      },
+      "stream_rows": [
+        {
+          "status": "ok",
+          "stream": "solusdt@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "solusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "solusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "SOLUSDT",
+      "ws_quality_risks": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 82.66,
+          "best_bid": 82.65,
+          "bid_levels": 5,
+          "final_update_id": 469652019701,
+          "first_update_id": 469652017366,
+          "spread_bps": 1.209848
+        },
+        "kline": {
+          "close": 82.65,
+          "closed": false,
+          "high": 82.72,
+          "interval": "1m",
+          "low": 82.65,
+          "open": 82.72,
+          "quote_volume": 1538.5825,
+          "trade_count": 14
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0001,
+          "index_price": 82.70266474,
+          "mark_price": 82.659759,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 25279724,
+          "buyer_is_maker": true,
+          "event_time": 1780235551161,
+          "price": 82.65,
+          "qty": 1.75,
+          "trade_time": 1780235551005
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 1719.7,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.0,
+        "ws_trade_vs_rest_last_price_bps": -2.419257
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 82.67,
+        "best_bid": 82.65,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0001,
+        "index_price": 82.73280588,
+        "last_price": 82.67,
+        "mark_price": 82.67,
+        "quote_volume_24h": 12655735.07,
+        "trade_count_24h": 14966
+      },
+      "stream_rows": [
+        {
+          "status": "ok",
+          "stream": "solusd1@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "solusd1@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "solusd1@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "SOLUSD1",
+      "ws_quality_risks": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 82.66,
+          "best_bid": 82.65,
+          "bid_levels": 5,
+          "final_update_id": 469652040596,
+          "first_update_id": 469652039257,
+          "spread_bps": 1.209848
+        },
+        "kline": {
+          "close": 82.65,
+          "closed": false,
+          "high": 82.75,
+          "interval": "1m",
+          "low": 82.65,
+          "open": 82.75,
+          "quote_volume": 5805.7171,
+          "trade_count": 20
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0001,
+          "index_price": 82.73055167,
+          "mark_price": 82.67,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 2117091,
+          "buyer_is_maker": true,
+          "event_time": 1780235554306,
+          "price": 82.65,
+          "qty": 11.3,
+          "trade_time": 1780235554150
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2068.39,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 3.447487,
+        "ws_trade_vs_rest_last_price_bps": 5.600149
+      },
+      "health_status": "active",
+      "rest_snapshot": {
+        "best_ask": 7.01632,
+        "best_bid": 7.01222,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": -0.00028514,
+        "index_price": 7.02302274,
+        "last_price": 7.01767,
+        "mark_price": 7.01670557,
+        "quote_volume_24h": 25700375.55,
+        "trade_count_24h": 97072
+      },
+      "stream_rows": [
+        {
+          "status": "ok",
+          "stream": "labusdt@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "labusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "labusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "LABUSDT",
+      "ws_quality_risks": [],
+      "ws_quality_score": 93,
+      "ws_quality_verdict": "ws_forward_ready",
+      "ws_quality_warnings": [
+        "moderate_mark_rest_divergence"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 7.02799,
+          "best_bid": 7.0252,
+          "bid_levels": 5,
+          "final_update_id": 469630677620,
+          "first_update_id": 469630675801,
+          "spread_bps": 3.970629
+        },
+        "kline": {
+          "close": 7.0216,
+          "closed": false,
+          "high": 7.05188,
+          "interval": "1m",
+          "low": 6.97308,
+          "open": 7.0004,
+          "quote_volume": 49863.53153,
+          "trade_count": 323
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": -0.00028514,
+          "index_price": 7.02544174,
+          "mark_price": 7.01912457,
+          "next_funding_time": 1780232400000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 2256012,
+          "buyer_is_maker": true,
+          "event_time": 1780229934283,
+          "price": 7.0216,
+          "qty": 4.0,
+          "trade_time": 1780229934127
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 1533.58,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 4
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.0,
+        "ws_trade_vs_rest_last_price_bps": -1.326612
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 75.38,
+        "best_bid": 75.37,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 75.38726368,
+        "last_price": 75.38,
+        "mark_price": 75.38,
+        "quote_volume_24h": 358154.67,
+        "trade_count_24h": 437
+      },
+      "stream_rows": [
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 3771.72,
+          "status": "ok",
+          "stream": "xagusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "xagusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "xagusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "XAGUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream"
+      ],
+      "ws_quality_score": 75,
+      "ws_quality_verdict": "ws_forward_watch",
+      "ws_quality_warnings": [],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 75.38,
+          "best_bid": 75.37,
+          "bid_levels": 5,
+          "final_update_id": 469651363599,
+          "first_update_id": 469651363590,
+          "spread_bps": 1.3267
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 75.38723306,
+          "mark_price": 75.38,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": 2728289,
+          "buyer_is_maker": true,
+          "event_time": 1780235387825,
+          "price": 75.37,
+          "qty": 0.199,
+          "trade_time": 1780235387650
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 3604.17,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 3
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.012619,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 88.64,
+        "best_bid": 88.63,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 8.624e-05,
+        "index_price": 88.60979427,
+        "last_price": 88.63,
+        "mark_price": 88.62529595,
+        "quote_volume_24h": 2362975.86,
+        "trade_count_24h": 5996
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "clusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "clusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "clusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "CLUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream"
+      ],
+      "ws_quality_score": 68,
+      "ws_quality_verdict": "ws_forward_watch",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 88.65,
+          "best_bid": 88.64,
+          "bid_levels": 5,
+          "final_update_id": 469649512820,
+          "first_update_id": 469649511162,
+          "spread_bps": 1.128095
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 8.624e-05,
+          "index_price": 88.60968243,
+          "mark_price": 88.62518411,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 3864.43,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.043129,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 4542.14,
+        "best_bid": 4542.13,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 4545.69860699,
+        "last_price": 4541.06,
+        "mark_price": 4542.44661326,
+        "quote_volume_24h": 836002.34,
+        "trade_count_24h": 1084
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "xauusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "xauusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "xauusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "XAUUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream"
+      ],
+      "ws_quality_score": 68,
+      "ws_quality_verdict": "ws_forward_watch",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 4542.14,
+          "best_bid": 4542.13,
+          "bid_levels": 5,
+          "final_update_id": 469649630185,
+          "first_update_id": 469649630185,
+          "spread_bps": 0.022016
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 4545.69774905,
+          "mark_price": 4542.42702233,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 3236.5,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -1e-05,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 216.8,
+        "best_bid": 216.65,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 216.81664413,
+        "last_price": 216.79,
+        "mark_price": 216.79011711,
+        "quote_volume_24h": 50399.3,
+        "trade_count_24h": 236
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "nvdausdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "nvdausdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "nvdausdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "NVDAUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream"
+      ],
+      "ws_quality_score": 60,
+      "ws_quality_verdict": "ws_forward_watch",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_quote_volume"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 216.8,
+          "best_bid": 216.65,
+          "bid_levels": 5,
+          "final_update_id": 469649574832,
+          "first_update_id": 469649572966,
+          "spread_bps": 6.921214
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 216.81643275,
+          "mark_price": 216.79011689,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 3283.13,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.01329,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 6.377,
+        "best_bid": 6.372,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 7.258e-05,
+        "index_price": 6.38080019,
+        "last_price": 6.367,
+        "mark_price": 6.37299622,
+        "quote_volume_24h": 215502.7,
+        "trade_count_24h": 684
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "injusdt@aggTrade"
+        },
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 5561.08,
+          "status": "ok",
+          "stream": "injusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "injusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "INJUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream"
+      ],
+      "ws_quality_score": 52,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread",
+        "moderate_quote_volume"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 6.383,
+          "best_bid": 6.376,
+          "bid_levels": 5,
+          "final_update_id": 469683022297,
+          "first_update_id": 469683019958,
+          "spread_bps": 10.972647
+        },
+        "kline": {
+          "close": 6.367,
+          "closed": true,
+          "high": 6.367,
+          "interval": "1m",
+          "low": 6.367,
+          "open": 6.367,
+          "quote_volume": 50.2993,
+          "trade_count": 1
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 7.258e-05,
+          "index_price": 6.38080866,
+          "mark_price": 6.37300469,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2536.39,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 3
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.011351,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 465.02,
+        "best_bid": 464.21,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 464.79478175,
+        "last_price": 463.5,
+        "mark_price": 464.79478175,
+        "quote_volume_24h": 15509.52,
+        "trade_count_24h": 23
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "msftusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "msftusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "msftusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "MSFTUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 465.02,
+          "best_bid": 464.21,
+          "bid_levels": 5,
+          "final_update_id": 469651181115,
+          "first_update_id": 469651179242,
+          "spread_bps": 17.433789
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 464.79425414,
+          "mark_price": 464.79425414,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2974.54,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.016279,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 526.22,
+        "best_bid": 525.08,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 526.69481311,
+        "last_price": 526.12,
+        "mark_price": 526.69481311,
+        "quote_volume_24h": 33498.4,
+        "trade_count_24h": 110
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "amdusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "amdusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "amdusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "AMDUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 4,
+          "best_ask": 526.22,
+          "best_bid": 525.08,
+          "bid_levels": 5,
+          "final_update_id": 469651420236,
+          "first_update_id": 469651419680,
+          "spread_bps": 21.687435
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 526.69395572,
+          "mark_price": 526.69395572,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 3444.13,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.012268,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 66.05,
+        "best_bid": 65.86,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 65.99118878,
+        "last_price": 65.4,
+        "mark_price": 65.99118878,
+        "quote_volume_24h": 32471.48,
+        "trade_count_24h": 199
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "dramusdt@aggTrade"
+        },
+        {
+          "status": "ok",
+          "stream": "dramusdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "dramusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "DRAMUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 66.05,
+          "best_bid": 65.86,
+          "bid_levels": 5,
+          "final_update_id": 469652159816,
+          "first_update_id": 469652157544,
+          "spread_bps": 28.80752
+        },
+        "kline": {
+          "close": 65.4,
+          "closed": true,
+          "high": 65.4,
+          "interval": "1m",
+          "low": 65.4,
+          "open": 65.4,
+          "quote_volume": 0.0,
+          "trade_count": 0
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 65.99110782,
+          "mark_price": 65.99110782,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2973.78,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 3
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.005642,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 640.69,
+        "best_bid": 638.69,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 639.22819648,
+        "last_price": 634.91,
+        "mark_price": 639.18002785,
+        "quote_volume_24h": 110405.99,
+        "trade_count_24h": 28
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "metausdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "metausdt@kline_1m"
+        },
+        {
+          "status": "ok",
+          "stream": "metausdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "METAUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "wide_ws_spread"
+      ],
+      "ws_quality_score": 40,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "missing_trade_rest_consistency",
+        "moderate_quote_volume"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 640.73,
+          "best_bid": 638.69,
+          "bid_levels": 5,
+          "final_update_id": 469651242658,
+          "first_update_id": 469651241017,
+          "spread_bps": 31.88945
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 639.22783584,
+          "mark_price": 639.17966721,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 2665.07,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.015117,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 112.83,
+        "best_bid": 112.81,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 112.83356511,
+        "last_price": 112.82,
+        "mark_price": 112.83356511,
+        "quote_volume_24h": 11170.16,
+        "trade_count_24h": 66
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "crclusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "crclusdt@kline_1m"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "crclusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "CRCLUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 35,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "moderate_ws_latency",
+        "missing_trade_rest_consistency",
+        "missing_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 0,
+          "best_ask": null,
+          "best_bid": null,
+          "bid_levels": 0,
+          "final_update_id": null,
+          "first_update_id": null,
+          "spread_bps": null
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 112.83339454,
+          "mark_price": 112.83339454,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 4080.27,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 1
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": 0.000453,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 92.55,
+        "best_bid": 92.35,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 92.53854721,
+        "last_price": 92.17,
+        "mark_price": 92.49438468,
+        "quote_volume_24h": 8111.86,
+        "trade_count_24h": 20
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "bzusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "bzusdt@kline_1m"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "bzusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "BZUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 35,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "moderate_ws_latency",
+        "missing_trade_rest_consistency",
+        "missing_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 0,
+          "best_ask": null,
+          "best_bid": null,
+          "bid_levels": 0,
+          "final_update_id": null,
+          "first_update_id": null,
+          "spread_bps": null
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 92.53855703,
+          "mark_price": 92.49438887,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 4253.2,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 1
+      }
+    },
+    {
+      "consistency": {
+        "ws_mark_vs_rest_mark_bps": -0.090599,
+        "ws_trade_vs_rest_last_price_bps": null
+      },
+      "health_status": "degraded",
+      "rest_snapshot": {
+        "best_ask": 115.75,
+        "best_bid": 115.54,
+        "endpoint_status": {
+          "book_ticker": "ok",
+          "premium_index": "ok",
+          "ticker_24h": "ok"
+        },
+        "funding_rate": 0.0,
+        "index_price": 115.68041333,
+        "last_price": 115.31,
+        "mark_price": 115.6994826,
+        "quote_volume_24h": 8645.53,
+        "trade_count_24h": 12
+      },
+      "stream_rows": [
+        {
+          "status": "missing_in_window",
+          "stream": "intcusdt@aggTrade"
+        },
+        {
+          "status": "missing_in_window",
+          "stream": "intcusdt@kline_1m"
+        },
+        {
+          "fallback_individual": true,
+          "fallback_latency_ms": 4861.84,
+          "status": "ok",
+          "stream": "intcusdt@depth5@500ms"
+        },
+        {
+          "status": "ok",
+          "stream": "!markPrice@arr@1s"
+        }
+      ],
+      "symbol": "INTCUSDT",
+      "ws_quality_risks": [
+        "missing_ws_stream",
+        "low_quote_volume"
+      ],
+      "ws_quality_score": 34,
+      "ws_quality_verdict": "ws_forward_risky",
+      "ws_quality_warnings": [
+        "moderate_ws_latency",
+        "missing_trade_rest_consistency",
+        "moderate_ws_spread"
+      ],
+      "ws_snapshot": {
+        "depth": {
+          "ask_levels": 5,
+          "best_ask": 115.75,
+          "best_bid": 115.54,
+          "bid_levels": 5,
+          "final_update_id": 469651083014,
+          "first_update_id": 469651081575,
+          "spread_bps": 18.159021
+        },
+        "kline": {
+          "close": null,
+          "closed": null,
+          "high": null,
+          "interval": null,
+          "low": null,
+          "open": null,
+          "quote_volume": null,
+          "trade_count": null
+        },
+        "mark_index": {
+          "array_count": 602,
+          "funding_rate": 0.0,
+          "index_price": 115.68015492,
+          "mark_price": 115.69843438,
+          "next_funding_time": 1780243200000,
+          "symbol_found": true
+        },
+        "trade": {
+          "agg_trade_id": null,
+          "buyer_is_maker": null,
+          "event_time": null,
+          "price": null,
+          "qty": null,
+          "trade_time": null
+        }
+      },
+      "ws_summary": {
+        "latency_ms": 4503.24,
+        "status": "ok",
+        "streams_expected": 4,
+        "streams_received": 2
+      }
+    }
+  ],
+  "safety": {
+    "would_call_trade_endpoint": false,
+    "would_execute_trade": false,
+    "would_send_wallet_transaction": false,
+    "would_store_credentials": false,
+    "would_write": true,
+    "writes_performed": 0
+  },
+  "source_policy": "public_ws_symbol_quality_preview_merged_for_aster_v2",
+  "status": "ready",
+  "summary": {
+    "last_refresh_updated_symbols": 1,
+    "symbols_tested": 21,
+    "ws_forward_ready": 9,
+    "ws_forward_risky": 8,
+    "ws_forward_watch": 4
+  },
+  "symbols": [
+    "BTCUSDT",
+    "ASTERUSDT",
+    "BNBUSDT",
+    "ETHUSDT",
+    "HYPEUSDT",
+    "ETHUSD1",
+    "SOLUSDT",
+    "SOLUSD1",
+    "LABUSDT",
+    "XAGUSDT",
+    "CLUSDT",
+    "XAUUSDT",
+    "NVDAUSDT",
+    "INJUSDT",
+    "MSFTUSDT",
+    "AMDUSDT",
+    "DRAMUSDT",
+    "METAUSDT",
+    "CRCLUSDT",
+    "BZUSDT",
+    "INTCUSDT"
+  ]
+}

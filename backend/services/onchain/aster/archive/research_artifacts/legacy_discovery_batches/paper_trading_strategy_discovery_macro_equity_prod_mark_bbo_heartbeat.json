@@ -1,0 +1,21 @@
+{
+  "batch_id": "high_tf_g01",
+  "candidates_so_far": 12,
+  "csv_v2_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_macro_equity_prod_mark_bbo_v2.csv",
+  "current_batch": 2,
+  "execution_model": "bbo_limit",
+  "failures_so_far": 0,
+  "intervals": "2h,3h,4h,5h,6h",
+  "last_progress_at": "2026-06-02T14:35:08.519146+00:00",
+  "mode": "discovery_progress",
+  "ok": true,
+  "output_tag": "macro_equity_prod_mark_bbo",
+  "phase": "batch_started",
+  "run_id": "strategy-discovery-20260602-135303",
+  "search_mode": "exploration",
+  "symbol_group": "XAUUSDT,XAGUSDT,CLUSDT",
+  "symbol_preset": "macro_equity",
+  "tagged_json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_macro_equity_prod_mark_bbo_latest.json",
+  "total_batches": 12,
+  "trigger_reference": "mark_price"
+}

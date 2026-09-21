@@ -1,0 +1,15 @@
+{
+  "indexed_at": "2026-06-03T03:56:40.014063+00:00",
+  "domain": "security",
+  "collection": "core_security_context",
+  "document_count": 42,
+  "file_count": 42,
+  "chunk_count": 1338,
+  "bm25_chunk_count": 1338,
+  "qdrant_mode": "server",
+  "qdrant_location": "http://127.0.0.1:6333",
+  "embedding_model": "BAAI/bge-small-en-v1.5",
+  "embedding_device": "cuda",
+  "chunk_size": 512,
+  "chunk_overlap": 80
+}

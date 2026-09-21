@@ -1,0 +1,931 @@
+{
+  "backtest_ready_symbols": [
+    "LABUSDT",
+    "ASTERUSDT",
+    "BTCUSDT",
+    "CLUSDT",
+    "BNBUSDT",
+    "ETHUSDT",
+    "XAUUSDT",
+    "NVDAUSDT",
+    "HYPEUSDT",
+    "ETHUSD1",
+    "XAGUSDT",
+    "SOLUSDT",
+    "SOLUSD1"
+  ],
+  "blocked_symbols": [],
+  "champion_rows_used": [
+    {
+      "best_tradable_leverage": 5.0,
+      "champion_decision": "keep_testing",
+      "historical_closed_trades": 17,
+      "historical_max_drawdown_usd": 16.346203,
+      "historical_profit_factor": 7.332351,
+      "historical_roi_pct": 16.201313,
+      "historical_win_rate": 0.764706,
+      "interval": "5h",
+      "lane_status": "preserve_but_reality_check",
+      "mark_index_blockers": "",
+      "mark_index_verdict": "mark_index_watch",
+      "mark_index_warnings": "single_candle_extreme_last_vs_reference_divergence",
+      "next_action": "Keep in exploitation runners and collect more closed trades.",
+      "reality_quality_score": 68,
+      "reality_quality_verdict": "backtest_quality_watch",
+      "reality_risks": "large_mark_index_kline_divergence",
+      "reality_warnings": "moderate_mark_index_premium,wide_funding_cap_floor",
+      "schema_version": "aster_exploitation_champions_v1",
+      "side": "long",
+      "symbol": "LABUSDT",
+      "timestamp": "2026-05-31T13:10:11.704474+00:00",
+      "validation_score": 64.419016
+    },
+    {
+      "best_tradable_leverage": 5.0,
+      "champion_decision": "keep_testing",
+      "historical_closed_trades": 14,
+      "historical_max_drawdown_usd": 10.602368,
+      "historical_profit_factor": 13.434769,
+      "historical_roi_pct": 6.040186,
+      "historical_win_rate": 0.928571,
+      "interval": "15m",
+      "lane_status": "keep_monitoring",
+      "mark_index_blockers": "",
+      "mark_index_verdict": "mark_index_watch",
+      "mark_index_warnings": "single_candle_extreme_last_vs_reference_divergence",
+      "next_action": "Keep in exploitation runners and collect more closed trades.",
+      "reality_quality_score": 72,
+      "reality_quality_verdict": "backtest_quality_watch",
+      "reality_risks": "",
+      "reality_warnings": "moderate_24h_quote_volume,moderate_spread,moderate_mark_index_kline_divergence,wide_funding_cap_floor",
+      "schema_version": "aster_exploitation_champions_v1",
+      "side": "long",
+      "symbol": "INJUSDT",
+      "timestamp": "2026-05-31T13:10:11.704474+00:00",
+      "validation_score": 60.993114
+    },
+    {
+      "best_tradable_leverage": 10.0,
+      "champion_decision": "keep_testing",
+      "historical_closed_trades": 10,
+      "historical_max_drawdown_usd": 8.985014,
+      "historical_profit_factor": 14.523724,
+      "historical_roi_pct": 8.235662,
+      "historical_win_rate": 0.9,
+      "interval": "30m",
+      "lane_status": "preserve_but_reality_check",
+      "mark_index_blockers": "",
+      "mark_index_verdict": "mark_index_watch",
+      "mark_index_warnings": "single_candle_extreme_last_vs_reference_divergence",
+      "next_action": "Keep in exploitation runners and collect more closed trades.",
+      "reality_quality_score": 61,
+      "reality_quality_verdict": "backtest_quality_watch",
+      "reality_risks": "low_24h_quote_volume",
+      "reality_warnings": "moderate_spread,wide_funding_cap_floor,low_index_reference_count",
+      "schema_version": "aster_exploitation_champions_v1",
+      "side": "long",
+      "symbol": "INTCUSDT",
+      "timestamp": "2026-05-31T13:10:11.704474+00:00",
+      "validation_score": 55.348794
+    },
+    {
+      "best_tradable_leverage": 20.0,
+      "champion_decision": "needs_reality_check",
+      "historical_closed_trades": 9,
+      "historical_max_drawdown_usd": 4.031385,
+      "historical_profit_factor": 15.943225,
+      "historical_roi_pct": 3.36174,
+      "historical_win_rate": 0.888889,
+      "interval": "2h",
+      "lane_status": "preserve_but_reality_check",
+      "mark_index_blockers": "",
+      "mark_index_verdict": "mark_index_watch",
+      "mark_index_warnings": "single_candle_extreme_last_vs_reference_divergence",
+      "next_action": "Historical result is useful but not clean enough for promotion.",
+      "reality_quality_score": 68,
+      "reality_quality_verdict": "backtest_quality_watch",
+      "reality_risks": "low_24h_quote_volume",
+      "reality_warnings": "wide_funding_cap_floor,low_index_reference_count",
+      "schema_version": "aster_exploitation_champions_v1",
+      "side": "long",
+      "symbol": "CRCLUSDT",
+      "timestamp": "2026-05-31T13:10:11.704474+00:00",
+      "validation_score": 48.292194
+    },
+    {
+      "best_tradable_leverage": 20.0,
+      "champion_decision": "needs_reality_check",
+      "historical_closed_trades": 8,
+      "historical_max_drawdown_usd": 2.831197,
+      "historical_profit_factor": 168.637168,
+      "historical_roi_pct": 1.681283,
+      "historical_win_rate": 0.875,
+      "interval": "4h",
+      "lane_status": "preserve_but_reality_check",
+      "mark_index_blockers": "",
+      "mark_index_verdict": "mark_index_watch",
+      "mark_index_warnings": "single_candle_extreme_last_vs_reference_divergence",
+      "next_action": "Historical result is useful but not clean enough for promotion.",
+      "reality_quality_score": 61,
+      "reality_quality_verdict": "backtest_quality_watch",
+      "reality_risks": "low_24h_quote_volume",
+      "reality_warnings": "moderate_spread,wide_funding_cap_floor,low_index_reference_count",
+      "schema_version": "aster_exploitation_champions_v1",
+      "side": "long",
+      "symbol": "MSFTUSDT",
+      "timestamp": "2026-05-31T13:10:11.704474+00:00",
+      "validation_score": 47.879767
+    }
+  ],
+  "generated_at": "2026-06-03T03:29:54.353134+00:00",
+  "inputs": {
+    "champions_validation": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_exploitation_champions_latest.json",
+    "exclude_symbols": [],
+    "include_exploration": true,
+    "include_review": true,
+    "max_exploitation": 5,
+    "max_exploration": 16,
+    "max_review": 2,
+    "priority_watchlist_plan": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_priority_watchlist_backtest_plan_latest.json",
+    "public_universe_snapshot": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_public_universe_snapshot_latest.json",
+    "require_preflight_ready": false,
+    "ws_quality_snapshot": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_ws_symbol_quality_report_latest.json"
+  },
+  "lane_preflight": {
+    "exploitation_symbols": [
+      {
+        "blockers": [],
+        "lane": "exploitation",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": -2.268,
+        "quote_volume_24h": 27791255.1,
+        "spread_bps": 4.154519,
+        "symbol": "LABUSDT",
+        "universe_flags": [
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [],
+        "ws_quality_score": 93,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploitation",
+        "preflight_status": "needs_ws_validation",
+        "price_change_pct_24h": -3.455,
+        "quote_volume_24h": 213530.92,
+        "spread_bps": 7.571742,
+        "symbol": "INJUSDT",
+        "universe_flags": [
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [
+          "ws_forward_risky"
+        ],
+        "ws_quality_score": 52,
+        "ws_quality_verdict": "ws_forward_risky"
+      },
+      {
+        "blockers": [],
+        "lane": "exploitation",
+        "preflight_status": "needs_ws_validation",
+        "price_change_pct_24h": -0.603,
+        "quote_volume_24h": 8645.53,
+        "spread_bps": 15.550756,
+        "symbol": "INTCUSDT",
+        "universe_flags": [
+          "low_24h_quote_volume",
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [
+          "low_24h_quote_volume",
+          "ws_forward_risky"
+        ],
+        "ws_quality_score": 34,
+        "ws_quality_verdict": "ws_forward_risky"
+      }
+    ],
+    "exploration_symbols": [
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 7.19,
+        "quote_volume_24h": 349475339.71,
+        "spread_bps": 1.349619,
+        "symbol": "ASTERUSDT",
+        "universe_flags": [
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [],
+        "ws_quality_score": 100,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.229,
+        "quote_volume_24h": 284108331.7,
+        "spread_bps": 0.013528,
+        "symbol": "BTCUSDT",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 100,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.624,
+        "quote_volume_24h": 2381981.38,
+        "spread_bps": 3.383522,
+        "symbol": "CLUSDT",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 68,
+        "ws_quality_verdict": "ws_forward_watch"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "needs_ws_validation",
+        "price_change_pct_24h": 0.065,
+        "quote_volume_24h": 110405.99,
+        "spread_bps": 26.861569,
+        "symbol": "METAUSDT",
+        "universe_flags": [
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [
+          "ws_forward_risky"
+        ],
+        "ws_quality_score": 40,
+        "ws_quality_verdict": "ws_forward_risky"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 8.558,
+        "quote_volume_24h": 168255440.81,
+        "spread_bps": 0.136729,
+        "symbol": "BNBUSDT",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 100,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.199,
+        "quote_volume_24h": 167793058.07,
+        "spread_bps": 0.049418,
+        "symbol": "ETHUSDT",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 100,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.102,
+        "quote_volume_24h": 855011.28,
+        "spread_bps": 0.066031,
+        "symbol": "XAUUSDT",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 68,
+        "ws_quality_verdict": "ws_forward_watch"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.505,
+        "quote_volume_24h": 50399.3,
+        "spread_bps": 5.537865,
+        "symbol": "NVDAUSDT",
+        "universe_flags": [
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [],
+        "ws_quality_score": 60,
+        "ws_quality_verdict": "ws_forward_watch"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.116,
+        "quote_volume_24h": 74044077.14,
+        "spread_bps": 3.230306,
+        "symbol": "HYPEUSDT",
+        "universe_flags": [
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [],
+        "ws_quality_score": 100,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.168,
+        "quote_volume_24h": 31173178.26,
+        "spread_bps": 0.494059,
+        "symbol": "ETHUSD1",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 100,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": -0.027,
+        "quote_volume_24h": 367641.69,
+        "spread_bps": 1.326348,
+        "symbol": "XAGUSDT",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 75,
+        "ws_quality_verdict": "ws_forward_watch"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "needs_ws_validation",
+        "price_change_pct_24h": 1.068,
+        "quote_volume_24h": 33498.4,
+        "spread_bps": 18.290243,
+        "symbol": "AMDUSDT",
+        "universe_flags": [
+          "low_24h_quote_volume",
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [
+          "low_24h_quote_volume",
+          "ws_forward_risky"
+        ],
+        "ws_quality_score": 42,
+        "ws_quality_verdict": "ws_forward_risky"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.534,
+        "quote_volume_24h": 26297488.98,
+        "spread_bps": 1.2062,
+        "symbol": "SOLUSDT",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 100,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "backtest_ready",
+        "price_change_pct_24h": 0.509,
+        "quote_volume_24h": 12681910.95,
+        "spread_bps": 2.411963,
+        "symbol": "SOLUSD1",
+        "universe_flags": [],
+        "warnings": [],
+        "ws_quality_score": 100,
+        "ws_quality_verdict": "ws_forward_ready"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "needs_ws_validation",
+        "price_change_pct_24h": 0.677,
+        "quote_volume_24h": 8111.86,
+        "spread_bps": 22.71621,
+        "symbol": "BZUSDT",
+        "universe_flags": [
+          "low_24h_quote_volume"
+        ],
+        "warnings": [
+          "low_24h_quote_volume",
+          "ws_forward_risky"
+        ],
+        "ws_quality_score": 35,
+        "ws_quality_verdict": "ws_forward_risky"
+      },
+      {
+        "blockers": [],
+        "lane": "exploration",
+        "preflight_status": "needs_ws_validation",
+        "price_change_pct_24h": 1.663,
+        "quote_volume_24h": 32471.48,
+        "spread_bps": 22.691173,
+        "symbol": "DRAMUSDT",
+        "universe_flags": [
+          "low_24h_quote_volume",
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [
+          "low_24h_quote_volume",
+          "ws_forward_risky"
+        ],
+        "ws_quality_score": 42,
+        "ws_quality_verdict": "ws_forward_risky"
+      }
+    ],
+    "review_symbols": [
+      {
+        "blockers": [],
+        "lane": "review",
+        "preflight_status": "needs_ws_validation",
+        "price_change_pct_24h": -0.468,
+        "quote_volume_24h": 11170.16,
+        "spread_bps": 1.771636,
+        "symbol": "CRCLUSDT",
+        "universe_flags": [
+          "low_24h_quote_volume",
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [
+          "low_24h_quote_volume",
+          "ws_forward_risky"
+        ],
+        "ws_quality_score": 35,
+        "ws_quality_verdict": "ws_forward_risky"
+      },
+      {
+        "blockers": [],
+        "lane": "review",
+        "preflight_status": "needs_ws_validation",
+        "price_change_pct_24h": 1.868,
+        "quote_volume_24h": 15509.52,
+        "spread_bps": 15.490534,
+        "symbol": "MSFTUSDT",
+        "universe_flags": [
+          "low_24h_quote_volume",
+          "wide_funding_cap_floor"
+        ],
+        "warnings": [
+          "low_24h_quote_volume",
+          "ws_forward_risky"
+        ],
+        "ws_quality_score": 42,
+        "ws_quality_verdict": "ws_forward_risky"
+      }
+    ]
+  },
+  "lanes": {
+    "exploitation": [
+      "LABUSDT",
+      "INJUSDT",
+      "INTCUSDT"
+    ],
+    "exploration": [
+      "ASTERUSDT",
+      "BTCUSDT",
+      "CLUSDT",
+      "METAUSDT",
+      "BNBUSDT",
+      "ETHUSDT",
+      "XAUUSDT",
+      "NVDAUSDT",
+      "HYPEUSDT",
+      "ETHUSD1",
+      "XAGUSDT",
+      "AMDUSDT",
+      "SOLUSDT",
+      "SOLUSD1",
+      "BZUSDT",
+      "DRAMUSDT"
+    ],
+    "exploration_buckets": {
+      "commodities": [
+        "XAUUSDT",
+        "XAGUSDT",
+        "CLUSDT",
+        "BZUSDT"
+      ],
+      "crypto_universe": [
+        "ASTERUSDT",
+        "BTCUSDT",
+        "BNBUSDT",
+        "ETHUSDT",
+        "HYPEUSDT",
+        "ETHUSD1",
+        "SOLUSDT",
+        "SOLUSD1"
+      ],
+      "equities": [
+        "NVDAUSDT",
+        "METAUSDT",
+        "DRAMUSDT",
+        "AMDUSDT"
+      ],
+      "priority_watchlist": [
+        "BTCUSDT",
+        "ASTERUSDT",
+        "HYPEUSDT",
+        "BNBUSDT",
+        "ETHUSDT",
+        "ETHUSD1",
+        "SOLUSDT"
+      ]
+    },
+    "review": [
+      "CRCLUSDT",
+      "MSFTUSDT"
+    ]
+  },
+  "needs_universe_refresh_symbols": [],
+  "needs_ws_validation_symbols": [
+    "INJUSDT",
+    "INTCUSDT",
+    "CRCLUSDT",
+    "MSFTUSDT",
+    "METAUSDT",
+    "AMDUSDT",
+    "BZUSDT",
+    "DRAMUSDT"
+  ],
+  "ok": true,
+  "preflight_rows": [
+    {
+      "blockers": [],
+      "lane": "exploitation",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": -2.268,
+      "quote_volume_24h": 27791255.1,
+      "spread_bps": 4.154519,
+      "symbol": "LABUSDT",
+      "universe_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [],
+      "ws_quality_score": 93,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploitation",
+      "preflight_status": "needs_ws_validation",
+      "price_change_pct_24h": -3.455,
+      "quote_volume_24h": 213530.92,
+      "spread_bps": 7.571742,
+      "symbol": "INJUSDT",
+      "universe_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [
+        "ws_forward_risky"
+      ],
+      "ws_quality_score": 52,
+      "ws_quality_verdict": "ws_forward_risky"
+    },
+    {
+      "blockers": [],
+      "lane": "exploitation",
+      "preflight_status": "needs_ws_validation",
+      "price_change_pct_24h": -0.603,
+      "quote_volume_24h": 8645.53,
+      "spread_bps": 15.550756,
+      "symbol": "INTCUSDT",
+      "universe_flags": [
+        "low_24h_quote_volume",
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [
+        "low_24h_quote_volume",
+        "ws_forward_risky"
+      ],
+      "ws_quality_score": 34,
+      "ws_quality_verdict": "ws_forward_risky"
+    },
+    {
+      "blockers": [],
+      "lane": "review",
+      "preflight_status": "needs_ws_validation",
+      "price_change_pct_24h": -0.468,
+      "quote_volume_24h": 11170.16,
+      "spread_bps": 1.771636,
+      "symbol": "CRCLUSDT",
+      "universe_flags": [
+        "low_24h_quote_volume",
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [
+        "low_24h_quote_volume",
+        "ws_forward_risky"
+      ],
+      "ws_quality_score": 35,
+      "ws_quality_verdict": "ws_forward_risky"
+    },
+    {
+      "blockers": [],
+      "lane": "review",
+      "preflight_status": "needs_ws_validation",
+      "price_change_pct_24h": 1.868,
+      "quote_volume_24h": 15509.52,
+      "spread_bps": 15.490534,
+      "symbol": "MSFTUSDT",
+      "universe_flags": [
+        "low_24h_quote_volume",
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [
+        "low_24h_quote_volume",
+        "ws_forward_risky"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 7.19,
+      "quote_volume_24h": 349475339.71,
+      "spread_bps": 1.349619,
+      "symbol": "ASTERUSDT",
+      "universe_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.229,
+      "quote_volume_24h": 284108331.7,
+      "spread_bps": 0.013528,
+      "symbol": "BTCUSDT",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.624,
+      "quote_volume_24h": 2381981.38,
+      "spread_bps": 3.383522,
+      "symbol": "CLUSDT",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 68,
+      "ws_quality_verdict": "ws_forward_watch"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "needs_ws_validation",
+      "price_change_pct_24h": 0.065,
+      "quote_volume_24h": 110405.99,
+      "spread_bps": 26.861569,
+      "symbol": "METAUSDT",
+      "universe_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [
+        "ws_forward_risky"
+      ],
+      "ws_quality_score": 40,
+      "ws_quality_verdict": "ws_forward_risky"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 8.558,
+      "quote_volume_24h": 168255440.81,
+      "spread_bps": 0.136729,
+      "symbol": "BNBUSDT",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.199,
+      "quote_volume_24h": 167793058.07,
+      "spread_bps": 0.049418,
+      "symbol": "ETHUSDT",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.102,
+      "quote_volume_24h": 855011.28,
+      "spread_bps": 0.066031,
+      "symbol": "XAUUSDT",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 68,
+      "ws_quality_verdict": "ws_forward_watch"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.505,
+      "quote_volume_24h": 50399.3,
+      "spread_bps": 5.537865,
+      "symbol": "NVDAUSDT",
+      "universe_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [],
+      "ws_quality_score": 60,
+      "ws_quality_verdict": "ws_forward_watch"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.116,
+      "quote_volume_24h": 74044077.14,
+      "spread_bps": 3.230306,
+      "symbol": "HYPEUSDT",
+      "universe_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.168,
+      "quote_volume_24h": 31173178.26,
+      "spread_bps": 0.494059,
+      "symbol": "ETHUSD1",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": -0.027,
+      "quote_volume_24h": 367641.69,
+      "spread_bps": 1.326348,
+      "symbol": "XAGUSDT",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 75,
+      "ws_quality_verdict": "ws_forward_watch"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "needs_ws_validation",
+      "price_change_pct_24h": 1.068,
+      "quote_volume_24h": 33498.4,
+      "spread_bps": 18.290243,
+      "symbol": "AMDUSDT",
+      "universe_flags": [
+        "low_24h_quote_volume",
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [
+        "low_24h_quote_volume",
+        "ws_forward_risky"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.534,
+      "quote_volume_24h": 26297488.98,
+      "spread_bps": 1.2062,
+      "symbol": "SOLUSDT",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "backtest_ready",
+      "price_change_pct_24h": 0.509,
+      "quote_volume_24h": 12681910.95,
+      "spread_bps": 2.411963,
+      "symbol": "SOLUSD1",
+      "universe_flags": [],
+      "warnings": [],
+      "ws_quality_score": 100,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "needs_ws_validation",
+      "price_change_pct_24h": 0.677,
+      "quote_volume_24h": 8111.86,
+      "spread_bps": 22.71621,
+      "symbol": "BZUSDT",
+      "universe_flags": [
+        "low_24h_quote_volume"
+      ],
+      "warnings": [
+        "low_24h_quote_volume",
+        "ws_forward_risky"
+      ],
+      "ws_quality_score": 35,
+      "ws_quality_verdict": "ws_forward_risky"
+    },
+    {
+      "blockers": [],
+      "lane": "exploration",
+      "preflight_status": "needs_ws_validation",
+      "price_change_pct_24h": 1.663,
+      "quote_volume_24h": 32471.48,
+      "spread_bps": 22.691173,
+      "symbol": "DRAMUSDT",
+      "universe_flags": [
+        "low_24h_quote_volume",
+        "wide_funding_cap_floor"
+      ],
+      "warnings": [
+        "low_24h_quote_volume",
+        "ws_forward_risky"
+      ],
+      "ws_quality_score": 42,
+      "ws_quality_verdict": "ws_forward_risky"
+    }
+  ],
+  "preflight_summary": {
+    "backtest_ready": 13,
+    "blocked_data_quality": 0,
+    "needs_universe_refresh": 0,
+    "needs_ws_validation": 8,
+    "runnable_symbols": 21
+  },
+  "recommended_output_tag": "aster_v2_postfix_20260603",
+  "runner": {
+    "delegates_to": "services.onchain.aster.backtest_strategy_discovery",
+    "purpose": "single v2 runner combining validated champions and filtered exploration symbols"
+  },
+  "safety": {
+    "would_call_signed_endpoint": false,
+    "would_send_wallet_transaction": false,
+    "would_trade": false,
+    "would_write_db": false,
+    "writes_performed": 0
+  },
+  "source_policy": "local_aster_v2_orchestrator_plan",
+  "status": "ready",
+  "symbols": [
+    "LABUSDT",
+    "INJUSDT",
+    "INTCUSDT",
+    "CRCLUSDT",
+    "MSFTUSDT",
+    "ASTERUSDT",
+    "BTCUSDT",
+    "CLUSDT",
+    "METAUSDT",
+    "BNBUSDT",
+    "ETHUSDT",
+    "XAUUSDT",
+    "NVDAUSDT",
+    "HYPEUSDT",
+    "ETHUSD1",
+    "XAGUSDT",
+    "AMDUSDT",
+    "SOLUSDT",
+    "SOLUSD1",
+    "BZUSDT",
+    "DRAMUSDT"
+  ],
+  "symbols_csv": "LABUSDT,INJUSDT,INTCUSDT,CRCLUSDT,MSFTUSDT,ASTERUSDT,BTCUSDT,CLUSDT,METAUSDT,BNBUSDT,ETHUSDT,XAUUSDT,NVDAUSDT,HYPEUSDT,ETHUSD1,XAGUSDT,AMDUSDT,SOLUSDT,SOLUSD1,BZUSDT,DRAMUSDT"
+}

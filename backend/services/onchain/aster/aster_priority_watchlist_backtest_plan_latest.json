@@ -1,0 +1,176 @@
+{
+  "generated_at": "2026-06-01T21:39:49.067819+00:00",
+  "inputs": {
+    "exclude_symbols": [],
+    "include_statuses": [
+      "candidate",
+      "priority"
+    ],
+    "max_symbols": 12,
+    "min_priority_score": 35.0,
+    "priority_watchlist_snapshot": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_priority_watchlist_latest.json"
+  },
+  "ok": true,
+  "rejected_sample": [
+    {
+      "blockers": [
+        "wide_spread",
+        "low_24h_quote_volume"
+      ],
+      "priority_score": 33.698263,
+      "reason": "watchlist_blockers_present",
+      "symbol": "TAKEUSDT"
+    },
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "priority_score": 25.28588,
+      "reason": "watchlist_blockers_present",
+      "symbol": "PORTALUSDT"
+    }
+  ],
+  "runner": {
+    "delegates_to": "services.onchain.aster.backtest_strategy_discovery",
+    "module": "services.onchain.aster.backtest_priority_watchlist",
+    "output_tag_default": "priority_watchlist",
+    "symbol_preset_label": "priority_watchlist"
+  },
+  "safety": {
+    "would_call_external_api": false,
+    "would_send_wallet_transaction": false,
+    "would_trade": false,
+    "would_write_db": false,
+    "writes_performed": 0
+  },
+  "selected_rows": [
+    {
+      "mark_index_verdict": "not_checked",
+      "price_change_pct_24h": 0.487,
+      "priority_score": 63.926488,
+      "priority_status": "priority",
+      "quote_volume_24h": 293063318.26,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread",
+        "ws_forward_ready"
+      ],
+      "spread_bps": 0.013525,
+      "symbol": "BTCUSDT",
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "mark_index_verdict": "not_checked",
+      "price_change_pct_24h": 6.536,
+      "priority_score": 59.447238,
+      "priority_status": "priority",
+      "quote_volume_24h": 344472575.44,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 1.351625,
+      "symbol": "ASTERUSDT",
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "mark_index_verdict": "not_checked",
+      "price_change_pct_24h": -0.38,
+      "priority_score": 52.131261,
+      "priority_status": "priority",
+      "quote_volume_24h": 85195439.91,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.147978,
+      "symbol": "HYPEUSDT",
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "mark_index_verdict": "not_checked",
+      "price_change_pct_24h": 7.285,
+      "priority_score": 50.136299,
+      "priority_status": "priority",
+      "quote_volume_24h": 162636232.49,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.414631,
+      "symbol": "BNBUSDT",
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "mark_index_verdict": "not_checked",
+      "price_change_pct_24h": 0.325,
+      "priority_score": 50.055799,
+      "priority_status": "priority",
+      "quote_volume_24h": 168293870.11,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.04943,
+      "symbol": "ETHUSDT",
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "mark_index_verdict": "not_checked",
+      "price_change_pct_24h": 0.297,
+      "priority_score": 47.256652,
+      "priority_status": "priority",
+      "quote_volume_24h": 31756370.6,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.494181,
+      "symbol": "ETHUSD1",
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "mark_index_verdict": "not_checked",
+      "price_change_pct_24h": 42.212,
+      "priority_score": 46.357606,
+      "priority_status": "priority",
+      "quote_volume_24h": 669604.17,
+      "reasons": [
+        "sufficient_volume",
+        "large_24h_move",
+        "acceptable_spread",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 16.088742,
+      "symbol": "PLAYUSDT",
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "mark_index_verdict": "not_checked",
+      "price_change_pct_24h": 0.559,
+      "priority_score": 45.587272,
+      "priority_status": "priority",
+      "quote_volume_24h": 26410634.13,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 1.208386,
+      "symbol": "SOLUSDT",
+      "ws_quality_verdict": "not_checked"
+    }
+  ],
+  "source_policy": "local_priority_watchlist_to_existing_backtest_runner",
+  "status": "ready",
+  "symbols": [
+    "BTCUSDT",
+    "ASTERUSDT",
+    "HYPEUSDT",
+    "BNBUSDT",
+    "ETHUSDT",
+    "ETHUSD1",
+    "PLAYUSDT",
+    "SOLUSDT"
+  ],
+  "symbols_csv": "BTCUSDT,ASTERUSDT,HYPEUSDT,BNBUSDT,ETHUSDT,ETHUSD1,PLAYUSDT,SOLUSDT"
+}

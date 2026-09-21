@@ -1,0 +1,15 @@
+{
+  "accepted_count": 24,
+  "best": {
+    "interval": "5h",
+    "quality_score": 75,
+    "roi_pct_on_paper_balance": 13.854855,
+    "symbol": "LABUSDT"
+  },
+  "csv_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_reality_checked_backtest.csv",
+  "json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_reality_checked_backtest_latest.json",
+  "last_run_at": "2026-05-31T12:19:24.092125+00:00",
+  "ok": true,
+  "rejected_count": 6,
+  "run_id": "reality-checked-20260531-124049"
+}

@@ -1,0 +1,19 @@
+{
+  "batch_id": "low_tf_g06",
+  "candidates_so_far": 90,
+  "csv_v2_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_core_explore_fresh_v2.csv",
+  "current_batch": 11,
+  "failures_so_far": 35,
+  "intervals": "15m,30m,1h",
+  "last_progress_at": "2026-05-31T16:55:10.108171+00:00",
+  "mode": "discovery_progress",
+  "ok": true,
+  "output_tag": "core_explore_fresh",
+  "phase": "batch_started",
+  "run_id": "strategy-discovery-20260531-142805",
+  "search_mode": "exploration",
+  "symbol_group": "OPUSDT,AVAXUSDT,LINKUSDT",
+  "symbol_preset": "core",
+  "tagged_json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_core_explore_fresh_latest.json",
+  "total_batches": 16
+}

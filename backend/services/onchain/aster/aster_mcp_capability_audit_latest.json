@@ -1,0 +1,932 @@
+{
+  "capabilities": [
+    {
+      "backtest_value": "high",
+      "endpoint": "GET /fapi/v3/exchangeInfo",
+      "mcp_tool": "get_exchange_info",
+      "name": "exchange_info",
+      "next_action": "Use filters in execution-quality validation before promoting lanes.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "tick_size",
+        "step_size",
+        "min_notional",
+        "percent_price",
+        "market_take_bound",
+        "liquidation_fee"
+      ]
+    },
+    {
+      "backtest_value": "high",
+      "endpoint": "GET /fapi/v3/ticker/24hr",
+      "mcp_tool": "get_ticker",
+      "name": "ticker_24h",
+      "next_action": "Keep as liquidity gate in reality check.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "24h_quote_volume",
+        "trade_count",
+        "last_price"
+      ]
+    },
+    {
+      "backtest_value": "high",
+      "endpoint": "GET /fapi/v3/depth",
+      "mcp_tool": "get_order_book",
+      "name": "order_book_depth",
+      "next_action": "Use to reject thin lanes and estimate slippage proxy.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "spread_bps",
+        "top10_depth",
+        "depth_imbalance"
+      ]
+    },
+    {
+      "backtest_value": "high",
+      "endpoint": "GET /fapi/v3/klines",
+      "mcp_tool": "get_klines",
+      "name": "last_price_klines",
+      "next_action": "Base replay remains last-price kline until mark/index replay is added.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "OHLCV",
+        "trade_count",
+        "taker_buy_ratio"
+      ]
+    },
+    {
+      "backtest_value": "very_high",
+      "endpoint": "GET /fapi/v3/markPriceKlines",
+      "mcp_tool": "not_explicit_or_public_api",
+      "name": "mark_price_klines",
+      "next_action": "Add mark-price replay variant to compare against last-price replay.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "liquidation_reference",
+        "mark_price_replay",
+        "manipulation_resistant_price"
+      ]
+    },
+    {
+      "backtest_value": "very_high",
+      "endpoint": "GET /fapi/v3/indexPriceKlines?pair={symbol}",
+      "mcp_tool": "not_explicit_or_public_api",
+      "name": "index_price_klines",
+      "next_action": "Use mark-index divergence as a pre-trade filter.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "index_reference",
+        "premium_replay",
+        "basis_filter"
+      ]
+    },
+    {
+      "backtest_value": "very_high",
+      "endpoint": "GET /fapi/v3/premiumIndex",
+      "mcp_tool": "get_funding_info_or_public_api",
+      "name": "premium_index",
+      "next_action": "Use premium_bps to filter longs/shorts when perp is too far from index.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "mark_price",
+        "index_price",
+        "premium_bps",
+        "latest_funding_rate",
+        "next_funding_time"
+      ]
+    },
+    {
+      "backtest_value": "high",
+      "endpoint": "GET /fapi/v3/fundingRate",
+      "mcp_tool": "get_funding_rate",
+      "name": "funding_rate_history",
+      "next_action": "Replace fixed 1 bps/8h proxy with recent funding history.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "funding_cost_estimate",
+        "carry_filter"
+      ]
+    },
+    {
+      "backtest_value": "medium",
+      "endpoint": "GET /fapi/v3/fundingInfo",
+      "mcp_tool": "get_funding_info",
+      "name": "funding_info",
+      "next_action": "Keep in reality check as a risk warning.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "funding_interval",
+        "funding_cap",
+        "funding_floor"
+      ]
+    },
+    {
+      "backtest_value": "medium",
+      "endpoint": "GET /fapi/v3/indexreferences",
+      "mcp_tool": "not_explicit_or_public_api",
+      "name": "index_references",
+      "next_action": "Warn when reference count is too low.",
+      "safe_now": true,
+      "security_type": "PUBLIC",
+      "status": "integrated",
+      "uses": [
+        "index_quality",
+        "reference_count",
+        "reference_weights"
+      ]
+    },
+    {
+      "backtest_value": "very_high",
+      "endpoint": "wss://fstream.asterdex.com/ws <symbol>@aggTrade or trade streams",
+      "mcp_tool": "not_integrated",
+      "name": "public_websocket_trades",
+      "next_action": "Create read-only websocket sampler before using for paper forward.",
+      "safe_now": true,
+      "security_type": "PUBLIC_WS",
+      "status": "available_not_integrated",
+      "uses": [
+        "forward_tick_feed",
+        "less_rest_polling",
+        "microstructure"
+      ]
+    },
+    {
+      "backtest_value": "very_high",
+      "endpoint": "wss://fstream.asterdex.com/ws <symbol>@depth",
+      "mcp_tool": "not_integrated",
+      "name": "public_websocket_depth",
+      "next_action": "Add sampler with sequence/update-id checks; no trading.",
+      "safe_now": true,
+      "security_type": "PUBLIC_WS",
+      "status": "available_not_integrated",
+      "uses": [
+        "live_spread",
+        "depth_changes",
+        "order_book_pressure"
+      ]
+    },
+    {
+      "backtest_value": "high",
+      "endpoint": "wss://fstream.asterdex.com/ws mark price streams",
+      "mcp_tool": "not_integrated",
+      "name": "public_websocket_mark_price",
+      "next_action": "Use for forward paper monitoring once sampler exists.",
+      "safe_now": true,
+      "security_type": "PUBLIC_WS",
+      "status": "available_not_integrated",
+      "uses": [
+        "forward_mark_price",
+        "liquidation_reference"
+      ]
+    },
+    {
+      "backtest_value": "very_high",
+      "endpoint": "GET /fapi/v3/leverageBracket",
+      "mcp_tool": "get_leverage_bracket",
+      "name": "leverage_bracket",
+      "next_action": "Test on V3 testnet/read-only credentials only; never with trade permissions.",
+      "safe_now": false,
+      "security_type": "USER_DATA_SIGNED",
+      "status": "blocked_until_readonly_credentials_policy",
+      "uses": [
+        "maintenance_margin_ratio",
+        "notional_cap",
+        "max_initial_leverage",
+        "liquidation_proxy_replacement"
+      ]
+    },
+    {
+      "backtest_value": "high",
+      "endpoint": "GET /fapi/v3/commissionRate",
+      "mcp_tool": "get_commission_rate",
+      "name": "commission_rate",
+      "next_action": "Use only after credential policy exists.",
+      "safe_now": false,
+      "security_type": "USER_DATA_SIGNED",
+      "status": "blocked_until_readonly_credentials_policy",
+      "uses": [
+        "maker_fee",
+        "taker_fee",
+        "fee_model_replacement"
+      ]
+    },
+    {
+      "backtest_value": "medium",
+      "endpoint": "GET /fapi/v3/balance",
+      "mcp_tool": "get_balance",
+      "name": "account_balance",
+      "next_action": "Not needed before paper strategy has strong evidence.",
+      "safe_now": false,
+      "security_type": "USER_DATA_SIGNED",
+      "status": "blocked_until_readonly_credentials_policy",
+      "uses": [
+        "paper_account_comparison",
+        "exposure_limit"
+      ]
+    },
+    {
+      "backtest_value": "medium",
+      "endpoint": "GET /fapi/v3/positionRisk or account positions",
+      "mcp_tool": "get_positions",
+      "name": "positions",
+      "next_action": "Not needed until a real read-only account phase exists.",
+      "safe_now": false,
+      "security_type": "USER_DATA_SIGNED",
+      "status": "blocked_until_readonly_credentials_policy",
+      "uses": [
+        "real_account_reconciliation",
+        "position_monitoring"
+      ]
+    },
+    {
+      "backtest_value": "high_later",
+      "endpoint": "WebSocket user data stream",
+      "mcp_tool": "not_integrated",
+      "name": "user_data_stream",
+      "next_action": "Only after signed read-only testnet phase.",
+      "safe_now": false,
+      "security_type": "USER_DATA_SIGNED_WS",
+      "status": "blocked_until_readonly_credentials_policy",
+      "uses": [
+        "order_status",
+        "position_updates",
+        "balance_updates"
+      ]
+    },
+    {
+      "backtest_value": "none_now",
+      "endpoint": "POST/DELETE TRADE endpoints",
+      "mcp_tool": "create_order/cancel_order/cancel_all_orders",
+      "name": "create_or_cancel_order",
+      "next_action": "Do not enable. Paper trading evidence is insufficient.",
+      "safe_now": false,
+      "security_type": "TRADE_SIGNED",
+      "status": "blocked",
+      "uses": [
+        "real_execution"
+      ]
+    },
+    {
+      "backtest_value": "none_now",
+      "endpoint": "POST TRADE account config endpoints",
+      "mcp_tool": "set_leverage/set_margin_mode",
+      "name": "set_leverage_or_margin",
+      "next_action": "Do not enable in Core Equity agent.",
+      "safe_now": false,
+      "security_type": "TRADE_SIGNED",
+      "status": "blocked",
+      "uses": [
+        "real_account_mutation"
+      ]
+    },
+    {
+      "backtest_value": "none_now",
+      "endpoint": "TRANSFER endpoints",
+      "mcp_tool": "transfer_funds/transfer_spot_futures",
+      "name": "transfers",
+      "next_action": "Never expose to the agent.",
+      "safe_now": false,
+      "security_type": "TRANSFER_SIGNED",
+      "status": "blocked",
+      "uses": [
+        "fund movement"
+      ]
+    }
+  ],
+  "capability_count": 21,
+  "dry_run": true,
+  "generated_at": "2026-05-31T10:32:30.031067+00:00",
+  "groups": {
+    "available_now_public": [
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/exchangeInfo",
+        "mcp_tool": "get_exchange_info",
+        "name": "exchange_info",
+        "next_action": "Use filters in execution-quality validation before promoting lanes.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "tick_size",
+          "step_size",
+          "min_notional",
+          "percent_price",
+          "market_take_bound",
+          "liquidation_fee"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/ticker/24hr",
+        "mcp_tool": "get_ticker",
+        "name": "ticker_24h",
+        "next_action": "Keep as liquidity gate in reality check.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "24h_quote_volume",
+          "trade_count",
+          "last_price"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/depth",
+        "mcp_tool": "get_order_book",
+        "name": "order_book_depth",
+        "next_action": "Use to reject thin lanes and estimate slippage proxy.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "spread_bps",
+          "top10_depth",
+          "depth_imbalance"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/klines",
+        "mcp_tool": "get_klines",
+        "name": "last_price_klines",
+        "next_action": "Base replay remains last-price kline until mark/index replay is added.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "OHLCV",
+          "trade_count",
+          "taker_buy_ratio"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "GET /fapi/v3/markPriceKlines",
+        "mcp_tool": "not_explicit_or_public_api",
+        "name": "mark_price_klines",
+        "next_action": "Add mark-price replay variant to compare against last-price replay.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "liquidation_reference",
+          "mark_price_replay",
+          "manipulation_resistant_price"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "GET /fapi/v3/indexPriceKlines?pair={symbol}",
+        "mcp_tool": "not_explicit_or_public_api",
+        "name": "index_price_klines",
+        "next_action": "Use mark-index divergence as a pre-trade filter.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "index_reference",
+          "premium_replay",
+          "basis_filter"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "GET /fapi/v3/premiumIndex",
+        "mcp_tool": "get_funding_info_or_public_api",
+        "name": "premium_index",
+        "next_action": "Use premium_bps to filter longs/shorts when perp is too far from index.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "mark_price",
+          "index_price",
+          "premium_bps",
+          "latest_funding_rate",
+          "next_funding_time"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/fundingRate",
+        "mcp_tool": "get_funding_rate",
+        "name": "funding_rate_history",
+        "next_action": "Replace fixed 1 bps/8h proxy with recent funding history.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "funding_cost_estimate",
+          "carry_filter"
+        ]
+      },
+      {
+        "backtest_value": "medium",
+        "endpoint": "GET /fapi/v3/fundingInfo",
+        "mcp_tool": "get_funding_info",
+        "name": "funding_info",
+        "next_action": "Keep in reality check as a risk warning.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "funding_interval",
+          "funding_cap",
+          "funding_floor"
+        ]
+      },
+      {
+        "backtest_value": "medium",
+        "endpoint": "GET /fapi/v3/indexreferences",
+        "mcp_tool": "not_explicit_or_public_api",
+        "name": "index_references",
+        "next_action": "Warn when reference count is too low.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "index_quality",
+          "reference_count",
+          "reference_weights"
+        ]
+      }
+    ],
+    "available_now_public_ws_not_integrated": [
+      {
+        "backtest_value": "very_high",
+        "endpoint": "wss://fstream.asterdex.com/ws <symbol>@aggTrade or trade streams",
+        "mcp_tool": "not_integrated",
+        "name": "public_websocket_trades",
+        "next_action": "Create read-only websocket sampler before using for paper forward.",
+        "safe_now": true,
+        "security_type": "PUBLIC_WS",
+        "status": "available_not_integrated",
+        "uses": [
+          "forward_tick_feed",
+          "less_rest_polling",
+          "microstructure"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "wss://fstream.asterdex.com/ws <symbol>@depth",
+        "mcp_tool": "not_integrated",
+        "name": "public_websocket_depth",
+        "next_action": "Add sampler with sequence/update-id checks; no trading.",
+        "safe_now": true,
+        "security_type": "PUBLIC_WS",
+        "status": "available_not_integrated",
+        "uses": [
+          "live_spread",
+          "depth_changes",
+          "order_book_pressure"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "wss://fstream.asterdex.com/ws mark price streams",
+        "mcp_tool": "not_integrated",
+        "name": "public_websocket_mark_price",
+        "next_action": "Use for forward paper monitoring once sampler exists.",
+        "safe_now": true,
+        "security_type": "PUBLIC_WS",
+        "status": "available_not_integrated",
+        "uses": [
+          "forward_mark_price",
+          "liquidation_reference"
+        ]
+      }
+    ],
+    "blocked_trade_or_transfer": [
+      {
+        "backtest_value": "none_now",
+        "endpoint": "POST/DELETE TRADE endpoints",
+        "mcp_tool": "create_order/cancel_order/cancel_all_orders",
+        "name": "create_or_cancel_order",
+        "next_action": "Do not enable. Paper trading evidence is insufficient.",
+        "safe_now": false,
+        "security_type": "TRADE_SIGNED",
+        "status": "blocked",
+        "uses": [
+          "real_execution"
+        ]
+      },
+      {
+        "backtest_value": "none_now",
+        "endpoint": "POST TRADE account config endpoints",
+        "mcp_tool": "set_leverage/set_margin_mode",
+        "name": "set_leverage_or_margin",
+        "next_action": "Do not enable in Core Equity agent.",
+        "safe_now": false,
+        "security_type": "TRADE_SIGNED",
+        "status": "blocked",
+        "uses": [
+          "real_account_mutation"
+        ]
+      },
+      {
+        "backtest_value": "none_now",
+        "endpoint": "TRANSFER endpoints",
+        "mcp_tool": "transfer_funds/transfer_spot_futures",
+        "name": "transfers",
+        "next_action": "Never expose to the agent.",
+        "safe_now": false,
+        "security_type": "TRANSFER_SIGNED",
+        "status": "blocked",
+        "uses": [
+          "fund movement"
+        ]
+      }
+    ],
+    "needs_readonly_credentials": [
+      {
+        "backtest_value": "very_high",
+        "endpoint": "GET /fapi/v3/leverageBracket",
+        "mcp_tool": "get_leverage_bracket",
+        "name": "leverage_bracket",
+        "next_action": "Test on V3 testnet/read-only credentials only; never with trade permissions.",
+        "safe_now": false,
+        "security_type": "USER_DATA_SIGNED",
+        "status": "blocked_until_readonly_credentials_policy",
+        "uses": [
+          "maintenance_margin_ratio",
+          "notional_cap",
+          "max_initial_leverage",
+          "liquidation_proxy_replacement"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/commissionRate",
+        "mcp_tool": "get_commission_rate",
+        "name": "commission_rate",
+        "next_action": "Use only after credential policy exists.",
+        "safe_now": false,
+        "security_type": "USER_DATA_SIGNED",
+        "status": "blocked_until_readonly_credentials_policy",
+        "uses": [
+          "maker_fee",
+          "taker_fee",
+          "fee_model_replacement"
+        ]
+      },
+      {
+        "backtest_value": "medium",
+        "endpoint": "GET /fapi/v3/balance",
+        "mcp_tool": "get_balance",
+        "name": "account_balance",
+        "next_action": "Not needed before paper strategy has strong evidence.",
+        "safe_now": false,
+        "security_type": "USER_DATA_SIGNED",
+        "status": "blocked_until_readonly_credentials_policy",
+        "uses": [
+          "paper_account_comparison",
+          "exposure_limit"
+        ]
+      },
+      {
+        "backtest_value": "medium",
+        "endpoint": "GET /fapi/v3/positionRisk or account positions",
+        "mcp_tool": "get_positions",
+        "name": "positions",
+        "next_action": "Not needed until a real read-only account phase exists.",
+        "safe_now": false,
+        "security_type": "USER_DATA_SIGNED",
+        "status": "blocked_until_readonly_credentials_policy",
+        "uses": [
+          "real_account_reconciliation",
+          "position_monitoring"
+        ]
+      },
+      {
+        "backtest_value": "high_later",
+        "endpoint": "WebSocket user data stream",
+        "mcp_tool": "not_integrated",
+        "name": "user_data_stream",
+        "next_action": "Only after signed read-only testnet phase.",
+        "safe_now": false,
+        "security_type": "USER_DATA_SIGNED_WS",
+        "status": "blocked_until_readonly_credentials_policy",
+        "uses": [
+          "order_status",
+          "position_updates",
+          "balance_updates"
+        ]
+      }
+    ],
+    "not_useful_now": [
+      {
+        "backtest_value": "none_now",
+        "endpoint": "POST/DELETE TRADE endpoints",
+        "mcp_tool": "create_order/cancel_order/cancel_all_orders",
+        "name": "create_or_cancel_order",
+        "next_action": "Do not enable. Paper trading evidence is insufficient.",
+        "safe_now": false,
+        "security_type": "TRADE_SIGNED",
+        "status": "blocked",
+        "uses": [
+          "real_execution"
+        ]
+      },
+      {
+        "backtest_value": "none_now",
+        "endpoint": "POST TRADE account config endpoints",
+        "mcp_tool": "set_leverage/set_margin_mode",
+        "name": "set_leverage_or_margin",
+        "next_action": "Do not enable in Core Equity agent.",
+        "safe_now": false,
+        "security_type": "TRADE_SIGNED",
+        "status": "blocked",
+        "uses": [
+          "real_account_mutation"
+        ]
+      },
+      {
+        "backtest_value": "none_now",
+        "endpoint": "TRANSFER endpoints",
+        "mcp_tool": "transfer_funds/transfer_spot_futures",
+        "name": "transfers",
+        "next_action": "Never expose to the agent.",
+        "safe_now": false,
+        "security_type": "TRANSFER_SIGNED",
+        "status": "blocked",
+        "uses": [
+          "fund movement"
+        ]
+      }
+    ],
+    "useful_for_backtest": [
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/exchangeInfo",
+        "mcp_tool": "get_exchange_info",
+        "name": "exchange_info",
+        "next_action": "Use filters in execution-quality validation before promoting lanes.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "tick_size",
+          "step_size",
+          "min_notional",
+          "percent_price",
+          "market_take_bound",
+          "liquidation_fee"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/ticker/24hr",
+        "mcp_tool": "get_ticker",
+        "name": "ticker_24h",
+        "next_action": "Keep as liquidity gate in reality check.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "24h_quote_volume",
+          "trade_count",
+          "last_price"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/depth",
+        "mcp_tool": "get_order_book",
+        "name": "order_book_depth",
+        "next_action": "Use to reject thin lanes and estimate slippage proxy.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "spread_bps",
+          "top10_depth",
+          "depth_imbalance"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/klines",
+        "mcp_tool": "get_klines",
+        "name": "last_price_klines",
+        "next_action": "Base replay remains last-price kline until mark/index replay is added.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "OHLCV",
+          "trade_count",
+          "taker_buy_ratio"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "GET /fapi/v3/markPriceKlines",
+        "mcp_tool": "not_explicit_or_public_api",
+        "name": "mark_price_klines",
+        "next_action": "Add mark-price replay variant to compare against last-price replay.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "liquidation_reference",
+          "mark_price_replay",
+          "manipulation_resistant_price"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "GET /fapi/v3/indexPriceKlines?pair={symbol}",
+        "mcp_tool": "not_explicit_or_public_api",
+        "name": "index_price_klines",
+        "next_action": "Use mark-index divergence as a pre-trade filter.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "index_reference",
+          "premium_replay",
+          "basis_filter"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "GET /fapi/v3/premiumIndex",
+        "mcp_tool": "get_funding_info_or_public_api",
+        "name": "premium_index",
+        "next_action": "Use premium_bps to filter longs/shorts when perp is too far from index.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "mark_price",
+          "index_price",
+          "premium_bps",
+          "latest_funding_rate",
+          "next_funding_time"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/fundingRate",
+        "mcp_tool": "get_funding_rate",
+        "name": "funding_rate_history",
+        "next_action": "Replace fixed 1 bps/8h proxy with recent funding history.",
+        "safe_now": true,
+        "security_type": "PUBLIC",
+        "status": "integrated",
+        "uses": [
+          "funding_cost_estimate",
+          "carry_filter"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "wss://fstream.asterdex.com/ws <symbol>@aggTrade or trade streams",
+        "mcp_tool": "not_integrated",
+        "name": "public_websocket_trades",
+        "next_action": "Create read-only websocket sampler before using for paper forward.",
+        "safe_now": true,
+        "security_type": "PUBLIC_WS",
+        "status": "available_not_integrated",
+        "uses": [
+          "forward_tick_feed",
+          "less_rest_polling",
+          "microstructure"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "wss://fstream.asterdex.com/ws <symbol>@depth",
+        "mcp_tool": "not_integrated",
+        "name": "public_websocket_depth",
+        "next_action": "Add sampler with sequence/update-id checks; no trading.",
+        "safe_now": true,
+        "security_type": "PUBLIC_WS",
+        "status": "available_not_integrated",
+        "uses": [
+          "live_spread",
+          "depth_changes",
+          "order_book_pressure"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "wss://fstream.asterdex.com/ws mark price streams",
+        "mcp_tool": "not_integrated",
+        "name": "public_websocket_mark_price",
+        "next_action": "Use for forward paper monitoring once sampler exists.",
+        "safe_now": true,
+        "security_type": "PUBLIC_WS",
+        "status": "available_not_integrated",
+        "uses": [
+          "forward_mark_price",
+          "liquidation_reference"
+        ]
+      },
+      {
+        "backtest_value": "very_high",
+        "endpoint": "GET /fapi/v3/leverageBracket",
+        "mcp_tool": "get_leverage_bracket",
+        "name": "leverage_bracket",
+        "next_action": "Test on V3 testnet/read-only credentials only; never with trade permissions.",
+        "safe_now": false,
+        "security_type": "USER_DATA_SIGNED",
+        "status": "blocked_until_readonly_credentials_policy",
+        "uses": [
+          "maintenance_margin_ratio",
+          "notional_cap",
+          "max_initial_leverage",
+          "liquidation_proxy_replacement"
+        ]
+      },
+      {
+        "backtest_value": "high",
+        "endpoint": "GET /fapi/v3/commissionRate",
+        "mcp_tool": "get_commission_rate",
+        "name": "commission_rate",
+        "next_action": "Use only after credential policy exists.",
+        "safe_now": false,
+        "security_type": "USER_DATA_SIGNED",
+        "status": "blocked_until_readonly_credentials_policy",
+        "uses": [
+          "maker_fee",
+          "taker_fee",
+          "fee_model_replacement"
+        ]
+      },
+      {
+        "backtest_value": "high_later",
+        "endpoint": "WebSocket user data stream",
+        "mcp_tool": "not_integrated",
+        "name": "user_data_stream",
+        "next_action": "Only after signed read-only testnet phase.",
+        "safe_now": false,
+        "security_type": "USER_DATA_SIGNED_WS",
+        "status": "blocked_until_readonly_credentials_policy",
+        "uses": [
+          "order_status",
+          "position_updates",
+          "balance_updates"
+        ]
+      }
+    ]
+  },
+  "ok": true,
+  "roadmap": [
+    {
+      "name": "mark_index_replay_filter",
+      "priority": 1,
+      "requires_credentials": false,
+      "why": "Les donnees mark/index publiques existent deja; elles peuvent reduire les faux edges issus du last-price."
+    },
+    {
+      "name": "public_websocket_sampler",
+      "priority": 2,
+      "requires_credentials": false,
+      "why": "Les monitors forward doivent sortir du polling REST repetitif et lire un flux public plus proche du temps reel."
+    },
+    {
+      "name": "funding_fee_proxy_replacement",
+      "priority": 3,
+      "requires_credentials": false,
+      "why": "L'historique funding public peut remplacer notre proxy fixe de 1 bps par 8h."
+    },
+    {
+      "name": "readonly_signed_testnet_probe",
+      "priority": 4,
+      "requires_credentials": true,
+      "why": "Utile pour les leverage brackets et frais reels, mais seulement apres une politique credentials read-only."
+    }
+  ],
+  "safety": {
+    "would_call_external": false,
+    "would_execute_trade": false,
+    "would_send_wallet_transaction": false,
+    "would_store_credentials": false,
+    "would_write": false,
+    "writes_performed": 0
+  },
+  "status": "ready"
+}

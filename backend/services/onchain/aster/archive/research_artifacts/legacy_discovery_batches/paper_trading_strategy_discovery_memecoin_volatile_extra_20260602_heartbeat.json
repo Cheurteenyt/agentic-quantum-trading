@@ -1,0 +1,21 @@
+{
+  "batch_id": "low_tf_g09",
+  "candidates_so_far": 143,
+  "csv_v2_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_memecoin_volatile_extra_20260602_v2.csv",
+  "current_batch": 17,
+  "execution_model": "bbo_limit",
+  "failures_so_far": 35,
+  "intervals": "15m,30m,1h",
+  "last_progress_at": "2026-06-02T20:34:46.906278+00:00",
+  "mode": "discovery_progress",
+  "ok": true,
+  "output_tag": "memecoin_volatile_extra_20260602",
+  "phase": "batch_started",
+  "run_id": "strategy-discovery-20260602-154600",
+  "search_mode": "exploration",
+  "symbol_group": "WLDUSDT,JUPUSDT",
+  "symbol_preset": "core",
+  "tagged_json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_memecoin_volatile_extra_20260602_latest.json",
+  "total_batches": 18,
+  "trigger_reference": "mark_price"
+}

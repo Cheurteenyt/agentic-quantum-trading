@@ -1,0 +1,20 @@
+# Core Equity - Cloudflare Tunnel template
+#
+# Copy this file to your Cloudflare config directory and replace:
+# - <TUNNEL_UUID>
+# - <YOUR_WINDOWS_USER>
+# - core.your-domain.com
+#
+# Windows default location:
+#   C:\Users\<YOUR_WINDOWS_USER>\.cloudflared\config.yml
+#
+# WSL/Linux default location:
+#   ~/.cloudflared/config.yml
+
+tunnel: <TUNNEL_UUID>
+credentials-file: C:\Users\<YOUR_WINDOWS_USER>\.cloudflared\<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: core.your-domain.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404

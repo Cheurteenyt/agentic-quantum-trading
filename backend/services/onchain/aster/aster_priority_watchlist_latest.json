@@ -1,0 +1,700 @@
+{
+  "blocked_or_excluded": [
+    {
+      "blockers": [
+        "wide_spread",
+        "low_24h_quote_volume"
+      ],
+      "data_flags": [
+        "low_24h_quote_volume",
+        "wide_spread",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 0.00014695,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 26.931904,
+      "price_change_pct_24h": 29.926,
+      "priority_score": 33.698263,
+      "priority_status": "blocked",
+      "quote_volume_24h": 16182.43,
+      "reasons": [
+        "large_24h_move",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 99.350401,
+      "symbol": "TAKEUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "data_flags": [
+        "wide_spread",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 1.25e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 10.314049,
+      "price_change_pct_24h": 43.819,
+      "priority_score": 25.28588,
+      "priority_status": "blocked",
+      "quote_volume_24h": 598069.89,
+      "reasons": [
+        "sufficient_volume",
+        "large_24h_move"
+      ],
+      "spread_bps": 63.047285,
+      "symbol": "PORTALUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "data_flags": [
+        "wide_spread",
+        "large_mark_index_premium",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 1.562e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 63.993196,
+      "price_change_pct_24h": 21.774,
+      "priority_score": 24.875651,
+      "priority_status": "blocked",
+      "quote_volume_24h": 852850.67,
+      "reasons": [
+        "sufficient_volume",
+        "large_24h_move",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 35.121951,
+      "symbol": "STGUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread",
+        "low_24h_quote_volume"
+      ],
+      "data_flags": [
+        "low_24h_quote_volume",
+        "wide_spread",
+        "high_funding_rate",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": -0.00216829,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -20.799494,
+      "price_change_pct_24h": 13.976,
+      "priority_score": 23.957462,
+      "priority_status": "blocked",
+      "quote_volume_24h": 14363.19,
+      "reasons": [
+        "large_24h_move",
+        "funding_dislocation",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 42.149631,
+      "symbol": "MANTRAUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread",
+        "low_24h_quote_volume"
+      ],
+      "data_flags": [
+        "low_24h_quote_volume",
+        "wide_spread",
+        "large_mark_index_premium",
+        "high_funding_rate",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": -0.00121937,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -144.641768,
+      "price_change_pct_24h": 7.419,
+      "priority_score": 23.223879,
+      "priority_status": "blocked",
+      "quote_volume_24h": 30578.57,
+      "reasons": [
+        "funding_dislocation",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 37.313433,
+      "symbol": "ZORAUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "data_flags": [
+        "wide_spread",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 1.25e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 0.122915,
+      "price_change_pct_24h": 34.825,
+      "priority_score": 22.761696,
+      "priority_status": "blocked",
+      "quote_volume_24h": 112112.91,
+      "reasons": [
+        "large_24h_move"
+      ],
+      "spread_bps": 55.13439,
+      "symbol": "AIAUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "data_flags": [
+        "wide_spread",
+        "large_mark_index_premium",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 0.00052118,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 65.392906,
+      "price_change_pct_24h": -2.958,
+      "priority_score": 20.19344,
+      "priority_status": "blocked",
+      "quote_volume_24h": 122839.75,
+      "reasons": [
+        "funding_dislocation",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 49.107064,
+      "symbol": "BASUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "low_24h_quote_volume"
+      ],
+      "data_flags": [
+        "low_24h_quote_volume",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 0.0001,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -12.710463,
+      "price_change_pct_24h": 3.165,
+      "priority_score": 15.78927,
+      "priority_status": "blocked",
+      "quote_volume_24h": 31677.74,
+      "reasons": [
+        "acceptable_spread"
+      ],
+      "spread_bps": 27.894003,
+      "symbol": "1000FLOKIUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "data_flags": [
+        "wide_spread",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 0.00045084,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 8.093609,
+      "price_change_pct_24h": -1.836,
+      "priority_score": 12.974666,
+      "priority_status": "blocked",
+      "quote_volume_24h": 70744.33,
+      "reasons": [],
+      "spread_bps": 36.708474,
+      "symbol": "SAHARAUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "low_24h_quote_volume"
+      ],
+      "data_flags": [
+        "low_24h_quote_volume",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 5e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -3.907286,
+      "price_change_pct_24h": 0.986,
+      "priority_score": 9.977368,
+      "priority_status": "blocked",
+      "quote_volume_24h": 5711.05,
+      "reasons": [
+        "acceptable_spread"
+      ],
+      "spread_bps": 18.168605,
+      "symbol": "1000BONKUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    }
+  ],
+  "candidate_watchlist": [],
+  "dry_run": true,
+  "generated_at": "2026-05-31T12:34:56.735018+00:00",
+  "inputs": {
+    "consolidated_report": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_research_consolidated_report_latest.json",
+    "exclude_symbols": [
+      "CRCLUSDT",
+      "INJUSDT",
+      "INTCUSDT",
+      "LABUSDT",
+      "MSFTUSDT"
+    ],
+    "mark_index_snapshot": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_mark_index_replay_filter_latest.json",
+    "universe_snapshot": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_public_universe_snapshot_latest.json",
+    "ws_quality_snapshot": "D:\\trading-agent\\backend\\services\\onchain\\aster\\aster_ws_symbol_quality_report_latest.json"
+  },
+  "ok": true,
+  "priority_watchlist": [
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 1.417e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -4.385441,
+      "price_change_pct_24h": 0.487,
+      "priority_score": 63.926488,
+      "priority_status": "priority",
+      "quote_volume_24h": 293063318.26,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread",
+        "ws_forward_ready"
+      ],
+      "spread_bps": 0.013525,
+      "symbol": "BTCUSDT",
+      "ws_quality_score": 100.0,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "data_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": -0.00017791,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -9.882689,
+      "price_change_pct_24h": 6.536,
+      "priority_score": 59.447238,
+      "priority_status": "priority",
+      "quote_volume_24h": 344472575.44,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 1.351625,
+      "symbol": "ASTERUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": -0.00011238,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -11.231306,
+      "price_change_pct_24h": -0.38,
+      "priority_score": 52.131261,
+      "priority_status": "priority",
+      "quote_volume_24h": 85195439.91,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.147978,
+      "symbol": "HYPEUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 0.0,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 5.183997,
+      "price_change_pct_24h": 7.285,
+      "priority_score": 50.136299,
+      "priority_status": "priority",
+      "quote_volume_24h": 162636232.49,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.414631,
+      "symbol": "BNBUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 0.0001,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -4.141495,
+      "price_change_pct_24h": 0.325,
+      "priority_score": 50.055799,
+      "priority_status": "priority",
+      "quote_volume_24h": 168293870.11,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.04943,
+      "symbol": "ETHUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 4.088e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -5.023761,
+      "price_change_pct_24h": 0.297,
+      "priority_score": 47.256652,
+      "priority_status": "priority",
+      "quote_volume_24h": 31756370.6,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.494181,
+      "symbol": "ETHUSD1",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 0.00027675,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 38.44001,
+      "price_change_pct_24h": 42.212,
+      "priority_score": 46.357606,
+      "priority_status": "priority",
+      "quote_volume_24h": 669604.17,
+      "reasons": [
+        "sufficient_volume",
+        "large_24h_move",
+        "acceptable_spread",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 16.088742,
+      "symbol": "PLAYUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 7.604e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -4.916691,
+      "price_change_pct_24h": 0.559,
+      "priority_score": 45.587272,
+      "priority_status": "priority",
+      "quote_volume_24h": 26410634.13,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 1.208386,
+      "symbol": "SOLUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    }
+  ],
+  "recommended_symbols": [
+    "BTCUSDT",
+    "ASTERUSDT",
+    "HYPEUSDT",
+    "BNBUSDT",
+    "ETHUSDT",
+    "ETHUSD1",
+    "PLAYUSDT",
+    "SOLUSDT"
+  ],
+  "safety": {
+    "would_call_external_api": false,
+    "would_call_trade_endpoint": false,
+    "would_execute_trade": false,
+    "would_send_wallet_transaction": false,
+    "would_store_credentials": false,
+    "would_write": true,
+    "writes_performed": 0
+  },
+  "source_policy": "local_snapshots_only_priority_watchlist",
+  "status": "ready",
+  "summary": {
+    "blocked_count": 13,
+    "candidate_count": 0,
+    "low_priority_count": 1,
+    "priority_count": 8,
+    "symbols_scored": 22
+  },
+  "top_scored_sample": [
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 1.417e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -4.385441,
+      "price_change_pct_24h": 0.487,
+      "priority_score": 63.926488,
+      "priority_status": "priority",
+      "quote_volume_24h": 293063318.26,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread",
+        "ws_forward_ready"
+      ],
+      "spread_bps": 0.013525,
+      "symbol": "BTCUSDT",
+      "ws_quality_score": 100.0,
+      "ws_quality_verdict": "ws_forward_ready"
+    },
+    {
+      "blockers": [],
+      "data_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": -0.00017791,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -9.882689,
+      "price_change_pct_24h": 6.536,
+      "priority_score": 59.447238,
+      "priority_status": "priority",
+      "quote_volume_24h": 344472575.44,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 1.351625,
+      "symbol": "ASTERUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": -0.00011238,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -11.231306,
+      "price_change_pct_24h": -0.38,
+      "priority_score": 52.131261,
+      "priority_status": "priority",
+      "quote_volume_24h": 85195439.91,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.147978,
+      "symbol": "HYPEUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 0.0,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 5.183997,
+      "price_change_pct_24h": 7.285,
+      "priority_score": 50.136299,
+      "priority_status": "priority",
+      "quote_volume_24h": 162636232.49,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.414631,
+      "symbol": "BNBUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 0.0001,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -4.141495,
+      "price_change_pct_24h": 0.325,
+      "priority_score": 50.055799,
+      "priority_status": "priority",
+      "quote_volume_24h": 168293870.11,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.04943,
+      "symbol": "ETHUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 4.088e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -5.023761,
+      "price_change_pct_24h": 0.297,
+      "priority_score": 47.256652,
+      "priority_status": "priority",
+      "quote_volume_24h": 31756370.6,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 0.494181,
+      "symbol": "ETHUSD1",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 0.00027675,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 38.44001,
+      "price_change_pct_24h": 42.212,
+      "priority_score": 46.357606,
+      "priority_status": "priority",
+      "quote_volume_24h": 669604.17,
+      "reasons": [
+        "sufficient_volume",
+        "large_24h_move",
+        "acceptable_spread",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 16.088742,
+      "symbol": "PLAYUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [],
+      "data_flags": [],
+      "last_funding_rate": 7.604e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": -4.916691,
+      "price_change_pct_24h": 0.559,
+      "priority_score": 45.587272,
+      "priority_status": "priority",
+      "quote_volume_24h": 26410634.13,
+      "reasons": [
+        "sufficient_volume",
+        "tight_spread"
+      ],
+      "spread_bps": 1.208386,
+      "symbol": "SOLUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread",
+        "low_24h_quote_volume"
+      ],
+      "data_flags": [
+        "low_24h_quote_volume",
+        "wide_spread",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 0.00014695,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 26.931904,
+      "price_change_pct_24h": 29.926,
+      "priority_score": 33.698263,
+      "priority_status": "blocked",
+      "quote_volume_24h": 16182.43,
+      "reasons": [
+        "large_24h_move",
+        "mark_index_premium_interest"
+      ],
+      "spread_bps": 99.350401,
+      "symbol": "TAKEUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    },
+    {
+      "blockers": [
+        "wide_spread"
+      ],
+      "data_flags": [
+        "wide_spread",
+        "wide_funding_cap_floor"
+      ],
+      "last_funding_rate": 1.25e-05,
+      "mark_index_verdict": "not_checked",
+      "overuse_count": 0,
+      "premium_bps": 10.314049,
+      "price_change_pct_24h": 43.819,
+      "priority_score": 25.28588,
+      "priority_status": "blocked",
+      "quote_volume_24h": 598069.89,
+      "reasons": [
+        "sufficient_volume",
+        "large_24h_move"
+      ],
+      "spread_bps": 63.047285,
+      "symbol": "PORTALUSDT",
+      "ws_quality_score": null,
+      "ws_quality_verdict": "not_checked"
+    }
+  ]
+}

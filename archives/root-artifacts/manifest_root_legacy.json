@@ -1,0 +1,13 @@
+{
+  "name": "Core Equity",
+  "short_name": "Core Equity",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
+  "description": "Core Equity private trading intelligence terminal.",
+  "icons": [
+    { "src": "/hermes-orb.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/hermes-orb.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

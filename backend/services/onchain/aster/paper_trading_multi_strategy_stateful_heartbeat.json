@@ -1,0 +1,37 @@
+{
+  "csv_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_multi_strategy_stateful_monitor.csv",
+  "last_cycle_at": "2026-06-01T17:50:49.393135+00:00",
+  "ok": true,
+  "rows": [
+    {
+      "active_positions_count": 2,
+      "active_unrealized_pnl_usd": 0.775092,
+      "allowed_entry_utc_hours": "0-12,14-18,21-23",
+      "closed_in_session": 0,
+      "deduped_rows": 0,
+      "event_type": "forward_optimized_long_ms_inj_tia_regime",
+      "failed_symbols_count": 0,
+      "health_status": "active",
+      "ledger_max_drawdown_usd": 0.0,
+      "ledger_net_pnl_usd": 10.132725,
+      "ledger_profit_factor": 1.534482,
+      "ledger_total_entries": 14,
+      "ledger_total_exits": 12,
+      "ledger_win_rate": 0.583333,
+      "max_holding_trades": null,
+      "mode": "persist",
+      "new_trades_replayed_total": 2,
+      "persist_allowed": true,
+      "realized_pnl_session": 0.0,
+      "rows_inserted": 1,
+      "session_win_rate": null,
+      "strategy_id": "inj_tia_regime_filtered",
+      "symbols": "INJUSDT,TIAUSDT",
+      "timestamp": "2026-06-01T17:50:49.387823+00:00",
+      "would_insert_rows": 0
+    }
+  ],
+  "strategies": [
+    "inj_tia_regime_filtered"
+  ]
+}

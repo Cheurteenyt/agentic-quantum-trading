@@ -1,0 +1,64 @@
+{
+  "best": {
+    "best_tradable_leverage": 5.0,
+    "interval": "15m",
+    "profit_factor": 11.341741,
+    "roi_pct_on_paper_balance": 9.326612,
+    "symbol": "INTCUSDT",
+    "win_rate": 0.875
+  },
+  "csv_v2_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_macro_equity_deep_mark_bbo_night_v2.csv",
+  "cycle": 1,
+  "cycles": "forever",
+  "failed_fetches_count": 6,
+  "last_cycle_at": "2026-05-31T21:24:24.602573+00:00",
+  "mode": "rotation",
+  "ok": true,
+  "output_tag": "macro_equity_deep_mark_bbo_night",
+  "run_id": "strategy-discovery-20260531-212424",
+  "search_mode": "deep",
+  "tagged_json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_macro_equity_deep_mark_bbo_night_latest.json",
+  "top_unique_symbols": [
+    {
+      "best_tradable_leverage": 5.0,
+      "interval": "15m",
+      "profit_factor": 11.341741,
+      "roi_pct_on_paper_balance": 9.326612,
+      "symbol": "INTCUSDT",
+      "win_rate": 0.875
+    },
+    {
+      "best_tradable_leverage": 20.0,
+      "interval": "2h",
+      "profit_factor": 20.500918,
+      "roi_pct_on_paper_balance": 2.174086,
+      "symbol": "MSFTUSDT",
+      "win_rate": 0.928571
+    },
+    {
+      "best_tradable_leverage": 10.0,
+      "interval": "1h",
+      "profit_factor": 11.441349,
+      "roi_pct_on_paper_balance": 3.835188,
+      "symbol": "DRAMUSDT",
+      "win_rate": 0.909091
+    },
+    {
+      "best_tradable_leverage": 10.0,
+      "interval": "4h",
+      "profit_factor": 5.744297,
+      "roi_pct_on_paper_balance": 4.22209,
+      "symbol": "CRCLUSDT",
+      "win_rate": 0.75
+    },
+    {
+      "best_tradable_leverage": 20.0,
+      "interval": "15m",
+      "profit_factor": 3.266688,
+      "roi_pct_on_paper_balance": 2.436929,
+      "symbol": "AMZNUSDT",
+      "win_rate": 0.727273
+    }
+  ],
+  "total_candidates": 144
+}

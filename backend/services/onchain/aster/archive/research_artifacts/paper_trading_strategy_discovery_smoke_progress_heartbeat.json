@@ -1,0 +1,17 @@
+{
+  "csv_v2_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_smoke_progress_v2.csv",
+  "current_batch": 1,
+  "failed_batches": 0,
+  "last_progress_at": "2026-05-31T14:23:19.267993+00:00",
+  "last_run_at": "2026-05-31T14:23:16.431616+00:00",
+  "mode": "discovery_progress",
+  "ok": true,
+  "output_tag": "smoke_progress",
+  "phase": "completed",
+  "run_id": "strategy-discovery-20260531-142316",
+  "search_mode": "standard",
+  "tagged_json_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_strategy_discovery_smoke_progress_latest.json",
+  "top_unique_symbols": [],
+  "total_batches": 1,
+  "total_candidates": 0
+}

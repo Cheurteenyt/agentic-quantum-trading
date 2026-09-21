@@ -1,0 +1,111 @@
+# Environment
+.env
+.env.local
+backend/env
+backend/.env
+*.pem
+*.key
+*.cert
+*.crt
+.cloudflared/
+cloudflared/
+configs/cloudflare-tunnel.yml
+configs/*.credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+.venv-rag/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Local scratch / cleanup archives
+tmp/
+graphify-out/
+
+# Repos git embarqués, gérés séparément (remote propre)
+hermes-cloudflare/
+
+# Runtime data (DB warehouse regenerables via fetch, donnees collectees)
+data/*
+!data/README.md
+backend/data/
+
+# Node (frontend has its own frontend/node_modules; root one is a stray build artifact)
+node_modules/
+
+# Generated report outputs (paper-trading CSV/JSON, built reports)
+reports/*.csv
+reports/*.json
+reports/*.html
+
+# Local backup archives
+archives/backups/
+
+# Root scratch files created during live debugging
+/_*.py
+/_*.js
+/_*.html
+/_*.png
+/fix_*.py
+/patch_*.py
+/test_*.py
+/check.py
+/collector.py
+*screenshot*.png
+*vision-analysis*.json
+*conversation*.json
+backend/uvicorn*.log
+backend/uvicorn*.err
+backend/*_test*.py
+backend/test_*.py
+backend/*.bak
+backend/analyze_section.txt
+
+# RAG local indexes
+rag/indexes/
+rag/cache/
+rag/logs/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.coverage
+.tox/
+
+# OS
+.DS_Store
+Thumbs.db

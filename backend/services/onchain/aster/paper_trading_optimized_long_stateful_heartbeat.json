@@ -1,0 +1,16 @@
+{
+  "active_positions_count": 3,
+  "active_unrealized_pnl_usd": 4.299759,
+  "allowed_entry_utc_hours": null,
+  "csv_path": "D:\\trading-agent\\backend\\services\\onchain\\aster\\paper_trading_optimized_long_stateful_monitor.csv",
+  "cycle_index": 169,
+  "health_status": "active",
+  "last_cycle_at": "2026-06-01T17:47:58.140952+00:00",
+  "ledger_exits": 163,
+  "ledger_net_pnl_usd": 34.284697,
+  "ledger_win_rate": 0.515337,
+  "mode": "persist",
+  "new_trades_replayed_total": 93,
+  "ok": true,
+  "run_forever": true
+}

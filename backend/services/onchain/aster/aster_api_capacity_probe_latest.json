@@ -1,0 +1,531 @@
+{
+  "elapsed_ms": 2629.212,
+  "generated_at": "2026-06-02T03:21:31.891811+00:00",
+  "latency": {
+    "avg_ms": 311.916,
+    "count": 40,
+    "max_ms": 565.656,
+    "median_ms": 271.951,
+    "p95_ms": 520.09
+  },
+  "max_parallel": 5,
+  "mode": "read_only_api_capacity_probe",
+  "ok": true,
+  "rate_limit_headers_seen": [
+    {
+      "x-mbx-used-weight-1m": "16"
+    },
+    {
+      "x-mbx-used-weight-1m": "37"
+    },
+    {
+      "x-mbx-used-weight-1m": "9"
+    },
+    {
+      "x-mbx-used-weight-1m": "24"
+    },
+    {
+      "x-mbx-used-weight-1m": "5"
+    },
+    {
+      "x-mbx-used-weight-1m": "32"
+    },
+    {
+      "x-mbx-used-weight-1m": "26"
+    },
+    {
+      "x-mbx-used-weight-1m": "19"
+    },
+    {
+      "x-mbx-used-weight-1m": "11"
+    },
+    {
+      "x-mbx-used-weight-1m": "40"
+    },
+    {
+      "x-mbx-used-weight-1m": "4"
+    },
+    {
+      "x-mbx-used-weight-1m": "34"
+    },
+    {
+      "x-mbx-used-weight-1m": "12"
+    },
+    {
+      "x-mbx-used-weight-1m": "28"
+    },
+    {
+      "x-mbx-used-weight-1m": "31"
+    },
+    {
+      "x-mbx-used-weight-1m": "21"
+    },
+    {
+      "x-mbx-used-weight-1m": "8"
+    },
+    {
+      "x-mbx-used-weight-1m": "38"
+    },
+    {
+      "x-mbx-used-weight-1m": "22"
+    },
+    {
+      "x-mbx-used-weight-1m": "30"
+    },
+    {
+      "x-mbx-used-weight-1m": "17"
+    },
+    {
+      "x-mbx-used-weight-1m": "13"
+    },
+    {
+      "x-mbx-used-weight-1m": "1"
+    },
+    {
+      "x-mbx-used-weight-1m": "36"
+    },
+    {
+      "x-mbx-used-weight-1m": "29"
+    },
+    {
+      "x-mbx-used-weight-1m": "15"
+    },
+    {
+      "x-mbx-used-weight-1m": "7"
+    },
+    {
+      "x-mbx-used-weight-1m": "23"
+    },
+    {
+      "x-mbx-used-weight-1m": "2"
+    },
+    {
+      "x-mbx-used-weight-1m": "27"
+    },
+    {
+      "x-mbx-used-weight-1m": "6"
+    },
+    {
+      "x-mbx-used-weight-1m": "20"
+    },
+    {
+      "x-mbx-used-weight-1m": "14"
+    },
+    {
+      "x-mbx-used-weight-1m": "35"
+    }
+  ],
+  "recommendation": {
+    "capacity_status": "safe_to_expand_carefully",
+    "reason": "No rate-limit/blocking and latency acceptable; one extra exploration runner is reasonable.",
+    "recommended_parallel_runners": 6,
+    "recommended_sleep_seconds": 1200
+  },
+  "requests_completed": 40,
+  "requests_planned": 40,
+  "sample_rows": [
+    {
+      "endpoint": "book_ticker",
+      "http_status": 200,
+      "latency_ms": 265.773,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "16"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "book_ticker",
+      "http_status": 200,
+      "latency_ms": 270.635,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "37"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "book_ticker",
+      "http_status": 200,
+      "latency_ms": 278.145,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "9"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "book_ticker",
+      "http_status": 200,
+      "latency_ms": 287.942,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "24"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "book_ticker",
+      "http_status": 200,
+      "latency_ms": 471.791,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "5"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "book_ticker",
+      "http_status": 200,
+      "latency_ms": 565.656,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "32"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "depth_5",
+      "http_status": 200,
+      "latency_ms": 256.976,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "26"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "depth_5",
+      "http_status": 200,
+      "latency_ms": 265.379,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "19"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "depth_5",
+      "http_status": 200,
+      "latency_ms": 269.75,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "11"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "depth_5",
+      "http_status": 200,
+      "latency_ms": 278.857,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "40"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "depth_5",
+      "http_status": 200,
+      "latency_ms": 452.966,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "4"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "depth_5",
+      "http_status": 200,
+      "latency_ms": 542.87,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "34"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "klines_50",
+      "http_status": 200,
+      "latency_ms": 254.028,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "12"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "klines_50",
+      "http_status": 200,
+      "latency_ms": 256.294,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "28"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "klines_50",
+      "http_status": 200,
+      "latency_ms": 266.478,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "31"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "klines_50",
+      "http_status": 200,
+      "latency_ms": 275.446,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "21"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "klines_50",
+      "http_status": 200,
+      "latency_ms": 277.903,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "8"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "ping",
+      "http_status": 200,
+      "latency_ms": 257.114,
+      "ok": true,
+      "rate_limit_headers": {},
+      "status": "ok"
+    },
+    {
+      "endpoint": "ping",
+      "http_status": 200,
+      "latency_ms": 265.615,
+      "ok": true,
+      "rate_limit_headers": {},
+      "status": "ok"
+    },
+    {
+      "endpoint": "ping",
+      "http_status": 200,
+      "latency_ms": 267.126,
+      "ok": true,
+      "rate_limit_headers": {},
+      "status": "ok"
+    },
+    {
+      "endpoint": "ping",
+      "http_status": 200,
+      "latency_ms": 267.321,
+      "ok": true,
+      "rate_limit_headers": {},
+      "status": "ok"
+    },
+    {
+      "endpoint": "ping",
+      "http_status": 200,
+      "latency_ms": 279.007,
+      "ok": true,
+      "rate_limit_headers": {},
+      "status": "ok"
+    },
+    {
+      "endpoint": "ping",
+      "http_status": 200,
+      "latency_ms": 447.777,
+      "ok": true,
+      "rate_limit_headers": {},
+      "status": "ok"
+    },
+    {
+      "endpoint": "ticker_24h",
+      "http_status": 200,
+      "latency_ms": 249.882,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "38"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "ticker_24h",
+      "http_status": 200,
+      "latency_ms": 255.335,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "22"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "ticker_24h",
+      "http_status": 200,
+      "latency_ms": 255.501,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "30"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "ticker_24h",
+      "http_status": 200,
+      "latency_ms": 273.327,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "17"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "ticker_24h",
+      "http_status": 200,
+      "latency_ms": 289.608,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "13"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "ticker_24h",
+      "http_status": 200,
+      "latency_ms": 448.972,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "1"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "time",
+      "http_status": 200,
+      "latency_ms": 257.76,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "36"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "time",
+      "http_status": 200,
+      "latency_ms": 261.85,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "29"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "time",
+      "http_status": 200,
+      "latency_ms": 263.507,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "15"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "time",
+      "http_status": 200,
+      "latency_ms": 273.266,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "7"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "time",
+      "http_status": 200,
+      "latency_ms": 281.858,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "23"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "time",
+      "http_status": 200,
+      "latency_ms": 454.273,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "2"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "trades_50",
+      "http_status": 200,
+      "latency_ms": 251.806,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "27"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "trades_50",
+      "http_status": 200,
+      "latency_ms": 256.111,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "6"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "trades_50",
+      "http_status": 200,
+      "latency_ms": 275.944,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "20"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "trades_50",
+      "http_status": 200,
+      "latency_ms": 286.712,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "14"
+      },
+      "status": "ok"
+    },
+    {
+      "endpoint": "trades_50",
+      "http_status": 200,
+      "latency_ms": 520.09,
+      "ok": true,
+      "rate_limit_headers": {
+        "x-mbx-used-weight-1m": "35"
+      },
+      "status": "ok"
+    }
+  ],
+  "status_counts": {
+    "ok": 40
+  },
+  "symbols": [
+    "BTCUSDT",
+    "LABUSDT",
+    "INJUSDT",
+    "XAUUSDT",
+    "NVDAUSDT"
+  ],
+  "timeout_seconds": 8,
+  "would_call_signed_endpoint": false,
+  "would_trade": false,
+  "would_write_db": false,
+  "writes_performed": 0
+}

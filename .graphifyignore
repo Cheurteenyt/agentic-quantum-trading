@@ -1,0 +1,14 @@
+﻿# Graphify ignore patterns
+frontend/dist/
+frontend/node_modules/
+backend/node_modules/
+.venv/
+.venv.wsl/
+__pycache__/
+*.pyc
+.env
+*.env
+graphify-out/cache/
+graphify-out/graph.json.old
+*.min.js
+*.min.css

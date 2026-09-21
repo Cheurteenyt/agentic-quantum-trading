@@ -1,0 +1,9 @@
+tmp/
+node_modules/
+.venv/
+.venv-win/
+.venv-rag/
+.venv.wsl/
+__pycache__/
+*.pyc
+backend/static/assets/

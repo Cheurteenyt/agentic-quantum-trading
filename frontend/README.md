@@ -1,0 +1,5 @@
+# frontend/ — React + Vite
+
+Voir la documentation centrale : [`docs/02-architecture.md`](../docs/02-architecture.md) (section `frontend/`)
+
+Point d'entree : [`docs/README.md`](../docs/README.md)
