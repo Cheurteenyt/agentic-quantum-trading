@@ -90,7 +90,7 @@ def goto_profile(page, handle: str) -> bool:
 
 
 def harvest_profiles(handles: list[str], scrolls: int) -> int:
-    from playwright.sync_api import sync_playwright
+    from patchright.sync_api import sync_playwright
 
     if not PROFILE_DIR.exists():
         print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
@@ -124,23 +124,31 @@ def harvest_profiles(handles: list[str], scrolls: int) -> int:
     out.write_text(
         json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8"
     )
+    # chemin fixe pour l'ingestion automatique (timer nocturne)
+    (OUT_DIR / "latest.json").write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
     print(f"[harvest] total {len(out_posts)} posts -> {out}")
     return 0
 
 
 def run_login() -> int:
-    from playwright.sync_api import sync_playwright
+    from patchright.sync_api import sync_playwright
 
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=False)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        page.goto("https://x.com/home", wait_until="domcontentloaded")
+        page.goto("https://x.com/i/flow/login", wait_until="domcontentloaded")
+        # déjà connecté (session existante) : X redirige vers /home avec le fil
+        page.wait_for_timeout(3000)
         deadline = time.time() + LOGIN_TIMEOUT_S
-        print("[login] fenetre ouverte — connecte-toi. Detection auto de la reussite…")
+        print("[login] fenetre ouverte — connecte-toi (accepte la banniere cookies"
+              " si elle apparait). Detection auto de la reussite…", flush=True)
         while time.time() < deadline:
             try:
                 if page.locator("article[data-testid='tweet']").count() > 0:
-                    print("[login] session X valide — profil sauvegarde. Fermeture.")
+                    print("[login] session X valide — profil sauvegarde. Fermeture.",
+                          flush=True)
                     time.sleep(2)
                     ctx.close()
                     return 0
@@ -153,7 +161,7 @@ def run_login() -> int:
 
 
 def check_status() -> int:
-    from playwright.sync_api import sync_playwright
+    from patchright.sync_api import sync_playwright
 
     if not PROFILE_DIR.exists():
         print("[status] profil absent — --login requis")
