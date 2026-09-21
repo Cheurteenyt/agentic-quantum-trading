@@ -70,6 +70,26 @@ CREATE TABLE IF NOT EXISTS x_calls (
     parsed_at      TEXT NOT NULL,
     UNIQUE(post_id, parser_version)
 );
+
+-- Series temporelles : le prix n'est pas la seule data. La velocite des
+-- mentions et le positionnement de la foule sont des facteurs backtestables
+-- des qu'on a 2-4 semaines d'accumulation.
+CREATE TABLE IF NOT EXISTS x_mentions (
+    symbol      TEXT NOT NULL,
+    day         TEXT NOT NULL,
+    n           INTEGER NOT NULL,
+    total_likes INTEGER NOT NULL DEFAULT 0,
+    total_views INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (symbol, day)
+);
+
+CREATE TABLE IF NOT EXISTS x_positioning (
+    day      TEXT NOT NULL,
+    symbol   TEXT NOT NULL,
+    n_calls  INTEGER NOT NULL,
+    pct_long REAL NOT NULL,
+    PRIMARY KEY (day, symbol)
+);
 """
 
 
@@ -258,9 +278,73 @@ def _parse_calls(con: sqlite3.Connection) -> int:
     return calls
 
 
+def _update_derived(con: sqlite3.Connection, day: str | None = None) -> dict:
+    """Met a jour les series temporelles derivees : positionnement de la
+    foule par jour (facteur contrarian futur) et velocite des cashtags.
+
+    Les mentions sont un ECHANTILLON (nos recherches/profiles), pas un total
+    absolu : comparable d'une nuit a l'autre seulement si le protocole de
+    collecte reste constant.
+    """
+    day = day or _utc_now()[:10]
+    # positionnement par symbole pour la journee d'observation
+    rows = con.execute(
+        """
+        SELECT c.symbol, c.direction FROM x_calls c
+        JOIN x_posts p ON p.post_id = c.post_id
+        WHERE c.parser_version = (SELECT MAX(parser_version) FROM x_calls)
+          AND substr(p.fetched_at, 1, 10) = ?
+        """,
+        (day,),
+    ).fetchall()
+    by_symbol: dict[str, dict[str, int]] = {}
+    for sym, direction in rows:
+        bucket = by_symbol.setdefault((sym or "").upper(), {"long": 0, "short": 0})
+        if direction in ("long", "short"):
+            bucket[direction] += 1
+    for sym, bucket in by_symbol.items():
+        total = bucket["long"] + bucket["short"]
+        if total:
+            con.execute(
+                """
+                INSERT OR REPLACE INTO x_positioning (day, symbol, n_calls, pct_long)
+                VALUES (?, ?, ?, ?)
+                """,
+                (day, sym, total, round(bucket["long"] / total * 100, 1)),
+            )
+    # velocite des cashtags sur les posts ingeres du jour
+    tag_rows = con.execute(
+        "SELECT text, metrics FROM x_posts WHERE substr(fetched_at, 1, 10) = ?",
+        (day,),
+    ).fetchall()
+    mentions: dict[str, dict[str, int]] = {}
+    for text, metrics_json in tag_rows:
+        for m in re.finditer(r"\$([A-Za-z]{2,10})\b", text or ""):
+            sym = m.group(1).upper()
+            bucket = mentions.setdefault(sym, {"n": 0, "likes": 0, "views": 0})
+            bucket["n"] += 1
+            try:
+                metrics = json.loads(metrics_json or "{}")
+            except (TypeError, ValueError):
+                metrics = {}
+            bucket["likes"] += int(metrics.get("likes") or 0)
+            bucket["views"] += int(metrics.get("views") or 0)
+    for sym, bucket in mentions.items():
+        con.execute(
+            """
+            INSERT OR REPLACE INTO x_mentions (symbol, day, n, total_likes, total_views)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (sym, day, bucket["n"], bucket["likes"], bucket["views"]),
+        )
+    con.commit()
+    return {"symbols_positioning": len(by_symbol), "symbols_mentions": len(mentions)}
+
+
 def cmd_parse_calls() -> int:
     con = _connect()
     calls = _parse_calls(con)
+    derived = _update_derived(con)
     total = con.execute("SELECT COUNT(*) FROM x_calls").fetchone()[0]
     con.close()
     print(f"[x-registre] calls parses : {calls} nouveaux ({PARSER_VERSION}), total {total}")

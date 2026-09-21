@@ -208,5 +208,28 @@ class TestForwardPrices(unittest.TestCase):
         self.assertEqual(close, 84_200)
 
 
+class TestDerived(RegistreDbTest):
+    """Positionnement de la foule et velocite des mentions."""
+
+    def test_positioning_et_mentions(self) -> None:
+        self._add_post("d1", "$BTC long here")
+        self._add_post("d2", "$BTC short now")
+        self._add_post("d3", "$ETH long, $BTC mentioned too")
+        fxp._parse_calls(self.con)
+        fxp._update_derived(self.con, day="2026-09-21")
+        pos = {
+            sym: (n, pct) for _, sym, n, pct in self.con.execute(
+                "SELECT day, symbol, n_calls, pct_long FROM x_positioning")
+        }
+        self.assertEqual(pos["BTC"], (2, 50.0))
+        self.assertEqual(pos["ETH"], (1, 100.0))
+        men = dict(
+            ((sym, n) for sym, day, n, *_ in self.con.execute(
+                "SELECT symbol, day, n FROM x_mentions"))
+        )
+        self.assertEqual(men["BTC"], 2)
+        self.assertEqual(men["ETH"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

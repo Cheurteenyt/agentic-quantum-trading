@@ -55,7 +55,16 @@ def _load(con: sqlite3.Connection) -> dict:
         ORDER BY c.call_id
         """
     ).fetchall()
-    return {"posts": posts, "accounts": accounts, "calls": calls}
+    positioning = con.execute(
+        "SELECT day, symbol, n_calls, pct_long FROM x_positioning "
+        "ORDER BY day DESC, symbol LIMIT 10"
+    ).fetchall()
+    mentions = con.execute(
+        "SELECT symbol, day, n, total_likes, total_views FROM x_mentions "
+        "ORDER BY day DESC, n DESC LIMIT 10"
+    ).fetchall()
+    return {"posts": posts, "accounts": accounts, "calls": calls,
+            "positioning": positioning, "mentions": mentions}
 
 
 def _render(data: dict) -> str:
@@ -63,6 +72,16 @@ def _render(data: dict) -> str:
     n_win = sum(1 for c in data["calls"] if c[13] == "win")
     n_loss = sum(1 for c in data["calls"] if c[13] == "loss")
     n_live = sum(1 for c in data["calls"] if c[13] in ("en_cours", None))
+    pos_rows = "\n".join(
+        f"<tr><td>{day}</td><td>{sym}</td><td>{n}</td>"
+        f"<td class=\"{'long' if pct >= 50 else 'short'}\">{pct:.0f} % long</td></tr>"
+        for day, sym, n, pct in data["positioning"]
+    ) or "<tr><td colspan='4'>positionnement observé à partir du 1er call</td></tr>"
+    men_rows = "\n".join(
+        f"<tr><td>${sym}</td><td>{day}</td><td>{n} posts</td>"
+        f"<td>{likes:,} likes</td><td>{views:,} vues</td></tr>".replace(",", " ")
+        for sym, day, n, likes, views in data["mentions"]
+    ) or "<tr><td colspan='5'>vélocité des mentions : s'accumule chaque nuit</td></tr>"
     rows_html = []
     for (handle, when, sym, direction, declared, tp, sl, conf,
          status, resolved, r1, r24, r7, verdict) in data["calls"]:
@@ -126,6 +145,21 @@ par compte apparaissent seulement à partir de 10 calls avec verdict —
 un hit rate sur 2-3 posts, c'est se mentir avec un petit échantillon.
 Verdict « indécis » = TP et SL touchés dans la même bougie : l'ordre
 intra-bougie est inconnaissable, et deviner serait mentir.</p>
+<h2>Positionnement de la foule (observé)</h2>
+<table>
+<tr><th>jour</th><th>actif</th><th>calls</th><th>consensus</th></tr>
+{pos_rows}
+</table>
+<p class="note">Un consensus extrême (>&nbsp;80 % d'un côté) est le candidat
+idéal pour un facteur contrarian — à backtester sur 2-4 semaines
+d'accumulation, pas avant.</p>
+<h2>Vélocité des mentions (échantillon nocturne)</h2>
+<table>
+<tr><th>cashtag</th><th>jour</th><th>posts</th><th>engagement</th></tr>
+{men_rows}
+</table>
+<p class="note">Échantillon de nos collectes, pas un total absolu —
+comparable d'une nuit à l'autre car le protocole est constant.</p>
 <p class="meta">Le Registre ne prouve aucun edge. Il tient le score.</p>
 </body></html>
 """

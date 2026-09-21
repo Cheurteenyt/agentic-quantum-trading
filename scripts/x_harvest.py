@@ -42,6 +42,30 @@ def _now_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+_METRIC_WORDS = {
+    "replies": "replies", "réponses": "replies",
+    "reposts": "reposts",
+    "likes": "likes", "j'aime": "likes", "j’aime": "likes",
+    "bookmarks": "bookmarks", "signets": "bookmarks",
+    "views": "views", "vues": "views",
+}
+
+
+def _parse_metrics(label: str | None) -> dict:
+    """'13 réponses, 16 reposts, 322 J'aime, 12107 vues' -> dict bilingue FR/EN."""
+    out: dict[str, int] = {}
+    if not label:
+        return out
+    for part in label.split(","):
+        m = re.match(r"\s*([\d\u202f\s.,]+)\s*(.+?)\s*$", part)
+        if not m:
+            continue
+        key = _METRIC_WORDS.get(m.group(2).strip().lower())
+        if key:
+            out[key] = int(re.sub(r"[^\d]", "", m.group(1)) or 0)
+    return out
+
+
 def extract_articles(page) -> list[dict]:
     """Extraction DOM : faits reels, pas de parsing d'etiquettes."""
     posts: list[dict] = []
@@ -68,12 +92,19 @@ def extract_articles(page) -> list[dict]:
             )
         except Exception:
             txt = ""
+        try:
+            group_label = art.locator("[role='group']").first.get_attribute(
+                "aria-label", timeout=1000
+            )
+        except Exception:
+            group_label = None
         posts.append({
             "post_id": post_id,
             "author_handle": handle,
             "status_url": f"https://x.com/{handle}/status/{post_id}",
             "posted_at_iso": dt,
             "text": txt.strip(),
+            "metrics": _parse_metrics(group_label),
             "source": "headless_profile",
         })
     return posts
