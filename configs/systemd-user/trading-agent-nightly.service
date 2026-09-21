@@ -19,5 +19,6 @@ ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/f
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range LTCUSDT --target-bars 3000
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/nightly_campaign.py --run
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/nightly_campaign.py --review
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/score_x_calls.py --score
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/reevaluate_oos.py
 TimeoutStartSec=3600
