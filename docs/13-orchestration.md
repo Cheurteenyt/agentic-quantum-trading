@@ -40,9 +40,13 @@ backtest unique.
 ### Commandes
 
 ```bash
-# 1) Données fraîches — vérifier puis récupérer
+# 1) Données fraîches — vérifier puis récupérer (--fetch-range prend UNE paire)
 python scripts/fetch_klines.py --check
-python scripts/fetch_klines.py --fetch-range BTCUSDT ETHUSDT SOLUSDT --target-bars 3000
+python scripts/fetch_klines.py --fetch-range BTCUSDT --target-bars 3000
+python scripts/fetch_klines.py --fetch-range ETHUSDT --target-bars 3000
+python scripts/fetch_klines.py --fetch-range SOLUSDT --target-bars 3000
+# ... et idem pour XRPUSDT BNBUSDT DOGEUSDT ADAUSDT AVAXUSDT LINKUSDT LTCUSDT.
+# Depuis 2026-09-21, le timer systemd fait les 10 paires automatiquement.
 ```
 
 ```bash
@@ -89,7 +93,7 @@ backtest gagnant » en « j'ai une hypothèse survivante à confirmer ».
 
 - **0 survivant** — *info utile, pas échec.* Le marché n'a favorisé aucune
   classe testée sur la fenêtre. C'est la réponse réelle, gratuite, et honnête.
-  Sur l'univers actuel (6 stratégies / 3 paires / ~9000 bougies) un 0 est
+  Sur l'univers actuel (6 stratégies / 10 paires / ~3000 bougies chacune) un 0 est
   **attendu**, pas un bug.
 - **≥ 1 survivant** — *à confirmer dans le temps.* C'est un candidat, pas une
   stratégie. Il attend 30j, puis `reevaluate_oos.py` tranche. Un survivant non

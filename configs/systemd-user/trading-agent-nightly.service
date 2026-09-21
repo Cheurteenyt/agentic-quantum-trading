@@ -1,0 +1,23 @@
+[Unit]
+Description=Trading agent — campagne nocturne (caches Aster + klines + campagne + revue)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/refresh_aster_cache.py --refresh-all --limit 50
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range BTCUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range ETHUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range SOLUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range XRPUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range BNBUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range DOGEUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range ADAUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range AVAXUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range LINKUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range LTCUSDT --target-bars 3000
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/nightly_campaign.py --run
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/nightly_campaign.py --review
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/reevaluate_oos.py
+TimeoutStartSec=3600

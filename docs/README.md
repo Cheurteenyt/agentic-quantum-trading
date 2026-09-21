@@ -9,7 +9,7 @@ updated: 2026-08-09
 
 **Tu débarques ? Lis `01-onboarding.md`. Rien d'autre.**
 
-Le pipeline est désormais **OPÉRATIONNEL** : la découverte (`nightly_campaign.py --run`) et la validation OOS (`reevaluate_oos.py`) sont câblées. Obtenir **0 survivant sur l'univers actuel** (6 stratégies / 3 paires / ~9000 bougies) est un résultat **attendu, pas un bug** — voir `13-orchestration.md`.
+Le pipeline est désormais **OPÉRATIONNEL** : la découverte (`nightly_campaign.py --run`) et la validation OOS (`reevaluate_oos.py`) sont câblées, et tournent chaque nuit en systemd timer sur 10 paires (BTC, ETH, SOL, XRP, BNB, DOGE, ADA, AVAX, LINK, LTC). Obtenir **0 survivant sur l'univers actuel** (6 stratégies / ~3000 bougies par paire) est un résultat **attendu, pas un bug** — voir `13-orchestration.md`.
 
 ## Les docs vivants
 

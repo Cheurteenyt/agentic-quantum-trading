@@ -59,7 +59,8 @@ Warehouse SQLite `data/warehouse/klines.db`.
   *silencieusement*. C'est la pire des sorties, donc on refuse plutôt que de
   deviner.
 
-État actuel : **500 bougies BTCUSDT 1h réelles, 0 trou.**
+État actuel (2026-09-21) : **10 paires × ~3000 bougies 1h réelles, 0 trou** —
+refresh nocturne automatisé par le timer systemd.
 
 ## `candidates.py` — le temps comme validateur
 
