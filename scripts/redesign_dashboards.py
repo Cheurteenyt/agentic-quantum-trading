@@ -108,7 +108,7 @@ CSS = """
   }
   table {
     width: 100%; border-collapse: collapse; font-size: 8.5pt;
-    margin: 0 0 5mm; table-layout: fixed;
+    margin: 0 0 5mm; table-layout: auto;
   }
   th {
     color: #0F172A; text-align: left;
@@ -118,7 +118,7 @@ CSS = """
   }
   td {
     border-bottom: 0.75px solid #E2E8F0; padding: 2.2mm 2.8mm; color: #334155;
-    overflow-wrap: break-word; vertical-align: top;
+    vertical-align: top; word-break: normal;
   }
   tr { break-inside: avoid; }
   .tbl-part {
@@ -228,7 +228,25 @@ def polish(blocks: list[dict]) -> list[dict]:
                 out.append({"t": "kv", "items": pairs})
                 i = j
                 continue
-            if "|" in text and 2 <= text.count("|") <= 8 and len(text) < 200:
+            # marqueur de liste aplati par le legacy ("4" seul) -> jete
+            if re.fullmatch(r"\d{1,2}", text) and i + 1 < len(blocks) \
+                    and blocks[i + 1]["t"] == "p" \
+                    and _is_labelish(blocks[i + 1]["text"]):
+                i += 1
+                continue
+            # liste a barres -> chips (sans plafond : les listes de symboles
+            # de 15+ elements doivent devenir des chips, pas du CSV cru)
+            if "|" in text and text.count("|") >= 2 and len(text) < 400:
+                parts = [p.strip() for p in text.split("|") if p.strip()]
+                out.append({"t": "chips", "items": parts})
+                i += 1
+                continue
+            # liste de tickers a virgules (tout caps, sans espaces)
+            if re.fullmatch(r"[A-Z0-9,]+", text) and text.count(",") >= 3:
+                parts = [p.strip() for p in text.split(",") if p.strip()]
+                out.append({"t": "chips", "items": parts})
+                i += 1
+                continue
                 parts = [p.strip() for p in text.split("|") if p.strip()]
                 out.append({"t": "chips", "items": parts})
                 i += 1
