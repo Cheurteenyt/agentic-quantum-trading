@@ -68,13 +68,12 @@ EXTRACT_JS = """
 """
 
 CSS = """
-  @page { size: A4; margin: 16mm 15mm 15mm; }
   html, body {
     margin: 0; padding: 0; background: #FFFFFF;
     font-family: "Roboto", "Noto Sans", "DejaVu Sans", sans-serif;
     color: #1E293B;
   }
-  .content { padding: 0 2mm; }
+  .content { padding: 2mm 14mm 0; }
   .cover {
     padding: 6mm 0 7mm; margin-bottom: 9mm;
     border-bottom: 3px solid #0F172A;
@@ -142,6 +141,9 @@ CSS = """
   .kv .v {
     font-size: 10.5pt; font-weight: 700; color: #0F172A;
     overflow-wrap: break-word;
+  }
+  .kv .v.small {
+    font-size: 8.5pt; font-weight: 600; line-height: 1.45; color: #1E293B;
   }
   .chips { margin: 0 0 4mm; }
   .chip {
@@ -267,12 +269,13 @@ def _build_html(title: str, blocks: list[dict]) -> str:
             head = rows[0]
             data = rows[1:]
             if n_cols <= 12:
-                body.append("<table>")
-                body.append("<tr>" + "".join(f"<th>{_esc(c)}</th>" for c in head) + "</tr>")
+                body.append("<table><thead><tr>"
+                            + "".join(f"<th>{_esc(c)}</th>" for c in head)
+                            + "</tr></thead><tbody>")
                 for r in data:
                     cells = list(r) + [""] * (n_cols - len(r))
                     body.append("<tr>" + "".join(f"<td>{_esc(c)}</td>" for c in cells) + "</tr>")
-                body.append("</table>")
+                body.append("</tbody></table>")
             else:
                 # table tres large (30+ colonnes) : decoupage horizontal en
                 # blocs de 8 colonnes avec la colonne identifiant repetee —
@@ -283,20 +286,20 @@ def _build_html(title: str, blocks: list[dict]) -> str:
                     cols = [0] + list(range(1 + part * chunk,
                                             min(1 + (part + 1) * chunk, n_cols)))
                     body.append(f'<p class="tbl-part">— partie {part + 1}/{n_parts} —</p>')
-                    body.append("<table>")
-                    body.append("<tr>" + "".join(
+                    body.append("<table><thead><tr>" + "".join(
                         f"<th>{_esc(head[c]) if c < len(head) else ''}</th>"
-                        for c in cols) + "</tr>")
+                        for c in cols) + "</tr></thead><tbody>")
                     for r in data:
                         cells = [(r[c] if c < len(r) else "") for c in cols]
                         body.append("<tr>" + "".join(f"<td>{_esc(c)}</td>" for c in cells) + "</tr>")
-                    body.append("</table>")
+                    body.append("</tbody></table>")
         elif b["t"] == "kv":
             body.append('<div class="kv-grid">')
             for label, value in b["items"]:
+                vclass = "v" if len(value) <= 50 else "v small"
                 body.append(
                     f'<div class="kv"><div class="k">{_esc(label)}</div>'
-                    f'<div class="v">{_esc(value)}</div></div>'
+                    f'<div class="{vclass}">{_esc(value)}</div></div>'
                 )
             body.append("</div>")
         elif b["t"] == "chips":
@@ -373,7 +376,20 @@ def main() -> int:
                 page.pdf(
                     path=str(out), width="210mm", height="297mm",
                     print_background=True,
-                    margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+                    display_header_footer=True,
+                    header_template=(
+                        '<div style="width:100%; font-size:7px; padding:0 14mm; '
+                        'color:#94A3B8;">Core Equity — ' + _esc(out_title) + "</div>"
+                    ),
+                    footer_template=(
+                        '<div style="width:100%; font-size:7px; padding:0 14mm; '
+                        'color:#94A3B8;"><span style="float:left">Core Equity '
+                        'Research</span><span style="float:right">page '
+                        '<span class="pageNumber"></span> / '
+                        '<span class="totalPages"></span></span></div>'
+                    ),
+                    margin={"top": "15mm", "bottom": "13mm",
+                            "left": "0", "right": "0"},
                 )
                 tmp_html.unlink()
                 if args.delete_source:
