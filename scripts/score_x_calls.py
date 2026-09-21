@@ -345,6 +345,9 @@ def write_report(result: dict) -> Path:
                 f"| {_fmt_pct(r['ret_7d'])} |"
             )
     n24 = sum(1 for r in rows if r["ret_24h"] is not None)
+    r24 = [r["ret_24h"] for r in rows if r["ret_24h"] is not None]
+    inv_cum = -sum(r24) if r24 else None
+    inv_wins = sum(1 for v in r24 if v < 0)
     verdicts: dict[int, str] = {}
     try:
         vcon = _connect()
@@ -359,9 +362,17 @@ def write_report(result: dict) -> Path:
         vcounts[v] = vcounts.get(v, 0) + 1
     lines += [
         "",
-        "## Verdicts par compte",
+        "## La vue inversee (reverse trading)",
         "",
-        f"Calls avec verdict +24h disponible : {n24}.",
+        f"Calls avec ret_24h : {len(r24)}. Direct : {len(r24) - inv_wins} gagnants, "
+        f"{inv_wins} perdants. L'INVERSE des memes calls : {inv_wins} gagnants, "
+        f"{len(r24) - inv_wins} perdants, cumul {_fmt_pct(inv_cum)}.",
+        "Un compte dont les calls perdent systematiquement EST un signal —",
+        "l'inverse d'un mauvais gourou est un gourou, aux frais et au spread pres",
+        "(l'inverse paie deux fois les frais : jamais gratuit, jamais oublie).",
+        "Agregats par compte des que >= 10 verdicts ; avant, ce sont des indices,",
+        "pas des statistiques.",
+        "",
         f"Verdicts trade (TP/SL rejoues) : "
         + (", ".join(f"{k} {v}" for k, v in sorted(vcounts.items())) or "aucun")
         + ".",
