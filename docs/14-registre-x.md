@@ -30,15 +30,26 @@ première du registre ?
    forward directionnels +1h/+24h/+7j contre le warehouse klines, rapport
    horodaté dans `reports/`. Branché au timer nocturne.
 
-## Récolte autonome (headless, depuis 2026-09-21)
+## Récolte autonome (headless, opérationnelle depuis 2026-09-21)
 
 1. **UNE fois** : `python scripts/x_harvest.py --login` — fenêtre Chromium
-   visible, se connecter à X ; le script détecte la session, sauvegarde le
-   profil (`data/x_browser_profile/`, hors git) et se ferme seul.
+   visible (patchright, anti-détection : X refuse la connexion depuis un
+   navigateur d'automation standard), se connecter à X ; le script détecte
+   la session, sauvegarde le profil (`data/x_browser_profile/`, hors git)
+   et se ferme seul.
 2. **Ensuite** : `python scripts/x_harvest.py --profiles thatdevlr,lookonchain`
    — headless, pauses 18-32 s entre profils, abort après 2 rebonds
-   consécutifs (respect du throttle).
+   consécutifs (respect du throttle), `latest.json` à chemin fixe.
 3. `--status` vérifie que la session du profil est encore valide.
+
+## Branchement au timer nocturne (2026-09-21)
+
+La chaîne `x_harvest --profiles (watchlist)` → `--ingest-json latest.json` →
+`--parse-calls` → `score_x_calls --score` tourne chaque nuit à la FIN du
+service `trading-agent-nightly` — après le pipeline stratégies, pour qu'un
+souci de scraping ne bloque jamais la campagne. La session du profil
+persiste des mois ; si `--status` expire un jour, un `--login` de 60 s
+la renouvelle.
 
 ## Contrainte découverte le 2026-09-21 (importante)
 
