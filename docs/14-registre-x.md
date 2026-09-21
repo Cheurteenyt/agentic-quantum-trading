@@ -18,15 +18,27 @@ première du registre ?
 
 ## La chaîne
 
-1. **Récolte** — navigateur (session connectée), extraction DOM → JSON
-   (`post_id`, `author_handle`, `status_url`, `raw_label`).
+1. **Récolte** — deux voies : extraction navigateur (session ZCode) → JSON
+   labels ARIA, ou harvester autonome (ci-dessous) → JSON propre avec
+   timestamps ISO réels.
 2. **Ingestion** — `python scripts/fetch_x_posts.py --ingest-json posts.json`
    → `data/warehouse/x_posts.db` (tables `x_posts`, `x_accounts`, `x_calls`).
-3. **Parsing v0** — `--parse-calls` : passe déterministe (symbole $TICKER +
-   direction + prix d'entrée), confiance low/medium/high. Ne score que ce
-   qu'elle lit sans ambiguïté.
-4. **Scoring** (phase 3) — rendements forward des calls contre le warehouse
-   klines : la machinerie `reevaluate_oos.py` s'applique telle quelle.
+3. **Parsing v1** — `--parse-calls` : **$CASHTAG obligatoire** (les tickers
+   nus généraient des faux positifs type « l'EGLD »), direction, prix
+   d'entrée (multiplicateurs k/m gérés), confiance medium/high.
+4. **Scoring** — `python scripts/score_x_calls.py --score` : rendements
+   forward directionnels +1h/+24h/+7j contre le warehouse klines, rapport
+   horodaté dans `reports/`. Branché au timer nocturne.
+
+## Récolte autonome (headless, depuis 2026-09-21)
+
+1. **UNE fois** : `python scripts/x_harvest.py --login` — fenêtre Chromium
+   visible, se connecter à X ; le script détecte la session, sauvegarde le
+   profil (`data/x_browser_profile/`, hors git) et se ferme seul.
+2. **Ensuite** : `python scripts/x_harvest.py --profiles thatdevlr,lookonchain`
+   — headless, pauses 18-32 s entre profils, abort après 2 rebonds
+   consécutifs (respect du throttle).
+3. `--status` vérifie que la session du profil est encore valide.
 
 ## Contrainte découverte le 2026-09-21 (importante)
 

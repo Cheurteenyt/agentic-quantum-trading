@@ -31,7 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = ROOT / "data" / "warehouse" / "x_posts.db"
 
-PARSER_VERSION = "v0-regex"
+PARSER_VERSION = "v1-regex"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS x_posts (
@@ -100,25 +100,30 @@ def cmd_ingest_json(path: str, query: str) -> int:
     inserted = 0
     skipped = 0
     for item in raw:
-        label = str(item.get("raw_label") or "").strip()
+        raw_label = str(item.get("raw_label") or "").strip()
+        clean_text = str(item.get("text") or "").strip()
         handle = str(item.get("author_handle") or "").strip().lstrip("@").lower()
         post_id = str(item.get("post_id") or "").strip()
-        if not handle or not label:
+        if not handle or not (raw_label or clean_text):
             skipped += 1
             continue
         if not post_id:
-            post_id = "h-" + hashlib.sha1(label.encode()).hexdigest()[:16]
-        # horodatage brut : "Il y a 3 minutes", "17 sept.", etc.
-        m = re.search(r"(Il y a [^,;\"]{1,30}|\d{1,2} \w{3}\.? \d{0,4})", label)
-        posted_at_raw = m.group(1) if m else None
-        # texte propre = label sans l'entete "Nom Compte certifié @handle <date>"
-        hm = re.search(r"@[A-Za-z0-9_]{1,15}", label)
-        text = label
-        if hm:
-            tail = label[hm.end():]
-            tm = re.search(r"(Il y a [^,;\"]{1,30}|\d{1,2} \w{3}\.?(?: \d{4})?)", tail)
-            if tm:
-                text = tail[tm.end():].strip()
+            post_id = "h-" + hashlib.sha1((raw_label or clean_text).encode()).hexdigest()[:16]
+        if item.get("posted_at_iso"):
+            # format harvester headless : texte deja propre + ISO reel
+            posted_at_raw = str(item["posted_at_iso"])
+            text = clean_text
+        else:
+            # format extraction live : label ARIA brut -> entete a retirer
+            m = re.search(TIME_RE, raw_label)
+            posted_at_raw = m.group(0) if m else None
+            hm = re.search(r"@[A-Za-z0-9_]{1,15}", raw_label)
+            text = raw_label
+            if hm:
+                tail = raw_label[hm.end():]
+                tm = re.search(TIME_RE, tail)
+                if tm:
+                    text = tail[tm.end():].strip()
         cur = con.execute(
             """
             INSERT OR IGNORE INTO x_posts
@@ -149,17 +154,22 @@ def cmd_ingest_json(path: str, query: str) -> int:
     return 0
 
 
-_SYMBOL = r"\$?([A-Z]{2,10})\b"
 _DIRECTION = r"\b(long|short|bullish|bearish|achat|vente|achete|vend)\b"
-_PRICE = r"(?:@|at|a|entr[ée]e\s*)(\d{2,6}(?:[.,]\d+)?)[kK]?\b"
+_PRICE = r"(?:@|at\b|a\s|à\s|entr[ée]e\s)(\d{2,6}(?:[.,]\d+)?)([kKmM])?\b"
+# horodatage X relatif ou date courte — unité précise, sinon le motif glouton
+# avalerait le texte suivant ("Il y a 17 minutes Today $BTC flipped…")
+TIME_RE = r"(Il y a \d+ (?:seconde|minute|heure|jour|semaine)s?|\d{1,2} \w{3,5}\.?(?: \d{4})?)"
 
 
-def _parse_calls_v0(con: sqlite3.Connection) -> int:
+def _parse_calls(con: sqlite3.Connection) -> int:
     """Passe deterministe : ne score que ce qu'on sait lire sans ambiguite.
 
     Confiance 'high' uniquement si symbole + direction explicites dans une
     fenetre de texte courte. Tout le reste reste non parse : le registre ne
     devine pas, sinon il ment.
+    v1 : seul un $CASHTAG identifie l'actif sans ambiguite. Les tickers nus
+    ('l'EGLD a 500$') generaient des faux positifs — le registre ne score
+    que ce qu'il lit sans ambiguite.
     """
     now = _utc_now()
     rows = con.execute(
@@ -171,26 +181,24 @@ def _parse_calls_v0(con: sqlite3.Connection) -> int:
     ).fetchall()
     calls = 0
     for post_id, text in rows:
-        sym = re.search(_SYMBOL, text)
-        if not sym:
-            continue
-        symbol = sym.group(1).upper()
+        cashtag = re.search(r"\$([A-Za-z]{2,10})\b", text)
         direction_m = re.search(_DIRECTION, text, re.IGNORECASE)
-        if not direction_m:
+        if not cashtag or not direction_m:
             continue
+        symbol = cashtag.group(1).upper()
         direction = direction_m.group(1).lower()
         direction = {
             "bullish": "long", "bearish": "short", "achat": "long", "vente": "short",
             "achete": "long", "vend": "short",
         }.get(direction, direction)
-        confidence = "low"
+        confidence = "medium"
         entry_price = None
         horizon = None
-        if direction_m.start() - sym.end() < 60 or sym.start() - direction_m.end() < 60:
-            confidence = "medium"
         price_m = re.search(_PRICE, text, re.IGNORECASE)
         if price_m:
-            entry_price = float(price_m.group(1).replace(",", "."))
+            value = float(price_m.group(1).replace(",", "."))
+            mult = {"k": 1e3, "m": 1e6}.get((price_m.group(2) or "").lower(), 1.0)
+            entry_price = value * mult
             confidence = "high"
         if re.search(r"\b(daily|4h|1h|15m|intraday|day)\b", text, re.IGNORECASE):
             horizon = "intraday"
@@ -215,10 +223,10 @@ def _parse_calls_v0(con: sqlite3.Connection) -> int:
 
 def cmd_parse_calls() -> int:
     con = _connect()
-    calls = _parse_calls_v0(con)
+    calls = _parse_calls(con)
     total = con.execute("SELECT COUNT(*) FROM x_calls").fetchone()[0]
     con.close()
-    print(f"[x-registre] calls parses : {calls} nouveaux (v0), total {total}")
+    print(f"[x-registre] calls parses : {calls} nouveaux ({PARSER_VERSION}), total {total}")
     return 0
 
 

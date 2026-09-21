@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Registre X — recolte headless des profils de la watchlist (playwright).
+
+Contrairement a l'extraction via la session ZCode, ce script est autonome :
+il fait tourner Chromium avec un profil persistant (data/x_browser_profile/)
+dans lequel l'utilisateur se connecte UNE fois. Les runs suivants sont
+headless et silencieux.
+
+Contrainte connue (docs/14-registre-x.md) : X soft-throttle la navigation
+rapide. Ce harvester donc :
+  - peu de profils par run, pause aleatoire de 18-32 s entre chaque ;
+  - detection de rebond (URL verifiee deux fois) -> profil saute ;
+  - 2 rebonds consecutifs -> abort propre (respecter le throttle, pas le
+    forcer).
+
+    python scripts/x_harvest.py --login          # UNE fois : fenetre visible, se connecter
+    python scripts/x_harvest.py --profiles thatdevlr,lookonchain
+    python scripts/x_harvest.py --status         # le profil a-t-il une session valide ?
+
+Sortie : data/x_harvest/registre-<ts>.json (compatible --ingest-json).
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import re
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+PROFILE_DIR = ROOT / "data" / "x_browser_profile"
+OUT_DIR = ROOT / "data" / "x_harvest"
+
+PAUSE_RANGE_S = (18, 32)
+LOGIN_TIMEOUT_S = 15 * 60
+
+
+def _now_utc() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def extract_articles(page) -> list[dict]:
+    """Extraction DOM : faits reels, pas de parsing d'etiquettes."""
+    posts: list[dict] = []
+    for art in page.locator("article[data-testid='tweet']").all():
+        try:
+            href = art.locator("a[href*='/status/']").first.get_attribute(
+                "href", timeout=2000
+            )
+        except Exception:
+            href = None
+        if not href:
+            continue
+        m = re.search(r"^/([^/]+)/status/(\d+)", href)
+        if not m:
+            continue
+        handle, post_id = m.group(1), m.group(2)
+        try:
+            dt = art.locator("time").first.get_attribute("datetime", timeout=1500)
+        except Exception:
+            dt = None
+        try:
+            txt = art.locator("[data-testid='tweetText']").first.inner_text(
+                timeout=1500
+            )
+        except Exception:
+            txt = ""
+        posts.append({
+            "post_id": post_id,
+            "author_handle": handle,
+            "status_url": f"https://x.com/{handle}/status/{post_id}",
+            "posted_at_iso": dt,
+            "text": txt.strip(),
+            "source": "headless_profile",
+        })
+    return posts
+
+
+def goto_profile(page, handle: str) -> bool:
+    """Navigue vers le profil et verifie la stabilite (anti-rebond)."""
+    page.goto(f"https://x.com/{handle}", wait_until="domcontentloaded", timeout=30000)
+    page.wait_for_timeout(2600)
+    u1 = page.url
+    page.wait_for_timeout(1500)
+    u2 = page.url
+    return f"/{handle}" in u1 and f"/{handle}" in u2
+
+
+def harvest_profiles(handles: list[str], scrolls: int) -> int:
+    from playwright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
+        return 1
+    out_posts: list[dict] = []
+    consecutive_bounces = 0
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        for handle in handles:
+            if not goto_profile(page, handle):
+                consecutive_bounces += 1
+                print(f"[harvest] @{handle} : rebond (throttle ?) — saute")
+                if consecutive_bounces >= 2:
+                    print("[harvest] 2 rebonds consecutifs : abort, on respecte le throttle")
+                    break
+                continue
+            consecutive_bounces = 0
+            for _ in range(scrolls):
+                page.mouse.wheel(0, 1600)
+                page.wait_for_timeout(1100)
+            posts = extract_articles(page)
+            print(f"[harvest] @{handle} : {len(posts)} posts")
+            out_posts.extend(posts)
+            if handle != handles[-1]:
+                time.sleep(random.uniform(*PAUSE_RANGE_S))
+        ctx.close()
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = _now_utc().replace(":", "").replace("-", "")
+    out = OUT_DIR / f"registre-{ts}.json"
+    out.write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    print(f"[harvest] total {len(out_posts)} posts -> {out}")
+    return 0
+
+
+def run_login() -> int:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=False)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.goto("https://x.com/home", wait_until="domcontentloaded")
+        deadline = time.time() + LOGIN_TIMEOUT_S
+        print("[login] fenetre ouverte — connecte-toi. Detection auto de la reussite…")
+        while time.time() < deadline:
+            try:
+                if page.locator("article[data-testid='tweet']").count() > 0:
+                    print("[login] session X valide — profil sauvegarde. Fermeture.")
+                    time.sleep(2)
+                    ctx.close()
+                    return 0
+            except Exception:
+                pass
+            time.sleep(3)
+        print("[login] timeout : pas de session detectee en 15 min", file=sys.stderr)
+        ctx.close()
+        return 1
+
+
+def check_status() -> int:
+    from playwright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[status] profil absent — --login requis")
+        return 1
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(3000)
+        ok = page.locator("article[data-testid='tweet']").count() > 0
+        ctx.close()
+    print(f"[status] session X : {'VALIDE' if ok else 'EXPIREE/ABSENTE — relance --login'}")
+    return 0 if ok else 1
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Recolte headless des profils X (registre)")
+    ap.add_argument("--login", action="store_true", help="connexion manuelle unique (fenetre visible)")
+    ap.add_argument("--profiles", metavar="H1,H2", help="handles a recolter (sans @)")
+    ap.add_argument("--scrolls", type=int, default=1, help="scrolls par profil (1 scroll ≈ 4-6 posts)")
+    ap.add_argument("--status", action="store_true", help="verifie la session du profil")
+    args = ap.parse_args()
+    if args.login:
+        return run_login()
+    if args.status:
+        return check_status()
+    if args.profiles:
+        handles = [h.strip().lstrip("@") for h in args.profiles.split(",") if h.strip()]
+        return harvest_profiles(handles, args.scrolls)
+    ap.print_help()
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

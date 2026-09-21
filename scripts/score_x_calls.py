@@ -18,6 +18,7 @@ comptes, pas le marche ; il ne prouve aucun edge, il tient le score.
 from __future__ import annotations
 
 import argparse
+import re
 import sqlite3
 import sys
 import unicodedata
@@ -70,9 +71,12 @@ def resolve_posted_at(raw: str | None, fetched_at: str) -> str | None:
     """
     if not raw:
         return None
+    # ISO deja resolu (harvester headless) : pass-through
+    if re.match(r"\d{4}-\d{2}-\d{2}T", raw.strip()):
+        return raw.strip()
     now = datetime.strptime(fetched_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
     text = raw.strip().lower()
-    rel = __import__("re").match(
+    rel = re.match(
         r"il y a (\d+)\s*(seconde|minute|heure|jour|semaine)s?", text
     )
     if rel:
@@ -83,7 +87,7 @@ def resolve_posted_at(raw: str | None, fetched_at: str) -> str | None:
             "semaine": timedelta(weeks=n),
         }[unit]
         return (now - delta).strftime("%Y-%m-%dT%H:%M:%SZ")
-    abs_m = __import__("re").match(r"(\d{1,2}) (\w{3,5})\.?(?: (\d{4}))?$", text)
+    abs_m = re.match(r"(\d{1,2}) (\w{3,5})\.?(?: (\d{4}))?$", text)
     if abs_m:
         day, month = int(abs_m.group(1)), _norm_month(abs_m.group(2))
         if not month:
@@ -130,6 +134,7 @@ def score_all() -> dict:
         SELECT c.call_id, c.symbol, c.direction, c.entry_price, c.confidence,
                p.author_handle, p.posted_at_raw, p.fetched_at
         FROM x_calls c JOIN x_posts p ON p.post_id = c.post_id
+        WHERE c.parser_version = (SELECT MAX(parser_version) FROM x_calls)
         """
     ).fetchall()
     stats = {"scored": 0, "partiel": 0, "hors_univers": 0, "date_unparseable": 0, "pas_de_prix": 0}
