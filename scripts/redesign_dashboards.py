@@ -67,68 +67,68 @@ EXTRACT_JS = """
 """
 
 CSS = """
-  @page { size: A4; margin: 11mm 0; }
+  @page { size: A4; margin: 16mm 15mm 15mm; }
   html, body {
-    margin: 0; padding: 0; background: #0B1220;
+    margin: 0; padding: 0; background: #FFFFFF;
     font-family: "Roboto", "Noto Sans", "DejaVu Sans", sans-serif;
-    color: #C9D6E8;
+    color: #1E293B;
   }
-  .content { padding: 2mm 14mm 6mm; }
+  .content { padding: 0 2mm; }
   .cover {
-    background: linear-gradient(180deg, #0E1B33 0%, #0B1220 100%);
-    border-bottom: 1px solid rgba(56,189,248,.3);
-    padding: 14mm 16mm 10mm; margin: -11mm 0 8mm;
+    padding: 6mm 0 7mm; margin-bottom: 9mm;
+    border-bottom: 3px solid #0F172A;
   }
   .cover .kicker {
-    font-size: 9pt; letter-spacing: 3.5px; color: #38BDF8;
+    font-size: 9pt; letter-spacing: 3.5px; color: #0369A1;
     text-transform: uppercase; font-weight: 700; margin-bottom: 4mm;
   }
-  .cover h1 { font-size: 24pt; font-weight: 800; color: #F0F6FC; margin: 0 0 3mm; }
+  .cover h1 { font-size: 25pt; font-weight: 800; color: #0F172A; margin: 0 0 3mm;
+              letter-spacing: -0.4px; }
   .cover .meta { font-size: 8.5pt; color: #64748B; }
   h2 {
-    font-size: 15pt; font-weight: 800; color: #F0F6FC;
-    margin: 9mm 0 3.5mm; padding-bottom: 2mm;
-    border-bottom: 2px solid rgba(56,189,248,.35);
+    font-size: 15.5pt; font-weight: 800; color: #0F172A;
+    margin: 10mm 0 3.5mm; padding-bottom: 1.5mm;
+    border-bottom: 1px solid #CBD5E1;
     break-after: avoid;
   }
-  h3 { font-size: 11.5pt; font-weight: 700; color: #7DD3FC;
+  h3 { font-size: 11.5pt; font-weight: 700; color: #0369A1;
        margin: 6mm 0 2.5mm; break-after: avoid; }
-  h4 { font-size: 10.5pt; color: #E6EDF3; margin: 4mm 0 2mm; break-after: avoid; }
-  p { font-size: 9.5pt; line-height: 1.6; margin: 0 0 3mm;
+  h4 { font-size: 10.5pt; font-weight: 700; color: #0F172A; margin: 4mm 0 2mm;
+       break-after: avoid; }
+  p { font-size: 10pt; line-height: 1.65; margin: 0 0 3.5mm; color: #334155;
       overflow-wrap: break-word; }
-  ul { margin: 0 0 3mm; padding-left: 5mm; }
-  li { font-size: 9.5pt; line-height: 1.55; margin-bottom: 1.5mm;
-       overflow-wrap: break-word; }
+  ul { margin: 0 0 3.5mm; padding-left: 5mm; }
+  li { font-size: 10pt; line-height: 1.6; margin-bottom: 1.6mm; color: #334155; }
+  li::marker { color: #0369A1; }
   pre {
-    background: #111A2E; border: 1px solid #1E2A44; border-radius: 6px;
-    padding: 4mm; font-size: 8pt; color: #93C5FD;
+    background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px;
+    padding: 4mm; font-size: 8pt; color: #0F172A;
     overflow-wrap: break-word; white-space: pre-wrap;
-    break-inside: avoid; margin: 0 0 3mm;
+    break-inside: avoid; margin: 0 0 3.5mm;
   }
   table {
-    width: 100%; border-collapse: collapse; font-size: 8pt;
-    margin: 0 0 4mm; table-layout: fixed;
+    width: 100%; border-collapse: collapse; font-size: 8.5pt;
+    margin: 0 0 5mm; table-layout: fixed;
   }
   th {
-    background: #16233D; color: #7DD3FC; text-align: left;
-    padding: 2.5mm 3mm; border: 1px solid #1E2A44;
-    font-weight: 700; font-size: 7.5pt; text-transform: uppercase;
-    letter-spacing: .5px; overflow-wrap: break-word;
+    color: #0F172A; text-align: left;
+    border-top: 2px solid #0F172A; border-bottom: 1.2px solid #0F172A;
+    padding: 2.5mm 2.8mm; font-weight: 700; font-size: 8pt;
+    overflow-wrap: break-word; background: #F8FAFC;
   }
   td {
-    border: 1px solid #1E2A44; padding: 2.2mm 3mm; color: #C9D6E8;
+    border-bottom: 0.75px solid #E2E8F0; padding: 2.2mm 2.8mm; color: #334155;
     overflow-wrap: break-word; vertical-align: top;
   }
-  tr:nth-child(even) td { background: #0F1830; }
   tr { break-inside: avoid; }
   .tbl-part {
-    font-size: 8pt; color: #38BDF8; font-weight: 700;
-    letter-spacing: 1px; margin: 4mm 0 1.5mm;
+    font-size: 8pt; color: #0369A1; font-weight: 700;
+    letter-spacing: 1px; margin: 5mm 0 1.5mm;
   }
   .foot {
-    margin-top: 10mm; padding-top: 4mm;
-    border-top: 1px solid rgba(56,189,248,.2);
-    font-size: 7.5pt; color: #64748B;
+    margin-top: 12mm; padding-top: 3mm;
+    border-top: 1px solid #CBD5E1;
+    font-size: 8pt; color: #64748B;
     display: flex; justify-content: space-between;
   }
 """
@@ -248,7 +248,7 @@ def main() -> int:
                 page.goto(f.as_uri(), wait_until="load", timeout=30000)
                 page.wait_for_timeout(600)
                 data = page.evaluate(EXTRACT_JS)
-                doc_title = data["title"] or out_title
+                doc_title = out_title or data["title"] or title_key
                 html = _build_html(doc_title, data["blocks"])
                 out = f.parent / (new_name + ".pdf")
                 tmp_html = f.parent / (new_name + ".redesign.html")
