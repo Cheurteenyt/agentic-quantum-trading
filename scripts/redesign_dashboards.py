@@ -17,6 +17,7 @@ import argparse
 import html as html_mod
 import math
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -123,7 +124,34 @@ CSS = """
   tr { break-inside: avoid; }
   .tbl-part {
     font-size: 8pt; color: #0369A1; font-weight: 700;
-    letter-spacing: 1px; margin: 5mm 0 1.5mm;
+    letter-spacing: 1px; margin: 4mm 0 1.5mm;
+  }
+  .kv-grid {
+    display: flex; flex-wrap: wrap; gap: 3mm;
+    margin: 3mm 0 5mm;
+  }
+  .kv {
+    flex: 1 1 42mm; min-width: 36mm; max-width: 70mm;
+    background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;
+    padding: 3mm 3.5mm; break-inside: avoid;
+  }
+  .kv .k {
+    font-size: 7.5pt; color: #64748B; text-transform: uppercase;
+    letter-spacing: .8px; margin-bottom: 1.2mm;
+  }
+  .kv .v {
+    font-size: 10.5pt; font-weight: 700; color: #0F172A;
+    overflow-wrap: break-word;
+  }
+  .chips { margin: 0 0 4mm; }
+  .chip {
+    display: inline-block; font-size: 8.5pt; font-weight: 600;
+    color: #0369A1; background: #F0F9FF; border: 1px solid #BAE6FD;
+    border-radius: 14px; padding: 1.5mm 3.5mm; margin: 0 2mm 2mm 0;
+  }
+  .doc-meta {
+    font-size: 8pt; color: #94A3B8; font-style: italic;
+    margin: -4mm 0 6mm;
   }
   .foot {
     margin-top: 12mm; padding-top: 3mm;
@@ -136,6 +164,78 @@ CSS = """
 
 def _esc(text: str) -> str:
     return html_mod.escape(text or "")
+
+
+META_RE = None  # compilé paresseusement dans polish()
+
+
+def _is_labelish(text: str) -> bool:
+    """Un paragraphe court, sans ponctuation finale, qui ressemble a une
+    etiquette de donnee ('Discovery rows', 'Phase', 'Top lanes')."""
+    t = text.strip()
+    if not t or len(t) > 60:
+        return False
+    if t.endswith((".", "!", "?", ":", ";", ",")):
+        return False
+    if t[0].isdigit():
+        return False
+    return len(t.split()) <= 6
+
+
+def _is_valueish(text: str) -> bool:
+    t = text.strip()
+    return bool(t) and len(t) <= 120 and not t.endswith((".", "!", "?"))
+
+
+def polish(blocks: list[dict]) -> list[dict]:
+    """Couche editoriale : transforme le dump DOM en document organise.
+
+    - etiquettes + valeurs consecutives -> groupes KPI (cartes)
+    - listes a barres 'a | b | c' -> chips
+    - metadonnees de generation -> note discrete de couverture
+    """
+    out: list[dict] = []
+    meta_lines: list[str] = []
+    meta_re = re.compile(r"^(generation|généré|genere)\b", re.I)
+    i = 0
+    while i < len(blocks):
+        b = blocks[i]
+        if b["t"] == "p":
+            text = b["text"].strip()
+            if meta_re.match(text):
+                meta_lines.append(text)
+                i += 1
+                continue
+            if _is_labelish(text) and i + 1 < len(blocks) \
+                    and blocks[i + 1]["t"] == "p" \
+                    and _is_valueish(blocks[i + 1]["text"]):
+                # chaine etiquette -> valeur (-> etiquette -> valeur ...)
+                pairs: list[tuple[str, str]] = []
+                label = text
+                j = i + 1
+                while j < len(blocks) and blocks[j]["t"] == "p" \
+                        and _is_valueish(blocks[j]["text"]):
+                    pairs.append((label, blocks[j]["text"].strip()))
+                    j += 1
+                    if j < len(blocks) and blocks[j]["t"] == "p" \
+                            and _is_labelish(blocks[j]["text"]):
+                        label = blocks[j]["text"].strip()
+                        j += 1
+                    else:
+                        break
+                out.append({"t": "kv", "items": pairs})
+                i = j
+                continue
+            if "|" in text and 2 <= text.count("|") <= 8 and len(text) < 200:
+                parts = [p.strip() for p in text.split("|") if p.strip()]
+                out.append({"t": "chips", "items": parts})
+                i += 1
+                continue
+        out.append(b)
+        i += 1
+    if meta_lines:
+        out.insert(0, {"t": "meta", "lines": meta_lines})
+    return out
 
 
 def _build_html(title: str, blocks: list[dict]) -> str:
@@ -191,6 +291,20 @@ def _build_html(title: str, blocks: list[dict]) -> str:
                         cells = [(r[c] if c < len(r) else "") for c in cols]
                         body.append("<tr>" + "".join(f"<td>{_esc(c)}</td>" for c in cells) + "</tr>")
                     body.append("</table>")
+        elif b["t"] == "kv":
+            body.append('<div class="kv-grid">')
+            for label, value in b["items"]:
+                body.append(
+                    f'<div class="kv"><div class="k">{_esc(label)}</div>'
+                    f'<div class="v">{_esc(value)}</div></div>'
+                )
+            body.append("</div>")
+        elif b["t"] == "chips":
+            body.append('<div class="chips">' + "".join(
+                f'<span class="chip">{_esc(c)}</span>' for c in b["items"]) + "</div>")
+        elif b["t"] == "meta":
+            body.append('<div class="doc-meta">'
+                        + "<br>".join(_esc(l) for l in b["lines"]) + "</div>")
         elif b["t"] == "p":
             body.append(f"<p>{_esc(b['text'])}</p>")
         elif b["t"] == "ul":
@@ -248,8 +362,9 @@ def main() -> int:
                 page.goto(f.as_uri(), wait_until="load", timeout=30000)
                 page.wait_for_timeout(600)
                 data = page.evaluate(EXTRACT_JS)
+                blocks = polish(data["blocks"])
                 doc_title = out_title or data["title"] or title_key
-                html = _build_html(doc_title, data["blocks"])
+                html = _build_html(doc_title, blocks)
                 out = f.parent / (new_name + ".pdf")
                 tmp_html = f.parent / (new_name + ".redesign.html")
                 tmp_html.write_text(html, encoding="utf-8")
