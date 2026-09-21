@@ -200,9 +200,11 @@ def main() -> int:
     BOARD.write_text(html, encoding="utf-8")
     ts = _utc_now().replace(":", "").replace("-", "")
     (REPORTS / f"registre-board-{ts}.html").write_text(html, encoding="utf-8")
-    (REPORTS / "registre-draft-post.txt").write_text(
-        _draft_post(data), encoding="utf-8"
-    )
+    draft = _draft_post(data)
+    (REPORTS / "registre-draft-post.txt").write_text(draft, encoding="utf-8")
+    # canal push : le produit vendable du registre (no-op si non configure)
+    from scripts.telegram_notify import send_if_configured
+    send_if_configured(draft)
     print(f"[registre] board : {BOARD}")
     print("[registre] draft post : reports/registre-draft-post.txt")
     return 0

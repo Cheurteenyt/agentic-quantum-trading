@@ -7,6 +7,7 @@ After=network-online.target
 Type=oneshot
 WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/refresh_aster_cache.py --refresh-all --limit 50
+ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/funding_scanner.py
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range BTCUSDT --target-bars 3000
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range ETHUSDT --target-bars 3000
 ExecStart=/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python scripts/fetch_klines.py --fetch-range SOLUSDT --target-bars 3000
