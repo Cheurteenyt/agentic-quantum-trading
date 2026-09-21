@@ -34,6 +34,19 @@ REPORTS = ROOT / "reports"
 BPS_PER_8H_TO_ANNUAL_PCT = 3 * 365 / 100  # 3 reglements/jour, 100 bps = 1 %
 SEUIL_EXTREME_ANN = 50.0  # % annualises
 
+# Perps d'actions / matieres premieres : horaires New York, erreur
+# -2016 NO_TRADING_WINDOW hors session (working-map Aster legacy).
+SESSION_GATED_PREFIXES = (
+    "INTC", "MSFT", "NVDA", "MSTR", "GOOGL", "AAPL", "AMZN", "TSLA",
+    "META", "NFLX", "AMD", "ORCL", "CRCL", "CLU", "BZ", "XAU", "XAG",
+)
+
+
+def _session_note(symbol: str) -> str:
+    if symbol.startswith(SESSION_GATED_PREFIXES):
+        return " ⚠️ session NY (hors session : NO_TRADING_WINDOW)"
+    return ""
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -59,6 +72,7 @@ def load_ranked() -> list[dict]:
             "avg_ann": avg,
             "heat": latest - avg,
             "who_collects": "shorts" if latest > 0 else "longs",
+            "session_note": _session_note(sym),
         })
     rows.sort(key=lambda r: abs(r["latest_ann"]), reverse=True)
     return rows
@@ -94,7 +108,7 @@ def write_report(rows: list[dict]) -> Path:
         heat = "chauffe" if r["heat"] > 0 else "refroidit"
         lines.append(
             f"| {r['symbol']} | {_fmt(r['latest_ann'])} | {_fmt(r['avg_ann'])} "
-            f"| {heat} | {r['who_collects']} |"
+            f"| {heat} | {r['who_collects']} |{r['session_note']}"
         )
     if extremes:
         lines += ["", "### Regime extreme", ""]

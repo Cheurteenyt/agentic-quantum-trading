@@ -44,6 +44,22 @@ N_LONGS = 4           # meilleures jambes longues (funding negatif)
 KLINE_LIMIT = 168     # 7 jours de bougies 1h
 CORR_QUASI_NEUTRE = 0.70
 CORR_PARTIELLE = 0.40
+MAX_SPREAD_BPS = 20.0  # seuil du validateur microstructure legacy
+
+
+def _leg_spread_bps(symbol: str) -> float | None:
+    """Spread top-10 du carnet — la fillabilite mesuree par le legacy
+    (aster_microstructure_replay_validator : max 20 bps)."""
+    try:
+        data = _get_json(f"{BASE_URL}/fapi/v3/depth?symbol={symbol}&limit=10")
+        bids = [float(x[0]) for x in data.get("bids", [])]
+        asks = [float(x[0]) for x in data.get("asks", [])]
+        if not bids or not asks:
+            return None
+        mid = (bids[0] + asks[0]) / 2
+        return (asks[0] - bids[0]) / mid * 10000
+    except Exception:
+        return None
 
 
 def _utc_now() -> str:
@@ -115,8 +131,11 @@ def build_pairs() -> list[dict]:
     if not shorts or not longs:
         return []
     returns_cache: dict[str, list[float] | None] = {}
+    spread_cache: dict[str, float | None] = {}
     for row in shorts + longs:
         returns_cache[row["symbol"]] = hourly_returns(row["symbol"])
+    for sym in sorted({r["symbol"] for r in shorts + longs}):
+        spread_cache[sym] = _leg_spread_bps(sym)
     pairs: list[dict] = []
     for s in shorts:
         for l in longs:
@@ -125,11 +144,18 @@ def build_pairs() -> list[dict]:
                 corr = None
             else:
                 corr = pearson(rs, rl)
+            spreads = [
+                spread_cache[x] for x in (s["symbol"], l["symbol"])
+                if spread_cache.get(x) is not None
+            ]
+            worst_spread = max(spreads) if spreads else None
             pairs.append({
                 "short_leg": s["symbol"],
                 "long_leg": l["symbol"],
                 "net_ann": s["ann"] + abs(l["ann"]),
                 "corr": corr,
+                "worst_spread_bps": worst_spread,
+                "liquid": worst_spread is None or worst_spread <= MAX_SPREAD_BPS,
             })
     pairs.sort(key=lambda p: (p["corr"] is not None and p["corr"] >= CORR_QUASI_NEUTRE,
                               p["corr"] if p["corr"] is not None else 0,
@@ -157,14 +183,19 @@ def write_report(pairs: list[dict], n_shorts: int, n_longs: int) -> Path:
         "",
         f"Jambes courtes candidates : {n_shorts} | jambes longues : {n_longs}",
         "",
-        "| short (encaisse) | long (encaisse) | carry net ann. | correlation | lecture |",
-        "|---|---|---|---|---|",
+        "| short (encaisse) | long (encaisse) | carry net ann. | correlation | spread pire jambe | lecture |",
+        "|---|---|---|---|---|---|---|",
     ]
     for p in pairs:
         corr = f"{p['corr']:.2f}" if p["corr"] is not None else "?"
+        spread = (
+            f"{p['worst_spread_bps']:.1f} bps"
+            if p["worst_spread_bps"] is not None else "?"
+        )
         lines.append(
             f"| {p['short_leg']} | {p['long_leg']} | {p['net_ann']:+.1f} % "
-            f"| {corr} | {_label(p['corr'])} |"
+            f"| {corr} | {spread} | {_label(p['corr'])}"
+            f"{' / ILLIQUIDE' if not p['liquid'] else ''} |"
         )
     if not pairs:
         lines.append("| — | — | — | — | aucune jambe long collectrice ce soir |")
