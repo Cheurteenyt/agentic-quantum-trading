@@ -50,6 +50,8 @@ SOURCE = "aster_public_klines_fapi_v3"
 
 # Duree theorique de chaque interval en millisecondes. Sert de base a
 # detect_gaps : sans duree attendue, un trou est indetectable.
+# 3h/5h : intervalles SYNTHETIQUES (agreges depuis 1h par
+# scripts/synthesize_intervals.py — l'API Aster ne les expose pas).
 INTERVAL_MS: dict[str, int] = {
     "1m": 60_000,
     "3m": 3 * 60_000,
@@ -58,6 +60,8 @@ INTERVAL_MS: dict[str, int] = {
     "30m": 30 * 60_000,
     "1h": 3_600_000,
     "2h": 2 * 3_600_000,
+    "3h": 3 * 3_600_000,
+    "5h": 5 * 3_600_000,
     "4h": 4 * 3_600_000,
     "6h": 6 * 3_600_000,
     "8h": 8 * 3_600_000,
