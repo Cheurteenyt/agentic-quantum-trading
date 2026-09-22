@@ -1,0 +1,9 @@
+[Unit]
+Description=Registre X — deuxième passage quotidien à 14h00
+
+[Timer]
+OnCalendar=14:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=Registre X — passage diurne (harvest + ingest + parse + score)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --profiles thatdevlr,lookonchain,bscnews,dumpdetected,lesssgooohhh,avw_5
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest.json --query noon
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --searches '$$BTC (long OR short),$$ETH (long OR short),$$ASTER (long OR short),$$SOL (long OR short)'
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest-searches.json --query noon-searches
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --parse-calls
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/score_x_calls.py --score
+TimeoutStartSec=1200
