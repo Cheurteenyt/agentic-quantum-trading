@@ -109,3 +109,13 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Rapports volatiles regénérés chaque nuit (rétention gérée par housekeeping.py)
+reports/campaign-nightly-*.md
+reports/registre-honnetete-*.md
+reports/carry-hedged-*.md
+reports/carry-intra-aster-*.md
+reports/funding-scanner-*.md
+reports/depth-heatmap-*.pdf
+reports/registre-board-*.pdf
+reports/etat-projet.md
