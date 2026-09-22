@@ -126,6 +126,31 @@ tests (exactement le chemin fait pour Absorption & Sweep). MMT devient une
 3. Portage Python natif Aster + tests + accumulation nocturne
 4. Backtest dans 2-4 semaines avec la règle pré-enregistrée
 
+### Heatmap et positioning MAISON (équivalents natifs Aster, 23/09)
+
+Le catalogue public MMT (mmt.gg/indicators) expose 24 indicateurs publiés —
+slugs + IDs extraits vers /tmp (référence : `aggregated-ob-imbalance`,
+`net-positioning-v2`, `naked-poc-tpoc-single-prints`, `key-levels-v2-4`,
+`the-oracle`…). MAIS les IDs de la vitrine ne sont pas des IDs M5 :
+`script_get`/`script_fork` sur ces UUID renvoient 404, et la source lisible
+exige la session app. Procédure de portage (quand M5 est ouvert) :
+ouvrir l'indicateur dans l'UI MMT → bouton Fork → le fork apparaît dans
+notre `script_list` → je lis la source via MCP et je porte.
+
+En attendant, les DEUX concepts phares ont déjà leurs équivalents natifs :
+
+- **Heatmap de liquidité maison** : `scripts/depth_collector.py` (systemd
+  `aster-depth-collector.service`, 24/7, Restart=always) échantillonne le
+  carnet Aster (500 niveaux, bacs 0.01 % du mid) dans `depth.db` (rétention
+  30 j). `scripts/depth_heatmap.py` rend le PDF vectoriel
+  (`reports/depth-heatmap-<sym>-<date>.pdf`, fond blanc/encre navy) — étape
+  nocturne 21. Première heatmap exploitable après ~12 h d'accumulation.
+- **Positioning proxy** : Aster n'expose PAS les ratios long/short de Binance
+  (endpoints `/futures/data/*` = 404 déguisé) — `scripts/flow_snapshot.py`
+  (étape nocturne 20) capture donc Open Interest + delta taker 30m dans
+  `flow_snapshots` : la lecture « la foule se renforce-t-elle ? » sur données
+  Aster natives.
+
 ### Workflow recommandé
 
 1. Ouvrir M5 dans le navigateur (free).

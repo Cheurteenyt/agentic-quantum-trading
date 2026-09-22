@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+"""Capteur de profondeur Aster 24/7 — fondations de la heatmap maison.
+
+MMT ne couvrira jamais Aster (docs/17-mmt-m5.md) : leur heatmap order-book
+est donc reconstruite chez nous. Toutes les POLL_SEC secondes, on échantillonne
+le carnet (500 niveaux) de chaque symbole, on agrège les quantités par bacs de
+prix (~0.1 % du mid) et on stocke dans data/warehouse/depth.db.
+
+Le rendu (heatmap temps × prix, PDF vectoriel) est fait par
+scripts/depth_heatmap.py dans la campagne nocturne.
+
+Service : systemd user `aster-depth-collector.service` (Restart=always).
+Stdlib uniquement — même discipline que liq_collector.
+"""
+
+from __future__ import annotations
+
+import json
+import signal
+import sqlite3
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DB_PATH = ROOT / "data" / "warehouse" / "depth.db"
+
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "ASTERUSDT"]
+DEPTH_URL = "https://fapi.asterdex.com/fapi/v1/depth"
+POLL_SEC = 30
+BIN_FRAC = 0.0001         # largeur de bac = 0.01 % du mid
+RETENTION_DAYS = 30
+
+DEPTH_DDL = """
+CREATE TABLE IF NOT EXISTS depth_bins (
+    symbol    TEXT    NOT NULL,
+    ts        INTEGER NOT NULL,
+    side      TEXT    NOT NULL,
+    bin_price REAL    NOT NULL,
+    qty       REAL    NOT NULL,
+    PRIMARY KEY (symbol, ts, side, bin_price)
+);
+CREATE TABLE IF NOT EXISTS depth_meta (
+    symbol TEXT    NOT NULL,
+    ts     INTEGER NOT NULL,
+    mid    REAL    NOT NULL,
+    PRIMARY KEY (symbol, ts)
+);
+"""
+
+_running = True
+
+
+def _stop(signum, frame):  # noqa: ARG001
+    global _running
+    _running = False
+
+
+def connect(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
+    con = sqlite3.connect(db_path, timeout=30)
+    con.executescript(DEPTH_DDL)
+    return con
+
+
+def bin_levels(levels: list[list[str]], grid: float) -> dict[float, float]:
+    """Agrège [(prix, qty)...] dans des bacs centrés sur la grille."""
+    bins: dict[float, float] = {}
+    for price_s, qty_s in levels:
+        price, qty = float(price_s), float(qty_s)
+        if price <= 0 or qty <= 0:
+            continue
+        b = round(price / grid) * grid
+        bins[b] = bins.get(b, 0.0) + qty
+    return bins
+
+
+def snapshot_symbol(con: sqlite3.Connection, symbol: str) -> bool:
+    url = f"{DEPTH_URL}?symbol={symbol}&limit=500"
+    req = urllib.request.Request(url, headers={"User-Agent": "trading-agent/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.load(resp)
+    except Exception as exc:  # noqa: BLE001 — le capteur ne doit jamais mourir sur un tick
+        print(f"[warn] {symbol}: {exc}", file=sys.stderr, flush=True)
+        return False
+    bids, asks = data.get("bids") or [], data.get("asks") or []
+    if not bids or not asks:
+        return False
+    mid = (float(bids[0][0]) + float(asks[0][0])) / 2.0
+    grid = mid * BIN_FRAC
+    ts = int(time.time())
+    rows = []
+    for side, levels in (("bid", bids), ("ask", asks)):
+        for b, qty in bin_levels(levels, grid).items():
+            rows.append((symbol, ts, side, b, qty))
+    con.executemany(
+        "INSERT OR REPLACE INTO depth_bins (symbol, ts, side, bin_price, qty) VALUES (?, ?, ?, ?, ?)",
+        rows,
+    )
+    con.execute("INSERT OR REPLACE INTO depth_meta (symbol, ts, mid) VALUES (?, ?, ?)", (symbol, ts, mid))
+    con.commit()
+    return True
+
+
+def prune_old(con: sqlite3.Connection) -> int:
+    cutoff = int(time.time()) - RETENTION_DAYS * 86400
+    cur = con.execute("DELETE FROM depth_bins WHERE ts < ?", (cutoff,))
+    con.execute("DELETE FROM depth_meta WHERE ts < ?", (cutoff,))
+    con.commit()
+    return cur.rowcount
+
+
+def main() -> int:
+    signal.signal(signal.SIGTERM, _stop)
+    signal.signal(signal.SIGINT, _stop)
+    con = connect()
+    print(f"[depth-collector] démarré : {SYMBOLS} toutes les {POLL_SEC}s -> {DB_PATH}", flush=True)
+    last_prune_day = -1
+    while _running:
+        started = time.time()
+        for symbol in SYMBOLS:
+            if not _running:
+                break
+            snapshot_symbol(con, symbol)
+        day = int(started // 86400)
+        if day != last_prune_day:
+            removed = prune_old(con)
+            last_prune_day = day
+            if removed:
+                print(f"[prune] {removed} lignes > {RETENTION_DAYS}j supprimées", flush=True)
+        elapsed = time.time() - started
+        rest = max(1.0, POLL_SEC - elapsed)
+        # dormir par petites tranches pour réagir aux signaux d'arrêt
+        for _ in range(int(rest * 4)):
+            if not _running:
+                break
+            time.sleep(0.25)
+    con.close()
+    print("[depth-collector] arrêt propre", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
