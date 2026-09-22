@@ -38,4 +38,5 @@ ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/depth_heatmap.py --hours 12
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/housekeeping.py --apply
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/memecoin_pulse.py
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/listing_watcher.py
 TimeoutStartSec=3600

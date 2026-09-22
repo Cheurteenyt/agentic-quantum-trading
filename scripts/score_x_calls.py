@@ -185,15 +185,17 @@ def score_all() -> dict:
     rows = con.execute(
         """
         SELECT c.call_id, c.symbol, c.direction, c.entry_price, c.confidence,
-               p.author_handle, p.posted_at_raw, p.fetched_at
+               p.author_handle, p.posted_at_raw, p.fetched_at, p.metrics
         FROM x_calls c JOIN x_posts p ON p.post_id = c.post_id
-        WHERE c.parser_version = (SELECT MAX(parser_version) FROM x_calls)
+        WHERE c.call_id IN (
+            SELECT MAX(call_id) FROM x_calls GROUP BY post_id
+        )
         """
     ).fetchall()
     stats = {"scored": 0, "partiel": 0, "hors_univers": 0, "date_unparseable": 0, "pas_de_prix": 0}
     scored_rows = []
     for (call_id, sym, direction, entry_declared, confidence,
-         handle, posted_raw, fetched_at) in rows:
+         handle, posted_raw, fetched_at, metrics_raw) in rows:
         pair = f"{(sym or '').upper()}USDT"
         if pair not in universe:
             stats["hors_univers"] += 1
@@ -240,11 +242,17 @@ def score_all() -> dict:
              rets["ret_7d"], "partiel" if not complete else "scored",
              _utc_now(), ENGINE_VERSION),
         )
+        try:
+            _m = json.loads(metrics_raw) if metrics_raw else {}
+        except Exception:  # noqa: BLE001
+            _m = {}
         scored_rows.append({
             "call_id": call_id,
             "handle": handle, "symbol": sym, "direction": direction,
             "entry_declared": entry_declared, "entry": entry,
             "confidence": confidence, **rets,
+            "views": int(_m.get("views") or 0),
+            "bookmarks": int(_m.get("bookmarks") or 0),
         })
     con.commit()
     posts_total = con.execute("SELECT COUNT(*) FROM x_posts").fetchone()[0]
@@ -375,9 +383,9 @@ def write_report(result: dict) -> Path:
     else:
         trad = tradability({r["symbol"] for r in rows})
         lines.append(
-            "| compte | call | entree (declaree -> resolue) | +1h | +24h | +7j | coll. (spread bps) |"
+            "| compte | call | entree (declaree -> resolue) | +1h | +24h | +7j | coll. (spread bps) | portée (vues) |"
         )
-        lines.append("|---|---|---|---|---|---|---|")
+        lines.append("|---|---|---|---|---|---|---|---|")
         for r in rows:
             declared = (
                 f"{r['entry_declared']:g}" if r["entry_declared"] else "auto"
@@ -385,11 +393,13 @@ def write_report(result: dict) -> Path:
             t = trad.get((r["symbol"] or "").upper(), {})
             spread = t.get("spread_bps")
             coll = "—" if spread is None else ("OUI" if t["collectionnable"] else f"non ({spread:g})")
+            reach = r.get("views") or 0
+            reach_s = f"{reach/1000:.1f}k" if reach >= 1000 else (str(reach) if reach else "—")
             lines.append(
                 f"| @{r['handle']} | {r['symbol']} {r['direction'].upper()} "
                 f"({r['confidence']}) | {declared} -> {r['entry']:.4g} "
                 f"| {_fmt_pct(r['ret_1h'])} | {_fmt_pct(r['ret_24h'])} "
-                f"| {_fmt_pct(r['ret_7d'])} | {coll} |"
+                f"| {_fmt_pct(r['ret_7d'])} | {coll} | {reach_s} |"
             )
         coll_rows = [r for r in rows
                      if trad.get((r["symbol"] or "").upper(), {}).get("collectionnable")]
