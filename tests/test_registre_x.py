@@ -282,3 +282,31 @@ class TestParseCallsV3(RegistreDbTest):
         self._add_post("v3f", "$BOME is looking interesting today")
         fxp._parse_calls(self.con)
         self.assertEqual(self._calls(), [])
+
+
+class TestTradability(unittest.TestCase):
+    """Gate microstructure : spread top-10 live + frais legacy par symbole."""
+
+    def test_collectionnable_selon_spread(self) -> None:
+        from scripts.score_x_calls import tradability
+
+        spreads = {"WIFUSDT": 5.0, "BOMEUSDT": 150.0}
+        res = tradability({"BOME", "WIF"}, spread_fetch=spreads.get)
+        self.assertTrue(res["WIF"]["collectionnable"])
+        self.assertFalse(res["BOME"]["collectionnable"])
+        self.assertEqual(res["BOME"]["spread_bps"], 150.0)
+        self.assertEqual(res["WIF"]["fee_bps"], 4.0)  # frais taker USDT legacy
+
+    def test_spread_indisponible_n_est_pas_collectionnable(self) -> None:
+        from scripts.score_x_calls import tradability
+
+        res = tradability({"BTC"}, spread_fetch=lambda pair: None)
+        self.assertFalse(res["BTC"]["collectionnable"])
+        self.assertIsNone(res["BTC"]["spread_bps"])
+
+    def test_usd1_a_des_frais_reduits(self) -> None:
+        from scripts.score_x_calls import tradability
+
+        res = tradability({"FOO"}, spread_fetch=lambda pair: 1.0)
+        # FOOUSDT : quote inconnue -> fallback 4 bps ; USD1 reste 0.5 via le legacy
+        self.assertEqual(res["FOO"]["fee_bps"], 4.0)

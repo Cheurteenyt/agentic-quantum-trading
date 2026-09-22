@@ -18,16 +18,21 @@ comptes, pas le marche ; il ne prouve aucun edge, il tient le score.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sqlite3
 import sys
 import unicodedata
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from backend.services.onchain.aster.aster_perps_model import (  # noqa: E402
+    taker_fee_bps_for_symbol,
+)
 from scripts.fetch_klines import init_db as init_klines_db  # noqa: E402
 from scripts.fetch_klines import load_bars  # noqa: E402
 from scripts.fetch_x_posts import DB_PATH, _connect  # noqa: E402
@@ -35,6 +40,44 @@ from scripts.fetch_x_posts import DB_PATH, _connect  # noqa: E402
 REPORTS = ROOT / "reports"
 ENGINE_VERSION = "v0-horizons"
 HORIZONS_H = {"ret_1h": 1, "ret_24h": 24, "ret_7d": 168}
+
+DEPTH_URL = "https://fapi.asterdex.com/fapi/v1/depth"
+SPREAD_BPS_LIMIT = 20.0  # seuil legacy microstructure (spread top-10)
+
+
+def _live_spread_bps(symbol_pair: str) -> float | None:
+    """Spread top-10 live en bps (même mesure que le gate legacy)."""
+    try:
+        req = urllib.request.Request(
+            f"{DEPTH_URL}?symbol={symbol_pair}&limit=10",
+            headers={"User-Agent": "trading-agent/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            d = json.load(resp)
+        bid, ask = float(d["bids"][0][0]), float(d["asks"][0][0])
+        mid = (bid + ask) / 2.0
+        return (ask - bid) / mid * 10000.0
+    except Exception:  # noqa: BLE001 — un symbole injoignable ne bloque pas le rapport
+        return None
+
+
+def tradability(symbols: set[str], spread_fetch=_live_spread_bps) -> dict[str, dict]:
+    """Tradabilité réelle par symbole : spread top-10 live + frais taker Aster.
+
+    Le registre mesure les COMPTES (la prédiction) ; la tradabilité est un
+    autre regard : un call parfait sur un marché à 200 bps de spread n'était
+    pas encaissable. Renvoie {base: {spread_bps, fee_bps, collectionnable}}.
+    """
+    out: dict[str, dict] = {}
+    for base in sorted({(s or "").upper() for s in symbols if s}):
+        pair = f"{base}USDT"
+        spread = spread_fetch(pair)
+        out[base] = {
+            "spread_bps": round(spread, 1) if spread is not None else None,
+            "fee_bps": taker_fee_bps_for_symbol(pair),
+            "collectionnable": spread is not None and spread < SPREAD_BPS_LIMIT,
+        }
+    return out
 
 SCORES_SCHEMA = """
 CREATE TABLE IF NOT EXISTS x_call_scores (
@@ -330,20 +373,34 @@ def write_report(result: dict) -> Path:
     if not rows:
         lines.append("Aucun call scoreable pour l'instant.")
     else:
+        trad = tradability({r["symbol"] for r in rows})
         lines.append(
-            "| compte | call | entree (declaree -> resolue) | +1h | +24h | +7j |"
+            "| compte | call | entree (declaree -> resolue) | +1h | +24h | +7j | coll. (spread bps) |"
         )
-        lines.append("|---|---|---|---|---|---|")
+        lines.append("|---|---|---|---|---|---|---|")
         for r in rows:
             declared = (
                 f"{r['entry_declared']:g}" if r["entry_declared"] else "auto"
             )
+            t = trad.get((r["symbol"] or "").upper(), {})
+            spread = t.get("spread_bps")
+            coll = "—" if spread is None else ("OUI" if t["collectionnable"] else f"non ({spread:g})")
             lines.append(
                 f"| @{r['handle']} | {r['symbol']} {r['direction'].upper()} "
                 f"({r['confidence']}) | {declared} -> {r['entry']:.4g} "
                 f"| {_fmt_pct(r['ret_1h'])} | {_fmt_pct(r['ret_24h'])} "
-                f"| {_fmt_pct(r['ret_7d'])} |"
+                f"| {_fmt_pct(r['ret_7d'])} | {coll} |"
             )
+        coll_rows = [r for r in rows
+                     if trad.get((r["symbol"] or "").upper(), {}).get("collectionnable")]
+        lines += [
+            "",
+            f"Collectionnables (spread top-10 < {SPREAD_BPS_LIMIT:g} bps, seuil legacy) : "
+            f"{len(coll_rows)}/{len(rows)} calls affiches. Frais taker Aster : "
+            "4 bps (USDT), 0,5 bps (USD1) — un aller-retour coute 2x les frais.",
+            "Le registre mesure la PREDICTION des comptes ; la colonne coll. dit",
+            "si le call etait reellement encaissable sur Aster au moment du score.",
+        ]
     n24 = sum(1 for r in rows if r["ret_24h"] is not None)
     r24 = [r["ret_24h"] for r in rows if r["ret_24h"] is not None]
     inv_cum = -sum(r24) if r24 else None
