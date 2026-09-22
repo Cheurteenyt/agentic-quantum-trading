@@ -1,6 +1,6 @@
 # Scanner de funding Aster
 
-Genere : 2026-09-22T01:04:49Z UTC — source : cache Aster nocturne (59 symboles)
+Genere : 2026-09-22T00:37:14Z UTC — source : cache Aster nocturne (59 symboles)
 
 ## Regle de lecture
 
@@ -14,6 +14,7 @@ signal de surchauffe.
 | symbole | dernier (ann.) | moyenne 100p (ann.) | chauffe | qui encaisse |
 |---|---|---|---|---|
 | 1000PEPEUSDT | +60.0 % | +14.5 % | chauffe | shorts |
+| MEMEUSDT | +45.6 % | +6.6 % | chauffe | shorts |
 | DRAMUSDT | +34.6 % | +1.3 % | chauffe | shorts |
 | PIEVERSEUSDT | +33.4 % | +25.2 % | chauffe | shorts |
 | CRCLUSDT | +27.2 % | +10.4 % | chauffe | shorts | ⚠️ session NY (hors session : NO_TRADING_WINDOW)
@@ -22,7 +23,6 @@ signal de surchauffe.
 | ESPORTSUSDT | +20.1 % | +36.0 % | refroidit | shorts |
 | PLAYUSDT | -19.4 % | -1.5 % | refroidit | longs |
 | LABUSDT | +19.3 % | +15.1 % | chauffe | shorts |
-| SOLUSDT | -18.5 % | +0.8 % | refroidit | longs |
 
 ### Regime extreme
 

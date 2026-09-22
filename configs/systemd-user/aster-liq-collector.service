@@ -1,0 +1,14 @@
+[Unit]
+Description=Aster — capteur de liquidations WS !forceOrder@arr
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/liq_collector.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
