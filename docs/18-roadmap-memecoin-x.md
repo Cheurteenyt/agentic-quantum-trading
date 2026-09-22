@@ -131,3 +131,17 @@ Login utilisateur effectué dans le navigateur in-app → minage direct :
   innerText, exclure DizzyOnlyClam = compte utilisateur) → écrire
   data/fomo/leaderboard-*.json → analyse de constance → mise à jour
   watchlist. Les PnL clans sont affichés en K/M (normaliser au parsing).
+
+### Minage des positions (23/09 très tard) — limite documentée
+
+Les profils fomo virtualisent leurs listes : seules les positions RENDERED
+apparaissent dans le DOM/ARIA (0xAvast : 2 visibles / 37 déclarées). Le
+minage complet demandera une passe d'interaction (cliquer l'onglet
+Positions, scroll incrémental dans le conteneur). Ce qui est déjà acquis :
+- unipcs tient des **RWA tokenisés** (SPYX = S&P 500, MSFTX = Microsoft
+  sur Solana) — les top traders memecoin diversifient ;
+- positions déclarées des 6 constants minés : unipcs 99, AvgJoesCrypto 51,
+  ogle 42, 0xAvast 37, frogmanhaha 32, Salem 29 ;
+- le filtre DOM des positions réelles est identifié (parents à classes
+  vides, hors sidebar `A.block.rounded-lg` / discovery `grid-transition` /
+  footer) — à réutiliser.
