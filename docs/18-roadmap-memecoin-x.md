@@ -87,3 +87,23 @@ réutilise TEL QUEL :
 2. Free only — aucun abonnement, aucune clé payante.
 3. Aucun ordre réel sans validation utilisateur à chaque porte.
 4. La règle pré-enregistrée (N ≥ 10, 55 %) s'applique à tout nouveau signal.
+
+## Verdict du backtest absorption/sweep (23/09, nuit) — BRUIT CLASSÉ
+
+`scripts/backtest_absorption.py` : 22 symboles × ~3000 bougies 1h, ~2 400
+événements, règles EXACTES de l'indicateur, coûts 8 bps, split 70/30, règle
+pré-enregistrée. Résultat : 224 bruit, 235 insuffisants, 63 « prometteurs »
+en apparence — **mais ZÉRO combinaison confirmée train + val** (N val ≥ 10).
+Les 63 sont les survivants aléatoires prédits par l'avertissement de
+multiplicité.
+
+Conséquences (acceptées avant de chercher ailleurs) :
+1. Absorption & Sweep reste un outil VISUEL/contexte dans le terminal — PAS
+   un signal directionnel autonome. Ne plus jamais le présenter comme edge.
+2. Le paper ledger des ondes (C3) ne se construira PAS sur le flow seul :
+   le moteur de la thèse est la couche SOCIALE (vélocité X, calls du
+   registre) que personne d'autre ne systématise — le flow reste contexte.
+3. Troisième grand résultat nul du projet (lab 36 372 combos, funding
+   extrême, absorption/sweep). La règle pré-enregistrée tient : c'est ce
+   qui distingue ce projet de la majority des « stratégies » qui ne se
+   testent jamais contre elles-mêmes.
