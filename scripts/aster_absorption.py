@@ -23,11 +23,82 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
+import time
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DB_PATH = ROOT / "data" / "warehouse" / "klines.db"
 
 ASTERNDEX_BASE = "https://fapi.asterdex.com/fapi/v1/klines"
+
+FLOW_EVENTS_DDL = """
+CREATE TABLE IF NOT EXISTS flow_events (
+    symbol      TEXT    NOT NULL,
+    interval    TEXT    NOT NULL,
+    kind        TEXT    NOT NULL,
+    bar_time    INTEGER NOT NULL,
+    close       REAL    NOT NULL,
+    delta       REAL    NOT NULL,
+    baseline    REAL    NOT NULL,
+    depth_atr   REAL    NOT NULL,
+    params      TEXT    NOT NULL,
+    captured_at REAL    NOT NULL,
+    PRIMARY KEY (symbol, interval, kind, bar_time, params)
+);
+"""
+
+
+def param_signature(params: dict) -> str:
+    """Empreinte compacte des paramètres : changer un seuil crée une nouvelle
+    famille d'événements au lieu de corrompre l'accumulation en cours."""
+    return (
+        f"l{params['len_baseline']}_t{params['thr_mult']}"
+        f"_b{params['max_body_frac']}_s{params['sweep_len']}"
+        f"_a{params['sweep_atr_frac']}"
+    )
+
+
+def init_flow_db(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
+    con = sqlite3.connect(db_path)
+    con.execute(FLOW_EVENTS_DDL)
+    con.commit()
+    return con
+
+
+def record_events(rows: list[dict], db_path: Path | str = DB_PATH) -> int:
+    """Insertion idempotente (PK composite) ; retourne le nb de nouvelles lignes."""
+    if not rows:
+        return 0
+    con = init_flow_db(db_path)
+    try:
+        cur = con.executemany(
+            "INSERT OR IGNORE INTO flow_events "
+            "(symbol, interval, kind, bar_time, close, delta, baseline, depth_atr, params, captured_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    r["symbol"],
+                    r["interval"],
+                    r["kind"],
+                    r["bar_time"],
+                    r["close"],
+                    r["delta"],
+                    r["baseline_abs_delta"],
+                    r["depth_atr"],
+                    r["params"],
+                    time.time(),
+                )
+                for r in rows
+            ],
+        )
+        con.commit()
+        return cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+    finally:
+        con.close()
 
 
 def fetch_klines(symbol: str, interval: str, limit: int = 400) -> list:
@@ -119,19 +190,24 @@ def run(symbol: str, interval: str, limit: int, last: int, params: dict) -> list
     events = detect(bars, **params)
     if last >= 0:
         events = events[-last:]
+    sig = param_signature(params)
     out = []
     for ev in events:
         b = bars[ev["i"]]
-        row = {
-            "symbol": symbol,
-            "time_utc": _fmt_ts(b["t"]),
-            "kind": ev["kind"],
-            "close": b["c"],
-            "delta": round(ev.get("delta", 0.0), 3),
-            "baseline_abs_delta": round(ev.get("baseline", 0.0), 3),
-            "depth_atr": round(ev.get("depth_atr", 0.0), 2),
-        }
-        out.append(row)
+        out.append(
+            {
+                "symbol": symbol,
+                "interval": interval,
+                "kind": ev["kind"],
+                "bar_time": b["t"],
+                "time_utc": _fmt_ts(b["t"]),
+                "close": b["c"],
+                "delta": round(ev.get("delta", 0.0), 3),
+                "baseline_abs_delta": round(ev.get("baseline", 0.0), 3),
+                "depth_atr": round(ev.get("depth_atr", 0.0), 2),
+                "params": sig,
+            }
+        )
     return out
 
 
@@ -146,6 +222,9 @@ def main() -> int:
     p.add_argument("--max-body-frac", type=float, default=0.4)
     p.add_argument("--sweep-len", type=int, default=20)
     p.add_argument("--sweep-atr-frac", type=float, default=0.15)
+    p.add_argument("--record", action="store_true",
+                   help="insérer les événements de la fenêtre dans flow_events (klines.db) ; --last est ignoré")
+    p.add_argument("--db", default=str(DB_PATH))
     p.add_argument("--json", action="store_true")
     args = p.parse_args()
 
@@ -160,9 +239,14 @@ def main() -> int:
     all_rows: list[dict] = []
     for sym in [s.strip().upper() for s in args.symbol.split(",") if s.strip()]:
         try:
-            all_rows.extend(run(sym, args.interval, args.limit, args.last, params))
+            # --record accumule TOUTE la fenêtre (idempotent), pas juste les N derniers
+            all_rows.extend(run(sym, args.interval, args.limit, -1 if args.record else args.last, params))
         except Exception as exc:  # noqa: BLE001 — un symbole en échec ne bloque pas les autres
             print(f"[WARN] {sym}: {exc}", file=sys.stderr)
+
+    if args.record:
+        inserted = record_events(all_rows, args.db)
+        print(f"[record] {inserted} nouveaux événements -> {args.db} (fenêtre : {len(all_rows)})")
 
     if args.json:
         print(json.dumps(all_rows, indent=1))

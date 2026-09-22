@@ -91,17 +91,53 @@ contexte visuel.
   Binance relues via `chart_get_candles` avec split buy/sell) ; fréquence
   ~6 % de bougies signalées sur 200 (sain, pas du bruit).
 
-## Workflow recommandé
+## Organisation d'ensemble : deux stations, un pont, une accumulation
+
+### Station CONTEXTE — MMT free (Binance, lecture seule)
+
+Leurs 266 indicateurs communautaires + footprint/heatmaps natifs restent
+attachables en deux clics sur les charts Binance. Notre « Absorption & Sweep »
+M5 y vit aussi. Rôle : vision macro de l'order-flow du lieu de price
+discovery — JAMAIS une vérité d'exécution.
+
+### Station VÉRITÉ — notre stack sur données Aster natives
+
+- `scripts/aster_absorption.py --record` : mêmes signaux, vrais prix Aster,
+  accumulation dans `flow_events` (klines.db, PK composite = idempotent, la
+  signature de params sépare les familles de seuils).
+- `scripts/basis_guard.py --record` : divergence Aster↔Binance mesurée par
+  symbole, snapshot en `basis_snapshots`, alerte si |basis| ≥ 0.5 % —
+  l'avertissement « les charts ne sont pas les mêmes » est devenu une mesure.
+- Les deux tournent chaque nuit dans la campagne systemd (étapes 18-19) —
+  dans 2-4 semaines : backtest `flow_events` avec la règle pré-enregistrée
+  habituelle (N ≥ 10, winrate ≥ 55 %, sinon classé bruit comme le funding).
+
+### Le pont : reprendre la LOGIQUE des indicateurs MMT vers Aster
+
+Impossible d'importer un indicateur MMT (moteur fermé, leurs exchanges
+seulement). MAIS `script_fork` fourke tout script publié à source visible →
+on lit la logique → on la ré-implémente en Python sur données Aster, avec
+tests (exactement le chemin fait pour Absorption & Sweep). MMT devient une
+**bibliothèque gratuite d'idées de trading** :
+
+1. Repérer un indicateur qui parle dans le catalogue MMT (UI, bouton
+   indicateurs → communauté)
+2. Me donner son nom → je le fourke via MCP et je lis sa source
+3. Portage Python natif Aster + tests + accumulation nocturne
+4. Backtest dans 2-4 semaines avec la règle pré-enregistrée
+
+### Workflow recommandé
 
 1. Ouvrir M5 dans le navigateur (free).
 2. Contexte macro/order-flow : layers natifs M5 (footprint, heatmap) sur
    Binance — lecture seule.
 3. Nos signaux : attacher « Absorption & Sweep » (bouton indicateurs →
    scripts personnels).
-4. Décision/exécution : sur **Aster uniquement**.
-5. Les événements restent à corréler avec nos couches maison (funding
-   extrême, liq_events, positioning Registre X) — pas encore de pont
-   automatique M5 ↔ warehouse (futur).
+4. Décision/exécution : sur **Aster uniquement**, en vérifiant
+   `basis_guard` si le symbole est petit.
+5. Les événements absorption/sweep Aster s'accumulent automatiquement
+   (`flow_events`) — corrélation future avec funding extrême, liq_events et
+   positioning du Registre X.
 
 ## Pièges connus (notes pour la prochaine session)
 
