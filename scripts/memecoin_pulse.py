@@ -51,15 +51,17 @@ def spread_bps(symbol: str) -> float | None:
         return None
 
 
+FUNDING_CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / "aster_public_funding_history_cache.json"
+
+
 def funding_row(symbol: str) -> tuple[float | None, float | None]:
-    """(dernier taux %, annualisé %) depuis funding_history."""
+    """(dernier taux %, annualisé %) — source : cache funding Aster (nuit)."""
     try:
-        con = sqlite3.connect(f"file:{KLINES_DB}?mode=ro", uri=True)
-        (rate,) = con.execute(
-            "SELECT rate FROM funding_history WHERE symbol = ? ORDER BY funding_time DESC LIMIT 1",
-            (symbol,),
-        ).fetchone()
-        con.close()
+        cache = json.loads(FUNDING_CACHE.read_text())
+        entry = cache.get("symbols", {}).get(symbol) or {}
+        rate = entry.get("data", {}).get("latest_funding_rate")
+        if rate is None:
+            return None, None
         r = float(rate) * 100.0
         return r, r * 3 * 365
     except Exception:  # noqa: BLE001
