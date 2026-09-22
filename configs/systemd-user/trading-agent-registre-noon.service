@@ -6,7 +6,7 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
-ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --profiles thatdevlr,lookonchain,bscnews,dumpdetected,lesssgooohhh,avw_5,ckarku33,tmtheog,crypto_shivam7,quarky32,rhdaily__,toshixchain,ct_marketpulse,altcoinscoob
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --profiles thatdevlr,lookonchain,bscnews,dumpdetected,lesssgooohhh,avw_5,ckarku33,tmtheog,crypto_shivam7,quarky32,rhdaily__,toshixchain,ct_marketpulse,altcoinscoob,unipcs,Salem1299534,AvgJoesCrypto,frogmanhaha,ogle,0xAvast,cosby,RugDalio
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest.json --query noon
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --searches '$$MEME (long OR short),$$BOME (long OR short),$$WIF (long OR short),$$MOODENG (long OR short),$$PNUT (long OR short),$$TURBO (long OR short)'
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest-searches.json --query noon-searches

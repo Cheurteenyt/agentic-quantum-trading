@@ -107,3 +107,27 @@ Conséquences (acceptées avant de chercher ailleurs) :
    extrême, absorption/sweep). La règle pré-enregistrée tient : c'est ce
    qui distingue ce projet de la majority des « stratégies » qui ne se
    testent jamais contre elles-mêmes.
+
+## Couche fomo.family (23/09 nuit) — LA mine de track records
+
+Login utilisateur effectué dans le navigateur in-app → minage direct :
+
+- **Leaderboard** : 150 traders × 3 fenêtres (24h/7j/30j) capturés —
+  `data/fomo/leaderboard-*.json`. 281 traders uniques, **35 constants**
+  (PnL > 0 sur les 3 fenêtres). @unipcs : +$14,6 M/30j (258+ trades/24h).
+- **Clans** (équipes) : Fantom Troupe +$3,9 M/24h, Troupe KZ, Risk On…
+- **Profil type** : 2K trades, top 5 trades (PnL/%), positions ouvertes avec
+  contrats par chaîne (solana/ethereum/bnb/robinhood), **thèses postées**
+  (signal social interne à fomo).
+- **Pont X.com** : les handles fomo sont des handles X → les 12 meilleurs
+  constants sont dans la watchlist du registre (`fomo_top`) et dans les
+  récoltes (22 profils). Le registre score leurs CALLS ; fomo prouve leur
+  PnL. L'union des deux preuves = la watchlist la plus forte du projet.
+- **Pivot d'exécution (volonté utilisateur)** : fomo acceptable comme
+  plateforme pour les coins absents d'Aster — exécution MANUELLE par
+  l'utilisateur uniquement, jamais d'ordre autonome (règle inchangée).
+- **Procédure de minage** (repeatable en session) : navigateur in-app →
+  fomo.family/leaderboard → extraire 24H/7D/30D via evaluate (regex sur
+  innerText, exclure DizzyOnlyClam = compte utilisateur) → écrire
+  data/fomo/leaderboard-*.json → analyse de constance → mise à jour
+  watchlist. Les PnL clans sont affichés en K/M (normaliser au parsing).
