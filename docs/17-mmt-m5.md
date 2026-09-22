@@ -28,21 +28,48 @@ créés/édités headless avec diagnostics de compilation.
 - Le token vit dans `~/.zcode/cli/config.json` (HORS du repo git). Révocable
   depuis le terminal M5 si doute.
 
-## Verdict couverture Aster : NON
+## Verdict couverture Aster : NON (enquête exhaustive)
 
-Testé par sondage `markets.tickSize(exchange, symbol)` via un script M5
-(contrôles positifs : `binancef/btc/usd` = 0.1, `hyperliquid/btc/usd` = 0.1) :
-
-| IDs testés | `aster`, `asterd`, `asterdex`, `asterf` × formats usdt/usd |
-|---|---|
-| Résultat | tous `null` → aucun listing Aster |
+Quatre preuves indépendantes convergent :
+1. **Sonde `markets.tickSize`** via scripts M5 — 10 IDs candidats testés
+   (`aster`, `asterd`, `asterdex`, `asterf`, `asterusd`, `asterperp`,
+   `aster_dex` × formats btc/usdt, btc/usd, btc) : tous `null`. Contrôles
+   positifs : `binancef/btc/usd` = 0.1, `hyperliquid/btc/usd` = 0.1.
+2. **Code de l'app** (88 chunks SvelteKit téléchargés et greppés) : zéro
+   référence Aster (les seules occurrences « aster » sont le mot « master »).
+3. **Homepage** : 9 exchanges nommés sur « 20+ », pas d'Aster ; focus
+   Hyperliquid (position maps, API dédiée).
+4. `chart_set_market` n'a accepté aucun marché Aster avec données.
 
 Conséquence assumée : MMT sert à **lire les flux Binance** (lieu de price
 discovery des perps) comme contexte de marché ; l'exécution reste sur Aster ;
 **notre stack reste l'autorité sur les données Aster** (warehouse 42 séries,
 funding, liq-collector 24/7, Registre X). Sur les petites caps, prudence : les
 flux Binance ne prédisent pas les divergences locale-Aster (cf. incident MEME
-basis +4521 %).
+basis +4521 %). Rappel de l'utilisateur (23/09) : « sur aster les charts sont
+pas les même par rapport à un autre exchange » — tout signal lu sur Binance
+n'est qu'un CONTEXTE, jamais la vérité d'exécution.
+
+## L'alternative native Aster : scripts/aster_absorption.py
+
+L'API Aster (`fapi.asterdex.com/fapi/v1/klines`) expose le **volume taker buy
+par bougie** (colonne 9) → delta acheteur/vendeur calculable sur les VRAIS
+prix du lieu d'exécution. `scripts/aster_absorption.py` applique EXACTEMENT
+les règles de l'indicateur MMT aux klines Aster :
+
+    .venv/bin/python scripts/aster_absorption.py --symbol BTCUSDT,ETHUSDT,ASTERUSDT --interval 30m --last 14
+
+- absorption : |Δ| ≥ 2× baseline (50 bougies) + corps ≤ 40 % du range +
+  clôture à contre-sens du delta
+- sweep : perforation du plus-bas/plus-haut 20 bougies ≥ 0.15 ATR(14) +
+  reclaim (close dans les 40 % opposés du range)
+- 10 tests unittest (`tests/test_aster_absorption.py`) verrouillent la logique
+  (suite projet : 595 verts).
+
+Premier run (23/09) : ASTERUSDT 09-22 03:00 sweep_low à 2.80 ATR de profondeur
+(stop hunt), puis série d'absorptions vendeuses 0.72–0.74 avant le rebond.
+C'est ce flux qui fait autorité — l'indicateur MMT sur Binance reste le
+contexte visuel.
 
 ## Ce qui est branché
 
