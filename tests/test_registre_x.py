@@ -234,3 +234,51 @@ class TestDerived(RegistreDbTest):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestParseCallsV3(RegistreDbTest):
+    """v3 : ticker nu dans l'univers Aster, alias PEPE->1000PEPE, incrémental."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._old_universe = fxp._UNIVERSE_OVERRIDE
+        fxp._UNIVERSE_OVERRIDE = {"BOME", "WIF", "1000PEPE", "TURBO"}
+
+    def tearDown(self) -> None:
+        fxp._UNIVERSE_OVERRIDE = self._old_universe
+        super().tearDown()
+
+    def test_ticker_nu_dans_univers_parse_confiance_low(self) -> None:
+        self._add_post("v3a", "long BOME here we go boys")
+        fxp._parse_calls(self.con)
+        calls = self._calls()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual((calls[0][0], calls[0][1], calls[0][5]), ("BOME", "long", "low"))
+
+    def test_ticker_nu_hors_univers_ignore_regression_egld(self) -> None:
+        self._add_post("v3b", "l'EGLD a 500$, long EGLD maintenant c'est le moment")
+        fxp._parse_calls(self.con)
+        self.assertEqual(self._calls(), [])
+
+    def test_direction_doit_preceder_le_ticker(self) -> None:
+        self._add_post("v3c", "BOME long setup tonight")
+        fxp._parse_calls(self.con)
+        self.assertEqual(self._calls(), [])
+
+    def test_alias_pepe_vers_1000pepe(self) -> None:
+        self._add_post("v3d", "$PEPE long to the moon")
+        fxp._parse_calls(self.con)
+        calls = self._calls()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "1000PEPE")
+
+    def test_incremental_ne_reparse_pas_les_anciens(self) -> None:
+        self._add_post("v3e", "$WIF long entry now")
+        self.assertEqual(fxp._parse_calls(self.con), 1)
+        self.assertEqual(fxp._parse_calls(self.con), 0)
+        self.assertEqual(len(self._calls()), 1)
+
+    def test_cashtag_sans_direction_reste_ignore(self) -> None:
+        self._add_post("v3f", "$BOME is looking interesting today")
+        fxp._parse_calls(self.con)
+        self.assertEqual(self._calls(), [])

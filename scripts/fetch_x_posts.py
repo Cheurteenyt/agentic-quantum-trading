@@ -30,8 +30,30 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = ROOT / "data" / "warehouse" / "x_posts.db"
+FUNDING_CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / "aster_public_funding_history_cache.json"
 
-PARSER_VERSION = "v2-regex"
+PARSER_VERSION = "v3-regex"
+
+# Aliases cashtag -> perp Aster (echelle sans effet sur les rendements %)
+SYMBOL_ALIASES = {"PEPE": "1000PEPE"}
+
+# Override tests uniquement : None = univers derive du cache funding Aster
+_UNIVERSE_OVERRIDE: set[str] | None = None
+
+
+def _tradable_universe() -> set[str]:
+    """Bases tradables sur Aster (sans USDT), derivees du cache funding.
+
+    Sert de garde-fou au ticker nu (lecon EGLD) : un ticker nu hors de cet
+    univers n'est PAS parse — on ne score que ce qui se trade sur Aster.
+    """
+    if _UNIVERSE_OVERRIDE is not None:
+        return _UNIVERSE_OVERRIDE
+    try:
+        cache = json.loads(FUNDING_CACHE.read_text())
+        return {s[:-4] for s in cache.get("symbols", {}) if s.endswith("USDT")}
+    except Exception:
+        return set()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS x_posts (
@@ -222,28 +244,46 @@ def _parse_calls(con: sqlite3.Connection) -> int:
     v1 : seul un $CASHTAG identifie l'actif sans ambiguite. Les tickers nus
     ('l'EGLD a 500$') generaient des faux positifs — le registre ne score
     que ce qu'il lit sans ambiguite.
+    v2 : TP/SL quand ils existent -> verdict premier-touch sur le TRADE.
+    v3 : ticker nu ACCEPTE s'il est dans l'univers tradable Aster (le
+    garde-fou EGLD devient constructif : 'long BOME' passe, 'l'EGLD a 500$'
+    reste ignore car EGLD n'est pas sur Aster) ; alias PEPE -> 1000PEPE ;
+    incrementel (posts deja parses par une version anterieure non retouches).
     """
     now = _utc_now()
     rows = con.execute(
         """
         SELECT post_id, text FROM x_posts
-        WHERE post_id NOT IN (SELECT post_id FROM x_calls WHERE parser_version = ?)
+        WHERE post_id NOT IN (SELECT post_id FROM x_calls)
         """,
-        (PARSER_VERSION,),
     ).fetchall()
+    universe = _tradable_universe()
     calls = 0
     for post_id, text in rows:
+        parsed = None
         cashtag = re.search(r"\$([A-Za-z]{2,10})\b", text)
         direction_m = re.search(_DIRECTION, text, re.IGNORECASE)
-        if not cashtag or not direction_m:
+        if cashtag:
+            if direction_m:
+                parsed = (cashtag.group(1).upper(), "medium")
+        elif direction_m:
+            # v3 : direction suivie d'un ticker nu, uniquement dans l'univers
+            naked = re.search(
+                r"(?:^|\s)" + _DIRECTION + r"(?:\s+(?:on|sur|le|la|))?\s+\$?([A-Za-z]{2,10})\b",
+                text,
+                re.IGNORECASE,
+            )
+            if naked and naked.group(2).upper() in universe:
+                parsed = (naked.group(2).upper(), "low")
+        if not parsed:
             continue
-        symbol = cashtag.group(1).upper()
+        symbol_raw, confidence = parsed
+        symbol = SYMBOL_ALIASES.get(symbol_raw, symbol_raw)
         direction = direction_m.group(1).lower()
         direction = {
             "bullish": "long", "bearish": "short", "achat": "long", "vente": "short",
             "achete": "long", "vend": "short",
         }.get(direction, direction)
-        confidence = "medium"
         entry_price = None
         horizon = None
         price_m = re.search(_PRICE, text, re.IGNORECASE)
