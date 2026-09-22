@@ -1,0 +1,88 @@
+# 18 — Roadmap Memecoin × X.com × Aster (la vraie vague)
+
+Date : 2026-09-23 (nuit 3). Remplace l'approche « BTC long/short de petits
+comptes » du registre et l'attente passive de 4 semaines. Deux constats de
+l'utilisateur qui fondent cette roadmap : (1) le legacy a backtesté des lanes
+long-only sur small-caps — jamais la dynamique memecoin × social ; (2) les
+memecoins sont démocratisés sur X.com (cf. fomo.family) et **Aster liste leurs
+perps** : MEME, BOME, PEPE, WIF, PNUT, MOODENG, NEIRO, TURBO, PENGU, NOT,
+DOGS, TRUMP, FARTCOIN, CATE (~17 sur 567 perps).
+
+## La thèse
+
+Le cycle memecoin vit sur X.com (les callers créent la vague), se joue sur
+les launches (four.meme, fomo.family), et **se trade sur Aster en perps** avec
+des extrêmes de funding que personne ne traque systématiquement (MEME +88 %/an
+flaggé, basis +4521 % mesuré). Personne ne construit le pont
+**X.com → Aster perps** avec des données propriétaires. C'est le projet.
+
+## PILIER A — Registre X v2 : memecoin-first
+
+- **A1. Recherches memecoins** — fait ce soir : le passage de 14h00 tourne sur
+  `$MEME $BOME $PEPE $WIF $MOODENG $PNUT` ; la nuit garde majors + $ASTER.
+  Rotation à élargir (TURBO, PENGU, NOT, DOGS, TRUMP, FARTCOIN, CATE) avec un
+  sélecteur rotatif quand le parsing suit.
+- **A2. Parser v3 « memecoin »** — tickers nus sans `$` (BOME, pepe…),
+  patterns `CA: 0x…` (launches BSC), vocabulaire (ape, 100x, entry, MC).
+  Garde-fous anti-faux-positifs obligatoires (leçon EGLD) + tests.
+- **A3. fomo.family** — sonder la surface publique du leaderboard top traders
+  (2,5 M de traders revendiqués) : extraire QUI appelle quoi, intégrer ces
+  comptes à la watchlist X. **On n'y trade JAMAIS** (contrainte dure) — c'est
+  un annuaire de track records, pas un lieu d'exécution.
+- **A4. Verdicts memecoin complets** — klines perp Aster par cashtag
+  rencontré (fetch on-demand), **frais réels par symbole** du legacy
+  (`taker_fee_bps_for_symbol`), et **gate de collectionnabilité** : un call
+  sur un memecoin à spread 257 bps (MEME, mesuré) n'est PAS tradable — le
+  registre le flag `incollectionnable` au lieu de scorer du vent.
+- **A5. Klines on-demand** — fetch automatique des klines des symboles
+  apparaissant dans les calls (14 memecoins fetchés ce soir : 3000 bougies
+  chacun).
+
+## PILIER B — Le legacy comme arme (pas comme musée)
+
+Ce que le legacy a VRAIMENT fait : lanes long-only 15m-5h sur small-caps et
+stock-perps, microstructure + mark/index + frais réels, forward strict. Son
+verdict : champion paper (LAB ROI 48 %/PF 3) **non rentable en forward
+strict**. Ce qu'il n'a JAMAIS testé : la vague sociale memecoin. Ce qu'on
+réutilise TEL QUEL :
+
+- **B1. Les validateurs microstructure/mark-index deviennent le GATE du
+  registre memecoin** (module existant : `aster_microstructure_replay_validator`,
+  spread top-10, seuil 20 bps). Un call non collectionnable n'entre pas dans
+  les stats.
+- **B2. Ré-test des champions legacy (LAB 3h/5h, HYPE long) avec les NOUVELLES
+  couches comme filtres d'entrée** (flow_events, liq_events, depth) — sur
+  données fraîches, MAINTENANT, pas dans 4 semaines.
+- **B3. Backtest « funding wave » memecoin** — les 59 séries de funding ont
+  déjà MEME/BOME/PEPE/WIF : corriger extrêmes de funding × vélocité X
+  (`x_mentions`) × rendements. La donnée existe déjà.
+
+## PILIER C — Zéro attente passive
+
+- **C1. Rapport nocturne « Memecoin Pulse »** (nouvelle étape de campagne) —
+  par memecoin Aster : vélocité X du jour, funding annualisé, liquidations
+  captées, spread/collectionnabilité, calls du registre. Une page de faits
+  chaque nuit.
+- **C2. Backtest de la vélocité** dès que N jours suffisent (x_mentions
+  s'accumule depuis le 21/09) — règle pré-enregistrée inchangée (N ≥ 10,
+  win rate ≥ 55 %, sinon bruit et on le dit).
+- **C3. Ledger paper des « ondes d'appel »** — quand vélocité X + funding
+  extrême + collectionnable convergent, le signal est pris EN PAPER
+  automatiquement chaque nuit (jamais réel sans validation). Le track record
+  se construit en live pendant qu'on code la suite.
+
+## Phases et jalons
+
+| Phase | Contenu | Quand |
+|---|---|---|
+| 1 | klines memecoins (fait), recherches memecoin à 14h (fait), gate microstructure au registre | ce soir |
+| 2 | parser v3 + tests, klines on-demand, Memecoin Pulse nocturne | 48 h |
+| 3 | sonde fomo.family, verdicts memecoin complets, ré-test champions × couches flow, paper ledger des ondes | semaine 1 |
+| 4 | backtests vélocité/positioning/funding-wave, verdict pré-enregistré | quand N suffit |
+
+## Contraintes permanentes (non négociables)
+
+1. Trading 100 % Aster — fomo.family et tout le reste ne sont que de la DATA.
+2. Free only — aucun abonnement, aucune clé payante.
+3. Aucun ordre réel sans validation utilisateur à chaque porte.
+4. La règle pré-enregistrée (N ≥ 10, 55 %) s'applique à tout nouveau signal.
