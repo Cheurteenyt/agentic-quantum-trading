@@ -1,6 +1,6 @@
 # Scanner de funding Aster
 
-Genere : 2026-09-22T01:04:49Z UTC — source : cache Aster nocturne (59 symboles)
+Genere : 2026-09-22T20:35:24Z UTC — source : cache Aster nocturne (70 symboles)
 
 ## Regle de lecture
 
@@ -9,11 +9,10 @@ Negatif = l'inverse. Un perp seul reste un risque directionnel : le
 carry hedgge exige une seconde jambe. |Annualise| > 50 % = regime extreme, a la fois opportun et
 signal de surchauffe.
 
-## Top 10 (|annualise| le plus eleve) — 1 extreme(s) > 50 %
+## Top 10 (|annualise| le plus eleve) — 0 extreme(s) > 50 %
 
 | symbole | dernier (ann.) | moyenne 100p (ann.) | chauffe | qui encaisse |
 |---|---|---|---|---|
-| 1000PEPEUSDT | +60.0 % | +14.5 % | chauffe | shorts |
 | DRAMUSDT | +34.6 % | +1.3 % | chauffe | shorts |
 | PIEVERSEUSDT | +33.4 % | +25.2 % | chauffe | shorts |
 | CRCLUSDT | +27.2 % | +10.4 % | chauffe | shorts | ⚠️ session NY (hors session : NO_TRADING_WINDOW)
@@ -22,11 +21,8 @@ signal de surchauffe.
 | ESPORTSUSDT | +20.1 % | +36.0 % | refroidit | shorts |
 | PLAYUSDT | -19.4 % | -1.5 % | refroidit | longs |
 | LABUSDT | +19.3 % | +15.1 % | chauffe | shorts |
-| SOLUSDT | -18.5 % | +0.8 % | refroidit | longs |
-
-### Regime extreme
-
-- **1000PEPEUSDT** : +60.0 % annualise → les shorts encaissent
+| SOLUSD1 | -17.4 % | +1.7 % | refroidit | longs |
+| CLUSDT | -12.5 % | -45.3 % | chauffe | longs | ⚠️ session NY (hors session : NO_TRADING_WINDOW)
 
 Le scanner range, il ne conseille pas. Toute jambe engagee reste un
  choix de gestion du risque, pas une recommandation.

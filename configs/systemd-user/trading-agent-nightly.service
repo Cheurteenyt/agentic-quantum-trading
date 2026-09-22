@@ -6,7 +6,7 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
-ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/refresh_aster_cache.py --refresh-all --limit 50
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/refresh_aster_cache.py --refresh-funding --symbols BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,LTCUSDT,ASTERUSDT,MEMEUSDT,BOMEUSDT,WIFUSDT,PNUTUSDT,MOODENGUSDT,NEIROUSDT,TURBOUSDT,PENGUUSDT,NOTUSDT,DOGSUSDT,TRUMPUSDT,FARTCOINUSDT,CATEUSDT,1000PEPEUSDT,BONKUSDT,FLOKIUSDT,DRAMUSDT,PIEVERSEUSDT
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/funding_scanner.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/carry_hedged.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_klines.py --fetch-range BTCUSDT --target-bars 3000
@@ -37,4 +37,5 @@ ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/flow_snapshot.py --record
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/depth_heatmap.py --hours 12
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/housekeeping.py --apply
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/memecoin_pulse.py
 TimeoutStartSec=3600

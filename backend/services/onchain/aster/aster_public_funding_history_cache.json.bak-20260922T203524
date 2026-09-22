@@ -1,16 +1,16 @@
 {
   "symbols": {
     "1000PEPEUSDT": {
-      "cached_at": 1790109324.7221596,
+      "cached_at": 1790039066.298325,
       "data": {
-        "avg_funding_bps_per_8h": 1.3837770000000003,
-        "avg_funding_rate": 0.00013837770000000002,
+        "avg_funding_bps_per_8h": 1.323478,
+        "avg_funding_rate": 0.0001323478,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1787184000000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
-        "latest_funding_bps_per_8h": 1.0,
-        "latest_funding_rate": 0.0001,
+        "last_funding_time": 1790035200000,
+        "latest_funding_bps_per_8h": 5.4749,
+        "latest_funding_rate": 0.00054749,
         "max_funding_rate": 0.00097139,
         "min_funding_rate": -0.00022491,
         "source": "aster_public_funding_history_fapi_v3",
@@ -73,14 +73,14 @@
       }
     },
     "ADAUSDT": {
-      "cached_at": 1790109316.3495731,
+      "cached_at": 1790039068.134517,
       "data": {
         "avg_funding_bps_per_8h": 0.948597,
         "avg_funding_rate": 9.48597e-05,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1787184000000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
+        "last_funding_time": 1790035200000,
         "latest_funding_bps_per_8h": 1.0,
         "latest_funding_rate": 0.0001,
         "max_funding_rate": 0.0001,
@@ -181,14 +181,14 @@
       }
     },
     "ASTERUSDT": {
-      "cached_at": 1790109318.1968284,
+      "cached_at": 1790039070.8815591,
       "data": {
-        "avg_funding_bps_per_8h": 0.275152,
-        "avg_funding_rate": 2.75152e-05,
+        "avg_funding_bps_per_8h": 0.26188100000000003,
+        "avg_funding_rate": 2.61881e-05,
         "cache_status": "miss",
-        "first_funding_time": 1788681600002,
+        "first_funding_time": 1788609600000,
         "funding_count": 100,
-        "last_funding_time": 1790107200000,
+        "last_funding_time": 1790035200000,
         "latest_funding_bps_per_8h": 0.0,
         "latest_funding_rate": 0.0,
         "max_funding_rate": 0.00026928,
@@ -199,14 +199,14 @@
       }
     },
     "AVAXUSDT": {
-      "cached_at": 1790109316.812091,
+      "cached_at": 1790039071.339127,
       "data": {
         "avg_funding_bps_per_8h": 0.9369240000000001,
         "avg_funding_rate": 9.369240000000001e-05,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1787184000000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
+        "last_funding_time": 1790035200000,
         "latest_funding_bps_per_8h": 1.0,
         "latest_funding_rate": 0.0001,
         "max_funding_rate": 0.0001,
@@ -217,17 +217,17 @@
       }
     },
     "BNBUSDT": {
-      "cached_at": 1790109315.4207952,
+      "cached_at": 1790039071.7944956,
       "data": {
-        "avg_funding_bps_per_8h": 0.329644,
-        "avg_funding_rate": 3.29644e-05,
+        "avg_funding_bps_per_8h": 0.356404,
+        "avg_funding_rate": 3.56404e-05,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1787184000000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
-        "latest_funding_bps_per_8h": 0.0,
-        "latest_funding_rate": 0.0,
-        "max_funding_rate": 0.00021235,
+        "last_funding_time": 1790035200000,
+        "latest_funding_bps_per_8h": 0.7682,
+        "latest_funding_rate": 7.682e-05,
+        "max_funding_rate": 0.00022333,
         "min_funding_rate": 0.0,
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
@@ -235,14 +235,14 @@
       }
     },
     "BOMEUSDT": {
-      "cached_at": 1790109319.1193612,
+      "cached_at": 1790039072.3405643,
       "data": {
-        "avg_funding_bps_per_8h": 0.431354,
-        "avg_funding_rate": 4.31354e-05,
+        "avg_funding_bps_per_8h": 0.412604,
+        "avg_funding_rate": 4.12604e-05,
         "cache_status": "miss",
-        "first_funding_time": 1788865200001,
+        "first_funding_time": 1788847200007,
         "funding_count": 100,
-        "last_funding_time": 1790107200000,
+        "last_funding_time": 1790035200000,
         "latest_funding_bps_per_8h": 0.5,
         "latest_funding_rate": 5e-05,
         "max_funding_rate": 5e-05,
@@ -263,16 +263,16 @@
       }
     },
     "BTCUSDT": {
-      "cached_at": 1790109313.4837134,
+      "cached_at": 1790039073.3535473,
       "data": {
-        "avg_funding_bps_per_8h": 0.590653,
-        "avg_funding_rate": 5.90653e-05,
+        "avg_funding_bps_per_8h": 0.61078,
+        "avg_funding_rate": 6.1078e-05,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1787184000000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
-        "latest_funding_bps_per_8h": -0.3549,
-        "latest_funding_rate": -3.549e-05,
+        "last_funding_time": 1790035200000,
+        "latest_funding_bps_per_8h": 0.1566,
+        "latest_funding_rate": 1.566e-05,
         "max_funding_rate": 0.0001,
         "min_funding_rate": -7.405e-05,
         "source": "aster_public_funding_history_fapi_v3",
@@ -296,24 +296,6 @@
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "BZUSDT"
-      }
-    },
-    "CATEUSDT": {
-      "cached_at": 1790109324.2682872,
-      "data": {
-        "avg_funding_bps_per_8h": 2.7394149999999997,
-        "avg_funding_rate": 0.0002739415,
-        "cache_status": "miss",
-        "first_funding_time": 1789750800001,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.125,
-        "latest_funding_rate": 1.25e-05,
-        "max_funding_rate": 0.00238048,
-        "min_funding_rate": -0.00021721,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "CATEUSDT"
       }
     },
     "CLUSDT": {
@@ -371,14 +353,14 @@
       }
     },
     "DOGEUSDT": {
-      "cached_at": 1790109315.887891,
+      "cached_at": 1790039075.653713,
       "data": {
         "avg_funding_bps_per_8h": 0.7218979999999999,
         "avg_funding_rate": 7.21898e-05,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1787184000000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
+        "last_funding_time": 1790035200000,
         "latest_funding_bps_per_8h": 1.0,
         "latest_funding_rate": 0.0001,
         "max_funding_rate": 0.0001,
@@ -386,24 +368,6 @@
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "DOGEUSDT"
-      }
-    },
-    "DOGSUSDT": {
-      "cached_at": 1790109322.8944268,
-      "data": {
-        "avg_funding_bps_per_8h": 0.10715700000000002,
-        "avg_funding_rate": 1.0715700000000001e-05,
-        "cache_status": "miss",
-        "first_funding_time": 1788865200001,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 5e-05,
-        "min_funding_rate": -0.00093435,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "DOGSUSDT"
       }
     },
     "DRAMUSDT": {
@@ -461,39 +425,21 @@
       }
     },
     "ETHUSDT": {
-      "cached_at": 1790109313.9392502,
+      "cached_at": 1790039077.486699,
       "data": {
-        "avg_funding_bps_per_8h": 0.654042,
-        "avg_funding_rate": 6.54042e-05,
+        "avg_funding_bps_per_8h": 0.6558330000000001,
+        "avg_funding_rate": 6.55833e-05,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1787184000000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
-        "latest_funding_bps_per_8h": 0.9776999999999999,
-        "latest_funding_rate": 9.777e-05,
+        "last_funding_time": 1790035200000,
+        "latest_funding_bps_per_8h": 0.37320000000000003,
+        "latest_funding_rate": 3.732e-05,
         "max_funding_rate": 0.0001,
         "min_funding_rate": -8.245e-05,
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "ETHUSDT"
-      }
-    },
-    "FARTCOINUSDT": {
-      "cached_at": 1790109323.8169758,
-      "data": {
-        "avg_funding_bps_per_8h": 0.648969,
-        "avg_funding_rate": 6.48969e-05,
-        "cache_status": "miss",
-        "first_funding_time": 1788681600002,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 0.00033667,
-        "min_funding_rate": 5e-05,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "FARTCOINUSDT"
       }
     },
     "FLNCUSDT": {
@@ -669,14 +615,14 @@
       }
     },
     "LINKUSDT": {
-      "cached_at": 1790109317.274609,
+      "cached_at": 1790039082.5691612,
       "data": {
         "avg_funding_bps_per_8h": 0.991471,
         "avg_funding_rate": 9.91471e-05,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1787184000000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
+        "last_funding_time": 1790035200000,
         "latest_funding_bps_per_8h": 1.0,
         "latest_funding_rate": 0.0001,
         "max_funding_rate": 0.0001,
@@ -686,36 +632,18 @@
         "symbol": "LINKUSDT"
       }
     },
-    "LTCUSDT": {
-      "cached_at": 1790109317.7325346,
-      "data": {
-        "avg_funding_bps_per_8h": 0.938796,
-        "avg_funding_rate": 9.38796e-05,
-        "cache_status": "miss",
-        "first_funding_time": 1787241600000,
-        "funding_count": 100,
-        "last_funding_time": 1790092800000,
-        "latest_funding_bps_per_8h": 1.0,
-        "latest_funding_rate": 0.0001,
-        "max_funding_rate": 0.00018139,
-        "min_funding_rate": -1.7e-05,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "LTCUSDT"
-      }
-    },
     "MEMEUSDT": {
-      "cached_at": 1790109318.6604393,
+      "cached_at": 1790039083.0235255,
       "data": {
-        "avg_funding_bps_per_8h": 0.7399370000000001,
-        "avg_funding_rate": 7.39937e-05,
+        "avg_funding_bps_per_8h": 0.609106,
+        "avg_funding_rate": 6.09106e-05,
         "cache_status": "miss",
-        "first_funding_time": 1789750800001,
+        "first_funding_time": 1789682400001,
         "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.125,
-        "latest_funding_rate": 1.25e-05,
-        "max_funding_rate": 0.00128118,
+        "last_funding_time": 1790038800012,
+        "latest_funding_bps_per_8h": 0.6504,
+        "latest_funding_rate": 6.504e-05,
+        "max_funding_rate": 0.00141617,
         "min_funding_rate": -4.843e-05,
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
@@ -738,24 +666,6 @@
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "METAUSDT"
-      }
-    },
-    "MOODENGUSDT": {
-      "cached_at": 1790109320.4918766,
-      "data": {
-        "avg_funding_bps_per_8h": 0.508236,
-        "avg_funding_rate": 5.08236e-05,
-        "cache_status": "miss",
-        "first_funding_time": 1788681600002,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 0.00012886,
-        "min_funding_rate": 5e-05,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "MOODENGUSDT"
       }
     },
     "MSFTUSDT": {
@@ -810,42 +720,6 @@
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "NEARUSDT"
-      }
-    },
-    "NEIROUSDT": {
-      "cached_at": 1790109320.9458537,
-      "data": {
-        "avg_funding_bps_per_8h": -0.31718100000000005,
-        "avg_funding_rate": -3.1718100000000004e-05,
-        "cache_status": "miss",
-        "first_funding_time": 1788681600002,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 5e-05,
-        "min_funding_rate": -0.00021439,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "NEIROUSDT"
-      }
-    },
-    "NOTUSDT": {
-      "cached_at": 1790109322.433708,
-      "data": {
-        "avg_funding_bps_per_8h": 0.044397000000000006,
-        "avg_funding_rate": 4.439700000000001e-06,
-        "cache_status": "miss",
-        "first_funding_time": 1789070400000,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 5e-05,
-        "min_funding_rate": -0.00033228,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "NOTUSDT"
       }
     },
     "NVDAUSDT": {
@@ -920,24 +794,6 @@
         "symbol": "ORDIUSDT"
       }
     },
-    "PENGUUSDT": {
-      "cached_at": 1790109321.9813597,
-      "data": {
-        "avg_funding_bps_per_8h": 0.494801,
-        "avg_funding_rate": 4.94801e-05,
-        "cache_status": "miss",
-        "first_funding_time": 1788681600002,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 5e-05,
-        "min_funding_rate": 1.261e-05,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "PENGUUSDT"
-      }
-    },
     "PEPEUSDT": {
       "cached_at": 1790039087.161515,
       "data": {
@@ -990,24 +846,6 @@
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "PLAYUSDT"
-      }
-    },
-    "PNUTUSDT": {
-      "cached_at": 1790109320.0333538,
-      "data": {
-        "avg_funding_bps_per_8h": 0.065779,
-        "avg_funding_rate": 6.577900000000001e-06,
-        "cache_status": "miss",
-        "first_funding_time": 1788865200001,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 5e-05,
-        "min_funding_rate": -0.00021313,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "PNUTUSDT"
       }
     },
     "PORTALUSDT": {
@@ -1093,18 +931,18 @@
       }
     },
     "SOLUSDT": {
-      "cached_at": 1790109314.501495,
+      "cached_at": 1780588579.8634834,
       "data": {
-        "avg_funding_bps_per_8h": 0.43328599999999995,
-        "avg_funding_rate": 4.33286e-05,
+        "avg_funding_bps_per_8h": 0.073521,
+        "avg_funding_rate": 7.3521e-06,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1777708800000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
-        "latest_funding_bps_per_8h": 0.1499,
-        "latest_funding_rate": 1.499e-05,
+        "last_funding_time": 1780560000000,
+        "latest_funding_bps_per_8h": -1.6901,
+        "latest_funding_rate": -0.00016901,
         "max_funding_rate": 0.0001,
-        "min_funding_rate": -9.51e-05,
+        "min_funding_rate": -0.00031764,
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "SOLUSDT"
@@ -1146,24 +984,6 @@
         "symbol": "TIAUSDT"
       }
     },
-    "TRUMPUSDT": {
-      "cached_at": 1790109323.3559473,
-      "data": {
-        "avg_funding_bps_per_8h": -0.059072999999999994,
-        "avg_funding_rate": -5.907299999999999e-06,
-        "cache_status": "miss",
-        "first_funding_time": 1788681600002,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 5e-05,
-        "min_funding_rate": -0.00023583,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "TRUMPUSDT"
-      }
-    },
     "TSLAUSDT": {
       "cached_at": 1780589268.5273664,
       "data": {
@@ -1182,37 +1002,19 @@
         "symbol": "TSLAUSDT"
       }
     },
-    "TURBOUSDT": {
-      "cached_at": 1790109321.4075255,
-      "data": {
-        "avg_funding_bps_per_8h": 0.29808799999999996,
-        "avg_funding_rate": 2.9808799999999998e-05,
-        "cache_status": "miss",
-        "first_funding_time": 1788865200001,
-        "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 5e-05,
-        "min_funding_rate": -0.00012566,
-        "source": "aster_public_funding_history_fapi_v3",
-        "status": "ok",
-        "symbol": "TURBOUSDT"
-      }
-    },
     "WIFUSDT": {
-      "cached_at": 1790109319.5753639,
+      "cached_at": 1780585350.0395713,
       "data": {
-        "avg_funding_bps_per_8h": 0.308076,
-        "avg_funding_rate": 3.08076e-05,
+        "avg_funding_bps_per_8h": 0.125,
+        "avg_funding_rate": 1.25e-05,
         "cache_status": "miss",
-        "first_funding_time": 1789070400000,
+        "first_funding_time": 1780228800000,
         "funding_count": 100,
-        "last_funding_time": 1790107200000,
-        "latest_funding_bps_per_8h": 0.5,
-        "latest_funding_rate": 5e-05,
-        "max_funding_rate": 5e-05,
-        "min_funding_rate": -9.521e-05,
+        "last_funding_time": 1780585200000,
+        "latest_funding_bps_per_8h": 0.125,
+        "latest_funding_rate": 1.25e-05,
+        "max_funding_rate": 1.25e-05,
+        "min_funding_rate": 1.25e-05,
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "WIFUSDT"
@@ -1273,23 +1075,23 @@
       }
     },
     "XRPUSDT": {
-      "cached_at": 1790109314.9613469,
+      "cached_at": 1780580496.3427854,
       "data": {
-        "avg_funding_bps_per_8h": 0.565632,
-        "avg_funding_rate": 5.65632e-05,
+        "avg_funding_bps_per_8h": 0.236614,
+        "avg_funding_rate": 2.36614e-05,
         "cache_status": "miss",
-        "first_funding_time": 1787241600000,
+        "first_funding_time": 1777708800000,
         "funding_count": 100,
-        "last_funding_time": 1790092800000,
-        "latest_funding_bps_per_8h": 1.0,
-        "latest_funding_rate": 0.0001,
+        "last_funding_time": 1780560000000,
+        "latest_funding_bps_per_8h": -0.1984,
+        "latest_funding_rate": -1.984e-05,
         "max_funding_rate": 0.0001,
-        "min_funding_rate": -0.00010533,
+        "min_funding_rate": -0.00017468,
         "source": "aster_public_funding_history_fapi_v3",
         "status": "ok",
         "symbol": "XRPUSDT"
       }
     }
   },
-  "updated_at": 1790109324.7221663
+  "updated_at": 1790039088.9905002
 }
