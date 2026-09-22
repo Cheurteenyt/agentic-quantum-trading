@@ -5,8 +5,9 @@ comptes » du registre et l'attente passive de 4 semaines. Deux constats de
 l'utilisateur qui fondent cette roadmap : (1) le legacy a backtesté des lanes
 long-only sur small-caps — jamais la dynamique memecoin × social ; (2) les
 memecoins sont démocratisés sur X.com (cf. fomo.family) et **Aster liste leurs
-perps** : MEME, BOME, PEPE, WIF, PNUT, MOODENG, NEIRO, TURBO, PENGU, NOT,
-DOGS, TRUMP, FARTCOIN, CATE (~17 sur 567 perps).
+perps** : MEME, BOME, WIF, PNUT, MOODENG, NEIRO, TURBO, PENGU, NOT, DOGS,
+TRUMP, FARTCOIN, CATE (~13 vérifiées TRADING sur 567 perps ; PEPE n'y est
+PAS — tout cashtag dont le perp n'existe pas sur Aster est exclu d'office).
 
 ## La thèse
 
