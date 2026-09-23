@@ -76,11 +76,45 @@ def lot_du_jour(per_run: int = 4) -> list[str]:
     return uni[start:start + per_run]
 
 
+def top_calls_urls(n: int = 3) -> list[str]:
+    """Les N calls les plus vus du registre — leurs citations mesurent
+    l'amplification/critique de la foule (opérateur X url:)."""
+    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db")
+    rows = con.execute("""
+        SELECT p.status_url
+        FROM x_calls c JOIN x_posts p ON p.post_id = c.post_id
+        ORDER BY CAST(json_extract(p.metrics, '$.views') AS INTEGER) DESC
+        LIMIT ?""", (n,)).fetchall()
+    con.close()
+    return [r[0] for r in rows if r[0]]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Rotation cashtag X nocturne")
     ap.add_argument("--list", action="store_true", help="affiche le lot sans pêcher")
+    ap.add_argument("--quotes", metavar="N", type=int, default=None,
+                    help="pêche les CITATIONS des N calls les plus vus")
     ap.add_argument("--scrolls", type=int, default=2)
     args = ap.parse_args()
+
+    if args.quotes is not None:
+        urls = top_calls_urls(args.quotes)
+        queries = ",".join(f"url:{u}" for u in urls)
+        print(f"[rotation] citations des top {len(urls)} calls", file=sys.stderr)
+        if not queries:
+            return 1
+        r = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "x_harvest.py"),
+             "--searches", queries, "--scrolls", str(args.scrolls)],
+            cwd=ROOT, timeout=900)
+        if r.returncode != 0:
+            return 1
+        r = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "fetch_x_posts.py"),
+             "--ingest-json", "data/x_harvest/latest-searches.json",
+             "--query", "quotes"],
+            cwd=ROOT, timeout=300)
+        return r.returncode
 
     batch = lot_du_jour()
     raw = (_memecoins() | _fomo_new() | _waves()) - MAJEURS
