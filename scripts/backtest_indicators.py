@@ -35,7 +35,7 @@ from scripts import aster_indicators as ta  # noqa: E402
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
-COST_PCT = 0.08
+COST_PCT = 0.18  # fees 8 bps RT + slippage 10 bps RT (modèle coûts legacy du user)
 TRAIN_FRAC = 0.70
 HORIZONS = (1, 4, 12, 24, 72, 168, 336, 720, 1440, 2160)   # jusqu'à +90 jours
 BIG_MOVE_DAYS = 5      # exclure ±6h autour des N plus gros jours BTC
@@ -63,13 +63,13 @@ def selftest() -> None:
     for h in (1, 4, 24):
         res = outcomes(df, ev, +1)
         got = [r for hh, r, _ in res if hh == h]
-        expected = (110.0 - 100.0) / 100.0 * 100 - 0.08  # +10 % - coût
+        expected = (110.0 - 100.0) / 100.0 * 100 - COST_PCT  # +10 % - coûts réels
         assert got and abs(got[0] - expected) < 1e-9, \
             f"selftest h={h}: {got} != {expected}"
     # direction short = miroir exact
     res = outcomes(df, ev, -1)
     got = [r for hh, r, _ in res if hh == 1]
-    assert abs(got[0] - (-10.0 - 0.08)) < 1e-9, f"selftest short: {got}"
+    assert abs(got[0] - (-10.0 - COST_PCT)) < 1e-9, f"selftest short: {got}"
     print("[selftest] harnais vérifié sur données synthétiques — OK",
           file=sys.stderr)
 
