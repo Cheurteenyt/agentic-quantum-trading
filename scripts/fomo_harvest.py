@@ -190,18 +190,35 @@ def mine_positions(handle: str, scrolls: int = 10) -> dict:
         ctx = _ctx_of(browser)
         page = ctx.pages[0] if ctx.pages else \
             ctx.new_page()
-        _open_page(page, f"{BASE}/profile/{handle}")
         seen: dict = {}
-        for _ in range(scrolls):
-            for ticker, v in (page.evaluate(EXTRACT_POSITIONS_JS) or {}).items():
-                seen.setdefault(ticker, v)
-            page.evaluate("window.scrollBy(0, 700)")
-            page.wait_for_timeout(500)
-        declared = page.evaluate(
-            "() => { const m = (document.body.innerText||'').match(/Positions\\s*(\\d+)/);"
-            " return m ? parseInt(m[1]) : null; }"
-        )
-        return {"handle": handle, "via": via, "declared_positions": declared, "mined": seen}
+        declared = None
+        # 2 passes max : la 1re peut tomber avant l'init Privy (profils à 0
+        # après un restart du daemon) — on réessaie seulement si suspect.
+        for attempt in (1, 2):
+            _open_page(page, f"{BASE}/profile/{handle}",
+                       initial_wait=3000 if attempt == 1 else 6000)
+            seen = {}
+            for _ in range(scrolls):
+                for ticker, v in (page.evaluate(EXTRACT_POSITIONS_JS) or {}).items():
+                    seen.setdefault(ticker, v)
+                page.evaluate("window.scrollBy(0, 700)")
+                page.wait_for_timeout(500)
+            declared = page.evaluate(
+                "() => { const m = (document.body.innerText||'').match(/Positions\\s*(\\d+)/);"
+                " return m ? parseInt(m[1]) : null; }"
+            )
+            if attempt == 2:
+                break
+            if declared is not None and declared == 0:
+                break  # profil réellement vide
+            if declared is not None and len(seen) >= declared:
+                break  # compte déclaré atteint : minage fiable
+            if declared is not None:
+                scrolls = min(scrolls + declared // 5, scrolls + 20)
+            print(f"[mine] {handle}: {len(seen)}/{declared} positions — 2e passe",
+                  file=sys.stderr, flush=True)
+        return {"handle": handle, "via": via, "declared_positions": declared,
+                "mined": seen, "attempts": attempt}
     finally:
         if ctx is not None:
             ctx.close()
@@ -240,13 +257,59 @@ EXTRACT_TOKEN_PANEL_JS = """
   const body = document.body.innerText || "";
   const grab = (re) => { const m = body.match(re); return m ? m[1] : null; };
   const num = (s) => s ? parseFloat(s.replace(/,/g, "")) : null;
-  // flux d'ordres du token
+  // ——— panneau FLUX token : "3,166 buys / 2,857 sells" ———
   const buys = num(grab(/([\\d,]+) buys/));
   const sells = num(grab(/([\\d,]+) sells/));
   // volumes : deux lignes "$X vol." — buy puis sell (ordre du DOM)
   const vols = [...document.querySelectorAll("div")].map(d => d.innerText || "")
     .filter(t => /^\\$[\\d.,]+[KkMm]? vol\\.$/.test(t.trim()))
     .map(t => t.trim());
+  // ——— panneau POSITION (?tradeId=) — séquence normalisée du corps ———
+  // "$7.2M + $3.5M 10.9M PONS ▲ 96.53% Avg. entry $156.7M MC Invested $3.7M
+  //  Transactions (255)" — chaque libellé est sur sa propre ligne dans le DOM.
+  const nbody = body.replace(/\\s+/g, " ");
+  let txs = null, posValue = null, posQty = null, posUnit = null;
+  let pnlPct = null, posDir = null, avgEntryMc = null, invested = null;
+  const loc = nbody.indexOf("Avg. entry");
+  if (loc >= 0) {
+    const win = nbody.slice(Math.max(0, loc - 220), loc + 200);
+    const pm = win.match(/\\$([\\d.,]+)\\s*\\+\\s*\\$[\\d.,]+\\s+([\\d.,]+[KkMm]?) ([A-Z0-9]+)/);
+    if (pm) { posValue = num(pm[1]); posQty = pm[2]; posUnit = pm[3]; }
+    const pp = win.match(/([▲▼])\\s+([\\d.,]+)%/);
+    if (pp) { posDir = pp[1]; pnlPct = num(pp[2]); }
+    avgEntryMc = (win.match(/Avg\\. entry\\s*\\$([\\d.,]+[KMB]?)\\s*MC/) || [])[1] || null;
+    invested = num((win.match(/Invested\\s*\\$([\\d.,]+)/) || [])[1]);
+    txs = num((win.match(/Transactions \\(([\\d,]+)\\)/) || [])[1]);
+  }
+  if (txs === null) txs = num(grab(/Transactions \\(([\\d,]+)\\)/));
+  // thèses : "auteur / Thesis / heure / texte..." — une heure relative est
+  // exigée pour exclure la case à cocher "Thesis" de la charte
+  const lines = body.split("\\n").map(l => l.trim());
+  const theses = [];
+  for (let i = 1; i < lines.length - 2; i++) {
+    if (lines[i] !== "Thesis") continue;
+    const author = lines[i - 1], when = lines[i + 1];
+    if (!/^(\\d+[hmd]|now)/.test(when || "")) continue;
+    const after = lines.slice(i + 2, i + 10);
+    const stop = after.findIndex(l => /^♡/.test(l) || /^\\d+$/.test(l) || l === "Thesis");
+    const raw = (stop >= 0 ? after.slice(0, stop) : after.slice(0, 4)).join(" ");
+    const text = raw.slice(0, 220);
+    if (text && !theses.some(t0 => t0.text === text))
+      theses.push({ author, when, text });
+  }
+  // stats token (carte info : Volume 24hr / Holders / Top 10 / Contract)
+  let vol24 = null, holders = null, top10 = null, contract = null;
+  for (const d of document.querySelectorAll("div")) {
+    const t = (d.innerText || "").trim();
+    if (t.includes("Top 10 holding") && t.length < 300) {
+      vol24 = (t.match(/Volume 24hr\\n\\$?([\\d.,]+[KkMm]?)/) || [])[1] || null;
+      holders = (t.match(/Holders\\n([\\d.,]+[KkMm]?)/) || [])[1] || null;
+      top10 = (t.match(/Top 10 holding\\n([\\d.]+%)/) || [])[1] || null;
+      contract = (t.match(/(0x[a-fA-F0-9]{6,})/) || [])[1] || null;
+      break;
+    }
+  }
+  const mc = grab(/\\$([\\d.,]+[KMB]?) MC/);
   // liens sociaux hors footer (le footer pointe x.com/fomo)
   let xHandle = null, searchOnX = null, website = null;
   for (const a of document.querySelectorAll("a[href*='x.com'], a[href*='twitter.com']")) {
@@ -262,11 +325,20 @@ EXTRACT_TOKEN_PANEL_JS = """
   }
   const tickerEl = [...document.querySelectorAll("button")].find(b =>
     /^Buy /.test((b.innerText || "").trim()));
+  let panel_kind = null;
+  if (buys !== null) panel_kind = "token";
+  else if (avgEntryMc !== null || txs !== null) panel_kind = "position";
   return {
+    panel_kind,
     buys, sells,
     buy_vol: vols[0] || null, sell_vol: vols[1] || null,
     buyers: num(grab(/([\\d,]+) buyers/)),
     sellers: num(grab(/([\\d,]+) sellers/)),
+    pos_value: posValue, pos_qty: posQty, pos_unit: posUnit,
+    pnl_pct: pnlPct, pos_dir: posDir,
+    avg_entry_mc: avgEntryMc, invested, txs,
+    theses: theses.slice(0, 8),
+    vol_24h: vol24, holders, top_10_holding: top10, contract, mc,
     x_handle: xHandle, search_on_x: searchOnX, website,
     tradable_ticker: tickerEl ? tickerEl.innerText.trim().replace("Buy ", "") : null,
   };
@@ -292,28 +364,49 @@ def mine_token_panel(handle: str, ticker: str, scrolls: int = 4) -> dict:
         ctx = _ctx_of(browser)
         page = ctx.pages[0] if ctx.pages else \
             ctx.new_page()
-        _open_page(page, f"{BASE}/profile/{handle}")
-        # remonter en haut puis chercher la position du ticker
-        page.evaluate("window.scrollTo(0, 0)")
-        page.wait_for_timeout(800)
-        clicked = False
         pattern = re.compile(rf"{re.escape(ticker)}\s+[\d.,]+[KkMm]?\s+{re.escape(ticker)}")
-        for _ in range(scrolls + 3):
-            for b in page.locator("button").all():
-                txt = b.inner_text() or ""
-                if pattern.search(txt.replace("\n", " ")):
-                    b.click()
-                    clicked = True
-                    page.wait_for_timeout(6000)
+        intel: dict = {}
+        opened = clicked = False
+        # machine à états : profil propre -> clic position -> PREUVE d'ouverture
+        # (panel_kind renseigné : flux token OU position ?tradeId) sinon retour
+        # à un état propre, 3 fois max.
+        for attempt in (1, 2, 3):
+            _open_page(page, f"{BASE}/profile/{handle}",
+                       initial_wait=3000 if attempt == 1 else 5000)
+            page.evaluate("window.scrollTo(0, 0)")
+            page.wait_for_timeout(800)
+            clicked = False
+            for _ in range(scrolls + 3):
+                for b in page.locator("button").all():
+                    txt = b.inner_text() or ""
+                    if pattern.search(txt.replace("\n", " ")):
+                        clicked = True
+                        b.click()  # le clic centre ouvre le panneau position (?tradeId=)
+                        break
+                if clicked:
                     break
-            if clicked:
+                page.evaluate("window.scrollBy(0, 650)")
+                page.wait_for_timeout(500)
+            if not clicked:
+                continue
+            # le panneau est ouvert seulement si l'extracteur identifie son type
+            for _ in range(12):
+                page.wait_for_timeout(1000)
+                probe = page.evaluate(EXTRACT_TOKEN_PANEL_JS)
+                if probe.get("panel_kind"):
+                    intel = probe
+                    opened = True
+                    break
+            if opened:
                 break
-            page.evaluate("window.scrollBy(0, 650)")
-            page.wait_for_timeout(500)
-        intel = page.evaluate(EXTRACT_TOKEN_PANEL_JS) if clicked else {}
-        if clicked and intel.get("buys") is None:
+        if clicked and not opened:
             intel["debug_body"] = (page.evaluate("document.body.innerText") or "")[:500].replace("\n", " | ")
-        return {"ticker": ticker, "via_holder": handle, "panel_opened": clicked, **intel}
+            intel["debug_url"] = page.url
+            try:
+                page.screenshot(path="/tmp/panel_debug.png")
+            except Exception:  # noqa: BLE001 — le diagnostic ne doit pas masquer l'échec
+                pass
+        return {"ticker": ticker, "via_holder": handle, "panel_opened": opened, **intel}
     finally:
         if ctx is not None:
             ctx.close()

@@ -102,6 +102,27 @@ def main() -> int:
               f"({len([t for t in pos if t not in prev])} nouvelles)", flush=True)
     con.commit()
 
+    # 2e passage pour les profils restés à 0 (course Privy après un restart)
+    empty = [h for h, p in mined_now.items() if not p]
+    for handle in empty:
+        try:
+            res = mine_positions(handle)
+            if res["mined"]:
+                mined_now[handle] = res["mined"]
+                prev = previous.get(handle, set())
+                for ticker, p in res["mined"].items():
+                    con.execute("INSERT OR IGNORE INTO fomo_positions VALUES (?,?,?,?,?,?)",
+                                (handle, ticker, p.get("qty"), p.get("value_usd"),
+                                 p.get("dir"), now))
+                    inserted += 1
+                    if ticker not in prev and p.get("value_usd", 0) >= 5000:
+                        fresh[handle].append((ticker, p))
+                print(f"[radar] 2e passe {handle}: {len(res['mined'])} positions récupérées",
+                      flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[radar] 2e passe {handle}: ERREUR {str(exc)[:60]}", file=sys.stderr)
+    con.commit()
+
     # confluence à l'instant t
     by_ticker: dict[str, dict] = defaultdict(lambda: {"traders": [], "total": 0.0, "dirs": []})
     for handle, pos in mined_now.items():
