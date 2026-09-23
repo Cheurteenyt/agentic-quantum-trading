@@ -334,6 +334,7 @@ def run_daemon() -> int:
          f"--remote-debugging-port={CDP_PORT}",
          "--no-first-run", "--no-default-browser-check",
          "--window-position=60,60", "--window-size=1280,800",
+         "--class=fomo-whale", "--wayland-app-id=fomo-whale",
          f"{BASE}/leaderboard"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
