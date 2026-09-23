@@ -75,7 +75,7 @@ def roc(close: pd.Series, n: int = 10) -> pd.Series:
 def volume_z(volume: pd.Series, n: int = 20) -> pd.Series:
     m = volume.rolling(n).mean()
     s = volume.rolling(n).std()
-    return (volume - m) / s.replace(0, pd.NA)
+    return (volume - m) / s.where(s > 0)  # where() garde le dtype float (NaN, pas NA)
 
 
 def obv(df: pd.DataFrame) -> pd.Series:

@@ -37,7 +37,7 @@ KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
 COST_PCT = 0.08
 TRAIN_FRAC = 0.70
-HORIZONS = (1, 4, 12, 24, 72, 168, 336, 720)   # jusqu'à +30 jours
+HORIZONS = (1, 4, 12, 24, 72, 168, 336, 720, 1440, 2160)   # jusqu'à +90 jours
 BIG_MOVE_DAYS = 5      # exclure ±6h autour des N plus gros jours BTC
 BIG_MOVE_TH = 6 * 3600  # fenêtre d'exclusion en secondes
 COOLDOWN_S = 24 * 3600  # 1 événement max / 24h / signal / symbole
@@ -110,7 +110,7 @@ def load_df(con, symbol: str) -> pd.DataFrame | None:
         lambda d: d.set_index(pd.to_datetime(d.index, unit="ms")))
 
 
-def price_signals(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
+def price_signals(df: pd.DataFrame, btc_close: pd.Series | None = None) -> list[tuple[str, int, pd.Series]]:
     out: list[tuple[str, int, pd.Series]] = []
     close = df["close"]
     r = ta.rsi(close)
@@ -142,6 +142,24 @@ def price_signals(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
         ("vol_spike_retournement_short", -1,
          (vz > 3) & green.shift(1, fill_value=False) & red),
     ]
+    # ——— INDICATEURS INGÉNIEUX (propriétaires du harnais) ———
+    # 1. VOLUME MORT → CASSURE : 24h sans volume puis cassure de Donchian
+    #    (la contraction précède l'expansion)
+    dry = vz.rolling(24).min() < -1
+    out.append(("volume_mort_cassure", +1,
+                dry.shift(1, fill_value=False) & ta.crossover(close, ta.donchian_high(df))))
+    # 2. DISLOCATION DE BETA : BTC bouge ≥ 2 % en 4h, le symbole a bougé
+    #    BEAUCOUP moins/moins que son beta ne l'impose → fade du
+    #    déséquilibre (retour vers la relation)
+    if btc_close is not None:
+        sym_r = close.pct_change(4)
+        btc_r = btc_close.pct_change(4).reindex(close.index).ffill()
+        beta = sym_r.rolling(168).cov(btc_r) / btc_r.rolling(168).var().replace(0, pd.NA)
+        disloc = sym_r - beta * btc_r
+        out.append(("beta_dislocation_achat", +1,
+                    (btc_r <= -0.02) & (disloc <= -0.02)))
+        out.append(("beta_dislocation_vente", -1,
+                    (btc_r >= 0.02) & (disloc >= 0.02)))
     return out
 
 
@@ -248,7 +266,7 @@ def main() -> int:
         if df is None or not data_ok(df):
             n_skip_data += 1
             continue
-        for name, direction, ev in price_signals(df):
+        for name, direction, ev in price_signals(df, btc_close):
             n_combos += 1
             ev_s = [t.timestamp() for t in cooldown(df.index[ev.fillna(False)])]
             for h, ret, ets in outcomes(df, ev_s, direction):
@@ -268,11 +286,50 @@ def main() -> int:
         by_dir: dict[int, list[float]] = defaultdict(list)
         for t, d in fsg["events"]:
             by_dir[d].append(t / 1000.0)  # ms -> s
+        # DIVERGENCE FUNDING/PRIX (ingénieux) : la foule empile des longs
+        # (funding qui accélère) pendant que le prix chute ≥ 3 %/24h →
+        # short ; miroir → long
+        g = fh[fh.symbol == sym].set_index("funding_time")["rate"].astype(float)
+        rate_h = g.sort_index()
+        rate_h.index = pd.to_datetime(rate_h.index, unit="ms")
+        rate_aligned = rate_h.reindex(df.index, method="ffill", limit=8)
+        accel = rate_aligned.diff(3)
+        pchg = df["close"].pct_change(24)
+        extra = {
+            "funding_prix_divergence_short": (-1, (accel > 0) & (pchg < -0.03)),
+            "funding_prix_divergence_long": (+1, (accel < 0) & (pchg > 0.03)),
+        }
+        for sig, (d, mask) in extra.items():
+            n_combos += 1
+            ev_s = [t.timestamp() for t in cooldown(df.index[mask.fillna(False)])]
+            for h, ret, ets in outcomes(df, ev_s, d):
+                fund_rows.append((sig, sym, h, ret, ets))
         for d, ts_list in by_dir.items():
             ts_kept = cooldown(pd.DatetimeIndex(pd.to_datetime(ts_list, unit="s")))
             ts_list = [t.timestamp() for t in ts_kept]
             for h, ret, ets in outcomes(df, ts_list, d):
                 fund_rows.append((fsg["signal"], sym, h, ret, ets))
+    # ——— BASELINE : short AVEUGLE par horizon (contrôle anti-drift) ———
+    # un signal ne "compte" que si son WR dépasse CE chiffre : sur un an,
+    # les memecoins s'effondrent, donc tout short tenu longtemps gagne
+    # même sans signal. Δ = WR signal − WR blind.
+    baseline: dict[int, float] = {}
+    for h in HORIZONS:
+        wins = n = 0
+        for sym in sorted(symbols):
+            df = load_df(con, sym)
+            if df is None or not data_ok(df):
+                continue
+            closes, opens = df["close"].values, df["open"].values
+            for i in range(0, len(df.index) - h, 24):
+                e, x = opens[i], closes[min(i + h, len(df.index) - 1)]
+                r = (x - e) / e * 100 * (-1) - COST_PCT
+                n += 1
+                wins += r > 0
+        baseline[h] = wins / n * 100 if n else 50.0
+    print("[baseline] shorts aveugles : " +
+          ", ".join(f"+{h}h={baseline[h]:.1f} %" for h in HORIZONS), file=sys.stderr)
+
     con.close()
 
     # fusion funding dans pooled (sous préfixe distinct)
@@ -288,21 +345,22 @@ def main() -> int:
         "puis confirmé en VAL(30 %). Audit de multiplicité en fin de rapport.",
         "",
         "## Résultats poolés (tous symboles)", "",
-        "| Signal | H | N | WR | Médiane | Pire | Moy | Robuste hors big-moves ? | Verdict |",
+        "| Signal | H | N | WR | Δ blind | Médiane | Pire | Robuste hors big-moves ? | Verdict |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
-    confirmed, tested_cells = 0, 0
+    confirmed, tested_cells, above_drift = 0, 0, 0
     for (name, h), evs in sorted(pooled.items()):
         rets = [r for r, _, _ in evs]
         n = len(rets)
         if n < 10:
             continue
         tested_cells += 1
-        mid = len(rets) // 2
         srt = sorted(rets)
-        median = srt[mid]
+        median = srt[len(rets) // 2]
         worst, best = srt[0], srt[-1]
         wr_all = sum(1 for x in rets if x > 0) / n * 100
+        blind = baseline.get(h, 50.0)
+        delta = wr_all - blind
         # robustesse : exclure les big moves
         keep = [r for r, ets, _ in evs if not in_big_window(ets)]
         wr_rob = (sum(1 for x in keep if x > 0) / len(keep) * 100
@@ -317,10 +375,11 @@ def main() -> int:
         verdict = ("CONFIRMÉ" if wr_tr is not None and wr_va is not None
                    and wr_tr >= 55 and wr_va >= 55 else "BRUIT")
         confirmed += verdict == "CONFIRMÉ"
+        above_drift += (verdict == "CONFIRMÉ" and delta >= 5)
         rob_s = "—" if wr_rob is None else f"{wr_rob:.0f} %"
         lines.append(
-            f"| {name} | +{h}h | {n} | {wr_all:.1f} % | {median:+.2f} % "
-            f"| {worst:+.1f} % | {sum(rets)/n:+.2f} % | {rob_s} | {verdict} |")
+            f"| {name} | +{h}h | {n} | {wr_all:.1f} % | {delta:+.1f} pts "
+            f"| {median:+.2f} % | {worst:+.1f} % | {rob_s} | {verdict} |")
 
     lines += ["", "## Régimes de marché (signaux avec N≥50)", "",
               "| Signal | H | N | Hausse | Baisse | Vol haute | Vol basse |", "|---|---|---|---|---|---|---|"]
@@ -345,10 +404,11 @@ def main() -> int:
         "", "## Audit de multiplicité", "",
         f"- cellules signal×horizon testées : {tested_cells}",
         f"- confirmés poolés : {confirmed} (attendus par hasard ≈ {expected:.0f})",
+        f"- confirmés AU-DESSUS DU DRIFT (Δ blind ≥ +5 pts) : {above_drift}",
         "- VERDICT GLOBAL : " + (
-            "à examiner manuellement — au-dessus du hasard ×2"
-            if confirmed > expected * 2 and confirmed > 0 else
-            "aucun edge démontré — cohérent avec la culture des résultats nuls"),
+            "CANDIDATS AU-DESSUS DU DRIFT à examiner"
+            if above_drift > 0 else
+            "aucun edge démontré — tout confirmé est de la dérive de marché"),
         "",
         "Rappel : un signal « robuste » doit garder son WR hors big-moves ET",
         "sur plusieurs régimes. Tout le reste = bruit, et on le dit.",
