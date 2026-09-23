@@ -163,6 +163,133 @@ def harvest_profiles(handles: list[str], scrolls: int) -> int:
     return 0
 
 
+def extract_profile_meta(page, handle: str) -> dict:
+    """En-tête du profil : portée (followers/following), bio, date d'adhésion."""
+    meta = {"handle": handle, "followers": None, "following": None,
+            "bio": None, "joined": None}
+    for key, suffix in (("followers", "verified_followers"), ("following", "following")):
+        try:
+            el = page.locator(f"a[href$='/{suffix}']").first
+            txt = (el.inner_text(timeout=2000).strip() or "").split()
+            meta[key] = txt[0] if txt else None
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        el = page.locator("[data-testid='UserDescription']").first
+        meta["bio"] = el.inner_text(timeout=2000).strip() or None
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        body = page.evaluate("document.body.innerText") or ""
+        m = re.search(r"(?:Joined|A rejoint)\s+([^\n]+)", body)
+        if m:
+            meta["joined"] = m.group(1).strip()
+        for key, label in (("followers", "Followers"), ("following", "Following")):
+            if meta[key] is None:
+                m2 = re.search(r"([\d.,]+[KMB]?)\s+" + label, body)
+                if m2:
+                    meta[key] = m2.group(1)
+    except Exception:  # noqa: BLE001
+        pass
+    return meta
+
+
+def _db():
+    import sqlite3
+    return sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db")
+
+
+def top_registry_handles(n: int = 15) -> list[str]:
+    """Les comptes les plus actifs du registre — la portée X se mesure là
+    où il y a déjà du signal."""
+    con = _db()
+    rows = con.execute(
+        "SELECT author_handle, COUNT(*) c FROM x_posts "
+        "GROUP BY author_handle ORDER BY c DESC LIMIT ?", (n,)).fetchall()
+    con.close()
+    return [r[0] for r in rows if r[0]]
+
+
+def harvest_meta(handles: list[str]) -> int:
+    """Portée X des comptes suivis — un call de @x avec 500K followers
+    ne pèse pas comme un call à 800."""
+    from patchright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
+        return 1
+    out: list[dict] = []
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        for handle in handles:
+            if not goto_profile(page, handle):
+                print(f"[meta] @{handle} : rebond — saute", file=sys.stderr)
+                continue
+            meta = extract_profile_meta(page, handle)
+            out.append(meta)
+            print(f"[meta] @{handle}: {meta['followers']} followers", file=sys.stderr)
+            if handle != handles[-1]:
+                time.sleep(random.uniform(*PAUSE_RANGE_S))
+        ctx.close()
+    import sqlite3
+    con = _db()
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS x_profiles (
+        handle TEXT PRIMARY KEY, followers TEXT, following TEXT,
+        bio TEXT, joined TEXT, captured_at REAL NOT NULL);
+    """)
+    now = time.time()
+    for m in out:
+        con.execute("INSERT OR REPLACE INTO x_profiles VALUES (?,?,?,?,?,?)",
+                    (m["handle"], m["followers"], m["following"],
+                     m["bio"], m["joined"], now))
+    con.commit()
+    con.close()
+    print(f"[meta] {len(out)} profils -> x_posts.db:x_profiles", file=sys.stderr)
+    return 0
+
+
+def harvest_replies(urls: list[str], scrolls: int) -> int:
+    """Réponses sous des statuts : on ouvre la conversation et on extrait
+    les articles (les réponses sont des tweets, extract_articles les voit)."""
+    from patchright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
+        return 1
+    out_posts: list[dict] = []
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        for url in urls:
+            m = re.search(r"/status/(\d+)", url)
+            root_id = m.group(1) if m else None
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(3000)
+                for _ in range(scrolls):
+                    page.mouse.wheel(0, 1600)
+                    page.wait_for_timeout(1100)
+                posts = [p0 for p0 in extract_articles(page)
+                         if p0["post_id"] != root_id]
+                print(f"[replies] {url.rsplit('/', 1)[-1]} : {len(posts)} réponses",
+                      file=sys.stderr)
+                out_posts.extend(posts)
+            except Exception as exc:  # noqa: BLE001 — un statut mort ne bloque pas
+                print(f"[replies] échec {url}: {str(exc)[:60]}", file=sys.stderr)
+            time.sleep(random.uniform(*PAUSE_RANGE_S))
+        ctx.close()
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = _now_utc().replace(":", "").replace("-", "")
+    (OUT_DIR / f"registre-{ts}.json").write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8")
+    (OUT_DIR / "latest-replies.json").write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"[replies] total {len(out_posts)} -> latest-replies.json", file=sys.stderr)
+    return 0
+
+
 def goto_search(page, query: str) -> bool:
     """Navigue vers une recherche live et verifie la stabilite (anti-rebond)."""
     from urllib.parse import quote
@@ -276,11 +403,24 @@ def main() -> int:
     ap.add_argument("--searches", metavar='"Q1,Q2"', help="recherches live a pecher (sans virgule dans une query)")
     ap.add_argument("--scrolls", type=int, default=1, help="scrolls par profil (1 scroll ≈ 4-6 posts)")
     ap.add_argument("--status", action="store_true", help="verifie la session du profil")
+    ap.add_argument("--meta", metavar="AUTO|H1,H2",
+                    help="portee X des profils (followers/bio) -> x_profiles")
+    ap.add_argument("--replies", metavar="U1,U2",
+                    help="reponses sous des statuts (URLs completees)")
     args = ap.parse_args()
     if args.login:
         return run_login()
     if args.status:
         return check_status()
+    if args.meta:
+        if args.meta == "AUTO" or args.meta.isdigit():
+            handles = top_registry_handles(int(args.meta) if args.meta.isdigit() else 15)
+        else:
+            handles = [h.strip().lstrip("@") for h in args.meta.split(",") if h.strip()]
+        return harvest_meta(handles)
+    if args.replies:
+        urls = [u.strip() for u in args.replies.split(",") if u.strip()]
+        return harvest_replies(urls, args.scrolls)
     if args.profiles:
         handles = [h.strip().lstrip("@") for h in args.profiles.split(",") if h.strip()]
         return harvest_profiles(handles, args.scrolls)

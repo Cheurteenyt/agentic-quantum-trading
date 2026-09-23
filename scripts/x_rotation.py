@@ -94,8 +94,37 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="affiche le lot sans pêcher")
     ap.add_argument("--quotes", metavar="N", type=int, default=None,
                     help="pêche les CITATIONS des N calls les plus vus")
+    ap.add_argument("--replies", metavar="N", type=int, default=None,
+                    help="pêche les RÉPONSES sous les N calls les plus vus")
+    ap.add_argument("--meta", metavar="N", type=int, default=None,
+                    help="portée X des N comptes les plus actifs du registre")
     ap.add_argument("--scrolls", type=int, default=2)
     args = ap.parse_args()
+
+    if args.replies is not None or args.meta is not None:
+        if args.meta is not None:
+            r = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "x_harvest.py"),
+                 "--meta", "AUTO" if args.meta <= 0 else str(args.meta)],
+                cwd=ROOT, timeout=1500)
+            return r.returncode
+        urls = top_calls_urls(args.replies)
+        queries = ",".join(u for u in urls)
+        print(f"[rotation] réponses sous les top {len(urls)} calls", file=sys.stderr)
+        if not queries:
+            return 1
+        r = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "x_harvest.py"),
+             "--replies", queries, "--scrolls", str(args.scrolls)],
+            cwd=ROOT, timeout=1500)
+        if r.returncode != 0:
+            return 1
+        r = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "fetch_x_posts.py"),
+             "--ingest-json", "data/x_harvest/latest-replies.json",
+             "--query", "replies"],
+            cwd=ROOT, timeout=300)
+        return r.returncode
 
     if args.quotes is not None:
         urls = top_calls_urls(args.quotes)
