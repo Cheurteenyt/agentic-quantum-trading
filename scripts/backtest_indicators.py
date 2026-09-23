@@ -160,6 +160,27 @@ def price_signals(df: pd.DataFrame, btc_close: pd.Series | None = None) -> list[
                     (btc_r <= -0.02) & (disloc <= -0.02)))
         out.append(("beta_dislocation_vente", -1,
                     (btc_r >= 0.02) & (disloc >= 0.02)))
+    # 3. SWEEP DE LIQUIDITÉ (notre pattern MMT porté en événements testables) :
+    #    la mèche perce le plus bas 20 bougies de ≥ 0,15 ATR mais la clôture
+    #    reprend AU-DESSUS → les stops ont été mangés puis le prix repris
+    atr14 = ta.atr(df)
+    prior_low = df["low"].rolling(20).min().shift(1)
+    prior_high = df["high"].rolling(20).max().shift(1)
+    out.append(("sweep_liquidite_long", +1,
+                (df["low"] < prior_low - 0.15 * atr14) & (close > prior_low)))
+    out.append(("sweep_liquidite_short", -1,
+                (df["high"] > prior_high + 0.15 * atr14) & (close < prior_high)))
+    # 4. DÉVIATION VWAP 7 JOURS : prix à ±3σ de son vwap roulant → retour
+    tp = (df["high"] + df["low"] + df["close"]) / 3
+    vwap = ((tp * df["volume"]).rolling(168).sum()
+            / df["volume"].rolling(168).sum().replace(0, pd.NA))
+    dev = ((close - vwap) / vwap).astype(float)
+    dev_sd = dev.rolling(168).std()
+    out.append(("vwap_extreme_reprise_long", +1, dev < -3 * dev_sd))
+    out.append(("vwap_extreme_reprise_short", -1, dev > 3 * dev_sd))
+    # 5. STREAK FADE : 6 bougies d'affilée du même sens → rebond/essoufflement
+    out.append(("streak_rouge_fade_long", +1, red.rolling(6).sum() == 6))
+    out.append(("streak_vert_fade_short", -1, green.rolling(6).sum() == 6))
     return out
 
 
@@ -174,9 +195,10 @@ def funding_signals(fh: pd.DataFrame, btc_close: pd.Series) -> list[dict]:
     for sym, g in fh.groupby("symbol"):
         rate = g["rate"].astype(float)
         ts = g["funding_time"].astype(float)
-        # percentiles par symbole (les niveaux absolus varient trop)
-        p90 = rate.quantile(0.9)
-        p10 = rate.quantile(0.1)
+        # percentiles EXPANDING : à l'instant t on ne voit que le passé
+        # (un p90 « de l'année » contient le futur = look-ahead)
+        p90 = rate.expanding(min_periods=30).quantile(0.9)
+        p10 = rate.expanding(min_periods=30).quantile(0.1)
         events: dict[str, list[tuple[float, int]]] = defaultdict(list)
         flip_neg = (rate.shift(1) > 0) & (rate <= 0)   # crowd long se dégonfle
         flip_pos = (rate.shift(1) < 0) & (rate >= 0)
