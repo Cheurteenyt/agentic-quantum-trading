@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = ROOT / "data" / "warehouse" / "x_posts.db"
 FUNDING_CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / "aster_public_funding_history_cache.json"
 
-PARSER_VERSION = "v3-regex"
+PARSER_VERSION = "v3.1-regex"
 
 # Aliases cashtag -> perp Aster (echelle sans effet sur les rendements %)
 SYMBOL_ALIASES = {"PEPE": "1000PEPE"}
@@ -202,7 +202,7 @@ def cmd_ingest_json(path: str, query: str) -> int:
     return 0
 
 
-_DIRECTION = r"\b(long|short|bullish|bearish|achat|vente|achete|vend)\b"
+_DIRECTION = r"\b(long|short|bullish|bearish|achat|vente|achete|vend|bought|buying|aped|loaded|shorting|shorted|sold|selling|trimmed)\b"
 _PRICE = r"(?:@|at\b|a\s|à\s|entr[ée]e|entry)\s?(\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d+)?)([kKmM])?\b"
 _NUM = r"(\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d+)?)([kKmM])?"
 _TP_RE = r"(?:\btp\s*\d?\b|\btake\s?profit\b|\btarget\b|\bobjectif\b|\bcible\b)\s*(?:[:=])?\s*" + _NUM
@@ -283,6 +283,12 @@ def _parse_calls(con: sqlite3.Connection) -> int:
         direction = {
             "bullish": "long", "bearish": "short", "achat": "long", "vente": "short",
             "achete": "long", "vend": "short",
+            # v3.1 : verbes d'action réels des traders memecoin (frogmanhaha :
+            # « market bought $300k of $PAID » était raté par v2/v3)
+            "bought": "long", "buying": "long", "aped": "long", "loaded": "long",
+            "shorting": "short", "shorted": "short",
+            # sortir d'une position n'est PAS un short : enregistré, non scoré
+            "sold": "exit", "selling": "exit", "trimmed": "exit",
         }.get(direction, direction)
         entry_price = None
         horizon = None

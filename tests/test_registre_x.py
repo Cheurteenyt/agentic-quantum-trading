@@ -310,3 +310,38 @@ class TestTradability(unittest.TestCase):
         res = tradability({"FOO"}, spread_fetch=lambda pair: 1.0)
         # FOOUSDT : quote inconnue -> fallback 4 bps ; USD1 reste 0.5 via le legacy
         self.assertEqual(res["FOO"]["fee_bps"], 4.0)
+
+
+class TestParseCallsV31(RegistreDbTest):
+    """v3.1 : verbes d'action réels (bought/aped/sold) — le style fomo."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._old_universe = fxp._UNIVERSE_OVERRIDE
+        fxp._UNIVERSE_OVERRIDE = {"PAID", "WIF", "TURBO"}
+
+    def tearDown(self) -> None:
+        fxp._UNIVERSE_OVERRIDE = self._old_universe
+        super().tearDown()
+
+    def test_market_bought_est_un_long(self) -> None:
+        # le call réel de frogmanhaha raté par v2/v3
+        self._add_post("v31a", "Market bought around $300k worth of\n$PAID\nto get myself about 1% of the supply")
+        fxp._parse_calls(self.con)
+        calls = self._calls()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual((calls[0][0], calls[0][1]), ("PAID", "long"))
+
+    def test_sold_est_un_exit_pas_un_short(self) -> None:
+        self._add_post("v31b", "sold my $WIF bags, taking profits here")
+        fxp._parse_calls(self.con)
+        calls = self._calls()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1], "exit")
+
+    def test_aped_est_un_long(self) -> None:
+        self._add_post("v31c", "aped into $TURBO, this one prints")
+        fxp._parse_calls(self.con)
+        calls = self._calls()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual((calls[0][0], calls[0][1]), ("TURBO", "long"))

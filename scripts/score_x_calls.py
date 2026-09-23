@@ -214,6 +214,11 @@ def score_all() -> dict:
                  _utc_now(), ENGINE_VERSION),
             )
             continue
+        if direction not in ("long", "short"):
+            # v3.1 : direction "exit" (sold/selling/trimmed) = distribution,
+            # PAS un short. Scoré comme short ce serait mentir.
+            stats["exit_ignores"] = stats.get("exit_ignores", 0) + 1
+            continue
         posted_iso = re.sub(r"\.\d+Z$", "Z", posted_at.strip())
         posted_ms = int(
             datetime.strptime(posted_iso, "%Y-%m-%dT%H:%M:%SZ")
@@ -304,15 +309,20 @@ def trade_verdicts() -> dict:
                s.entry_resolved, s.posted_at
         FROM x_calls c
         LEFT JOIN x_call_scores s ON s.call_id = c.call_id
-        WHERE c.parser_version = (SELECT MAX(parser_version) FROM x_calls)
-          AND c.tp_price IS NOT NULL AND c.sl_price IS NOT NULL
+        WHERE c.call_id IN (
+            SELECT MAX(call_id) FROM x_calls
+            WHERE tp_price IS NOT NULL AND sl_price IS NOT NULL
+            GROUP BY post_id
+        )
         """
     ).fetchall()
     counts: dict[str, int] = {}
     for (call_id, sym, direction, tp, sl, entry_resolved, posted_at) in rows:
         entry = entry_resolved
         resolved_ts = None
-        if not entry or not posted_at:
+        if direction not in ("long", "short"):
+            verdict = "exit_ignores"
+        elif not entry or not posted_at:
             verdict = "sans_entree"
         elif direction == "long" and not (sl < entry < tp):
             verdict = "incoherent"
