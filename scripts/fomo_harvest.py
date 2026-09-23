@@ -414,6 +414,41 @@ def mine_token_panel(handle: str, ticker: str, scrolls: int = 4) -> dict:
             pw.stop()
 
 
+def _persist_token_intel(ticker: str, intel: dict) -> None:
+    """Entrepôt cumulatif des panneaux (flux, position, thèses, stats token)
+    — le diff entre captures = le signal frais."""
+    if not intel.get("panel_opened"):
+        return
+    import sqlite3
+    db = ROOT / "data" / "fomo" / "fomo.db"
+    con = sqlite3.connect(db)
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS fomo_token_intel (
+        ticker TEXT NOT NULL, panel_kind TEXT, holder TEXT,
+        buys INTEGER, sells INTEGER, buy_vol TEXT, sell_vol TEXT,
+        buyers INTEGER, sellers INTEGER,
+        pos_value REAL, pos_qty TEXT, pos_unit TEXT, pnl_pct REAL,
+        pos_dir TEXT, avg_entry_mc TEXT, invested REAL, txs INTEGER,
+        vol_24h TEXT, holders TEXT, top_10_holding TEXT,
+        contract TEXT, mc TEXT, x_handle TEXT,
+        theses_json TEXT, captured_at REAL NOT NULL,
+        PRIMARY KEY (ticker, holder, captured_at));
+    """)
+    con.execute("INSERT OR IGNORE INTO fomo_token_intel VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (ticker, intel.get("panel_kind"), intel.get("via_holder"),
+                 intel.get("buys"), intel.get("sells"), intel.get("buy_vol"),
+                 intel.get("sell_vol"), intel.get("buyers"), intel.get("sellers"),
+                 intel.get("pos_value"), intel.get("pos_qty"), intel.get("pos_unit"),
+                 intel.get("pnl_pct"), intel.get("pos_dir"), intel.get("avg_entry_mc"),
+                 intel.get("invested"), intel.get("txs"), intel.get("vol_24h"),
+                 intel.get("holders"), intel.get("top_10_holding"),
+                 intel.get("contract"), intel.get("mc"), intel.get("x_handle"),
+                 json.dumps(intel.get("theses") or [], ensure_ascii=False),
+                 time.time()))
+    con.commit()
+    con.close()
+
+
 def run_daemon() -> int:
     """Chromium headed lancé DIRECTEMENT (port CDP natif, pas de pipe) —
     UNE fenêtre à minimiser ; tous les minages se connectent via CDP."""
@@ -465,8 +500,9 @@ def main() -> int:
         return 0
     if args.token:
         ticker, holder = args.token.split(",", 1)
-        print(json.dumps(mine_token_panel(holder.strip(), ticker.strip()),
-                         indent=1, ensure_ascii=False))
+        intel = mine_token_panel(holder.strip(), ticker.strip())
+        _persist_token_intel(ticker.strip(), intel)
+        print(json.dumps(intel, indent=1, ensure_ascii=False))
         return 0
     if args.leaderboard:
         print(json.dumps(mine_leaderboard(["24h", "7d", "30d"]), indent=1, ensure_ascii=False))
