@@ -37,9 +37,63 @@ KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
 COST_PCT = 0.08
 TRAIN_FRAC = 0.70
-HORIZONS = (1, 4, 12, 24, 72)
+HORIZONS = (1, 4, 12, 24, 72, 168, 336, 720)   # jusqu'à +30 jours
 BIG_MOVE_DAYS = 5      # exclure ±6h autour des N plus gros jours BTC
 BIG_MOVE_TH = 6 * 3600  # fenêtre d'exclusion en secondes
+COOLDOWN_S = 24 * 3600  # 1 événement max / 24h / signal / symbole
+MIN_COVERAGE = 0.90     # complétude minimale des klines du symbole
+MAX_GAP_H = 6           # trou max toléré dans les klines
+
+
+def selftest() -> None:
+    """Le harnais PROUVE sa justesse sur des données synthétiques à issue
+    connue — à chaque run. Toute dérive = abort avant les vrais chiffres."""
+    idx = pd.date_range("2026-01-01", periods=50, freq="1h")
+    df = pd.DataFrame({
+        "open": [100.0] * 50,
+        "high": [101.0] * 50,
+        "low": [99.0] * 50,
+        "close": [100.5] * 50,
+        "volume": [1.0] * 50,
+    }, index=idx)
+    df.iloc[10, df.columns.get_loc("open")] = 100.0   # bougie d'entrée
+    # pump de +10 % à partir de la bougie 10 : closes[10+] = 110
+    df.loc[df.index[10:], "close"] = 110.0
+    ev = [idx[9].timestamp()]  # signal à la bougie 9 → entrée à la bougie 10
+    for h in (1, 4, 24):
+        res = outcomes(df, ev, +1)
+        got = [r for hh, r, _ in res if hh == h]
+        expected = (110.0 - 100.0) / 100.0 * 100 - 0.08  # +10 % - coût
+        assert got and abs(got[0] - expected) < 1e-9, \
+            f"selftest h={h}: {got} != {expected}"
+    # direction short = miroir exact
+    res = outcomes(df, ev, -1)
+    got = [r for hh, r, _ in res if hh == 1]
+    assert abs(got[0] - (-10.0 - 0.08)) < 1e-9, f"selftest short: {got}"
+    print("[selftest] harnais vérifié sur données synthétiques — OK",
+          file=sys.stderr)
+
+
+def data_ok(df: pd.DataFrame) -> bool:
+    """Complétude : couverture ≥ MIN_COVERAGE et aucun trou > MAX_GAP_H."""
+    if len(df) < 400:
+        return False
+    span_h = (df.index[-1] - df.index[0]).total_seconds() / 3600 + 1
+    coverage = len(df) / span_h
+    gaps = df.index.to_series().diff().dropna().dt.total_seconds() / 3600
+    return coverage >= MIN_COVERAGE and (len(gaps) == 0 or gaps.max() <= MAX_GAP_H)
+
+
+def cooldown(events_ms: pd.DatetimeIndex, cooldown_s: float = COOLDOWN_S) -> pd.DatetimeIndex:
+    """Garde un événement par fenêtre de cooldown (dé-corrélation)."""
+    kept: list = []
+    last = None
+    for ts in events_ms:
+        t = ts.timestamp()
+        if last is None or t - last >= cooldown_s:
+            kept.append(ts)
+            last = t
+    return pd.DatetimeIndex(kept)
 
 
 def load_df(con, symbol: str) -> pd.DataFrame | None:
@@ -126,12 +180,15 @@ def funding_signals(fh: pd.DataFrame, btc_close: pd.Series) -> list[dict]:
 
 def outcomes(df: pd.DataFrame, events, direction: int) -> list[tuple[int, float, float]]:
     """(horizon, ret %, ts_entrée_s) — entrée au close 1h APRÈS le signal."""
+    import numpy as np
+
     res: list[tuple[int, float, float]] = []
     idx = df.index  # DatetimeIndex
+    idx_ns = idx.astype("datetime64[ns]").asi8  # résolution unifiée (ns)
     opens, closes = df["open"].values, df["close"].values
     for ev_ts in events:  # secondes
-        target = pd.Timestamp(float(ev_ts), unit="s")
-        i = int(idx.searchsorted(target, side="right")) - 1
+        target_ns = int(float(ev_ts) * 1e9)
+        i = int(np.searchsorted(idx_ns, target_ns, side="right")) - 1
         entry_i = i + 1
         if entry_i >= len(idx):
             continue
@@ -149,6 +206,7 @@ def outcomes(df: pd.DataFrame, events, direction: int) -> list[tuple[int, float,
 
 
 def main() -> int:
+    selftest()
     con = sqlite3.connect(KDB)
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
@@ -169,9 +227,11 @@ def main() -> int:
     def in_big_window(ts_s: float) -> bool:
         return any(w0 - BIG_MOVE_TH <= ts_s <= w1 + BIG_MOVE_TH for w0, w1 in big_windows)
 
-    def regime(ts_ms: int) -> str:
-        i = int(btc.index.searchsorted(pd.Timestamp(int(ts_ms), unit="ms"),
-                                       side="right")) - 1
+    import numpy as np
+    btc_ns = btc.index.astype("datetime64[ns]").asi8
+
+    def regime(ts_s: float) -> str:
+        i = int(np.searchsorted(btc_ns, int(float(ts_s) * 1e9), side="right")) - 1
         if i < 0:
             return "?"
         trend = "hausse" if btc_trend_up.iloc[i] else "baisse"
@@ -182,32 +242,37 @@ def main() -> int:
     # events[(signal, horizon)] -> list[(ret, entry_ts)]
     pooled: dict[tuple[str, int], list[tuple[float, float, str]]] = defaultdict(list)
     n_combos = 0
+    n_skip_data = 0
     for sym in sorted(symbols):
         df = load_df(con, sym)
-        if df is None:
+        if df is None or not data_ok(df):
+            n_skip_data += 1
             continue
         for name, direction, ev in price_signals(df):
             n_combos += 1
-            ev_ts = df.index[ev.fillna(False)].astype("int64") // 10**6  # ms->? en s
-            for h, ret, ets in outcomes(df, ev_ts / 1000, direction):
+            ev_s = [t.timestamp() for t in cooldown(df.index[ev.fillna(False)])]
+            for h, ret, ets in outcomes(df, ev_s, direction):
                 pooled[(name, h)].append((ret, ets, regime(ets)))
 
     # ——— événements funding (chaque événement porte sa propre direction) ———
+    # ⚠️ funding_time est en MILLISECONDES : conversion en secondes ici
     fh = pd.read_sql_query("SELECT symbol, funding_time, rate FROM funding_history",
                            con)
     fund_rows: list[tuple[str, str, int, float, float]] = []
     for fsg in funding_signals(fh, btc_close):
         sym = fsg["symbol"]
         df = load_df(con, sym)
-        if df is None:
+        if df is None or not data_ok(df):
             continue
+        n_combos += 1
         by_dir: dict[int, list[float]] = defaultdict(list)
         for t, d in fsg["events"]:
-            by_dir[d].append(t)
+            by_dir[d].append(t / 1000.0)  # ms -> s
         for d, ts_list in by_dir.items():
+            ts_kept = cooldown(pd.DatetimeIndex(pd.to_datetime(ts_list, unit="s")))
+            ts_list = [t.timestamp() for t in ts_kept]
             for h, ret, ets in outcomes(df, ts_list, d):
                 fund_rows.append((fsg["signal"], sym, h, ret, ets))
-
     con.close()
 
     # fusion funding dans pooled (sous préfixe distinct)
