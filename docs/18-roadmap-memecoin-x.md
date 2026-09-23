@@ -220,3 +220,17 @@ Cliquer un token (position ou discovery) ouvre un panneau avec :
 radar ticker -> panneau token -> flux d'ordres (pression) + handle X
 -> recherches X ciblées (URL fournie par fomo) -> registre score les
 calls du coin -> wave ledger mesure. Chaque brique nourrit les autres.
+
+### Mineur de panneau token (23/09 nuit) — squelette prêt, état SPA à dompter
+
+`fomo_harvest.py --token TICKER,HOLDER` : ouvre le profil d'un tenant, clique
+sa position du ticker, extrait le panneau (buys/sells/vols/buyers/sellers,
+handle X du coin, Search-on-X, supply). Acquis ce soir :
+- **daemon CDP réparé** : chromium lancé DIRECTEMENT (port 9222 natif,
+  vérifié curl) — le launch_persistent_context de patchright garde le debug
+  sur pipe interne, jamais sur le port ;
+- `_open_page` unifié (retry « Couldn't load ») partout ;
+- clic de position fonctionnel (`panel_opened: true`) MAIS l'état du panneau
+  SPA est capricieux (l'extraction revient parfois sur la vue profil) —
+  prochain passage : machine à états (fermer overlay avant clic, vérifier
+  ?tradeId dans l'URL après clic, retry une fois).

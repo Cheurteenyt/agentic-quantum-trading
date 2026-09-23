@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -26,6 +27,14 @@ PROFILE_DIR = ROOT / "data" / "fomo_browser_profile"
 BASE = "https://fomo.family"
 LOGIN_TIMEOUT_S = 900
 CDP_PORT = 9222
+
+
+def _ctx_of(browser):
+    """CDP Browser -> .contexts[0] ; persistent context -> lui-même."""
+    ctxs = getattr(browser, "contexts", None)
+    if ctxs:
+        return ctxs[0]
+    return browser
 
 
 def _connect_cdp():
@@ -141,6 +150,26 @@ def check_status() -> int:
     return 0 if ok else 1
 
 
+def _open_page(page, url: str, initial_wait: int = 3000) -> None:
+    """Goto + résilience « Couldn't load your account » (réinit Privy après
+    redémarrage du navigateur) : Try again / reload jusqu'à 4 fois."""
+    page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    for _ in range(4):
+        page.wait_for_timeout(initial_wait)
+        body = page.evaluate("document.body.innerText") or ""
+        if "Couldn" not in body:
+            return
+        try:
+            btn = page.locator("button:has-text('Try again')")
+            if btn.count() > 0:
+                btn.first.click()
+            else:
+                page.reload(wait_until="domcontentloaded")
+        except Exception:
+            page.reload(wait_until="domcontentloaded")
+        page.wait_for_timeout(4000)
+
+
 def mine_positions(handle: str, scrolls: int = 10) -> dict:
     """Positions d'un trader — via le navigateur daemon (CDP) si présent,
     sinon headed éphémère (session persistée)."""
@@ -158,25 +187,10 @@ def mine_positions(handle: str, scrolls: int = 10) -> dict:
             args=["--window-position=0,0", "--window-size=1280,800"])
         browser = ctx
     try:
-        page = browser.contexts[0].pages[0] if browser.contexts[0].pages else \
-            browser.contexts[0].new_page()
-        page.goto(f"{BASE}/profile/{handle}", wait_until="domcontentloaded", timeout=30000)
-        # l'app affiche parfois « Couldn't load your account » après un
-        # redémarrage du navigateur (réinit Privy) : recharger jusqu'à 4 fois
-        for _ in range(4):
-            page.wait_for_timeout(3000)
-            body = page.evaluate("document.body.innerText") or ""
-            if "Couldn" not in body:
-                break
-            try:
-                btn = page.locator("button:has-text('Try again')")
-                if btn.count() > 0:
-                    btn.first.click()
-                else:
-                    page.reload(wait_until="domcontentloaded")
-            except Exception:
-                page.reload(wait_until="domcontentloaded")
-            page.wait_for_timeout(4000)
+        ctx = _ctx_of(browser)
+        page = ctx.pages[0] if ctx.pages else \
+            ctx.new_page()
+        _open_page(page, f"{BASE}/profile/{handle}")
         seen: dict = {}
         for _ in range(scrolls):
             for ticker, v in (page.evaluate(EXTRACT_POSITIONS_JS) or {}).items():
@@ -221,27 +235,118 @@ def mine_leaderboard(windows: list[str]) -> dict:
     return out
 
 
+EXTRACT_TOKEN_PANEL_JS = """
+() => {
+  const body = document.body.innerText || "";
+  const grab = (re) => { const m = body.match(re); return m ? m[1] : null; };
+  const num = (s) => s ? parseFloat(s.replace(/,/g, "")) : null;
+  // flux d'ordres du token
+  const buys = num(grab(/([\\d,]+) buys/));
+  const sells = num(grab(/([\\d,]+) sells/));
+  // volumes : deux lignes "$X vol." — buy puis sell (ordre du DOM)
+  const vols = [...document.querySelectorAll("div")].map(d => d.innerText || "")
+    .filter(t => /^\\$[\\d.,]+[KkMm]? vol\\.$/.test(t.trim()))
+    .map(t => t.trim());
+  // liens sociaux hors footer (le footer pointe x.com/fomo)
+  let xHandle = null, searchOnX = null, website = null;
+  for (const a of document.querySelectorAll("a[href*='x.com'], a[href*='twitter.com']")) {
+    const href = a.getAttribute("href") || "";
+    if (href.includes("/search?")) { searchOnX = href; continue; }
+    if (/twitter\\.com\\/fomo|x\\.com\\/fomo$/.test(href)) continue;
+    const m = href.match(/(?:x|twitter)\\.com\\/([A-Za-z0-9_]+)/);
+    if (m && m[1].toLowerCase() !== "fomo") xHandle = m[1];
+  }
+  for (const a of document.querySelectorAll("a")) {
+    const t = (a.innerText || "");
+    if (/website/i.test(t)) website = a.getAttribute("href");
+  }
+  const tickerEl = [...document.querySelectorAll("button")].find(b =>
+    /^Buy /.test((b.innerText || "").trim()));
+  return {
+    buys, sells,
+    buy_vol: vols[0] || null, sell_vol: vols[1] || null,
+    buyers: num(grab(/([\\d,]+) buyers/)),
+    sellers: num(grab(/([\\d,]+) sellers/)),
+    x_handle: xHandle, search_on_x: searchOnX, website,
+    tradable_ticker: tickerEl ? tickerEl.innerText.trim().replace("Buy ", "") : null,
+  };
+}
+"""
+
+
+def mine_token_panel(handle: str, ticker: str, scrolls: int = 4) -> dict:
+    """Ouvre le profil d'un tenant, clique sa position `ticker`, extrait le
+    panneau token (flux d'ordres, socials, metadata) via CDP/headed."""
+    pw = browser = ctx = None
+    pw, browser = _connect_cdp()
+    if browser is None:
+        from patchright.sync_api import sync_playwright
+
+        _require_profile()
+        pw = sync_playwright().start()
+        ctx = pw.chromium.launch_persistent_context(
+            str(PROFILE_DIR), headless=False,
+            args=["--window-position=0,0", "--window-size=1280,800"])
+        browser = ctx
+    try:
+        ctx = _ctx_of(browser)
+        page = ctx.pages[0] if ctx.pages else \
+            ctx.new_page()
+        _open_page(page, f"{BASE}/profile/{handle}")
+        # remonter en haut puis chercher la position du ticker
+        page.evaluate("window.scrollTo(0, 0)")
+        page.wait_for_timeout(800)
+        clicked = False
+        pattern = re.compile(rf"{re.escape(ticker)}\s+[\d.,]+[KkMm]?\s+{re.escape(ticker)}")
+        for _ in range(scrolls + 3):
+            for b in page.locator("button").all():
+                txt = b.inner_text() or ""
+                if pattern.search(txt.replace("\n", " ")):
+                    b.click()
+                    clicked = True
+                    page.wait_for_timeout(6000)
+                    break
+            if clicked:
+                break
+            page.evaluate("window.scrollBy(0, 650)")
+            page.wait_for_timeout(500)
+        intel = page.evaluate(EXTRACT_TOKEN_PANEL_JS) if clicked else {}
+        if clicked and intel.get("buys") is None:
+            intel["debug_body"] = (page.evaluate("document.body.innerText") or "")[:500].replace("\n", " | ")
+        return {"ticker": ticker, "via_holder": handle, "panel_opened": clicked, **intel}
+    finally:
+        if ctx is not None:
+            ctx.close()
+        else:
+            pw.stop()
+
+
 def run_daemon() -> int:
-    """Navigateur headed persistant + CDP : UNE fenêtre (à minimiser une fois),
-    tout le minage s'y connecte ensuite — fingerprint réel, zéro headless."""
+    """Chromium headed lancé DIRECTEMENT (port CDP natif, pas de pipe) —
+    UNE fenêtre à minimiser ; tous les minages se connectent via CDP."""
+    import subprocess
     from patchright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        ctx = p.chromium.launch_persistent_context(
-            str(PROFILE_DIR), headless=False,
-            args=[f"--remote-debugging-port={CDP_PORT}",
-                  "--window-position=60,60", "--window-size=1280,800"])
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        page.goto(f"{BASE}/leaderboard", wait_until="domcontentloaded")
-        print(f"[daemon] navigateur fomo prêt sur CDP :{CDP_PORT}"
-              " — minimise la fenêtre, elle reste branchée.", flush=True)
-        try:
-            while True:
-                time.sleep(60)
-        except KeyboardInterrupt:
-            pass
-        ctx.close()
-    return 0
+        exe = p.chromium.executable_path
+    proc = subprocess.Popen(
+        [exe, f"--user-data-dir={PROFILE_DIR}",
+         f"--remote-debugging-port={CDP_PORT}",
+         "--no-first-run", "--no-default-browser-check",
+         "--window-position=60,60", "--window-size=1280,800",
+         f"{BASE}/leaderboard"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    print(f"[daemon] chromium direct prêt sur CDP :{CDP_PORT} (pid {proc.pid})"
+          " — minimise la fenêtre, elle reste branchée.", flush=True)
+    try:
+        while proc.poll() is None:
+            time.sleep(30)
+        print("[daemon] navigateur fermé", flush=True)
+        return 0
+    except KeyboardInterrupt:
+        proc.terminate()
+        return 0
 
 
 def main() -> int:
@@ -251,6 +356,8 @@ def main() -> int:
     ap.add_argument("--daemon", action="store_true",
                     help="navigateur headed persistant + CDP (minimiser une fois)")
     ap.add_argument("--positions", metavar="HANDLE")
+    ap.add_argument("--token", metavar="TICKER,HOLDER",
+                    help="panneau token : via la position d'un tenant")
     ap.add_argument("--leaderboard", action="store_true")
     args = ap.parse_args()
     if args.login:
@@ -261,6 +368,11 @@ def main() -> int:
         return run_daemon()
     if args.positions:
         print(json.dumps(mine_positions(args.positions), indent=1, ensure_ascii=False))
+        return 0
+    if args.token:
+        ticker, holder = args.token.split(",", 1)
+        print(json.dumps(mine_token_panel(holder.strip(), ticker.strip()),
+                         indent=1, ensure_ascii=False))
         return 0
     if args.leaderboard:
         print(json.dumps(mine_leaderboard(["24h", "7d", "30d"]), indent=1, ensure_ascii=False))
