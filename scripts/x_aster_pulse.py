@@ -73,6 +73,7 @@ def main() -> int:
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     con = sqlite3.connect(XDB)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     rows: list[dict] = []
     for ticker in uni:
         n_now, engage = _mentions(con, ticker, today)
@@ -81,23 +82,45 @@ def main() -> int:
             continue
         longs, shorts = _calls(con, ticker, today)
         rate, annual = funding_row(ticker + "USDT")
+        # auteurs uniques : la largeur réelle du signal (anti-spam)
+        authors = con.execute(
+            "SELECT COUNT(DISTINCT author_handle) FROM x_posts "
+            "WHERE fetched_at LIKE ? AND (text LIKE ? OR text LIKE ?)",
+            (today + "%", f"%${ticker}%", f"%${ticker}USDT%")).fetchone()[0]
         rows.append({
             "ticker": ticker, "posts": n_now, "posts_prev": n_prev,
             "velocity": round(n_now / max(n_prev, 1), 2),
             "longs": longs, "shorts": shorts, "engagement": engage,
-            "funding_pct": annual,
+            "funding_pct": annual, "authors": authors,
         })
     con.executescript("""
     CREATE TABLE IF NOT EXISTS x_pressure (
         ticker TEXT PRIMARY KEY, posts INTEGER, posts_prev INTEGER,
         velocity REAL, longs INTEGER, shorts INTEGER, engagement REAL,
         funding_pct REAL, captured_at REAL NOT NULL);
+    CREATE TABLE IF NOT EXISTS x_signal_history (
+        day TEXT NOT NULL, ticker TEXT NOT NULL,
+        mentions INTEGER, unique_authors INTEGER, velocity REAL,
+        calls_long INTEGER, calls_short INTEGER, consensus REAL,
+        engagement REAL, captured_at REAL NOT NULL,
+        PRIMARY KEY (day, ticker));
     """)
     now = datetime.now(timezone.utc).timestamp()
     for r in rows:
         con.execute("INSERT OR REPLACE INTO x_pressure VALUES (?,?,?,?,?,?,?,?,?)",
                     (r["ticker"], r["posts"], r["posts_prev"], r["velocity"],
                      r["longs"], r["shorts"], r["engagement"], r["funding_pct"], now))
+        # historique quotidien des signaux X — la matière première du futur
+        # backtest des indicateurs X (il faut ~3 semaines de points pour
+        # que la règle N≥10 signifie quelque chose)
+        calls_total = r["longs"] + r["shorts"]
+        consensus = ((r["longs"] - r["shorts"]) / calls_total
+                     if calls_total else 0.0)
+        con.execute(
+            "INSERT OR REPLACE INTO x_signal_history VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (today, r["ticker"], r["posts"], r["authors"], r["velocity"],
+             r["longs"], r["shorts"], round(consensus, 3),
+             r["engagement"], now))
     con.commit()
     con.close()
 
