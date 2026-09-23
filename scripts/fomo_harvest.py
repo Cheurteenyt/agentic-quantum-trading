@@ -449,6 +449,210 @@ def _persist_token_intel(ticker: str, intel: dict) -> None:
     con.close()
 
 
+def _open_tokens_panel(page, tab: str = "trending") -> bool:
+    """Ouvre le panneau Tokens (bouton du shell app, pas de route /tokens)
+    et sélectionne l'onglet. Retourne True si le clic d'onglet a réussi."""
+    _open_page(page, f"{BASE}/leaderboard", initial_wait=4000)
+    try:
+        page.get_by_text("Tokens", exact=True).first.click()
+        page.wait_for_timeout(3000)
+    except Exception:  # noqa: BLE001 — on minera la vue par défaut
+        pass
+    labels = {"trending": "Trending", "most_held": "Most held",
+              "graduated": "Graduated", "bonding": "Bonding", "new": "New"}
+    clicked = False
+    if tab in labels:
+        try:
+            page.get_by_text(labels[tab], exact=True).first.click()
+            clicked = True
+            page.wait_for_timeout(2500)
+        except Exception:  # noqa: BLE001
+            pass
+    return clicked
+
+
+def mine_tokens(tab: str = "trending", scrolls: int = 8, debug: bool = False) -> dict:
+    """Panneau Tokens : découverte des coins (trending / most held /
+    graduated / bonding) — la couche amont de listing_watcher : un coin qui
+    monte ici peut lister sur Aster demain."""
+    pw, browser = _connect_cdp()
+    if browser is None:
+        raise RuntimeError("daemon CDP requis pour --tokens")
+    try:
+        ctx = _ctx_of(browser)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        tab_clicked = _open_tokens_panel(page, tab)
+        for _ in range(scrolls):
+            page.evaluate("window.scrollBy(0, 700)")
+            page.wait_for_timeout(400)
+        rows = page.evaluate(EXTRACT_TOKENS_JS) or []
+        out = {"tab": tab, "tab_clicked": tab_clicked, "rows": rows, "n": len(rows)}
+        if debug or not rows:
+            out["debug_body"] = (page.evaluate("document.body.innerText") or "")[:3500]
+            out["debug_url"] = page.url
+        return out
+    finally:
+        pw.stop()
+
+
+def mine_token_flow(ticker: str, tab: str = "trending", steps: int = 14) -> dict:
+    """Panneau FLUX d'un token : sidebar Tokens -> scroll de LA SIDEBAR (son
+    propre conteneur, la page ne bouge pas) -> clic sur la ligne du ticker ->
+    flux d'ordres global + thèses de tous les traders du coin."""
+    pw, browser = _connect_cdp()
+    if browser is None:
+        raise RuntimeError("daemon CDP requis pour --flow")
+    try:
+        ctx = _ctx_of(browser)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        _open_tokens_panel(page, tab)
+        # la sidebar virtualise : scroller SON conteneur jusqu'à trouver le ticker
+        scroll_sidebar = """
+        () => {
+          for (const e of document.querySelectorAll("div")) {
+            if (e.scrollHeight > e.clientHeight + 100 && e.clientHeight > 150
+                && e.clientWidth < 420 && /MC/.test(e.innerText || "")) {
+              e.scrollTop += 450;
+              return true;
+            }
+          }
+          return false;
+        }"""
+        clicked = False
+        for _ in range(steps):
+            loc = page.get_by_text(ticker, exact=True)
+            try:
+                if loc.count() > 0:
+                    loc.first.click()
+                    clicked = True
+                    break
+            except Exception:  # noqa: BLE001 — élément détaché, on rescrolle
+                pass
+            page.evaluate(scroll_sidebar)
+            page.wait_for_timeout(400)
+        if not clicked:
+            return {"ticker": ticker, "via_tab": tab, "panel_opened": False,
+                    "note": "ticker introuvable dans la sidebar"}
+        # preuve d'ouverture : le flux d'ordres est extrait
+        for _ in range(12):
+            page.wait_for_timeout(1000)
+            probe = page.evaluate(EXTRACT_TOKEN_PANEL_JS)
+            if probe.get("panel_kind") == "token":
+                return {"ticker": ticker, "via_tab": tab,
+                        "panel_opened": True, **probe}
+        return {"ticker": ticker, "via_tab": tab, "panel_opened": False,
+                "debug_url": page.url,
+                "debug_body": (page.evaluate("document.body.innerText") or "")[:400]}
+    finally:
+        pw.stop()
+
+
+EXTRACT_TOKENS_JS = """
+() => {
+  // Trois formats de lignes dans le panneau Tokens :
+  //  trending/most_held : TICKER $prix $MC [MC] "MC" ▲|▼ pct%
+  //  bonding            : TICKER âge $vol "Vol" $mc "MC" pct%   (pct = courbe)
+  //  graduated          : TICKER âge $vol "Vol" $mc [MC] "MC" ▲|▼ pct%
+  const lines = (document.body.innerText || "").split("\\n").map(l => l.trim());
+  const STOP = new Set(["Alerts","Tokens","Leaderboard","Feed","Watchlist",
+    "Crypto","Trending","Most held","Graduated","Bonding","cash","Deposit more",
+    "MC","Vol","New","Clans","View all","Your rank","PnL"]);
+  const isMoney = (s) => /^\\$[\\d.,]+[KMB]?$/.test(s);
+  const isAge = (s) => /^\\d+(m|h|d|w|mo|y)$/.test(s);
+  const rows = [];
+  const seen = new Set();
+  for (let i = 0; i < lines.length - 4; i++) {
+    const t = lines[i];
+    if (!/^[A-Za-z0-9$][A-Za-z0-9$.]{1,13}$/.test(t) || STOP.has(t)) continue;
+    if (isMoney(t) || isAge(t)) continue;
+    if (seen.has(t)) continue;
+    // — format trending : le prix suit directement —
+    if (isMoney(lines[i + 1] || "")) {
+      let k = -1;
+      for (let j = i + 2; j < Math.min(i + 6, lines.length); j++) {
+        if (lines[j] === "MC" || /^\\$[\\d.,]+[KMB]? MC$/.test(lines[j])) { k = j; break; }
+      }
+      if (k < 0) continue;
+      let mc = null;
+      for (let j = k - 1; j > i + 1; j--) {
+        if (isMoney(lines[j])) { mc = lines[j].slice(1); break; }
+      }
+      if (mc === null) {
+        const one = (lines[k] || "").match(/^\\$([\\d.,]+[KMB]?) MC$/);
+        if (one) mc = one[1];
+      }
+      let dir = null, chg = null;
+      for (let q = k + 1; q < Math.min(k + 3, lines.length); q++) {
+        if (lines[q] === "▲" || lines[q] === "▼") {
+          dir = lines[q];
+          const pct = (lines[q + 1] || "").match(/^([\\d.,]+)%$/);
+          if (pct) chg = pct[1];
+          break;
+        }
+      }
+      if (mc === null || chg === null) continue;
+      seen.add(t);
+      rows.push({ ticker: t, mc, price: lines[i + 1].slice(1), dir, change_pct: chg });
+      continue;
+    }
+    // — formats bonding / graduated : l'âge suit —
+    if (!isAge(lines[i + 1] || "")) continue;
+    let vol = null, mc = null, dir = null, pctAfter = null;
+    let stage = 0;  // 0: avant Vol, 1: entre Vol et MC, 2: après MC
+    for (let j = i + 2; j < Math.min(i + 10, lines.length); j++) {
+      const l = lines[j];
+      let m;
+      if (l === "Vol") { stage = 1; continue; }
+      if ((m = l.match(/^\\$([\\d.,]+[KMB]?) Vol$/))) { vol = m[1]; stage = 1; continue; }
+      if (l === "MC") { stage = 2; continue; }
+      if ((m = l.match(/^\\$([\\d.,]+[KMB]?) MC$/))) {
+        if (stage <= 1) mc = m[1];
+        stage = 2; continue;
+      }
+      if (isMoney(l)) {
+        if (stage === 0) vol = l.slice(1);
+        else if (stage === 1) mc = l.slice(1);
+        continue;
+      }
+      if (stage === 2 && (l === "▲" || l === "▼")) { dir = l; continue; }
+      const pct = l.match(/^([\\d.,]+)%$/);
+      if (pct && stage === 2) { pctAfter = pct[1]; break; }
+    }
+    if (vol === null || mc === null) continue;
+    seen.add(t);
+    const row = { ticker: t, mc, vol, age: lines[i + 1] };
+    if (dir) { row.dir = dir; row.change_pct = pctAfter; }
+    else { row.bonding_pct = pctAfter; }
+    rows.push(row);
+  }
+  return rows;
+}
+"""
+
+
+def _persist_tokens(tab: str, rows: list) -> None:
+    """Entrepôt cumulatif des couches découverte (bonding/graduated/trending)
+    — un ticker absent de la capture précédente = une nouveauté à surveiller."""
+    import sqlite3
+    db = ROOT / "data" / "fomo" / "fomo.db"
+    con = sqlite3.connect(db)
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS fomo_new_coins (
+        ticker TEXT NOT NULL, tab TEXT NOT NULL,
+        mc TEXT, price TEXT, vol TEXT, age TEXT, dir TEXT,
+        change_pct TEXT, bonding_pct TEXT, captured_at REAL NOT NULL,
+        PRIMARY KEY (ticker, tab, captured_at));
+    """)
+    now = time.time()
+    for r in rows:
+        con.execute("INSERT OR IGNORE INTO fomo_new_coins VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (r.get("ticker"), tab, r.get("mc"), r.get("price"), r.get("vol"),
+                     r.get("age"), r.get("dir"), r.get("change_pct"),
+                     r.get("bonding_pct"), now))
+    con.commit()
+    con.close()
+
+
 def run_daemon() -> int:
     """Chromium headed lancé DIRECTEMENT (port CDP natif, pas de pipe) —
     UNE fenêtre à minimiser ; tous les minages se connectent via CDP."""
@@ -488,6 +692,10 @@ def main() -> int:
     ap.add_argument("--token", metavar="TICKER,HOLDER",
                     help="panneau token : via la position d'un tenant")
     ap.add_argument("--leaderboard", action="store_true")
+    ap.add_argument("--tokens", metavar="TAB", nargs="?", const="trending",
+                    help="panneau découverte (trending|most_held|graduated|bonding)")
+    ap.add_argument("--flow", metavar="TICKER[,TAB]",
+                    help="panneau flux d'un token (buys/sells + thèses de tous)")
     args = ap.parse_args()
     if args.login:
         return run_login()
@@ -506,6 +714,17 @@ def main() -> int:
         return 0
     if args.leaderboard:
         print(json.dumps(mine_leaderboard(["24h", "7d", "30d"]), indent=1, ensure_ascii=False))
+        return 0
+    if args.tokens:
+        res = mine_tokens(args.tokens, debug=True)
+        _persist_tokens(args.tokens, res["rows"])
+        print(json.dumps(res, indent=1, ensure_ascii=False))
+        return 0
+    if args.flow:
+        parts = args.flow.split(",", 1)
+        print(json.dumps(mine_token_flow(parts[0].strip(),
+                                         parts[1].strip() if len(parts) > 1 else "trending"),
+                         indent=1, ensure_ascii=False))
         return 0
     ap.print_help()
     return 2
