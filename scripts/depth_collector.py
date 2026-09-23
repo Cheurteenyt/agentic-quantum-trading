@@ -26,7 +26,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = ROOT / "data" / "warehouse" / "depth.db"
 
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "ASTERUSDT"]
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "ASTERUSDT", "PONSUSDT", "CATEUSDT",
+           "MEMEUSDT", "WIFUSDT", "TURBOUSDT", "BOMEUSDT", "MOODENGUSDT",
+           "FARTCOINUSDT", "PNUTUSDT", "NEIROUSDT", "DOGSUSDT", "TRUMPUSDT"]
 DEPTH_URL = "https://fapi.asterdex.com/fapi/v1/depth"
 POLL_SEC = 30
 BIN_FRAC = 0.0001         # largeur de bac = 0.01 % du mid

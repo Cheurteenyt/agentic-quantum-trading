@@ -62,13 +62,13 @@ def selftest() -> None:
     ev = [idx[9].timestamp()]  # signal à la bougie 9 → entrée à la bougie 10
     for h in (1, 4, 24):
         res = outcomes(df, ev, +1)
-        got = [r for hh, r, _ in res if hh == h]
+        got = [r for hh, r, _, _m in res if hh == h]
         expected = (110.0 - 100.0) / 100.0 * 100 - COST_PCT  # +10 % - coûts réels
         assert got and abs(got[0] - expected) < 1e-9, \
             f"selftest h={h}: {got} != {expected}"
     # direction short = miroir exact
     res = outcomes(df, ev, -1)
-    got = [r for hh, r, _ in res if hh == 1]
+    got = [r for hh, r, _, _m in res if hh == 1]
     assert abs(got[0] - (-10.0 - COST_PCT)) < 1e-9, f"selftest short: {got}"
     print("[selftest] harnais vérifié sur données synthétiques — OK",
           file=sys.stderr)
@@ -218,14 +218,19 @@ def funding_signals(fh: pd.DataFrame, btc_close: pd.Series) -> list[dict]:
     return out
 
 
-def outcomes(df: pd.DataFrame, events, direction: int) -> list[tuple[int, float, float]]:
-    """(horizon, ret %, ts_entrée_s) — entrée au close 1h APRÈS le signal."""
+def outcomes(df: pd.DataFrame, events, direction: int,
+             cost_pct: float = COST_PCT) -> list[tuple]:
+    """(horizon, ret %, ts_entrée_s, mae %) — entrée au close 1h APRÈS le
+    signal ; mae = excursion adverse maximale sur le chemin de détention
+    (négative pour un long, positive pour un short) → sert au risque de
+    liquidation selon le levier."""
     import numpy as np
 
-    res: list[tuple[int, float, float]] = []
+    res: list[tuple] = []
     idx = df.index  # DatetimeIndex
     idx_ns = idx.astype("datetime64[ns]").asi8  # résolution unifiée (ns)
     opens, closes = df["open"].values, df["close"].values
+    lows, highs = df["low"].values, df["high"].values
     for ev_ts in events:  # secondes
         target_ns = int(float(ev_ts) * 1e9)
         i = int(np.searchsorted(idx_ns, target_ns, side="right")) - 1
@@ -240,8 +245,12 @@ def outcomes(df: pd.DataFrame, events, direction: int) -> list[tuple[int, float,
             j = entry_i + h - 1
             if j >= len(idx):
                 continue
-            ret = (closes[j] - entry) / entry * 100 * direction - COST_PCT
-            res.append((h, ret, entry_ts))
+            ret = (closes[j] - entry) / entry * 100 * direction - cost_pct
+            if direction > 0:
+                mae = (lows[entry_i:j + 1].min() - entry) / entry * 100
+            else:
+                mae = (highs[entry_i:j + 1].max() - entry) / entry * 100
+            res.append((h, ret, entry_ts, round(mae, 3)))
     return res
 
 
@@ -281,6 +290,20 @@ def main() -> int:
     # ——— collecte des événements prix ———
     # events[(signal, horizon)] -> list[(ret, entry_ts)]
     pooled: dict[tuple[str, int], list[tuple[float, float, str]]] = defaultdict(list)
+    # slippage MESURÉ par symbole (notre carnet d'ordres) — repli 10 bps
+    slip_by_sym: dict[str, float] = {}
+    try:
+        scon = sqlite3.connect(KDB)
+        for s, b in scon.execute("SELECT symbol, slip_bps FROM slippage_measured"):
+            slip_by_sym[s] = float(b)
+        scon.close()
+    except sqlite3.OperationalError:
+        pass
+
+    def cost_of(sym: str) -> float:
+        # fees taker 8 bps RT + slippage mesuré ×2 (aller-retour)
+        return 0.08 + slip_by_sym.get(sym, 10.0) / 100 * 2
+
     n_combos = 0
     n_skip_data = 0
     for sym in sorted(symbols):
@@ -291,8 +314,9 @@ def main() -> int:
         for name, direction, ev in price_signals(df, btc_close):
             n_combos += 1
             ev_s = [t.timestamp() for t in cooldown(df.index[ev.fillna(False)])]
-            for h, ret, ets in outcomes(df, ev_s, direction):
-                pooled[(name, h)].append((ret, ets, regime(ets)))
+            cst = cost_of(sym)
+            for h, ret, ets, mae in outcomes(df, ev_s, direction, cst):
+                pooled[(name, h)].append((ret, ets, regime(ets), mae, direction, sym))
 
     # ——— événements funding (chaque événement porte sa propre direction) ———
     # ⚠️ funding_time est en MILLISECONDES : conversion en secondes ici
@@ -324,13 +348,15 @@ def main() -> int:
         for sig, (d, mask) in extra.items():
             n_combos += 1
             ev_s = [t.timestamp() for t in cooldown(df.index[mask.fillna(False)])]
-            for h, ret, ets in outcomes(df, ev_s, d):
-                fund_rows.append((sig, sym, h, ret, ets))
+            cst = cost_of(sym)
+            for h, ret, ets, mae in outcomes(df, ev_s, d, cst):
+                fund_rows.append((sig, sym, h, ret, ets, mae, d))
         for d, ts_list in by_dir.items():
             ts_kept = cooldown(pd.DatetimeIndex(pd.to_datetime(ts_list, unit="s")))
             ts_list = [t.timestamp() for t in ts_kept]
-            for h, ret, ets in outcomes(df, ts_list, d):
-                fund_rows.append((fsg["signal"], sym, h, ret, ets))
+            cst = cost_of(sym)
+            for h, ret, ets, mae in outcomes(df, ts_list, d, cst):
+                fund_rows.append((fsg["signal"], sym, h, ret, ets, mae, d))
     # ——— BASELINE : short AVEUGLE par horizon (contrôle anti-drift) ———
     # un signal ne "compte" que si son WR dépasse CE chiffre : sur un an,
     # les memecoins s'effondrent, donc tout short tenu longtemps gagne
@@ -345,7 +371,7 @@ def main() -> int:
             closes, opens = df["close"].values, df["open"].values
             for i in range(0, len(df.index) - h, 24):
                 e, x = opens[i], closes[min(i + h, len(df.index) - 1)]
-                r = (x - e) / e * 100 * (-1) - COST_PCT
+                r = (x - e) / e * 100 * (-1) - cost_of(sym)
                 n += 1
                 wins += r > 0
         baseline[h] = wins / n * 100 if n else 50.0
@@ -355,8 +381,8 @@ def main() -> int:
     con.close()
 
     # fusion funding dans pooled (sous préfixe distinct)
-    for sig, sym, h, ret, ets in fund_rows:
-        pooled[(f"{sig}", h)].append((ret, ets, "n/a"))
+    for sig, sym, h, ret, ets, mae, d in fund_rows:
+        pooled[(f"{sig}", h)].append((ret, ets, "n/a", mae, d, sym))
 
     # ——— rapport ———
     lines = [
@@ -371,8 +397,9 @@ def main() -> int:
         "|---|---|---|---|---|---|---|---|---|",
     ]
     confirmed, tested_cells, above_drift = 0, 0, 0
+    confirmed_cells: list = []
     for (name, h), evs in sorted(pooled.items()):
-        rets = [r for r, _, _ in evs]
+        rets = [e[0] for e in evs]
         n = len(rets)
         if n < 10:
             continue
@@ -384,20 +411,22 @@ def main() -> int:
         blind = baseline.get(h, 50.0)
         delta = wr_all - blind
         # robustesse : exclure les big moves
-        keep = [r for r, ets, _ in evs if not in_big_window(ets)]
+        keep = [e[0] for e in evs if not in_big_window(e[1])]
         wr_rob = (sum(1 for x in keep if x > 0) / len(keep) * 100
                   if len(keep) >= 10 else None)
         # train/val : split par temps d'entrée sur TOUTE la période poolée
-        all_ts = sorted(ets for _, ets, _ in evs)
+        all_ts = sorted(e[1] for e in evs)
         split_ts = all_ts[int(len(all_ts) * TRAIN_FRAC)]
-        tr = [r for r, ets, _ in evs if ets < split_ts]
-        va = [r for r, ets, _ in evs if ets >= split_ts]
+        tr = [e[0] for e in evs if e[1] < split_ts]
+        va = [e[0] for e in evs if e[1] >= split_ts]
         wr_tr = sum(1 for x in tr if x > 0) / len(tr) * 100 if len(tr) >= 10 else None
         wr_va = sum(1 for x in va if x > 0) / len(va) * 100 if len(va) >= 5 else None
         verdict = ("CONFIRMÉ" if wr_tr is not None and wr_va is not None
                    and wr_tr >= 55 and wr_va >= 55 else "BRUIT")
         confirmed += verdict == "CONFIRMÉ"
         above_drift += (verdict == "CONFIRMÉ" and delta >= 5)
+        if verdict == "CONFIRMÉ":
+            confirmed_cells.append((name, h, [(m, d) for _, _, _, m, d, _ in evs]))
         rob_s = "—" if wr_rob is None else f"{wr_rob:.0f} %"
         lines.append(
             f"| {name} | +{h}h | {n} | {wr_all:.1f} % | {delta:+.1f} pts "
@@ -409,9 +438,9 @@ def main() -> int:
         if len(evs) < 50:
             continue
         by_reg: dict[str, list[float]] = defaultdict(list)
-        for r, _, reg in evs:
-            if reg != "n/a":
-                by_reg[reg].append(r)
+        for e in evs:
+            if e[2] != "n/a":
+                by_reg[e[2]].append(e[0])
         if not by_reg:
             continue
         cells = []
@@ -420,6 +449,21 @@ def main() -> int:
             cells.append(f"{sum(1 for x in rr if x > 0)/len(rr)*100:.0f} % (n={len(rr)})"
                          if len(rr) >= 15 else "—")
         lines.append(f"| {name} | +{h}h | {len(evs)} | " + " | ".join(cells) + " |")
+
+    if confirmed_cells:
+        lines += ["", "## Risque de LIQUIDATION selon le levier (confirmés)", "",
+                  "Part des trades dont l'excursion adverse touche ~100/levier %", "",
+                  "| Signal | H | 3x | 5x | 10x |", "|---|---|---|---|---|"]
+        for name, h, md in confirmed_cells:
+            cells = []
+            for L in (3, 5, 10):
+                th = 100.0 / L
+                n_liq = sum(1 for m, d in md
+                            if (d > 0 and m <= -th) or (d < 0 and m >= th))
+                cells.append(f"{n_liq/len(md)*100:.1f} %")
+            lines.append(f"| {name} | +{h}h | " + " | ".join(cells) + " |")
+        lines += ["Un % de liquidation > 0 rend la stratégie morte au levier",
+                  "considéré — la médiane positive ne sauve pas un compte liquidé."]
 
     expected = tested_cells * 0.025
     lines += [
