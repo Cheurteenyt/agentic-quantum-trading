@@ -1,0 +1,14 @@
+[Unit]
+Description=Navigateur fomo persistant (headed + CDP pour le Whale Radar)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_harvest.py --daemon
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

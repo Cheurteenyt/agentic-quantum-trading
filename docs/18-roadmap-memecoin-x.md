@@ -158,3 +158,15 @@ retenu : **headed sous Xvfb** (serveur X virtuel — fingerprint réel,
 invisible) ; `xorg-server-xvfb` à installer par l'utilisateur
 (`sudo pacman -S xorg-server-xvfb`) puis `xvfb-run` dans l'unité systemd.
 En attendant : minage interactif en session (éprouvé, 714 positions).
+
+### Whale Radar automatisé (23/09, 02h30) — LA solution sans Xvfb
+
+Le blocage headless est contourné SANS installation : **navigateur daemon**
+headed persistant + CDP. `systemctl --user` `fomo-browser.service`
+(Restart=always, survit aux reboots — minimiser la fenêtre une fois par
+reboot). `scripts/whale_radar.py` s'y connecte (connect_over_cdp :9222) :
+mine les positions de tous les constants, insère dans fomo.db, DIFF vs le
+snapshot précédent (les NOUVEAUX achats >= $5k = le signal frais), produit
+le radar (confluence + crochets Aster/fomo). Premier run automatique :
+9/12 profils propres (les échecs = réinit Privy après redémarrage — retry
+à affiner). Session persistée vérifiée headed après login patchright.

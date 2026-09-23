@@ -25,6 +25,20 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILE_DIR = ROOT / "data" / "fomo_browser_profile"
 BASE = "https://fomo.family"
 LOGIN_TIMEOUT_S = 900
+CDP_PORT = 9222
+
+
+def _connect_cdp():
+    """Se connecte au navigateur daemon (headed, session persistée) s'il tourne."""
+    from patchright.sync_api import sync_playwright
+
+    pw = sync_playwright().start()
+    try:
+        browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}", timeout=5000)
+        return pw, browser
+    except Exception:
+        pw.stop()
+        return None, None
 
 EXTRACT_POSITIONS_JS = """
 () => {
@@ -128,14 +142,41 @@ def check_status() -> int:
 
 
 def mine_positions(handle: str, scrolls: int = 10) -> dict:
-    from patchright.sync_api import sync_playwright
+    """Positions d'un trader — via le navigateur daemon (CDP) si présent,
+    sinon headed éphémère (session persistée)."""
+    pw = browser = ctx = None
+    via = "cdp"
+    pw, browser = _connect_cdp()
+    if browser is None:
+        from patchright.sync_api import sync_playwright
 
-    _require_profile()
-    with sync_playwright() as p:
-        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        _require_profile()
+        via = "headed éphémère"
+        pw = sync_playwright().start()
+        ctx = pw.chromium.launch_persistent_context(
+            str(PROFILE_DIR), headless=False,
+            args=["--window-position=0,0", "--window-size=1280,800"])
+        browser = ctx
+    try:
+        page = browser.contexts[0].pages[0] if browser.contexts[0].pages else \
+            browser.contexts[0].new_page()
         page.goto(f"{BASE}/profile/{handle}", wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(3000)
+        # l'app affiche parfois « Couldn't load your account » après un
+        # redémarrage du navigateur (réinit Privy) : recharger jusqu'à 4 fois
+        for _ in range(4):
+            page.wait_for_timeout(3000)
+            body = page.evaluate("document.body.innerText") or ""
+            if "Couldn" not in body:
+                break
+            try:
+                btn = page.locator("button:has-text('Try again')")
+                if btn.count() > 0:
+                    btn.first.click()
+                else:
+                    page.reload(wait_until="domcontentloaded")
+            except Exception:
+                page.reload(wait_until="domcontentloaded")
+            page.wait_for_timeout(4000)
         seen: dict = {}
         for _ in range(scrolls):
             for ticker, v in (page.evaluate(EXTRACT_POSITIONS_JS) or {}).items():
@@ -146,8 +187,12 @@ def mine_positions(handle: str, scrolls: int = 10) -> dict:
             "() => { const m = (document.body.innerText||'').match(/Positions\\s*(\\d+)/);"
             " return m ? parseInt(m[1]) : null; }"
         )
-        ctx.close()
-    return {"handle": handle, "declared_positions": declared, "mined": seen}
+        return {"handle": handle, "via": via, "declared_positions": declared, "mined": seen}
+    finally:
+        if ctx is not None:
+            ctx.close()
+        else:
+            pw.stop()
 
 
 def mine_leaderboard(windows: list[str]) -> dict:
@@ -176,10 +221,35 @@ def mine_leaderboard(windows: list[str]) -> dict:
     return out
 
 
+def run_daemon() -> int:
+    """Navigateur headed persistant + CDP : UNE fenêtre (à minimiser une fois),
+    tout le minage s'y connecte ensuite — fingerprint réel, zéro headless."""
+    from patchright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(
+            str(PROFILE_DIR), headless=False,
+            args=[f"--remote-debugging-port={CDP_PORT}",
+                  "--window-position=60,60", "--window-size=1280,800"])
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.goto(f"{BASE}/leaderboard", wait_until="domcontentloaded")
+        print(f"[daemon] navigateur fomo prêt sur CDP :{CDP_PORT}"
+              " — minimise la fenêtre, elle reste branchée.", flush=True)
+        try:
+            while True:
+                time.sleep(60)
+        except KeyboardInterrupt:
+            pass
+        ctx.close()
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Harvester fomo.family headless")
     ap.add_argument("--login", action="store_true")
     ap.add_argument("--status", action="store_true")
+    ap.add_argument("--daemon", action="store_true",
+                    help="navigateur headed persistant + CDP (minimiser une fois)")
     ap.add_argument("--positions", metavar="HANDLE")
     ap.add_argument("--leaderboard", action="store_true")
     args = ap.parse_args()
@@ -187,6 +257,8 @@ def main() -> int:
         return run_login()
     if args.status:
         return check_status()
+    if args.daemon:
+        return run_daemon()
     if args.positions:
         print(json.dumps(mine_positions(args.positions), indent=1, ensure_ascii=False))
         return 0
