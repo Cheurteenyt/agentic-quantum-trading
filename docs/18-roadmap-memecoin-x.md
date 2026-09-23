@@ -145,3 +145,16 @@ Positions, scroll incrémental dans le conteneur). Ce qui est déjà acquis :
 - le filtre DOM des positions réelles est identifié (parents à classes
   vides, hors sidebar `A.block.rounded-lg` / discovery `grid-transition` /
   footer) — à réutiliser.
+
+### Harvest headless fomo (23/09, 02h30) — blocage connu et contournement
+
+`scripts/fomo_harvest.py` (login/status/positions/leaderboard) fonctionne :
+le login headed est détecté (preuve POSITIVE : bouton nav Leaderboard,
+l'absence de Login seule est un faux positif de rendu) et le profil
+patchright persiste (cookies Privy vérifiés). MAIS le chargement du compte
+en mode **headless pur** est bloqué (« Couldn't load your account » après
+4 retries — anti-fingerprint Privy/Statsig côté fomo). Contournement
+retenu : **headed sous Xvfb** (serveur X virtuel — fingerprint réel,
+invisible) ; `xorg-server-xvfb` à installer par l'utilisateur
+(`sudo pacman -S xorg-server-xvfb`) puis `xvfb-run` dans l'unité systemd.
+En attendant : minage interactif en session (éprouvé, 714 positions).
