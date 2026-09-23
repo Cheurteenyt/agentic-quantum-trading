@@ -290,6 +290,92 @@ def harvest_replies(urls: list[str], scrolls: int) -> int:
     return 0
 
 
+def harvest_trends() -> int:
+    """Tendances mondiales X — un ticker qui trende AVANT d'être dans notre
+    univers est l'alpha le plus tôt qui existe. -> x_posts.db:x_trends
+    /explore est vide en headless : repli sur le rail « Tendances » du home."""
+    from patchright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
+        return 1
+    trends: list[dict] = []
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.goto("https://x.com/explore/tabs/trending",
+                  wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(4000)
+        trends = page.evaluate("""
+        () => {
+          const out = [];
+          document.querySelectorAll('[data-testid="trend"]').forEach(t => {
+            const lines = (t.innerText || "").split("\\n").map(s => s.trim())
+              .filter(Boolean);
+            const k = lines.findIndex(l => /\\d[\\d.,]*\\s*posts?$/i.test(l));
+            if (k >= 1) out.push({ name: lines[k - 1], count: lines[k],
+                                   category: lines[0] || null });
+          });
+          return out;
+        }""") or []
+        if not trends:
+            page.goto("https://x.com/home", wait_until="domcontentloaded",
+                      timeout=30000)
+            page.wait_for_timeout(5000)
+            body = page.evaluate("document.body.innerText") or ""
+            i = max(body.find("Tendances"), body.find("What's happening"))
+            if i >= 0:
+                j_end = min([x for x in (body.find("Suggestions", i),
+                                         body.find("Voir plus", i),
+                                         body.find("Show more", i),
+                                         i + 1500) if x > 0])
+                zone = body[i:j_end]
+                lines = [l.strip() for l in zone.split("\n") if l.strip()]
+                skip = re.compile(r"· (Tendances|Trending)|^(Tendances|What's happening|Voir plus|Show more|Suivre|Follow)$|@|^Tendance dans|^Trending in", re.I)
+                count = re.compile(r"^(?:[\d.,]+\s*[kKmM]?\s*)?posts$", re.I)
+                last_name = None
+                for l in lines[1:]:
+                    if skip.search(l):
+                        continue
+                    if count.match(l):
+                        if last_name:
+                            for t in trends:
+                                if t["name"] == last_name and not t.get("count"):
+                                    t["count"] = l
+                            last_name = None
+                        continue
+                    if l.startswith("#") or l.startswith("$") or len(l) <= 40:
+                        trends.append({"name": l, "count": None, "category": None})
+                        last_name = l
+        ctx.close()
+    import sqlite3
+    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db")
+    con.execute("""CREATE TABLE IF NOT EXISTS x_trends (
+        name TEXT NOT NULL, count TEXT, category TEXT,
+        captured_at REAL NOT NULL, PRIMARY KEY (name, captured_at))""")
+    now = time.time()
+    for t in trends:
+        con.execute("INSERT OR IGNORE INTO x_trends VALUES (?,?,?,?)",
+                    (t["name"], t.get("count"), t.get("category"), now))
+    con.commit()
+    con.close()
+    # signal fort : une tendance qui matche notre univers de tickers
+    universe = set()
+    try:
+        from scripts.x_aster_pulse import _universe
+        universe = {u.upper() for u in _universe()}
+    except Exception:  # noqa: BLE001
+        pass
+    hits = [t for t in trends if t["name"].upper().lstrip("$#") in universe]
+    print(f"[trends] {len(trends)} tendances", file=sys.stderr)
+    for t in trends[:10]:
+        print(f"[trends]   {t['name']}" + (f" — {t['count']}" if t.get("count") else ""),
+              file=sys.stderr)
+    for t in hits:
+        print(f"[trends] *** {t['name']} TRENDING — dans notre univers", file=sys.stderr)
+    return 0
+
+
 def goto_search(page, query: str) -> bool:
     """Navigue vers une recherche live et verifie la stabilite (anti-rebond)."""
     from urllib.parse import quote
@@ -407,6 +493,8 @@ def main() -> int:
                     help="portee X des profils (followers/bio) -> x_profiles")
     ap.add_argument("--replies", metavar="U1,U2",
                     help="reponses sous des statuts (URLs completees)")
+    ap.add_argument("--trends", action="store_true",
+                    help="tendances mondiales X -> x_trends (radar de narratif)")
     args = ap.parse_args()
     if args.login:
         return run_login()
@@ -421,6 +509,8 @@ def main() -> int:
     if args.replies:
         urls = [u.strip() for u in args.replies.split(",") if u.strip()]
         return harvest_replies(urls, args.scrolls)
+    if args.trends:
+        return harvest_trends()
     if args.profiles:
         handles = [h.strip().lstrip("@") for h in args.profiles.split(",") if h.strip()]
         return harvest_profiles(handles, args.scrolls)
