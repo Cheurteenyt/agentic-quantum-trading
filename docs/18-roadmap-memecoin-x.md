@@ -203,3 +203,20 @@ dur remplacée par exchangeInfo LIVE (leçon : ne jamais maintenir l'univers
   profil, avec likes. À ajouter au harvest (prochaine passe).
 - Réseau social du profil : Followers/Following/Mutuals affichés
   (RugDalio : 40.7K followers) — graphe social potentiel.
+
+### Le panneau token fomo (23/09 soir) — la pépite de la cartographie
+
+Cliquer un token (position ou discovery) ouvre un panneau avec :
+- **flux d'ordres du token** : nb buys/sells, volume buy/sell, nb buyers/
+  sellers (PONS : 3 166 buys vs 2 857 sells, $3,2 M de vol — la pression
+  réelle par coin, NOS données propriétaires)
+- **métadonnées** : supply, chaîne, date de création, contrat
+- **liens sociaux** : le compte X officiel du token (ponsdotfamily) ET
+  **l'URL « Search on X » pré-construite** (`0x39... OR $PONS`) — fomo nous
+  donne le pont vers sa propre chatter X !
+- stats multi-timeframes (5M/1H/4H/1D) + panneau Buy/Sell (exécution)
+
+**Circuit d'exploitation en boucle** (à automatiser) :
+radar ticker -> panneau token -> flux d'ordres (pression) + handle X
+-> recherches X ciblées (URL fournie par fomo) -> registre score les
+calls du coin -> wave ledger mesure. Chaque brique nourrit les autres.
