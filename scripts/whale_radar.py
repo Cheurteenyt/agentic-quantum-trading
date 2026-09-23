@@ -49,12 +49,23 @@ def _aster_universe() -> set[str]:
         return ASTEROIDS
 
 
-def constants(con: sqlite3.Connection) -> list[str]:
-    rows = con.execute(
-        "SELECT handle FROM fomo_traders "
-        "WHERE pnl_24h > 0 AND pnl_7d > 0 AND pnl_30d > 0 ORDER BY pnl_30d DESC"
-    ).fetchall()
-    return [r[0] for r in rows]
+def constants(con: sqlite3.Connection, top: int | None = None) -> list[str]:
+    """Constants (PnL>0 sur 24h/7j/30j) + tier list frogmanhaha S/A/B
+    (les meilleurs joueurs all-time sont minés même en drawdown courant)."""
+    q = ("SELECT handle FROM fomo_traders "
+         "WHERE pnl_24h > 0 AND pnl_7d > 0 AND pnl_30d > 0 ORDER BY pnl_30d DESC")
+    if top is not None:
+        q += f" LIMIT {int(top)}"
+    out = [r[0] for r in con.execute(q).fetchall()]
+    try:
+        tier = [r[0] for r in con.execute(
+            "SELECT DISTINCT handle FROM fomo_tier_list "
+            "WHERE tier IN ('S','A','B') AND handle IS NOT NULL "
+            "AND confidence IN ('high','medium')")]
+    except sqlite3.OperationalError:
+        tier = []
+    out += [h for h in tier if h not in out]
+    return out
 
 
 def main() -> int:
@@ -69,7 +80,7 @@ def main() -> int:
         value_usd  REAL, dir TEXT, captured_at REAL NOT NULL,
         PRIMARY KEY (handle, ticker, captured_at));
     """)
-    handles = constants(con)[: args.top]
+    handles = constants(con, top=args.top)
     if not handles:
         print("[radar] aucun constant en base — miner le leaderboard d'abord", file=sys.stderr)
         return 1
