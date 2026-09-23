@@ -653,6 +653,260 @@ def _persist_tokens(tab: str, rows: list) -> None:
     con.close()
 
 
+PROBE_CLICKS = {
+    # nom -> (URL de départ, texte à cliquer, attente ms)
+    "clans": (f"{BASE}/leaderboard", "Clans", 3000),
+    "alerts": (f"{BASE}/leaderboard", "Alerts", 3000),
+    "closed": (f"{BASE}/profile/ogle", "Closed", 3500),
+    "feed": (f"{BASE}/leaderboard", "Feed", 3000),
+}
+
+
+def probe(name: str) -> dict:
+    """Sonde visuelle : ouvre une surface (clic de texte), capture écran +
+    corps — pour cartographier avant d'écrire un mineur."""
+    if name not in PROBE_CLICKS:
+        return {"error": f"sonde inconnue: {name} ({list(PROBE_CLICKS)})"}
+    url, text, wait = PROBE_CLICKS[name]
+    pw, browser = _connect_cdp()
+    if browser is None:
+        raise RuntimeError("daemon CDP requis")
+    try:
+        ctx = _ctx_of(browser)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        _open_page(page, url, initial_wait=4000)
+        clicked = False
+        try:
+            page.get_by_text(text, exact=True).first.click()
+            clicked = True
+            page.wait_for_timeout(wait)
+        except Exception:  # noqa: BLE001 — le dump dira où on en est
+            pass
+        shot = f"/tmp/probe_{name}.png"
+        try:
+            page.screenshot(path=shot)
+        except Exception:  # noqa: BLE001
+            shot = None
+        return {"probe": name, "clicked": clicked, "url": page.url,
+                "screenshot": shot,
+                "body": (page.evaluate("document.body.innerText") or "")[:2500]}
+    finally:
+        pw.stop()
+
+
+EXTRACT_ALERTS_JS = """
+() => {
+  // Flux Alerts : "handle / Buy|Sell|Thesis / âge / corps" répétés.
+  // Le corps arrive ÉCLATÉ sur plusieurs lignes (ticker, $X, at, $Y, MC) —
+  // on collecte tout puis on reparse chaque événement.
+  const isMoney = (s) => /^\\$[\\d.,]+[KMB]?$/.test(s);
+  const isAge = (s) => /^\\d+(m|h|d|w|mo|y)$/.test(s);
+  const lines = (document.body.innerText || "").split("\\n").map(l => l.trim());
+  const events = [];
+  let cur = null;
+  const flush = () => {
+    if (cur && cur.handle && cur.badge) {
+      // reparse du corps éclaté
+      const r = cur.text;
+      for (let i = 0; i < r.length; i++) {
+        if (r[i] === "at" && isMoney(r[i - 1] || "") && isMoney(r[i + 1] || "")
+            && r[i + 2] === "MC") {
+          cur.amount = r[i - 1].slice(1);
+          cur.entry_mc = r[i + 1].slice(1);
+          cur.ticker = r.slice(0, i - 1).reverse().find(x =>
+            x && x !== "?" && !isMoney(x) && !isAge(x) && !/^[▲▼]$/.test(x)) || null;
+        }
+        const pos = r[i].match(/^\\$([\\d.,]+[KMB]?) \\(([+-]?[\\d.,]+)%\\)$/);
+        if (pos) { cur.pos_value = pos[1]; cur.pos_pct = pos[2]; }
+        if (/^♡ ?[\\d,]+$/.test(r[i])) cur.likes = r[i].replace(/\\D/g, "");
+      }
+      cur.text = cur.text.filter(x => x !== "at" && x !== "MC" && !isMoney(x)
+        && !/^\\?/.test(x));
+      events.push(cur);
+    }
+    cur = null;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const badge = l === "Buy" || l === "Sell" || l === "Thesis" ? l : null;
+    if (badge && i >= 1 && isAge(lines[i + 1] || "")) {
+      flush();
+      cur = { handle: lines[i - 1], badge, age: lines[i + 1], text: [],
+              ticker: null, amount: null, entry_mc: null, pos_value: null,
+              pos_pct: null, likes: null, links: [] };
+      i += 1;  // sauter l'âge
+      continue;
+    }
+    if (cur) {
+      if (/^x\\.com\\//.test(l) || /^https:\\/\\/x\\.com\\//.test(l)) {
+        cur.links.push(l);
+        continue;
+      }
+      if (l && cur.text.length < 14) cur.text.push(l.slice(0, 140));
+    }
+  }
+  flush();
+  return events;
+}
+"""
+
+
+def mine_alerts(steps: int = 10) -> dict:
+    """Flux Alerts (sidebar) : événements Buy/Sell/Thesis des traders avec
+    MC d'entrée — le temps réel de fomo. Scroll de la sidebar elle-même."""
+    pw, browser = _connect_cdp()
+    if browser is None:
+        raise RuntimeError("daemon CDP requis pour --alerts")
+    try:
+        ctx = _ctx_of(browser)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        _open_page(page, f"{BASE}/leaderboard", initial_wait=4000)
+        try:
+            page.get_by_text("Alerts", exact=True).first.click()
+            page.wait_for_timeout(3000)
+        except Exception:  # noqa: BLE001 — la vue par défaut peut suffire
+            pass
+        scroll_sidebar = """
+        () => {
+          for (const e of document.querySelectorAll("div")) {
+            if (e.scrollHeight > e.clientHeight + 100 && e.clientHeight > 150
+                && e.clientWidth < 420) {
+              e.scrollTop += 500;
+              return true;
+            }
+          }
+          return false;
+        }"""
+        seen: dict = {}
+        for _ in range(steps):
+            for ev in page.evaluate(EXTRACT_ALERTS_JS) or []:
+                key = (ev.get("handle"), ev.get("badge"), ev.get("age"),
+                       ev.get("ticker") or (ev.get("text") or [""])[0])
+                if key not in seen:
+                    seen[key] = ev
+            page.evaluate(scroll_sidebar)
+            page.wait_for_timeout(400)
+        return {"events": list(seen.values()), "n": len(seen)}
+    finally:
+        pw.stop()
+
+
+def _persist_events(events: list) -> None:
+    """Entrepôt du flux Alerts — les événements frais (Buy/Sell/Thesis avec
+    MC d'entrée) = le signal temps réel, diff entre captures."""
+    import sqlite3
+    db = ROOT / "data" / "fomo" / "fomo.db"
+    con = sqlite3.connect(db)
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS fomo_events (
+        handle TEXT NOT NULL, badge TEXT NOT NULL, age TEXT,
+        ticker TEXT, amount TEXT, entry_mc TEXT,
+        pos_value TEXT, pos_pct TEXT, likes TEXT,
+        text TEXT, links TEXT, captured_at REAL NOT NULL,
+        PRIMARY KEY (handle, badge, age, ticker, captured_at));
+    """)
+    now = time.time()
+    import json as _json
+    for ev in events:
+        con.execute("INSERT OR IGNORE INTO fomo_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (ev.get("handle"), ev.get("badge"), ev.get("age"),
+                     ev.get("ticker"), ev.get("amount"), ev.get("entry_mc"),
+                     ev.get("pos_value"), ev.get("pos_pct"), ev.get("likes"),
+                     " ".join(ev.get("text") or [])[:300] or None,
+                     _json.dumps(ev.get("links") or []), now))
+    con.commit()
+    con.close()
+
+
+EXTRACT_CLOSED_JS = """
+() => {
+  // Positions Closed : "TICKER / $X invested • âge / +|− / $Y / ▲|▼ / %"
+  const lines = (document.body.innerText || "").split("\\n").map(l => l.trim());
+  const isMoney = (s) => /^\\$[\\d.,]+[KMB]?$/.test(s);
+  const STOP = new Set(["Positions","Top trades","Open","Closed","Token","PnL",
+    "Total cash","invested"]);
+  const rows = [];
+  const seen = new Set();
+  for (let i = 0; i < lines.length - 4; i++) {
+    const t = lines[i];
+    if (!t || isMoney(t) || STOP.has(t) || /^\\d+(m|h|d|w|mo|y)$/.test(t)) continue;
+    const inv = (lines[i + 1] || "")
+      .match(/^\\$([\\d.,]+[KMB]?) invested(?: • (\\d+[a-z]{1,2}))?$/);
+    if (!inv) continue;
+    if (seen.has(t)) continue;
+    let pnl = null, dir = null, pct = null, sign = null;
+    for (let j = i + 2; j < Math.min(i + 8, lines.length); j++) {
+      const l = lines[j];
+      if (l === "+" || l === "−" || l === "-") { sign = l === "+" ? "+" : "-"; continue; }
+      if (pnl === null && isMoney(l)) { pnl = l.slice(1); continue; }
+      if (l === "▲" || l === "▼") { dir = l; continue; }
+      const m = l.match(/^([\\d.,]+)%$/);
+      if (m && dir) { pct = m[1]; break; }
+    }
+    if (pnl === null || pct === null) continue;
+    seen.add(t);
+    rows.push({ ticker: t, invested: inv[1], pnl: (sign || "") + pnl,
+                dir, pct, age: inv[2] || null });
+  }
+  return rows;
+}
+"""
+
+
+def mine_closed(handle: str, steps: int = 8) -> dict:
+    """Positions Closed d'un trader : historique RÉALISÉ (PnL par trade
+    clôturé) — la compétence prouvée du baleine, pour pondérer son signal."""
+    pw, browser = _connect_cdp()
+    if browser is None:
+        raise RuntimeError("daemon CDP requis pour --closed")
+    try:
+        ctx = _ctx_of(browser)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        _open_page(page, f"{BASE}/profile/{handle}", initial_wait=4000)
+        try:
+            page.get_by_text("Closed", exact=True).first.click()
+            page.wait_for_timeout(3000)
+        except Exception:  # noqa: BLE001 — pas de section Closed = 0 trades
+            return {"handle": handle, "closed": [], "n": 0, "cash": None}
+        cash = None
+        seen: dict = {}
+        for _ in range(steps):
+            body = page.evaluate("document.body.innerText") or ""
+            if cash is None:
+                m = re.search(r"Total cash\n\$([\d.,]+)", body)
+                cash = m.group(1) if m else None
+            for row in page.evaluate(EXTRACT_CLOSED_JS) or []:
+                seen.setdefault(row["ticker"], row)
+            page.evaluate("window.scrollBy(0, 700)")
+            page.wait_for_timeout(400)
+        return {"handle": handle, "closed": list(seen.values()), "n": len(seen),
+                "cash": cash,
+                "debug_body": (page.evaluate("document.body.innerText") or "")[:2000]}
+    finally:
+        pw.stop()
+
+
+def _persist_closed(handle: str, rows: list, cash: str | None) -> None:
+    """Historique réalisé par baleine — base du win rate qui pondère le radar."""
+    import sqlite3
+    db = ROOT / "data" / "fomo" / "fomo.db"
+    con = sqlite3.connect(db)
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS fomo_closed (
+        handle TEXT NOT NULL, ticker TEXT NOT NULL,
+        invested TEXT, pnl TEXT, dir TEXT, pct TEXT, age TEXT,
+        captured_at REAL NOT NULL,
+        PRIMARY KEY (handle, ticker, age, captured_at));
+    """)
+    now = time.time()
+    for r in rows:
+        con.execute("INSERT OR IGNORE INTO fomo_closed VALUES (?,?,?,?,?,?,?,?)",
+                    (handle, r.get("ticker"), r.get("invested"), r.get("pnl"),
+                     r.get("dir"), r.get("pct"), r.get("age"), now))
+    con.commit()
+    con.close()
+
+
 def run_daemon() -> int:
     """Chromium headed lancé DIRECTEMENT (port CDP natif, pas de pipe) —
     UNE fenêtre à minimiser ; tous les minages se connectent via CDP."""
@@ -696,6 +950,12 @@ def main() -> int:
                     help="panneau découverte (trending|most_held|graduated|bonding)")
     ap.add_argument("--flow", metavar="TICKER[,TAB]",
                     help="panneau flux d'un token (buys/sells + thèses de tous)")
+    ap.add_argument("--probe", metavar="NAME",
+                    help=f"sonde visuelle d'une surface: {','.join(PROBE_CLICKS)}")
+    ap.add_argument("--alerts", action="store_true",
+                    help="flux Alerts (Buy/Sell/Thesis avec MC d'entrée)")
+    ap.add_argument("--closed", metavar="H1,H2",
+                    help="positions Closed (historique réalisé -> win rate)")
     args = ap.parse_args()
     if args.login:
         return run_login()
@@ -718,6 +978,26 @@ def main() -> int:
     if args.tokens:
         res = mine_tokens(args.tokens, debug=True)
         _persist_tokens(args.tokens, res["rows"])
+        print(json.dumps(res, indent=1, ensure_ascii=False))
+        return 0
+    if args.probe:
+        print(json.dumps(probe(args.probe), indent=1, ensure_ascii=False))
+        return 0
+    if args.closed:
+        outs = []
+        for h in [x.strip() for x in args.closed.split(",") if x.strip()]:
+            res = mine_closed(h)
+            _persist_closed(h, res["closed"], res.get("cash"))
+            wins = sum(1 for r in res["closed"] if r.get("dir") == "▲")
+            n = res["n"]
+            wr = f"{wins}/{n} = {wins * 100 // n}%" if n else "0 trade"
+            print(f"{h}: {wr} closed | cash ${res.get('cash')}", file=sys.stderr)
+            outs.append(res)
+        print(json.dumps(outs, indent=1, ensure_ascii=False))
+        return 0
+    if args.alerts:
+        res = mine_alerts()
+        _persist_events(res["events"])
         print(json.dumps(res, indent=1, ensure_ascii=False))
         return 0
     if args.flow:
