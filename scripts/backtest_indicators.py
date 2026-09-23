@@ -66,8 +66,10 @@ def signals_of(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
     out.append(("rsi_surachat_reprise", -1, ta.crossunder(r, pd.Series(70, index=close.index))))
     out.append(("macd_cross_up", +1, ta.crossover(macd_line, macd_sig)))
     out.append(("macd_cross_down", -1, ta.crossunder(macd_line, macd_sig)))
-    out.append(("donchian_breakout", +1, close > ta.donchian_high(df)))
-    out.append(("donchian_breakdown", -1, close < ta.donchian_low(df)))
+    # cassures = CROSS de la clôture à travers le canal (1 seul événement,
+    # pas un événement par bougie au-dessus — sinon N gonflé d'événements corrélés)
+    out.append(("donchian_breakout", +1, ta.crossover(close, ta.donchian_high(df))))
+    out.append(("donchian_breakdown", -1, ta.crossunder(close, ta.donchian_low(df))))
     squeeze = bw <= bw.rolling(200, min_periods=100).quantile(0.2)
     out.append(("bb_squeeze_break_up", +1, squeeze.shift(1, fill_value=False) & (close > hi_bb)))
     out.append(("ema_golden_cross", +1, ta.crossover(e9, e21)))
@@ -82,7 +84,9 @@ def signals_of(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
 
 
 def outcomes(df: pd.DataFrame, events: pd.Series, direction: int) -> list[tuple[int, float]]:
-    """(horizon, ret %) pour chaque événement — entrée open suivant."""
+    """(horizon, ret %) pour chaque événement — entrée à l'open de la bougie
+    suivante (= l'instant où le signal est connaissable), sortie h bougies
+    après l'ENTRÉE : closes[entry_i + h - 1] = entry_open + h × 1h exactement."""
     res: list[tuple[int, float]] = []
     idx = df.index
     opens = df["open"].values
@@ -97,8 +101,8 @@ def outcomes(df: pd.DataFrame, events: pd.Series, direction: int) -> list[tuple[
         if entry <= 0:
             continue
         for h in HORIZONS:
-            j = min(entry_i + h, len(idx) - 1)
-            if j == entry_i:
+            j = entry_i + h - 1
+            if j >= len(idx):
                 continue
             ret = (closes[j] - entry) / entry * 100 * direction - COST_PCT
             res.append((h, ret))
@@ -122,7 +126,6 @@ def main() -> int:
             n_tested += 1
             outs = outcomes(df, ev, direction)
             for h, ret in outs:
-                ts_i = None
                 pooled[name][h].append((sym, ret, True))
             # split par évènement : train si l'index d'entrée < split_ts
             train_mask = df.index.get_indexer(df.index[ev.fillna(False)]) < int(len(df) * TRAIN_FRAC)
