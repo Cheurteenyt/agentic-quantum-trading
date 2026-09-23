@@ -1,3 +1,3 @@
-# Nouveaux listings Aster — 22/09/2026 23:34 UTC
+# Nouveaux listings Aster — 23/09/2026 01:27 UTC
 
 Aucun changement (567 perps stables).
