@@ -187,3 +187,19 @@ frais réels). Le radar v2 se trompait (« fomo seulement ») — liste Aster en
 dur remplacée par exchangeInfo LIVE (leçon : ne jamais maintenir l'univers
 à la main). $PONS ajouté aux recherches X de midi (sa vélocité sera trackée
 — 0 mention aujourd'hui : potentiellement tôt).
+
+### Exploration fomo profonde (23/09 soir) — structure et frontières
+
+- **Détails de trade** : cliquer une position ouvre un overlay avec URL
+  propre (`/profile/<handle>?tradeId=<uuid>`) MAIS les tradeIds sont
+  internes à l'état React (aucun attribut DOM) -> minage détaillé = flux
+  de clics en session (~3 s/item), pas d'URLs devinables.
+- **Pages token** : navigation directe /tokens/<chain>/<addr> redirigée
+  vers le dernier profil — les pages token sont des PANNEAUX internes
+  (clic depuis une position/le discovery).
+- **Feed** : bouton du shell app (pas de route /feed) — panneau JS.
+- **Thèses** : les traders postent des thèses SUR fomo (ex. RugDalio
+  « CASHCAT Thesis », 1034 likes) — contenu social natif minable par
+  profil, avec likes. À ajouter au harvest (prochaine passe).
+- Réseau social du profil : Followers/Following/Mutuals affichés
+  (RugDalio : 40.7K followers) — graphe social potentiel.
