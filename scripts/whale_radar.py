@@ -35,6 +35,20 @@ ASTEROIDS = {"CATE", "MEME", "BOME", "WIF", "PNUT", "MOODENG", "NEIRO", "TURBO",
              "FLOKI", "DRAM", "PIEVERSE", "SOL", "DOGE", "BTC", "ETH"}
 
 
+def _aster_universe() -> set[str]:
+    """Univers perp Aster LIVE (jamais en dur — leçon PONS, listé sans bruit)."""
+    try:
+        import urllib.request
+        req = urllib.request.Request("https://fapi.asterdex.com/fapi/v1/exchangeInfo",
+                                     headers={"User-Agent": "trading-agent/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            d = json.load(resp)
+        return {s["symbol"][:-4] for s in d.get("symbols", [])
+                if s.get("quoteAsset") == "USDT" and s.get("status") == "TRADING"}
+    except Exception:  # noqa: BLE001 — repli sur la liste en dur
+        return ASTEROIDS
+
+
 def constants(con: sqlite3.Connection) -> list[str]:
     rows = con.execute(
         "SELECT handle FROM fomo_traders "
@@ -121,7 +135,7 @@ def main() -> int:
               "| Token | Baleines | Valeur | Sentiment | Sur Aster ? |", "|---|---|---|---|---|"]
     for ticker, v in conv:
         up = sum(1 for d0 in v["dirs"] if d0 == "▲")
-        aster = "OUI (perp)" if ticker in ASTEROIDS else "fomo"
+        aster = "OUI (perp)" if ticker in _aster_universe() else "fomo"
         lines.append(f"| **{ticker}** | {len(v['traders'])}/35 | ${v['total']:,.0f} | "
                      f"{'▲' if up * 2 > len(v['dirs']) else '▼'} | {aster} |")
     out = REPORTS / f"whale-radar-{nowdt:%Y%m%d}.md"

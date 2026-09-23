@@ -170,3 +170,20 @@ snapshot précédent (les NOUVEAUX achats >= $5k = le signal frais), produit
 le radar (confluence + crochets Aster/fomo). Premier run automatique :
 9/12 profils propres (les échecs = réinit Privy après redémarrage — retry
 à affiner). Session persistée vérifiée headed après login patchright.
+
+### Détecteur d'Ondes + la découverte PONS (23/09, 02h50)
+
+`scripts/wave_detector.py` : la fusion des deux mondes — score composite
+(baleines fomo × vélocité X × exécution) avec **ledger intégré** : chaque
+onde >= 60/100 est flaggée avec son prix, les passages suivants remplissent
+ret_24h/ret_72h — le détecteur construit son propre backtest, règle
+pré-enregistrée inchangée.
+
+**PREMIÈRE ONDE : PONS, score 70** — 10/35 baleines ($30,35 M tenus,
+▲ unanime) et surtout **PONSUSDT est un perp TRADING sur Aster** (listé
+juin 2026, vérifié exchangeInfo + ticker) : la conviction maximale du monde
+fomo est exécutable avec notre arsenal complet (live terminal, gate spread,
+frais réels). Le radar v2 se trompait (« fomo seulement ») — liste Aster en
+dur remplacée par exchangeInfo LIVE (leçon : ne jamais maintenir l'univers
+à la main). $PONS ajouté aux recherches X de midi (sa vélocité sera trackée
+— 0 mention aujourd'hui : potentiellement tôt).
