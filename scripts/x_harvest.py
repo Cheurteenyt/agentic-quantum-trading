@@ -376,6 +376,76 @@ def harvest_trends() -> int:
     return 0
 
 
+def harvest_feed(scrolls: int = 6, tab: str = "following") -> int:
+    """Timeline « Abonné » : TOUS les comptes suivis (la watchlist entière)
+    en UNE page — la couverture temps réel la moins chère qui existe."""
+    from patchright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
+        return 1
+    out_posts: list[dict] = []
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(3500)
+        # basculer sur l'onglet Abonné (Following) : que nos comptes, pas l'algo
+        label = "Abonné" if tab == "following" else "Pour toi"
+        try:
+            page.get_by_text(label, exact=True).first.click()
+            page.wait_for_timeout(3000)
+        except Exception:  # noqa: BLE001 — l'onglet par défaut peut suffire
+            print(f"[feed] onglet '{label}' introuvable, timeline par défaut",
+                  file=sys.stderr)
+        for _ in range(scrolls):
+            page.mouse.wheel(0, 2400)
+            page.wait_for_timeout(1300)
+        out_posts = extract_articles(page)
+        print(f"[feed] {len(out_posts)} posts de la timeline ({tab})", file=sys.stderr)
+        ctx.close()
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = _now_utc().replace(":", "").replace("-", "")
+    (OUT_DIR / f"registre-{ts}.json").write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8")
+    (OUT_DIR / "latest-feed.json").write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"[feed] total {len(out_posts)} -> latest-feed.json", file=sys.stderr)
+    return 0
+
+
+def harvest_list(list_url: str, scrolls: int = 6) -> int:
+    """Timeline d'une liste X publique — 10-100 traders en un seul flux."""
+    from patchright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
+        return 1
+    if "/lists/" not in list_url:
+        print("[harvest] URL de liste attendue (x.com/i/lists/<id>)", file=sys.stderr)
+        return 1
+    out_posts: list[dict] = []
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.goto(list_url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(4000)
+        for _ in range(scrolls):
+            page.mouse.wheel(0, 2400)
+            page.wait_for_timeout(1300)
+        out_posts = extract_articles(page)
+        print(f"[list] {len(out_posts)} posts de la liste", file=sys.stderr)
+        ctx.close()
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = _now_utc().replace(":", "").replace("-", "")
+    (OUT_DIR / f"registre-{ts}.json").write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8")
+    (OUT_DIR / "latest-list.json").write_text(
+        json.dumps({"posts": out_posts}, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"[list] total {len(out_posts)} -> latest-list.json", file=sys.stderr)
+    return 0
+
+
 def goto_search(page, query: str) -> bool:
     """Navigue vers une recherche live et verifie la stabilite (anti-rebond)."""
     from urllib.parse import quote
@@ -495,6 +565,11 @@ def main() -> int:
                     help="reponses sous des statuts (URLs completees)")
     ap.add_argument("--trends", action="store_true",
                     help="tendances mondiales X -> x_trends (radar de narratif)")
+    ap.add_argument("--feed", action="store_true",
+                    help="timeline Abonné (toute la watchlist en 1 page)")
+    ap.add_argument("--list", metavar="URL",
+                    help="timeline d'une liste X publique")
+    ap.add_argument("--feed-tab", choices=("following", "foryou"), default="following")
     args = ap.parse_args()
     if args.login:
         return run_login()
@@ -511,6 +586,10 @@ def main() -> int:
         return harvest_replies(urls, args.scrolls)
     if args.trends:
         return harvest_trends()
+    if args.feed:
+        return harvest_feed(args.scrolls, tab=args.feed_tab)
+    if args.list:
+        return harvest_list(args.list, args.scrolls)
     if args.profiles:
         handles = [h.strip().lstrip("@") for h in args.profiles.split(",") if h.strip()]
         return harvest_profiles(handles, args.scrolls)
