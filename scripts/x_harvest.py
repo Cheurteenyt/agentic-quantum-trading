@@ -184,6 +184,18 @@ def extract_profile_meta(page, handle: str) -> dict:
         m = re.search(r"(?:Joined|A rejoint)\s+([^\n]+)", body)
         if m:
             meta["joined"] = m.group(1).strip()
+        # tweet épinglé = souvent la thèse du compte
+        try:
+            pin = page.locator(
+                'article[data-testid="tweet"] [data-testid="socialContext"]'
+            ).first
+            sc = (pin.inner_text(timeout=1500) or "").strip()
+            if "pin" in sc.lower() or "épingl" in sc.lower():
+                art = pin.locator("xpath=ancestor::article[1]")
+                meta["pinned"] = (art.locator("[data-testid='tweetText']")
+                                  .first.inner_text(timeout=1500) or "").strip()[:280]
+        except Exception:  # noqa: BLE001
+            pass
         for key, label in (("followers", "Followers"), ("following", "Following")):
             if meta[key] is None:
                 m2 = re.search(r"([\d.,]+[KMB]?)\s+" + label, body)
@@ -239,11 +251,18 @@ def harvest_meta(handles: list[str]) -> int:
         handle TEXT PRIMARY KEY, followers TEXT, following TEXT,
         bio TEXT, joined TEXT, captured_at REAL NOT NULL);
     """)
+    try:
+        con.execute("ALTER TABLE x_profiles ADD COLUMN pinned TEXT")
+    except sqlite3.OperationalError:
+        pass  # colonne déjà là
     now = time.time()
     for m in out:
-        con.execute("INSERT OR REPLACE INTO x_profiles VALUES (?,?,?,?,?,?)",
-                    (m["handle"], m["followers"], m["following"],
-                     m["bio"], m["joined"], now))
+        con.execute(
+            "INSERT OR REPLACE INTO x_profiles "
+            "(handle, followers, following, bio, joined, captured_at, pinned) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (m["handle"], m["followers"], m["following"], m["bio"],
+             m["joined"], now, m.get("pinned")))
     con.commit()
     con.close()
     print(f"[meta] {len(out)} profils -> x_posts.db:x_profiles", file=sys.stderr)
@@ -446,6 +465,66 @@ def harvest_list(list_url: str, scrolls: int = 6) -> int:
     return 0
 
 
+def discover_lists(query: str, limit: int = 12) -> int:
+    """Trouve des LISTES X publiques sur une requête (onglet Listes, f=list)
+    — chaque liste trouvée = une future source multi-traders pour --list."""
+    from urllib.parse import quote
+
+    from patchright.sync_api import sync_playwright
+
+    if not PROFILE_DIR.exists():
+        print("[harvest] aucun profil navigateur. Lance d'abord : --login", file=sys.stderr)
+        return 1
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=True)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.goto(f"https://x.com/search?q={quote(query)}&src=typed_query&f=list",
+                  wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(6000)
+        # les rangées ne sont pas des <a> : parser le texte puis cliquer
+        body = page.evaluate("document.body.innerText") or ""
+        rows: list[dict] = []
+        lines = [l.strip() for l in body.split("\n") if l.strip()]
+        for i, l in enumerate(lines):
+            m = re.match(r"^·?\s*(\d[\d.,]*)\s*membres", l)
+            if m and i >= 1 and lines[i - 1] not in ("Listes", "Médias"):
+                owner = lines[i + 1] if i + 1 < len(lines) and lines[i + 1].startswith("@") else None
+                rows.append({"name": lines[i - 1], "members": m[1],
+                             "owner": owner, "url": None})
+        for r in rows[:limit]:
+            if rows.index(r) >= limit:
+                break
+            try:
+                page.get_by_text(r["name"], exact=True).first.click()
+                page.wait_for_timeout(3000)
+                if "/lists/" in page.url:
+                    r["url"] = page.url.split("?")[0]
+                page.go_back()
+                page.wait_for_timeout(2500)
+            except Exception:  # noqa: BLE001 — une rangée morte ne bloque pas
+                continue
+        rows = [r for r in rows if r.get("url")][:limit]
+        ctx.close()
+    import sqlite3
+    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db")
+    con.execute("""CREATE TABLE IF NOT EXISTS x_lists_found (
+        query TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL,
+        members TEXT, subscribers TEXT, description TEXT,
+        captured_at REAL NOT NULL, PRIMARY KEY (url, captured_at))""")
+    now = time.time()
+    for r in rows[:limit]:
+        con.execute("INSERT OR IGNORE INTO x_lists_found VALUES (?,?,?,?,?,?,?)",
+                    (query, r["name"], r["url"], r["members"], r.get("subscribers"),
+                     (r.get("owner") or "") + " " + r.get("description", ""), now))
+    con.commit()
+    con.close()
+    print(f"[discover] {len(rows[:limit])} listes pour '{query}'", file=sys.stderr)
+    for r in rows[:limit]:
+        print(f"[discover]   {r['name']} — {r['members']} membres : {r['url']}",
+              file=sys.stderr)
+    return 0
+
+
 def goto_search(page, query: str) -> bool:
     """Navigue vers une recherche live et verifie la stabilite (anti-rebond)."""
     from urllib.parse import quote
@@ -569,6 +648,8 @@ def main() -> int:
                     help="timeline Abonné (toute la watchlist en 1 page)")
     ap.add_argument("--list", metavar="URL",
                     help="timeline d'une liste X publique")
+    ap.add_argument("--discover-lists", metavar="QUERY",
+                    help="trouve des listes publiques sur une requête -> x_lists_found")
     ap.add_argument("--feed-tab", choices=("following", "foryou"), default="following")
     args = ap.parse_args()
     if args.login:
@@ -590,6 +671,8 @@ def main() -> int:
         return harvest_feed(args.scrolls, tab=args.feed_tab)
     if args.list:
         return harvest_list(args.list, args.scrolls)
+    if args.discover_lists:
+        return discover_lists(args.discover_lists)
     if args.profiles:
         handles = [h.strip().lstrip("@") for h in args.profiles.split(",") if h.strip()]
         return harvest_profiles(handles, args.scrolls)

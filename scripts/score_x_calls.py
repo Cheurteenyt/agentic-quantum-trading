@@ -264,6 +264,22 @@ def score_all() -> dict:
     accounts_total = con.execute(
         "SELECT COUNT(*) FROM x_accounts WHERE active = 1"
     ).fetchone()[0]
+    # portée de l'AUTEUR (x_profiles) — un call à 500K followers ne pèse
+    # pas comme un call à 200, indépendamment des vues du post lui-même
+    reach_by_handle: dict[str, int] = {}
+    try:
+        for h, f in con.execute("SELECT handle, followers FROM x_profiles"):
+            if not f:
+                continue
+            m = re.match(r"([\d.,]+)\s*([KkMm]?)", str(f))
+            if m:
+                mult = {"k": 1e3, "K": 1e3, "m": 1e6, "M": 1e6}.get(m.group(2), 1)
+                reach_by_handle[str(h).lower()] = int(
+                    float(m.group(1).replace(",", "")) * mult)
+    except sqlite3.OperationalError:
+        pass
+    for r in scored_rows:
+        r["author_reach"] = reach_by_handle.get((r["handle"] or "").lower())
     con.close()
     kcon.close()
     stats["posts"] = posts_total
@@ -393,9 +409,9 @@ def write_report(result: dict) -> Path:
     else:
         trad = tradability({r["symbol"] for r in rows})
         lines.append(
-            "| compte | call | entree (declaree -> resolue) | +1h | +24h | +7j | coll. (spread bps) | portée (vues) |"
+            "| compte | call | entree (declaree -> resolue) | +1h | +24h | +7j | coll. (spread bps) | portée (vues) | audience (followers) |"
         )
-        lines.append("|---|---|---|---|---|---|---|---|")
+        lines.append("|---|---|---|---|---|---|---|---|---|")
         for r in rows:
             declared = (
                 f"{r['entry_declared']:g}" if r["entry_declared"] else "auto"
@@ -405,11 +421,13 @@ def write_report(result: dict) -> Path:
             coll = "—" if spread is None else ("OUI" if t["collectionnable"] else f"non ({spread:g})")
             reach = r.get("views") or 0
             reach_s = f"{reach/1000:.1f}k" if reach >= 1000 else (str(reach) if reach else "—")
+            aud = r.get("author_reach")
+            aud_s = f"{aud/1000:.0f}k" if (aud or 0) >= 1000 else (str(aud) if aud else "—")
             lines.append(
                 f"| @{r['handle']} | {r['symbol']} {r['direction'].upper()} "
                 f"({r['confidence']}) | {declared} -> {r['entry']:.4g} "
                 f"| {_fmt_pct(r['ret_1h'])} | {_fmt_pct(r['ret_24h'])} "
-                f"| {_fmt_pct(r['ret_7d'])} | {coll} | {reach_s} |"
+                f"| {_fmt_pct(r['ret_7d'])} | {coll} | {reach_s} | {aud_s} |"
             )
         coll_rows = [r for r in rows
                      if trad.get((r["symbol"] or "").upper(), {}).get("collectionnable")]
