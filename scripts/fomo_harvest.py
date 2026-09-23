@@ -654,20 +654,24 @@ def _persist_tokens(tab: str, rows: list) -> None:
 
 
 PROBE_CLICKS = {
-    # nom -> (URL de départ, texte à cliquer, attente ms)
-    "clans": (f"{BASE}/leaderboard", "Clans", 3000),
-    "alerts": (f"{BASE}/leaderboard", "Alerts", 3000),
-    "closed": (f"{BASE}/profile/ogle", "Closed", 3500),
-    "feed": (f"{BASE}/leaderboard", "Feed", 3000),
+    # nom -> (URL de départ, [textes à cliquer en séquence], attente finale ms)
+    "clans": (f"{BASE}/leaderboard", ["Clans"], 3000),
+    "clans_all": (f"{BASE}/leaderboard", ["View all"], 3500),
+    "alerts": (f"{BASE}/leaderboard", ["Alerts"], 3000),
+    "alerts_filter": (f"{BASE}/leaderboard", ["Alerts", "$1K"], 2500),
+    "closed": (f"{BASE}/profile/ogle", ["Closed"], 3500),
+    "feed": (f"{BASE}/leaderboard", ["Feed"], 3000),
+    "followers": (f"{BASE}/profile/ogle", ["Followers"], 3000),
+    "clan_tech": (f"{BASE}/leaderboard", ["View all", "Tech Dungeon"], 3500),
 }
 
 
 def probe(name: str) -> dict:
-    """Sonde visuelle : ouvre une surface (clic de texte), capture écran +
-    corps — pour cartographier avant d'écrire un mineur."""
+    """Sonde visuelle : ouvre une surface (clics de texte en séquence),
+    capture écran + corps — pour cartographier avant d'écrire un mineur."""
     if name not in PROBE_CLICKS:
         return {"error": f"sonde inconnue: {name} ({list(PROBE_CLICKS)})"}
-    url, text, wait = PROBE_CLICKS[name]
+    url, texts, wait = PROBE_CLICKS[name]
     pw, browser = _connect_cdp()
     if browser is None:
         raise RuntimeError("daemon CDP requis")
@@ -675,13 +679,15 @@ def probe(name: str) -> dict:
         ctx = _ctx_of(browser)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         _open_page(page, url, initial_wait=4000)
-        clicked = False
-        try:
-            page.get_by_text(text, exact=True).first.click()
-            clicked = True
-            page.wait_for_timeout(wait)
-        except Exception:  # noqa: BLE001 — le dump dira où on en est
-            pass
+        clicked = []
+        for text in texts:
+            try:
+                page.get_by_text(text, exact=True).first.click()
+                clicked.append(text)
+                page.wait_for_timeout(2500)
+            except Exception:  # noqa: BLE001 — le dump dira où on en est
+                pass
+        page.wait_for_timeout(max(0, wait - 2500 * len(clicked)))
         shot = f"/tmp/probe_{name}.png"
         try:
             page.screenshot(path=shot)
@@ -907,6 +913,133 @@ def _persist_closed(handle: str, rows: list, cash: str | None) -> None:
     con.close()
 
 
+EXTRACT_CLANS_JS = """
+() => {
+  // Liste des clans : "NOM / N members / +$PnL" + hrefs /clans/<uuid>
+  const lines = (document.body.innerText || "").split("\\n").map(l => l.trim());
+  const rows = [];
+  for (let i = 0; i < lines.length - 2; i++) {
+    const m = (lines[i + 1] || "").match(/^(\\d+) members?$/);
+    if (!m) continue;
+    const name = lines[i];
+    if (!name || name === "Clans" || /^\\d+$/.test(name)) continue;
+    const pnl = (lines[i + 2] || "").match(/^\\+\\$([\\d.,]+[KMB]?)$/);
+    rows.push({ name, members: parseInt(m[1]),
+                pnl: pnl ? pnl[1] : null });
+  }
+  // uuid de chaque clan via les liens
+  for (const a of document.querySelectorAll("a[href*='/clans/']")) {
+    const href = a.getAttribute("href") || "";
+    const id = (href.match(/\\/clans\\/([0-9a-f-]{20,})/) || [])[1];
+    if (!id) continue;
+    const txt = (a.innerText || "").split("\\n")[0].trim();
+    for (const r of rows) if (r.name === txt && !r.uuid) r.uuid = id;
+  }
+  return rows;
+}
+"""
+
+EXTRACT_CLAN_PAGE_JS = """
+() => {
+  // Page clan : profit + holdings combinés "TICKER $valeur [+$pnl]"
+  const body = document.body.innerText || "";
+  const lines = body.split("\\n").map(l => l.trim());
+  const out = { holdings: [], members: null, trades: null, profit: null };
+  const mMem = body.match(/(\\d+) members/);
+  if (mMem) out.members = parseInt(mMem[1]);
+  const mTr = body.match(/([\\d.,]+[KMB]?) trades/);
+  if (mTr) out.trades = mTr[1];
+  const mPr = body.match(/\\+\\$([\\d.,]+[KMB]?) past/);
+  if (mPr) out.profit = mPr[1];
+  // zone holdings : après "Clan holdings" jusqu'à "Members" / fin
+  const i0 = body.indexOf("Clan holdings");
+  const i1 = body.indexOf("Members", i0 + 5);
+  const zone = (i0 >= 0 ? lines.slice(
+    body.slice(0, i0).split("\\n").length,
+    i1 >= 0 ? body.slice(0, i1).split("\\n").length : lines.length) : []);
+  for (let i = 0; i < zone.length - 1; i++) {
+    const t = zone[i];
+    if (!/^[A-Za-z0-9$][A-Za-z0-9$.]{1,15}$/.test(t) || t === "Token") continue;
+    const v = zone[i + 1].match(/^\\$([\\d.,]+[KMB]?)$/);
+    if (!v) continue;
+    const p = (zone[i + 2] || "").match(/^([+-]\\$[\\d.,]+[KMB]?)$/);
+    out.holdings.push({ ticker: t, value: v[1], pnl: p ? p[1] : null });
+    i += p ? 2 : 1;
+  }
+  return out;
+}
+"""
+
+
+def mine_clans(top: int = 6) -> dict:
+    """Clans fomo : liste complète + page de chaque clan (holdings combinés
+    par token) — la conviction COLLECTIVE, au-dessus des baleines seules."""
+    pw, browser = _connect_cdp()
+    if browser is None:
+        raise RuntimeError("daemon CDP requis pour --clans")
+    try:
+        ctx = _ctx_of(browser)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        _open_page(page, f"{BASE}/leaderboard", initial_wait=4000)
+        try:
+            page.get_by_text("View all", exact=True).first.click()
+            page.wait_for_timeout(3000)
+        except Exception:  # noqa: BLE001
+            pass
+        clans = page.evaluate(EXTRACT_CLANS_JS) or []
+        for c in clans[:top]:
+            if not c.get("uuid"):
+                continue
+            try:
+                _open_page(page, f"{BASE}/clans/{c['uuid']}", initial_wait=3500)
+                # la liste des holdings virtualise : scroller et fusionner
+                merged: dict = {}
+                for _ in range(7):
+                    d = page.evaluate(EXTRACT_CLAN_PAGE_JS) or {}
+                    for h in d.get("holdings") or []:
+                        merged.setdefault(h["ticker"], h)
+                    c["detail"] = {"members": d.get("members"),
+                                   "trades": d.get("trades"),
+                                   "profit": d.get("profit"),
+                                   "holdings": list(merged.values())}
+                    page.evaluate("window.scrollBy(0, 800)")
+                    page.wait_for_timeout(350)
+            except Exception:  # noqa: BLE001 — un clan en échec ne bloque pas
+                c["detail"] = None
+        return {"clans": clans, "n": len(clans)}
+    finally:
+        pw.stop()
+
+
+def _persist_clans(clans: list) -> None:
+    """Conviction COLLECTIVE : clans (PnL combiné) + holdings par token."""
+    import sqlite3
+    db = ROOT / "data" / "fomo" / "fomo.db"
+    con = sqlite3.connect(db)
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS fomo_clans (
+        name TEXT NOT NULL, uuid TEXT, members INTEGER, pnl TEXT,
+        profit TEXT, trades TEXT, captured_at REAL NOT NULL,
+        PRIMARY KEY (name, captured_at));
+    CREATE TABLE IF NOT EXISTS fomo_clan_holdings (
+        clan TEXT NOT NULL, ticker TEXT NOT NULL, value TEXT, pnl TEXT,
+        captured_at REAL NOT NULL,
+        PRIMARY KEY (clan, ticker, captured_at));
+    """)
+    now = time.time()
+    for c in clans:
+        d = c.get("detail") or {}
+        con.execute("INSERT OR IGNORE INTO fomo_clans VALUES (?,?,?,?,?,?,?)",
+                    (c.get("name"), c.get("uuid"), c.get("members"), c.get("pnl"),
+                     d.get("profit"), d.get("trades"), now))
+        for h in d.get("holdings") or []:
+            con.execute("INSERT OR IGNORE INTO fomo_clan_holdings VALUES (?,?,?,?,?)",
+                        (c.get("name"), h.get("ticker"), h.get("value"),
+                         h.get("pnl"), now))
+    con.commit()
+    con.close()
+
+
 def run_daemon() -> int:
     """Chromium headed lancé DIRECTEMENT (port CDP natif, pas de pipe) —
     UNE fenêtre à minimiser ; tous les minages se connectent via CDP."""
@@ -954,6 +1087,8 @@ def main() -> int:
                     help=f"sonde visuelle d'une surface: {','.join(PROBE_CLICKS)}")
     ap.add_argument("--alerts", action="store_true",
                     help="flux Alerts (Buy/Sell/Thesis avec MC d'entrée)")
+    ap.add_argument("--clans", metavar="TOP", nargs="?", const="6",
+                    help="clans : liste + holdings combinés par token")
     ap.add_argument("--closed", metavar="H1,H2",
                     help="positions Closed (historique réalisé -> win rate)")
     args = ap.parse_args()
@@ -982,6 +1117,11 @@ def main() -> int:
         return 0
     if args.probe:
         print(json.dumps(probe(args.probe), indent=1, ensure_ascii=False))
+        return 0
+    if args.clans:
+        res = mine_clans(top=int(args.clans))
+        _persist_clans(res["clans"])
+        print(json.dumps(res, indent=1, ensure_ascii=False))
         return 0
     if args.closed:
         outs = []
