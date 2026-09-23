@@ -96,6 +96,10 @@ def main() -> int:
         handle     TEXT    NOT NULL, ticker TEXT NOT NULL, qty TEXT,
         value_usd  REAL, dir TEXT, captured_at REAL NOT NULL,
         PRIMARY KEY (handle, ticker, captured_at));
+    CREATE TABLE IF NOT EXISTS fomo_social (
+        handle TEXT NOT NULL, followers TEXT, following TEXT, mutuals TEXT,
+        x_ref TEXT, bio TEXT, captured_at REAL NOT NULL,
+        PRIMARY KEY (handle, captured_at));
     """)
     handles = constants(con, top=args.top)
     if not handles:
@@ -120,6 +124,11 @@ def main() -> int:
             continue
         pos = res["mined"]
         mined_now[handle] = pos
+        soc = res.get("social") or {}
+        if soc.get("followers"):
+            con.execute("INSERT OR IGNORE INTO fomo_social VALUES (?,?,?,?,?,?,?)",
+                        (handle, soc.get("followers"), soc.get("following"),
+                         soc.get("mutuals"), soc.get("x_ref"), soc.get("bio"), now))
         prev = previous.get(handle, set())
         for ticker, p in pos.items():
             con.execute("INSERT OR IGNORE INTO fomo_positions VALUES (?,?,?,?,?,?)",

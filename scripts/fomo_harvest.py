@@ -170,6 +170,29 @@ def _open_page(page, url: str, initial_wait: int = 3000) -> None:
         page.wait_for_timeout(4000)
 
 
+EXTRACT_SOCIAL_JS = """
+() => {
+  // Bandeau social du profil : "N Mutuals / N Following / X Followers" +
+  // bio via la ligne "Follow @handle on x // bio"
+  const body = document.body.innerText || "";
+  const lines = body.split("\\n").map(l => l.trim());
+  const grabCount = (label) => {
+    const i = lines.indexOf(label);
+    if (i >= 1 && /^[\\d.,]+[KMB]?$/.test(lines[i - 1] || "")) return lines[i - 1];
+    const j = lines.findIndex(l =>
+      new RegExp("^([\\d.,]+[KMB]?) " + label + "$").test(l));
+    if (j >= 0) return lines[j].split(" ")[0];
+    return null;
+  };
+  let bio = null, x_ref = null;
+  const mX = body.match(/Follow @(\\w+) on x ?(?:\\/\\/ ?([\\s\\S]{0,220}))?/);
+  if (mX) { x_ref = mX[1]; bio = (mX[2] || "").split("\\n")[0].slice(0, 220) || null; }
+  return { followers: grabCount("Followers"), following: grabCount("Following"),
+           mutuals: grabCount("Mutuals"), x_ref, bio };
+}
+"""
+
+
 def mine_positions(handle: str, scrolls: int = 10) -> dict:
     """Positions d'un trader — via le navigateur daemon (CDP) si présent,
     sinon headed éphémère (session persistée)."""
@@ -218,7 +241,8 @@ def mine_positions(handle: str, scrolls: int = 10) -> dict:
             print(f"[mine] {handle}: {len(seen)}/{declared} positions — 2e passe",
                   file=sys.stderr, flush=True)
         return {"handle": handle, "via": via, "declared_positions": declared,
-                "mined": seen, "attempts": attempt}
+                "mined": seen, "attempts": attempt,
+                "social": page.evaluate(EXTRACT_SOCIAL_JS) or {}}
     finally:
         if ctx is not None:
             ctx.close()
@@ -663,6 +687,7 @@ PROBE_CLICKS = {
     "feed": (f"{BASE}/leaderboard", ["Feed"], 3000),
     "followers": (f"{BASE}/profile/ogle", ["Followers"], 3000),
     "clan_tech": (f"{BASE}/leaderboard", ["View all", "Tech Dungeon"], 3500),
+    "clan_members": (f"{BASE}/clans/47e167b6-14e0-449b-806b-c8476afcc724", [], 3000),
 }
 
 
@@ -941,17 +966,17 @@ EXTRACT_CLANS_JS = """
 
 EXTRACT_CLAN_PAGE_JS = """
 () => {
-  // Page clan : profit + holdings combinés "TICKER $valeur [+$pnl]"
+  // Page clan : profit + holdings combinés + MEMBRES "Nom @handle +/- $X"
   const body = document.body.innerText || "";
   const lines = body.split("\\n").map(l => l.trim());
-  const out = { holdings: [], members: null, trades: null, profit: null };
+  const out = { holdings: [], members: [], n_members: null, trades: null, profit: null };
   const mMem = body.match(/(\\d+) members/);
-  if (mMem) out.members = parseInt(mMem[1]);
+  if (mMem) out.n_members = parseInt(mMem[1]);
   const mTr = body.match(/([\\d.,]+[KMB]?) trades/);
   if (mTr) out.trades = mTr[1];
   const mPr = body.match(/\\+\\$([\\d.,]+[KMB]?) past/);
   if (mPr) out.profit = mPr[1];
-  // zone holdings : après "Clan holdings" jusqu'à "Members" / fin
+  // zone holdings : après "Clan holdings" jusqu'à "Members"
   const i0 = body.indexOf("Clan holdings");
   const i1 = body.indexOf("Members", i0 + 5);
   const zone = (i0 >= 0 ? lines.slice(
@@ -965,6 +990,31 @@ EXTRACT_CLAN_PAGE_JS = """
     const p = (zone[i + 2] || "").match(/^([+-]\\$[\\d.,]+[KMB]?)$/);
     out.holdings.push({ ticker: t, value: v[1], pnl: p ? p[1] : null });
     i += p ? 2 : 1;
+  }
+  // membres : "@handle (-- | +/- $X)" combiné OU éclaté sur 2-3 lignes
+  for (let i = 1; i < lines.length; i++) {
+    let handle = null, name = null, pnl = null, done = false, j = i;
+    let m = lines[i].match(/^@(\\w+) (?:(--)|([+-]) \\$([\\d.,]+[KMB]?))$/);
+    if (m) {
+      handle = m[1]; name = lines[i - 1];
+      if (!m[2]) pnl = m[3] + m[4];
+      done = true;
+    } else if ((m = lines[i].match(/^@(\\w+)$/))) {
+      handle = m[1]; name = lines[i - 1]; j = i + 1;
+      for (let k = j; k < Math.min(j + 3, lines.length) && !done; k++) {
+        if (lines[k] === "--") { done = true; break; }
+        if (lines[k] === "+" || lines[k] === "-") {
+          const mv = (lines[k + 1] || "").match(/^\\$([\\d.,]+[KMB]?)$/);
+          if (mv) pnl = lines[k] + mv[1];
+          done = true;
+          break;
+        }
+        const mm = lines[k].match(/^([+-]) \\$([\\d.,]+[KMB]?)$/);
+        if (mm) { pnl = mm[1] + mm[2]; done = true; break; }
+      }
+    }
+    if (handle && done && !out.members.some(x => x.handle === handle))
+      out.members.push({ handle, name, pnl });
   }
   return out;
 }
@@ -994,14 +1044,18 @@ def mine_clans(top: int = 6) -> dict:
                 _open_page(page, f"{BASE}/clans/{c['uuid']}", initial_wait=3500)
                 # la liste des holdings virtualise : scroller et fusionner
                 merged: dict = {}
+                merged_m: dict = {}
                 for _ in range(7):
                     d = page.evaluate(EXTRACT_CLAN_PAGE_JS) or {}
                     for h in d.get("holdings") or []:
                         merged.setdefault(h["ticker"], h)
-                    c["detail"] = {"members": d.get("members"),
+                    for m in d.get("members") or []:
+                        merged_m.setdefault(m["handle"], m)
+                    c["detail"] = {"n_members": d.get("n_members"),
                                    "trades": d.get("trades"),
                                    "profit": d.get("profit"),
-                                   "holdings": list(merged.values())}
+                                   "holdings": list(merged.values()),
+                                   "members": list(merged_m.values())}
                     page.evaluate("window.scrollBy(0, 800)")
                     page.wait_for_timeout(350)
             except Exception:  # noqa: BLE001 — un clan en échec ne bloque pas
@@ -1025,17 +1079,28 @@ def _persist_clans(clans: list) -> None:
         clan TEXT NOT NULL, ticker TEXT NOT NULL, value TEXT, pnl TEXT,
         captured_at REAL NOT NULL,
         PRIMARY KEY (clan, ticker, captured_at));
+    CREATE TABLE IF NOT EXISTS fomo_clan_members (
+        clan TEXT NOT NULL, handle TEXT NOT NULL, name TEXT, pnl TEXT,
+        captured_at REAL NOT NULL,
+        PRIMARY KEY (clan, handle, captured_at));
     """)
     now = time.time()
     for c in clans:
         d = c.get("detail") or {}
         con.execute("INSERT OR IGNORE INTO fomo_clans VALUES (?,?,?,?,?,?,?)",
-                    (c.get("name"), c.get("uuid"), c.get("members"), c.get("pnl"),
-                     d.get("profit"), d.get("trades"), now))
+                    (c.get("name"), c.get("uuid"), d.get("n_members", c.get("members")),
+                     c.get("pnl"), d.get("profit"), d.get("trades"), now))
         for h in d.get("holdings") or []:
             con.execute("INSERT OR IGNORE INTO fomo_clan_holdings VALUES (?,?,?,?,?)",
                         (c.get("name"), h.get("ticker"), h.get("value"),
                          h.get("pnl"), now))
+        for m in d.get("members") or []:
+            con.execute("INSERT OR IGNORE INTO fomo_clan_members VALUES (?,?,?,?,?)",
+                        (c.get("name"), m.get("handle"), m.get("name"),
+                         m.get("pnl"), now))
+            # le membre devient un handle connu (radar futur), PnL à miner
+            con.execute("INSERT OR IGNORE INTO fomo_traders (handle, first_seen, last_seen) "
+                        "VALUES (?, ?, ?)", (m.get("handle"), now, now))
     con.commit()
     con.close()
 
