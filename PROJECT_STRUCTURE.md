@@ -1,6 +1,8 @@
 # Trading Agent — Structure
 
-**Cette page a déménagé → [`docs/02-architecture.md`](docs/02-architecture.md).**
+**Carte vivante du projet → [`docs/00-CARTE.md`](docs/00-CARTE.md)** — un seul endroit pour tout trouver (services, scripts, entrepôts, rapports).
+
+**Architecture détaillée → [`docs/02-architecture.md`](docs/02-architecture.md).**
 
 Point d'entrée de toute la documentation : [`docs/README.md`](docs/README.md).
 

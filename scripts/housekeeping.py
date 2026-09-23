@@ -40,6 +40,15 @@ FAMILIES: list[tuple[str, int]] = [
     ("carry-intra-aster-*.md", 2),
     ("funding-scanner-*.md", 2),
     ("depth-heatmap-*.pdf", 9),
+    # familles ajoutées le 24/09 (nouvelle pile fomo/X/convergence/backtests)
+    ("whale-radar-*.md", 7),
+    ("x-aster-pulse-*.md", 7),
+    ("aster-convergence-*.md", 7),
+    ("memecoin-pulse-*.md", 3),
+    ("wave-detector-*.md", 5),
+    ("absorption-backtest-*.md", 2),
+    ("backtest-campagne-*.md", 5),
+    ("backtest-indicators-*.md", 5),
 ]
 
 PROTECTED = re.compile(r"(ce001|ce-001|thread|draft|README|source_snapshot)", re.IGNORECASE)
