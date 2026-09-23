@@ -1,16 +1,22 @@
 #!/usr/bin/env python
-"""Backtest des indicateurs Aster — signaux discrets, discipline du registre.
+"""Campagne de backtest v2 — indicateurs prix + FUNDING, régime de marché,
+robustesse hors jours extrêmes. Discipline du registre, résultats complets.
 
-Chaque signal est un ÉVÉNEMENT daté (ex : RSI sort de survente). Sortie :
-+1h / +24h / +72h, entrée à l'open suivant, coût 8 bps aller-retour.
-SPLIT TEMPOREL 70/30 par symbole : le verdict CONFIRMÉ exige
-  train : N ≥ 10 ET winrate ≥ 55 %
-  val   : N ≥ 5  ET winrate ≥ 55 % (même direction)
-Sinon : BRUIT / INSUFFISANT. Audit de multiplicité : on annonce combien de
-combinaisons ont été testées et combien étaient attendues par hasard.
+NOUVEAUTÉS v2 (demandes utilisateur) :
+  - 5 horizons (+1h/+4h/+12h/+24h/+72h)
+  - conditionnement par RÉGIME de marché BTC (tendance haussière/baissière/
+    range × volatilité haute/basse) — un signal qui ne survit qu'à un régime
+    n'est pas un signal
+  - ROBUSTESSE : winrate recalculé en EXCLUANT les ±6h des 5 plus gros
+    mouvements quotidiens BTC — si l'edge disparaît hors crash/pump, il
+    dépend d'un événement, pas d'une méthode
+  - stats complètes : médiane, pire trade, meilleur (une moyenne gonflée
+    par un outlier doit se voir)
+  - signaux FUNDING (4,5 mois d'historique Aster) : flip, extrême-contre-
+    courant, accélération
 
-C'est le 1er test systématique des indicateurs CLASSIQUES sur perps Aster.
-Résultat attendu honnête : majoritairement BRUIT — c'est la culture.
+Règle CONFIRMÉ (pré-enregistrée) : pooled N≥10 & WR≥55 % en TRAIN(70 %)
+ET confirmé en VAL(30 %). Audit de multiplicité annoncé.
 """
 from __future__ import annotations
 
@@ -29,12 +35,14 @@ from scripts import aster_indicators as ta  # noqa: E402
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
-COST_PCT = 0.08          # 8 bps aller-retour
+COST_PCT = 0.08
 TRAIN_FRAC = 0.70
-HORIZONS = (1, 24, 72)
+HORIZONS = (1, 4, 12, 24, 72)
+BIG_MOVE_DAYS = 5      # exclure ±6h autour des N plus gros jours BTC
+BIG_MOVE_TH = 6 * 3600  # fenêtre d'exclusion en secondes
 
 
-def load_df(con: sqlite3.Connection, symbol: str) -> pd.DataFrame | None:
+def load_df(con, symbol: str) -> pd.DataFrame | None:
     rows = con.execute(
         "SELECT open_time, open, high, low, close, volume FROM klines "
         "WHERE symbol = ? AND interval = '1h' ORDER BY open_time",
@@ -44,68 +52,99 @@ def load_df(con: sqlite3.Connection, symbol: str) -> pd.DataFrame | None:
     df = pd.DataFrame(rows, columns=["ts", "open", "high", "low", "close", "volume"])
     for c in ("open", "high", "low", "close", "volume"):
         df[c] = pd.to_numeric(df[c])
-    df = df.drop_duplicates("ts").set_index("ts").sort_index()
-    return df
+    return df.drop_duplicates("ts").set_index("ts").sort_index().pipe(
+        lambda d: d.set_index(pd.to_datetime(d.index, unit="ms")))
 
 
-def signals_of(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
-    """(nom, direction +1/-1, Series bool d'événements)."""
+def price_signals(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
     out: list[tuple[str, int, pd.Series]] = []
-    close, df = df["close"], df
+    close = df["close"]
     r = ta.rsi(close)
     macd_line, macd_sig = ta.macd(close)
-    lo_bb, _, hi_bb = ta.bollinger(close)
+    _, _, hi_bb = ta.bollinger(close)
     bw = ta.bandwidth(close)
     e9, e21 = ta.ema(close, 9), ta.ema(close, 21)
     k, d = ta.stoch(df)
     vz = ta.volume_z(df["volume"])
-    red = close < df["open"]
-    green = close > df["open"]
-
-    out.append(("rsi_survente_reprise", +1, ta.crossover(r, pd.Series(30, index=close.index))))
-    out.append(("rsi_surachat_reprise", -1, ta.crossunder(r, pd.Series(70, index=close.index))))
-    out.append(("macd_cross_up", +1, ta.crossover(macd_line, macd_sig)))
-    out.append(("macd_cross_down", -1, ta.crossunder(macd_line, macd_sig)))
-    # cassures = CROSS de la clôture à travers le canal (1 seul événement,
-    # pas un événement par bougie au-dessus — sinon N gonflé d'événements corrélés)
-    out.append(("donchian_breakout", +1, ta.crossover(close, ta.donchian_high(df))))
-    out.append(("donchian_breakdown", -1, ta.crossunder(close, ta.donchian_low(df))))
-    squeeze = bw <= bw.rolling(200, min_periods=100).quantile(0.2)
-    out.append(("bb_squeeze_break_up", +1, squeeze.shift(1, fill_value=False) & (close > hi_bb)))
-    out.append(("ema_golden_cross", +1, ta.crossover(e9, e21)))
-    out.append(("ema_death_cross", -1, ta.crossunder(e9, e21)))
-    out.append(("stoch_survente_reprise", +1, ta.crossover(k, d) & (k.shift(1) < 20)))
-    out.append(("stoch_surachat_reprise", -1, ta.crossunder(k, d) & (k.shift(1) > 80)))
-    out.append(("vol_spike_reversal_long", +1,
-                (vz > 3) & red.shift(1, fill_value=False) & green))
-    out.append(("vol_spike_reversal_short", -1,
-                (vz > 3) & green.shift(1, fill_value=False) & red))
+    red, green = close < df["open"], close > df["open"]
+    up30 = pd.Series(30, index=close.index)
+    up70 = pd.Series(70, index=close.index)
+    out += [
+        ("rsi_survente_reprise", +1, ta.crossover(r, up30)),
+        ("rsi_surachat_reprise", -1, ta.crossunder(r, up70)),
+        ("macd_cross_up", +1, ta.crossover(macd_line, macd_sig)),
+        ("macd_cross_down", -1, ta.crossunder(macd_line, macd_sig)),
+        ("donchian_breakout", +1, ta.crossover(close, ta.donchian_high(df))),
+        ("donchian_breakdown", -1, ta.crossunder(close, ta.donchian_low(df))),
+        ("bb_squeeze_break_up", +1,
+         (bw <= bw.rolling(200, min_periods=100).quantile(0.2)).shift(1, fill_value=False)
+         & (close > hi_bb)),
+        ("ema_golden_cross", +1, ta.crossover(e9, e21)),
+        ("ema_death_cross", -1, ta.crossunder(e9, e21)),
+        ("stoch_survente_reprise", +1, ta.crossover(k, d) & (k.shift(1) < 20)),
+        ("stoch_surachat_reprise", -1, ta.crossunder(k, d) & (k.shift(1) > 80)),
+        ("vol_spike_retournement_long", +1,
+         (vz > 3) & red.shift(1, fill_value=False) & green),
+        ("vol_spike_retournement_short", -1,
+         (vz > 3) & green.shift(1, fill_value=False) & red),
+    ]
     return out
 
 
-def outcomes(df: pd.DataFrame, events: pd.Series, direction: int) -> list[tuple[int, float]]:
-    """(horizon, ret %) pour chaque événement — entrée à l'open de la bougie
-    suivante (= l'instant où le signal est connaissable), sortie h bougies
-    après l'ENTRÉE : closes[entry_i + h - 1] = entry_open + h × 1h exactement."""
-    res: list[tuple[int, float]] = []
-    idx = df.index
-    opens = df["open"].values
-    closes = df["close"].values
-    pos = {ts: i for i, ts in enumerate(idx)}
-    for ts in df.index[events.fillna(False)]:
-        i = pos[ts]
+def funding_signals(fh: pd.DataFrame, btc_close: pd.Series) -> list[dict]:
+    """Signaux basés sur l'historique de funding (4,5 mois).
+
+    Chaque signal = liste de (timestamp_utc_s, direction). L'entrée se fait
+    au close 1h suivant sur le symbole du funding.
+    """
+    out: list[dict] = []
+    fh = fh.sort_values("funding_time").reset_index(drop=True)
+    for sym, g in fh.groupby("symbol"):
+        rate = g["rate"].astype(float)
+        ts = g["funding_time"].astype(float)
+        # percentiles par symbole (les niveaux absolus varient trop)
+        p90 = rate.quantile(0.9)
+        p10 = rate.quantile(0.1)
+        events: dict[str, list[tuple[float, int]]] = defaultdict(list)
+        flip_neg = (rate.shift(1) > 0) & (rate <= 0)   # crowd long se dégonfle
+        flip_pos = (rate.shift(1) < 0) & (rate >= 0)
+        for t in ts[flip_neg.fillna(False)]:
+            events["funding_flip_neg"].append((t, -1))   # short
+        for t in ts[flip_pos.fillna(False)]:
+            events["funding_flip_pos"].append((t, +1))   # long
+        for t in ts[rate > p90]:
+            events["funding_extreme_contre_courant"].append((t, -1))  # crowded long -> short
+        for t in ts[rate < p10]:
+            events["funding_extreme_contre_courant"].append((t, +1))  # crowded short -> long
+        acc = rate.diff(3)  # 3 funding du même sens = accélération
+        for t in ts[(acc > 0) & (rate > 0)]:
+            events["funding_accel_momentum"].append((t, +1))
+        for k, v in events.items():
+            out.append({"symbol": sym, "signal": k, "events": v})
+    return out
+
+
+def outcomes(df: pd.DataFrame, events, direction: int) -> list[tuple[int, float, float]]:
+    """(horizon, ret %, ts_entrée_s) — entrée au close 1h APRÈS le signal."""
+    res: list[tuple[int, float, float]] = []
+    idx = df.index  # DatetimeIndex
+    opens, closes = df["open"].values, df["close"].values
+    for ev_ts in events:  # secondes
+        target = pd.Timestamp(float(ev_ts), unit="s")
+        i = int(idx.searchsorted(target, side="right")) - 1
         entry_i = i + 1
         if entry_i >= len(idx):
             continue
         entry = opens[entry_i]
         if entry <= 0:
             continue
+        entry_ts = idx[entry_i].timestamp()
         for h in HORIZONS:
             j = entry_i + h - 1
             if j >= len(idx):
                 continue
             ret = (closes[j] - entry) / entry * 100 * direction - COST_PCT
-            res.append((h, ret))
+            res.append((h, ret, entry_ts))
     return res
 
 
@@ -113,89 +152,147 @@ def main() -> int:
     con = sqlite3.connect(KDB)
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
-    pooled: dict[str, dict[int, list[tuple[str, float, bool]]]] = defaultdict(
-        lambda: defaultdict(list))
-    per_combo: list[dict] = []
-    n_tested = 0
+
+    btc = load_df(con, "BTCUSDT")
+    assert btc is not None, "BTCUSDT 1h requis"
+    btc_close = btc["close"]
+    e50 = ta.ema(btc_close, 50)
+    btc_trend_up = btc_close > e50
+    btc_atr = ta.atr(btc) / btc_close
+    atr_hi = btc_atr > btc_atr.rolling(500, min_periods=100).quantile(0.7)
+    # les 5 plus gros mouvements quotidiens BTC (close-to-close)
+    daily = btc_close.resample("1D").last().pct_change().abs().dropna()
+    big_days = set(daily.nlargest(BIG_MOVE_DAYS).index.date)
+    big_windows = [(int(pd.Timestamp(d).timestamp()), int((pd.Timestamp(d) + pd.Timedelta(days=1)).timestamp()))
+                   for d in big_days]
+
+    def in_big_window(ts_s: float) -> bool:
+        return any(w0 - BIG_MOVE_TH <= ts_s <= w1 + BIG_MOVE_TH for w0, w1 in big_windows)
+
+    def regime(ts_ms: int) -> str:
+        i = int(btc.index.searchsorted(pd.Timestamp(int(ts_ms), unit="ms"),
+                                       side="right")) - 1
+        if i < 0:
+            return "?"
+        trend = "hausse" if btc_trend_up.iloc[i] else "baisse"
+        vol = "vol_haute" if atr_hi.iloc[i] else "vol_basse"
+        return f"{trend}/{vol}"
+
+    # ——— collecte des événements prix ———
+    # events[(signal, horizon)] -> list[(ret, entry_ts)]
+    pooled: dict[tuple[str, int], list[tuple[float, float, str]]] = defaultdict(list)
+    n_combos = 0
     for sym in sorted(symbols):
         df = load_df(con, sym)
         if df is None:
             continue
-        split_ts = df.index[int(len(df) * TRAIN_FRAC)]
-        for name, direction, ev in signals_of(df):
-            n_tested += 1
-            outs = outcomes(df, ev, direction)
-            for h, ret in outs:
-                pooled[name][h].append((sym, ret, True))
-            # split par évènement : train si l'index d'entrée < split_ts
-            train_mask = df.index.get_indexer(df.index[ev.fillna(False)]) < int(len(df) * TRAIN_FRAC)
-            ev_train = ev.copy()
-            ev_train[:] = False
-            ev_train[df.index[ev.fillna(False)][train_mask]] = True
-            ev_val = ev.copy()
-            ev_val[:] = False
-            ev_val[df.index[ev.fillna(False)][~train_mask]] = True
-            tr = outcomes(df, ev_train, direction)
-            va = outcomes(df, ev_val, direction)
-            per_combo.append({"symbol": sym, "signal": name, "train": tr, "val": va})
+        for name, direction, ev in price_signals(df):
+            n_combos += 1
+            ev_ts = df.index[ev.fillna(False)].astype("int64") // 10**6  # ms->? en s
+            for h, ret, ets in outcomes(df, ev_ts / 1000, direction):
+                pooled[(name, h)].append((ret, ets, regime(ets)))
+
+    # ——— événements funding (chaque événement porte sa propre direction) ———
+    fh = pd.read_sql_query("SELECT symbol, funding_time, rate FROM funding_history",
+                           con)
+    fund_rows: list[tuple[str, str, int, float, float]] = []
+    for fsg in funding_signals(fh, btc_close):
+        sym = fsg["symbol"]
+        df = load_df(con, sym)
+        if df is None:
+            continue
+        by_dir: dict[int, list[float]] = defaultdict(list)
+        for t, d in fsg["events"]:
+            by_dir[d].append(t)
+        for d, ts_list in by_dir.items():
+            for h, ret, ets in outcomes(df, ts_list, d):
+                fund_rows.append((fsg["signal"], sym, h, ret, ets))
+
     con.close()
 
+    # fusion funding dans pooled (sous préfixe distinct)
+    for sig, sym, h, ret, ets in fund_rows:
+        pooled[(f"{sig}", h)].append((ret, ets, "n/a"))
+
+    # ——— rapport ———
     lines = [
-        "# Backtest indicateurs Aster — 1h, 31+ symboles, avril → septembre",
-        f"Combinaisons testées : {n_tested} signaux×symboles. "
-        f"Coût 8 bps. Split 70/30 temporel.",
-        "Règle CONFIRMÉ : train N≥10 & WR≥55 % PUIS val N≥5 & WR≥55 %.",
+        "# Campagne backtest v2 — prix + funding, régimes, robustesse",
+        f"{datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC — "
+        f"{n_combos} combinaisons signal×symbole, 5 horizons, coûts 8 bps.",
+        "Règle CONFIRMÉ (pré-enregistrée) : pooled N≥10 & WR≥55 % en TRAIN(70 %) "
+        "puis confirmé en VAL(30 %). Audit de multiplicité en fin de rapport.",
         "",
-        "## Pooled par signal (tous symboles confondus)", "",
-        "| Signal | H | N | Winrate | Verdict |", "|---|---|---|---|---|",
+        "## Résultats poolés (tous symboles)", "",
+        "| Signal | H | N | WR | Médiane | Pire | Moy | Robuste hors big-moves ? | Verdict |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
-    confirmed_total = 0
-    for name in sorted(pooled):
-        for h in HORIZONS:
-            rets = [r for _, r, *_ in pooled[name][h]]
-            n = len(rets)
-            if n == 0:
-                continue
-            wr = sum(1 for x in rets if x > 0) / n * 100
-            verdict = "CONFIRMÉ" if (n >= 10 and wr >= 55) else "BRUIT"
-            if verdict == "CONFIRMÉ":
-                confirmed_total += 1
-            lines.append(f"| {name} | +{h}h | {n} | {wr:.1f} % | {verdict} |")
+    confirmed, tested_cells = 0, 0
+    for (name, h), evs in sorted(pooled.items()):
+        rets = [r for r, _, _ in evs]
+        n = len(rets)
+        if n < 10:
+            continue
+        tested_cells += 1
+        mid = len(rets) // 2
+        srt = sorted(rets)
+        median = srt[mid]
+        worst, best = srt[0], srt[-1]
+        wr_all = sum(1 for x in rets if x > 0) / n * 100
+        # robustesse : exclure les big moves
+        keep = [r for r, ets, _ in evs if not in_big_window(ets)]
+        wr_rob = (sum(1 for x in keep if x > 0) / len(keep) * 100
+                  if len(keep) >= 10 else None)
+        # train/val : split par temps d'entrée sur TOUTE la période poolée
+        all_ts = sorted(ets for _, ets, _ in evs)
+        split_ts = all_ts[int(len(all_ts) * TRAIN_FRAC)]
+        tr = [r for r, ets, _ in evs if ets < split_ts]
+        va = [r for r, ets, _ in evs if ets >= split_ts]
+        wr_tr = sum(1 for x in tr if x > 0) / len(tr) * 100 if len(tr) >= 10 else None
+        wr_va = sum(1 for x in va if x > 0) / len(va) * 100 if len(va) >= 5 else None
+        verdict = ("CONFIRMÉ" if wr_tr is not None and wr_va is not None
+                   and wr_tr >= 55 and wr_va >= 55 else "BRUIT")
+        confirmed += verdict == "CONFIRMÉ"
+        rob_s = "—" if wr_rob is None else f"{wr_rob:.0f} %"
+        lines.append(
+            f"| {name} | +{h}h | {n} | {wr_all:.1f} % | {median:+.2f} % "
+            f"| {worst:+.1f} % | {sum(rets)/n:+.2f} % | {rob_s} | {verdict} |")
 
-    lines += ["", "## Confirmations par symbole (train + val)", ""]
-    any_confirmed = []
-    for c in per_combo:
-        for h in HORIZONS:
-            tr = [r for _, r in c["train"] if _ == h]
-            va = [r for _, r in c["val"] if _ == h]
-            if (len(tr) >= 10 and sum(1 for x in tr if x > 0) / len(tr) >= 0.55
-                    and len(va) >= 5 and sum(1 for x in va if x > 0) / len(va) >= 0.55):
-                any_confirmed.append(
-                    f"- {c['signal']} @ {c['symbol']} +{h}h : "
-                    f"train {len(tr)}/{sum(1 for x in tr if x > 0)} "
-                    f"({sum(1 for x in tr if x > 0)/len(tr)*100:.0f} %), "
-                    f"val {len(va)}/{sum(1 for x in va if x > 0)} "
-                    f"({sum(1 for x in va if x > 0)/len(va)*100:.0f} %)")
-    lines += any_confirmed or ["- aucun"]
+    lines += ["", "## Régimes de marché (signaux avec N≥50)", "",
+              "| Signal | H | N | Hausse | Baisse | Vol haute | Vol basse |", "|---|---|---|---|---|---|---|"]
+    for (name, h), evs in sorted(pooled.items()):
+        if len(evs) < 50:
+            continue
+        by_reg: dict[str, list[float]] = defaultdict(list)
+        for r, _, reg in evs:
+            if reg != "n/a":
+                by_reg[reg].append(r)
+        if not by_reg:
+            continue
+        cells = []
+        for reg in ("hausse/vol_basse", "hausse/vol_haute", "baisse/vol_basse", "baisse/vol_haute"):
+            rr = by_reg.get(reg, [])
+            cells.append(f"{sum(1 for x in rr if x > 0)/len(rr)*100:.0f} % (n={len(rr)})"
+                         if len(rr) >= 15 else "—")
+        lines.append(f"| {name} | +{h}h | {len(evs)} | " + " | ".join(cells) + " |")
 
-    n_signals = len(pooled)
-    expected = n_signals * len(HORIZONS) * 0.025  # ~2.5 % de faux positifs attendus
+    expected = tested_cells * 0.025
     lines += [
         "", "## Audit de multiplicité", "",
-        f"- signaux × horizons poolés : {n_signals * len(HORIZONS)}",
-        f"- confirmations pooled : {confirmed_total} "
-        f"(attendues par hasard ≈ {expected:.0f} au seuil 55 %/N≥10)",
-        f"- confirmations par symbole : {len(any_confirmed)} "
-        f"(sur {n_tested * len(HORIZONS)} combinaisons)",
+        f"- cellules signal×horizon testées : {tested_cells}",
+        f"- confirmés poolés : {confirmed} (attendus par hasard ≈ {expected:.0f})",
         "- VERDICT GLOBAL : " + (
-            "à examiner manuellement" if confirmed_total > expected * 2
-            else "aucun edge démontré — cohérent avec la culture des résultats nuls"),
+            "à examiner manuellement — au-dessus du hasard ×2"
+            if confirmed > expected * 2 and confirmed > 0 else
+            "aucun edge démontré — cohérent avec la culture des résultats nuls"),
+        "",
+        "Rappel : un signal « robuste » doit garder son WR hors big-moves ET",
+        "sur plusieurs régimes. Tout le reste = bruit, et on le dit.",
     ]
 
-    out = REPORTS / f"backtest-indicators-{datetime.now(timezone.utc):%Y-%m-%d}.md"
+    out = REPORTS / f"backtest-campagne-v2-{datetime.now(timezone.utc):%Y-%m-%d}.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"[backtest-ind] {n_tested} combinaisons, {confirmed_total} pooled "
-          f"confirmés, {len(any_confirmed)} par symbole -> {out}")
+    print(f"[campagne] {n_combos} combinaisons, {tested_cells} cellules, "
+          f"{confirmed} confirmés -> {out}")
     return 0
 
 
