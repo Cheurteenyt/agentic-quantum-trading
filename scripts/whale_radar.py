@@ -68,6 +68,23 @@ def constants(con: sqlite3.Connection, top: int | None = None) -> list[str]:
     return out
 
 
+def _skill(con: sqlite3.Connection) -> dict[str, dict]:
+    """Compétence réalisée par baleine (fomo_closed) — un achat d'un joueur
+    à 24/24 fermés et +$626K net ne pèse pas comme un joueur moyen."""
+    out: dict[str, dict] = {}
+    try:
+        for handle, n, wins, net in con.execute(
+            "SELECT handle, COUNT(*), SUM(dir = '▲'), "
+            "SUM(CASE WHEN pnl LIKE '-%' THEN -1 ELSE 1 END * "
+            "CAST(REPLACE(REPLACE(pnl, '+', ''), ',', '') AS REAL)) "
+            "FROM fomo_closed GROUP BY handle"
+        ):
+            out[handle] = {"closed": n, "wins": wins or 0, "net": net or 0.0}
+    except sqlite3.OperationalError:
+        pass
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Whale Radar nocturne (via CDP)")
     ap.add_argument("--top", type=int, default=35)
@@ -94,6 +111,7 @@ def main() -> int:
     inserted = 0
     fresh: dict[str, list] = defaultdict(list)
     mined_now: dict[str, dict] = {}
+    skill = _skill(con)
     for i, handle in enumerate(handles, 1):
         try:
             res = mine_positions(handle)
@@ -157,10 +175,13 @@ def main() -> int:
     ]
     any_fresh = False
     for handle, items in fresh.items():
+        sk = skill.get(handle)
+        tag = (f" [compétence: {sk['wins']}/{sk['closed']} fermés, "
+               f"+${sk['net']:,.0f} réalisé]" if sk and sk["closed"] else "")
         for ticker, p in items:
             any_fresh = True
             lines.append(f"- **@{handle} achète {ticker}** ({p.get('qty')}, "
-                         f"${p.get('value_usd'):,.0f}, {p.get('dir')})")
+                         f"${p.get('value_usd'):,.0f}, {p.get('dir')}){tag}")
     if not any_fresh:
         lines.append("- aucun nouvel achat >= $5k depuis le snapshot précédent")
     lines += ["", "## Confluence (>= 3 baleines, >= $5k, >= $2k/tenant)", "",
