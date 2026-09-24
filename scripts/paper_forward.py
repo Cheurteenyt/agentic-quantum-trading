@@ -34,6 +34,7 @@ REPORTS = ROOT / "reports"
 
 # les 5 candidats de la campagne v5 : (signal, horizon_h, direction)
 CANDIDATES = [
+    ("failed_ath_breakout_short", 1440, -1),   # le cycle de vie (v6, lent)
     ("funding_div_plus_vwap_short", 24, -1),   # la confluence vedette (v6)
     ("funding_div_plus_vwap_short", 168, -1),
     ("funding_prix_divergence_short", 12, -1),

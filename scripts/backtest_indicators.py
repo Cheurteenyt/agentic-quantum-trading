@@ -181,6 +181,20 @@ def price_signals(df: pd.DataFrame, btc_close: pd.Series | None = None) -> list[
     # 5. STREAK FADE : 6 bougies d'affilée du même sens → rebond/essoufflement
     out.append(("streak_rouge_fade_long", +1, red.rolling(6).sum() == 6))
     out.append(("streak_vert_fade_short", -1, green.rolling(6).sum() == 6))
+    # 6. CASSURE RATÉE D'ATH : bougie t-1 fait un nouveau plus-haut absolu,
+    #    la bougie t clôture SOUS l'ancien high → les late-buyers sont piégés
+    ath = close.cummax().shift(1)
+    made_ath = close > ath
+    out.append(("failed_ath_breakout_short", -1,
+                made_ath.shift(1, fill_value=False) & (close < ath.shift(1, fill_value=False))))
+    # 7. BOUGIE CLIMAX : range ≥ 4×ATR au plus haut 48 barres, clôture dans
+    #    le quart BAS de la bougie → le jet d'épuisement
+    rng = df["high"] - df["low"]
+    at_high = close > df["high"].rolling(48).max().shift(1)
+    close_pos = (close - df["low"]) / rng.replace(0, pd.NA)
+    out.append(("climax_top_short", -1,
+                (rng > 4 * atr14.shift(1, fill_value=0))
+                & at_high & (close_pos < 0.25).fillna(False)))
     return out
 
 
@@ -387,15 +401,25 @@ def main() -> int:
         dev_sd = dev.rolling(168).std()
         vwap_haut = dev > 3 * dev_sd
         vwap_bas = dev < -3 * dev_sd
+        rsi = ta.rsi(df["close"])
+        vz = ta.volume_z(df["volume"], 20)
+        div_short = (accel > 0) & (pchg < -0.03)
         extra = {
-            "funding_prix_divergence_short": (-1, (accel > 0) & (pchg < -0.03)),
+            "funding_prix_divergence_short": (-1, div_short),
             "funding_prix_divergence_long": (+1, (accel < 0) & (pchg > 0.03)),
             # COMBINAISONS (confluence de nos 2 meilleurs marqueurs d'épuisement)
             "funding_div_plus_vwap_short": (-1, (accel > 0) & vwap_haut),
-            "funding_extreme_plus_div_short": (-1, (accel > 0) & (pchg < -0.03)
-                                               & vwap_haut),
+            "funding_extreme_plus_div_short": (-1, div_short & vwap_haut),
             # miroir long jamais testé : foule shorte dans un pump
             "funding_div_miroir_long": (+1, (accel < 0) & (pchg > 0.03)),
+            # COUPES DE PRÉCISION : empiler les filtres d'épuisement
+            "precision_rsi75": (-1, (accel > 0) & vwap_haut
+                                & (rsi > 75).fillna(False)),
+            "precision_volume": (-1, (accel > 0) & vwap_haut
+                                 & (vz > 1).fillna(False)),
+            "precision_quad": (-1, (accel > 0) & vwap_haut
+                               & (vz > 1).fillna(False)
+                               & (rsi > 75).fillna(False)),
         }
         for sig, (d, mask) in extra.items():
             n_combos += 1
