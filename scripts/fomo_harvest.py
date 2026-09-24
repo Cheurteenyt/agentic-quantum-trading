@@ -246,6 +246,8 @@ def mine_positions(handle: str, scrolls: int = 10) -> dict:
     finally:
         if ctx is not None:
             ctx.close()
+        if pw is not None:
+            pw.stop()  # ⚠️ sans ça, l'instance sync fuit sa boucle asyncio
         else:
             pw.stop()
 
@@ -434,6 +436,8 @@ def mine_token_panel(handle: str, ticker: str, scrolls: int = 4) -> dict:
     finally:
         if ctx is not None:
             ctx.close()
+        if pw is not None:
+            pw.stop()  # ⚠️ sans ça, l'instance sync fuit sa boucle asyncio
         else:
             pw.stop()
 
