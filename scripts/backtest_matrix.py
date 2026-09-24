@@ -77,8 +77,8 @@ def funding_signals_any(df, fh_sym):
     return {"funding_div": div, "confluence": conf}
 
 
-def trade_outcomes(df, entry_positions, direction, horizons_h, liq_p,
-                   tf_hours: float = 1.0, funding_per_hour: float = 0.0):
+def trade_outcomes(df, entry_positions, direction, horizons_bars, liq_p,
+                   bar_hours: float = 1.0, funding_per_hour: float = 0.0):
     """Pour chaque entrée : (h, {L: ret marge}) — liquidation en chemin au
     seuil réel 100/L − maint %, funding réel pendant détention (× levier :
     le notional est L× la marge), marge perdue = -100 % − fee si liquidé."""
@@ -89,6 +89,8 @@ def trade_outcomes(df, entry_positions, direction, horizons_h, liq_p,
     max_lev = liq_p["max_lev"] or 0
     fee_liq = liq_p.get("fee", 0.025)
     res = []
+    import numpy as _np
+    bar_ns = int(bar_hours * 3600 * 10**9)
     for i in entry_positions:
         entry_i = i + 1
         if entry_i >= len(idx_ns):
@@ -96,9 +98,12 @@ def trade_outcomes(df, entry_positions, direction, horizons_h, liq_p,
         entry = opens[entry_i]
         if entry <= 0:
             continue
-        for h in horizons_h:
-            j = entry_i + h - 1
-            if j >= len(idx_ns):
+        entry_open_ns = idx_ns[entry_i]
+        for h in horizons_bars:
+            # ⚠️ la sortie par TIMESTAMP EXACT : entrée + h barres × la durée
+            exit_open_ns = entry_open_ns + h * bar_ns
+            j = int(_np.searchsorted(idx_ns, exit_open_ns, side="left"))
+            if j >= len(idx_ns) or idx_ns[j] != exit_open_ns:
                 continue
             price_ret = (closes[j] - entry) / entry * 100
             mae = ((lows[entry_i:j + 1].min() - entry) / entry * 100 if direction > 0
