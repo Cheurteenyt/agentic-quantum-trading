@@ -173,9 +173,10 @@ def main() -> int:
                 opened += 1
 
     # clôture des paper trades ouverts dont l'horizon est atteint
-    for row in con.execute(
+    open_rows = con.execute(
             "SELECT rowid, signal, symbol, horizon_h, direction, entry_ts, "
-            "entry_price FROM paper_trades WHERE status='open'").fetchall():
+            "entry_price FROM paper_trades WHERE status='open'").fetchall()
+    for row in open_rows:
         rid, name, sym, horizon, direction, entry_ts, entry_price = row
         df = load_df(con, sym)
         if df is None:
