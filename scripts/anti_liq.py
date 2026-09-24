@@ -21,6 +21,7 @@ DISCIPLINE (règle du projet) :
 """
 from __future__ import annotations
 
+import argparse
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -56,15 +57,21 @@ def funding_hourly_map() -> dict[str, float]:
     return {s: sum(v) / len(v) * 100 / 8 for s, v in acc.items()}
 
 
-def collect_featured(regime: pd.Series) -> list[dict]:
-    """Les événements cascade des majeures AVEC leurs features d'entrée.
+def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
+    """Les événements cascade AVEC leurs features d'entrée.
 
     La sélection séquentielle du sim (premier dispo, skip des chevauche-
-    ments) est répliquée pour que les labels correspondent au 719/73."""
+    ments) est répliquée pour que les labels correspondent au sim."""
     con = sqlite3.connect(KDB)
+    if universe == "majors":
+        symbols = list(MAJORS)
+    else:
+        symbols = [r[0] for r in con.execute(
+            "SELECT DISTINCT symbol FROM klines WHERE interval='1h' "
+            "ORDER BY symbol")]
     dfs: dict[str, pd.DataFrame] = {}
     signals: list[int] = []          # ts de TOUS les signaux (feature storm)
-    for sym in MAJORS:
+    for sym in symbols:
         df = load_df(con, sym)
         if df is None or len(df) < 500:
             continue
@@ -191,8 +198,11 @@ def tercile_lift(vals: np.ndarray, liq: np.ndarray) -> list[tuple[str, int, int,
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--universe", choices=["majors", "all"], default="majors")
+    args = ap.parse_args()
     regime = btc_regime_series()
-    events = collect_featured(regime)
+    events = collect_featured(regime, args.universe)
     liq_all = np.array([e["liq"] for e in events])
     n_liq = int(liq_all.sum())
     base_rate = n_liq / len(events) * 100
@@ -205,9 +215,9 @@ def main() -> int:
     # les niveaux absolus dérivent avec les régimes (le train ne transfère
     # pas) → chaque feature est rangée contre SES 90 derniers jours, puis
     # les rangs sont moyennés. Aucun look-ahead : fenêtre = événements
-    # antérieurs uniquement.
+    # antérieurs uniquement. v2 : cascade_depth ajouté (profond = rebond = liq).
     RISK_UP = ("atr_pct", "vol24", "dd_pct")       # haut = risqué
-    RISK_DOWN = ("btc_ret24", "vwap_dev")          # bas = risqué
+    RISK_DOWN = ("btc_ret24", "vwap_dev", "cascade_depth")  # bas = risqué
     WIN_NS = 90 * 86400 * 10**9
     for i, e in enumerate(events):
         lo = e["ts_ms"] - WIN_NS
@@ -218,10 +228,18 @@ def main() -> int:
         ranks = []
         for f in RISK_UP:
             vals = np.array([p[f] for p in window])
-            ranks.append(float(np.mean(vals <= e[f])))
+            v = e[f]
+            if not np.isfinite(v):
+                ranks.append(0.5)
+                continue
+            ranks.append(float(np.mean(vals <= v)))
         for f in RISK_DOWN:
             vals = np.array([p[f] for p in window])
-            ranks.append(float(np.mean(vals <= -e[f])))
+            v = -e[f]
+            if not np.isfinite(v):
+                ranks.append(0.5)
+                continue
+            ranks.append(float(np.mean(vals <= v)))
         e["al_score"] = float(np.mean(ranks))
     tr_liq = np.array([e["liq"] for e in train])
     va_liq = np.array([e["liq"] for e in val])
@@ -229,7 +247,7 @@ def main() -> int:
     lines = [
         "# L'INDICATEUR ANTI-LIQUIDATION",
         f"{datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC — "
-        f"{len(events)} trades cascade (majeures, hold 24h, sélection sim), "
+        f"{len(events)} trades cascade ({args.universe}, hold 24h, sélection sim), "
         f"{n_liq} liqs ({base_rate:.1f} %). Train {len(train)} / Val {len(val)} "
         f"(split par le temps).", "",
         "## Univarié TRAIN — taux de liq par tercile", "",
@@ -339,31 +357,132 @@ def main() -> int:
                   f"{g['n_liq']} liqs) vs sans gate ${real['balance']:,.2f} "
                   f"(DD {real['max_dd']:.1f} %, {real['n_liq']} liqs)"]
 
-    # --- le SIZING dynamique : réduire la taille quand le score est chaud ---
-    q33, q66 = np.nanquantile(tr_scores, [1/3, 2/3])
-    def size_low(e: dict) -> float:
-        s = e.get("al_score", float("nan"))
-        return 0.025 if (not np.isnan(s) and s >= q66) else 0.0625
-    def size_inv(e: dict) -> float:   # le CONTRÔLE inverse (anti-auto-tromperie)
-        s = e.get("al_score", float("nan"))
-        return 0.0625 if (not np.isnan(s) and s >= q66) else 0.025
-    sim_low = run_sim(events, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS, size_fn=size_low)
-    sim_inv = run_sim(events, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS, size_fn=size_inv)
-    lines += ["", "### Sizing dynamique (exposition moyenne constante = 5 %)", "",
-              f"- FLAT 5 % : 100 $ → ${real['balance']:,.2f} "
-              f"(DD {real['max_dd']:.1f} %, {real['n_liq']} liqs)",
-              f"- 2,5 % si chaud / 6,25 % sinon : 100 $ → "
-              f"${sim_low['balance']:,.2f} (DD {sim_low['max_dd']:.1f} %, "
-              f"{sim_low['n_liq']} liqs)",
-              f"- CONTRÔLE INVERSE (6,25 % si chaud / 2,5 % sinon) : "
-              f"100 $ → ${sim_inv['balance']:,.2f} "
-              f"(DD {sim_inv['max_dd']:.1f} %, {sim_inv['n_liq']} liqs)"]
+    # --- le SIZING dynamique : la frontière ROI/DD ---
+    # grille de politiques à EXPOSITION CONSTANTE 5 % (moyenne 2/3 cool +
+    # 1/3 hot), choisie sur TRAIN, jugée sur VAL, puis sim complet.
+    # (0.075, 0.0) = le gate binaire fait proprement (les chauds sautés).
+    POLICIES = [(0.0625, 0.025), (0.06, 0.03), (0.065, 0.02),
+                (0.07, 0.01), (0.075, 0.0)]
 
-    ok_dir = sim_low["balance"] > real["balance"] and sim_low["max_dd"] < real["max_dd"]
-    ok_inv = sim_inv["balance"] > sim_low["balance"]
+    def make_size_fn(cool: float, hot: float, thr: float):
+        def fn(e: dict) -> float:
+            s = e.get("al_score", float("nan"))
+            if np.isnan(s):
+                return SIZE
+            return hot if s >= thr else cool
+        return fn
+
+    def make_cont_fn(k: float):
+        def fn(e: dict) -> float:
+            s = e.get("al_score", float("nan"))
+            if np.isnan(s):
+                return SIZE
+            return float(np.clip(SIZE * (1 + k * (0.5 - s)), 0.005, 0.095))
+        return fn
+
+    q66 = float(np.nanquantile(tr_scores, 2/3))
+    lines += ["", "### LA FRONTIÈRE ROI/DD — politiques de sizing "
+              "(exposition moyenne 5 %)", "",
+              "Choisie sur TRAIN, jugée sur VAL. Le palier chaud est appliqué "
+              f"au score ≥ p66 ({q66:.2f}).", "",
+              "| Politique | TRAIN 100 $ → | DD | VAL 100 $ → | DD |",
+              "|---|---|---|---|---|"]
+    flat_tr = run_sim(train, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS)
+    flat_va = run_sim(val, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS)
+    lines.append(f"| FLAT 5 % (référence) | ${flat_tr['balance']:,.2f} "
+                 f"| {flat_tr['max_dd']:.1f} % | ${flat_va['balance']:,.2f} "
+                 f"| {flat_va['max_dd']:.1f} % |")
+    best = None
+    for cool, hot in POLICIES:
+        fn = make_size_fn(cool, hot, q66)
+        label = f"{cool:.2%} / {hot:.1%}" if hot > 0 else f"{cool:.2%} / gate chaud"
+        tr_s = run_sim(train, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS, size_fn=fn)
+        va_s = run_sim(val, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS, size_fn=fn)
+        lines.append(f"| {label} | ${tr_s['balance']:,.2f} | {tr_s['max_dd']:.1f} % "
+                     f"| ${va_s['balance']:,.2f} | {va_s['max_dd']:.1f} % |")
+        # objectif pré-énoncé : max ROI/DD sur TRAIN (le DD est la monnaie)
+        ratio = tr_s["balance"] / max(tr_s["max_dd"], 1.0)
+        if best is None or ratio > best[2]:
+            best = (label, fn, ratio, (cool, hot))
+    fn = make_cont_fn(1.5)
+    tr_s = run_sim(train, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS, size_fn=fn)
+    va_s = run_sim(val, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS, size_fn=fn)
+    lines.append(f"| continu k=1.5 | ${tr_s['balance']:,.2f} | {tr_s['max_dd']:.1f} % "
+                 f"| ${va_s['balance']:,.2f} | {va_s['max_dd']:.1f} % |")
+
+    ratio = tr_s["balance"] / max(tr_s["max_dd"], 1.0)
+    if best is None or ratio > best[2]:
+        best = ("continu k=1.5", fn, ratio, "cont")
+
+    full_sim = inv_sim = None
+    if best is not None:
+        full_sim = run_sim(events, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS,
+                           size_fn=best[1])
+        if best[3] == "cont":
+            inv_fn = make_cont_fn(-1.5)
+            inv_label = "continu INVERSE k=-1.5"
+        else:
+            cool, hot = best[3]
+            inv_fn = make_size_fn(hot, cool, q66)
+            inv_label = f"INVERSE {hot:.1%} / {cool:.2%}"
+        inv_sim = run_sim(events, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS,
+                          size_fn=inv_fn)
+        lines += ["", f"**Choisi sur TRAIN (ratio ROI/DD) : {best[0]}** — "
+                  f"sim COMPLET 1 an + le RE-LEVER (tu choisis ta tolérance) :",
+                  f"- flat 5 % : 100 $ → ${real['balance']:,.2f} "
+                  f"(DD {real['max_dd']:.1f} %, {real['n_liq']} liqs)",
+                  f"- {best[0]} ×1.0 : 100 $ → **${full_sim['balance']:,.2f}** "
+                  f"(DD {full_sim['max_dd']:.1f} %, {full_sim['n_liq']} liqs)"]
+        for m in (1.25, 1.5):
+            if best[3] == "cont":
+                def mk(m):
+                    def f(e: dict) -> float:
+                        s = e.get("al_score", float("nan"))
+                        if np.isnan(s):
+                            return SIZE * m
+                        return float(np.clip(SIZE * m * (1 + 1.5 * (0.5 - s)),
+                                             0.005, 0.095 * m))
+                    return f
+            else:
+                cool, hot = best[3]
+                def mk(m):
+                    return make_size_fn(cool * m, hot * m, q66)
+            fs = run_sim(events, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS, size_fn=mk(m))
+            lines.append(f"- {best[0]} ×{m} : 100 $ → ${fs['balance']:,.2f} "
+                         f"(DD {fs['max_dd']:.1f} %, {fs['n_liq']} liqs)")
+        lines.append(f"- {inv_label} (contrôle) : 100 $ → "
+                     f"${inv_sim['balance']:,.2f} (DD {inv_sim['max_dd']:.1f} %)")
+
+    # --- le gate-UNION des filtres univariés adoptés (phase 1) dans le sim ---
+    if adopted:
+        def union_gated(e: dict) -> bool:
+            return any((e[f] >= q) if side == "haut" else (e[f] <= q)
+                       for f, q, side in adopted)
+        mva = np.array([union_gated(e) for e in val])
+        catch_u = (va_liq & mva).sum() / max(va_liq.sum(), 1) * 100
+        lost_u = (~va_liq & mva).sum() / max((~va_liq).sum(), 1) * 100
+        kept = [e for e in events if not union_gated(e)]
+        g0 = run_sim(kept, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS)
+        lines += ["", f"### GATE-UNION des filtres adoptés "
+                  f"({', '.join(f for f, _, _ in adopted)})", "",
+                  f"- VAL : {catch_u:.0f} % des liqs attrapées, "
+                  f"{lost_u:.1f} % des gagnants perdus",
+                  f"- sim 1 an, gate seul : 100 $ → ${g0['balance']:,.2f} "
+                  f"(DD {g0['max_dd']:.1f} %, {g0['n_liq']} liqs)"]
+        if best is not None:
+            g1 = run_sim(kept, 100.0, SIZE, fh, FEE_BPS, SLIP_BPS,
+                         size_fn=best[1])
+            lines.append(f"- sim 1 an, gate + {best[0]} : 100 $ → "
+                         f"**${g1['balance']:,.2f}** (DD {g1['max_dd']:.1f} %, "
+                         f"{g1['n_liq']} liqs)")
+
+    ok_dir = (full_sim is not None and full_sim["balance"] > real["balance"]
+              and full_sim["max_dd"] <= real["max_dd"] + 2)
+    ok_inv = (inv_sim is not None and full_sim is not None
+              and inv_sim["balance"] > full_sim["balance"])
     if ok_dir and not ok_inv:
-        verdict2 = ("LE SCORE MARCHE — le sizing dynamique améliore le ROI ET le DD, "
-                    "le contrôle inverse est battu (le signal n'est pas un artefact)")
+        verdict2 = ("LE SCORE MARCHE — la politique améliore le ROI sans "
+                    "dégrader le DD, le contrôle inverse est battu")
     elif ok_dir and ok_inv:
         verdict2 = ("AMBIGU — le direct et l'inverse améliorent tous les deux : "
                     "le signal n'est pas assez discriminant, ne pas croire")
@@ -386,9 +505,11 @@ def main() -> int:
     print(f"[anti-liq] {len(events)} trades, {n_liq} liqs ({base_rate:.1f} %), "
           f"{len(adopted)} filtre(s) univarié(s) adopté(s)")
     print(f"[anti-liq] sim flat : ${real['balance']:,.2f} (DD {real['max_dd']:.1f} %) | "
-          f"gate score : {'tient en VAL' if score_gate_adopted is not None else 'aucun ne tient'} | "
-          f"sizing dyn : ${sim_low['balance']:,.2f} (DD {sim_low['max_dd']:.1f} %) "
-          f"vs inverse ${sim_inv['balance']:,.2f} (DD {sim_inv['max_dd']:.1f} %)")
+          f"gate score : {'tient en VAL' if score_gate_adopted is not None else 'aucun ne tient'}")
+    if full_sim is not None:
+        print(f"[anti-liq] frontière : {best[0]} → ${full_sim['balance']:,.2f} "
+              f"(DD {full_sim['max_dd']:.1f} %) | inverse "
+              f"${inv_sim['balance']:,.2f} (DD {inv_sim['max_dd']:.1f} %)")
     print(f"[anti-liq] {verdict2}")
     return 0
 

@@ -150,6 +150,9 @@ def run_sim(events: list[dict], capital: float, size: float,
         if balance <= 1:
             break
         trade_size = size_fn(e) if size_fn is not None else size
+        if trade_size <= 0:
+            i += 1               # gated : le créneau est libéré pour le suivant
+            continue
         margin_alloc = balance * trade_size
         notional = margin_alloc * LEV
         fees = notional * (fee_bps + slip_bps) / 10000 * 2
