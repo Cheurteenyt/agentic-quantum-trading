@@ -32,7 +32,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.backtest_indicators import load_df, COST_PCT, HORIZONS  # noqa: E402
+from scripts.backtest_indicators import load_df, outcomes, COST_PCT, HORIZONS  # noqa: E402
 from scripts import aster_indicators as ta  # noqa: E402
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
@@ -252,12 +252,14 @@ def main() -> int:
 
     # prix en mémoire (ns-index) pour l'évaluation
     price_arr: dict[str, tuple] = {}
+    price_df: dict[str, pd.DataFrame] = {}
     for sym in symbols:
         df = load_df(con, sym)
         if df is None or len(df) < 400:
             continue
         idx_ns = df.index.astype("datetime64[ns]").asi8
         price_arr[sym] = (idx_ns, df["open"].values, df["close"].values)
+        price_df[sym] = df
 
     horizons = HORIZONS
     # baseline blind SHORT par horizon (avec coûts+funding par symbole)
