@@ -300,6 +300,15 @@ def main() -> int:
     except sqlite3.OperationalError:
         pass
 
+    # paramètres de liquidation RÉELS par symbole (exchangeInfo → liq_params)
+    liq_params: dict[str, dict] = {}
+    try:
+        for sym, maxlev, mm in con.execute(
+            "SELECT symbol, max_leverage, maint_margin_pct FROM liq_params"):
+            liq_params[sym] = {"max_lev": maxlev or 0, "mm": mm or 0}
+    except sqlite3.OperationalError:
+        pass
+
     def cost_of(sym: str) -> float:
         # fees taker 8 bps RT + slippage mesuré ×2 (aller-retour)
         return 0.08 + slip_by_sym.get(sym, 10.0) / 100 * 2
@@ -426,7 +435,7 @@ def main() -> int:
         confirmed += verdict == "CONFIRMÉ"
         above_drift += (verdict == "CONFIRMÉ" and delta >= 5)
         if verdict == "CONFIRMÉ":
-            confirmed_cells.append((name, h, [(m, d) for _, _, _, m, d, _ in evs]))
+            confirmed_cells.append((name, h, [(e[3], e[4], e[5]) for e in evs]))
         rob_s = "—" if wr_rob is None else f"{wr_rob:.0f} %"
         lines.append(
             f"| {name} | +{h}h | {n} | {wr_all:.1f} % | {delta:+.1f} pts "
@@ -457,13 +466,26 @@ def main() -> int:
         for name, h, md in confirmed_cells:
             cells = []
             for L in (3, 5, 10):
-                th = 100.0 / L
-                n_liq = sum(1 for m, d in md
-                            if (d > 0 and m <= -th) or (d < 0 and m >= th))
-                cells.append(f"{n_liq/len(md)*100:.1f} %")
+                tradeable = [1 for _m, d, sym in md
+                             if liq_params.get(sym, {}).get("max_lev", 0) >= L]
+                if not tradeable:
+                    cells.append("— (levier n'existe pas)")
+                    continue
+                n_liq = 0
+                for _m, d, sym in md:
+                    if liq_params.get(sym, {}).get("max_lev", 0) < L:
+                        continue
+                    mm = liq_params[sym]["mm"]
+                    th = 100.0 / L - mm  # seuil réel : marge init − marge maint
+                    if (d > 0 and _m <= -th) or (d < 0 and _m >= th):
+                        n_liq += 1
+                cells.append(f"{n_liq/len(tradeable)*100:.1f} % (n={len(tradeable)})")
             lines.append(f"| {name} | +{h}h | " + " | ".join(cells) + " |")
-        lines += ["Un % de liquidation > 0 rend la stratégie morte au levier",
-                  "considéré — la médiane positive ne sauve pas un compte liquidé."]
+        lines += [
+            "Seuil réel = 100/levier − maintMarginPercent du symbole (exchangeInfo),",
+            "levier plafonné au max réellement autorisé par symbole (PONS/CATE/MEME : 3x).",
+            "Un % de liquidation > 0 rend la stratégie morte au levier considéré —",
+            "la médiane positive ne sauve pas un compte liquidé."]
 
     expected = tested_cells * 0.025
     lines += [
