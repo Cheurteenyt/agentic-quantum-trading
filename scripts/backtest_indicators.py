@@ -219,11 +219,12 @@ def funding_signals(fh: pd.DataFrame, btc_close: pd.Series) -> list[dict]:
 
 
 def outcomes(df: pd.DataFrame, events, direction: int,
-             cost_pct: float = COST_PCT) -> list[tuple]:
+             cost_pct: float = COST_PCT, funding_per_hour: float = 0.0) -> list[tuple]:
     """(horizon, ret %, ts_entrée_s, mae %) — entrée au close 1h APRÈS le
-    signal ; mae = excursion adverse maximale sur le chemin de détention
-    (négative pour un long, positive pour un short) → sert au risque de
-    liquidation selon le levier."""
+    signal ; mae = excursion adverse maximale sur le chemin de détention.
+    funding_per_hour = taux de funding moyen PAR HEURE en % (signé) :
+    un long PAYE ce taux, un short le REÇOIT — appliqué sur le temps
+    MUR réel de détention (les memecoins fundent chaque heure !)."""
     import numpy as np
 
     res: list[tuple] = []
@@ -245,7 +246,9 @@ def outcomes(df: pd.DataFrame, events, direction: int,
             j = entry_i + h - 1
             if j >= len(idx):
                 continue
-            ret = (closes[j] - entry) / entry * 100 * direction - cost_pct
+            hold_h = (idx[j] - idx[entry_i]).total_seconds() / 3600
+            ret = ((closes[j] - entry) / entry * 100 * direction
+                   - cost_pct - direction * funding_per_hour * hold_h)
             if direction > 0:
                 mae = (lows[entry_i:j + 1].min() - entry) / entry * 100
             else:
@@ -290,6 +293,31 @@ def main() -> int:
     # ——— collecte des événements prix ———
     # events[(signal, horizon)] -> list[(ret, entry_ts)]
     pooled: dict[tuple[str, int], list[tuple[float, float, str]]] = defaultdict(list)
+    # funding RÉEL par symbole : taux moyen par heure (depuis funding_history)
+    # ⚠️ l'intervalle varie par symbole (1h memecoins, 8h majeurs — doc V3)
+    funding_by_sym: dict[str, float] = {}
+    try:
+        fh_rows = con.execute(
+            "SELECT symbol, funding_time, rate FROM funding_history").fetchall()
+        import statistics
+        by_sym: dict[str, list[float]] = defaultdict(list)
+        by_sym_ts: dict[str, list[float]] = defaultdict(list)
+        for s, t, rate in fh_rows:
+            try:
+                by_sym[s].append(float(rate))
+                by_sym_ts[s].append(float(t))
+            except (TypeError, ValueError):
+                continue
+        for s, rates in by_sym.items():
+            ts = sorted(by_sym_ts[s])
+            gaps = [(ts[i + 1] - ts[i]) / 3600000 for i in range(len(ts) - 1)
+                    if 0 < ts[i + 1] - ts[i] < 40000000]
+            iv = statistics.median(gaps) if gaps else 8.0
+            # taux moyen PAR ÉVÉNEMENT → par heure : /intervalle
+            funding_by_sym[s] = (statistics.mean(rates) * 100) / max(iv, 0.5)
+    except sqlite3.OperationalError:
+        pass
+
     # slippage MESURÉ par symbole (notre carnet d'ordres) — repli 10 bps
     slip_by_sym: dict[str, float] = {}
     try:
@@ -324,7 +352,8 @@ def main() -> int:
             n_combos += 1
             ev_s = [t.timestamp() for t in cooldown(df.index[ev.fillna(False)])]
             cst = cost_of(sym)
-            for h, ret, ets, mae in outcomes(df, ev_s, direction, cst):
+            for h, ret, ets, mae in outcomes(df, ev_s, direction, cst,
+                                             funding_by_sym.get(sym, 0.0)):
                 pooled[(name, h)].append((ret, ets, regime(ets), mae, direction, sym))
 
     # ——— événements funding (chaque événement porte sa propre direction) ———
@@ -358,13 +387,15 @@ def main() -> int:
             n_combos += 1
             ev_s = [t.timestamp() for t in cooldown(df.index[mask.fillna(False)])]
             cst = cost_of(sym)
-            for h, ret, ets, mae in outcomes(df, ev_s, d, cst):
+            for h, ret, ets, mae in outcomes(df, ev_s, d, cst,
+                                             funding_by_sym.get(sym, 0.0)):
                 fund_rows.append((sig, sym, h, ret, ets, mae, d))
         for d, ts_list in by_dir.items():
             ts_kept = cooldown(pd.DatetimeIndex(pd.to_datetime(ts_list, unit="s")))
             ts_list = [t.timestamp() for t in ts_kept]
             cst = cost_of(sym)
-            for h, ret, ets, mae in outcomes(df, ts_list, d, cst):
+            for h, ret, ets, mae in outcomes(df, ts_list, d, cst,
+                                             funding_by_sym.get(sym, 0.0)):
                 fund_rows.append((fsg["signal"], sym, h, ret, ets, mae, d))
     # ——— BASELINE : short AVEUGLE par horizon (contrôle anti-drift) ———
     # un signal ne "compte" que si son WR dépasse CE chiffre : sur un an,
@@ -380,7 +411,9 @@ def main() -> int:
             closes, opens = df["close"].values, df["open"].values
             for i in range(0, len(df.index) - h, 24):
                 e, x = opens[i], closes[min(i + h, len(df.index) - 1)]
-                r = (x - e) / e * 100 * (-1) - cost_of(sym)
+                hold = min(h, len(df.index) - 1 - i)
+                r = ((x - e) / e * 100 * (-1) - cost_of(sym)
+                     + funding_by_sym.get(sym, 0.0) * hold)
                 n += 1
                 wins += r > 0
         baseline[h] = wins / n * 100 if n else 50.0
