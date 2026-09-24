@@ -40,6 +40,7 @@ HOLDS = (4, 8, 16)    # barres 15m : 1h, 2h, 4h
 
 def x20_signals(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
     out: list[tuple[str, int, pd.Series]] = []
+    close = df["close"]
     atr = ta.atr(df, 14)
     atr_p20 = atr.rolling(48, min_periods=20).quantile(0.2)
     squeeze = atr <= atr_p20
@@ -58,6 +59,13 @@ def x20_signals(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
     lower_wick = (df[["open", "close"]].min(axis=1) - df["low"])
     out.append(("meche_rejet_long", +1,
                 (df["low"] <= prior_low) & (lower_wick >= 2 * body)))
+    # 3. FAILED ATH en 15m (cycle de vie micro) : bougie fait un nouveau
+    #    plus-haut absolu, la suivante clôture sous l'ancien → short
+    ath = close.cummax().shift(1)
+    made_ath = close > ath
+    out.append(("failed_ath_micro_short", -1,
+                made_ath.shift(1, fill_value=False)
+                & (close < ath.shift(1, fill_value=False))))
     # 3. volume vide → pompe
     vz = ta.volume_z(df["volume"], 48)
     dead = vz.rolling(8).max() < -1.5
