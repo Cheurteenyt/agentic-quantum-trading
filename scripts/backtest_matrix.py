@@ -28,7 +28,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.backtest_indicators import load_df  # noqa: E402
+from scripts.backtest_indicators import load_df, data_ok  # noqa: E402
 from scripts import aster_indicators as ta  # noqa: E402
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
@@ -77,12 +77,11 @@ def funding_signals_any(df, fh_sym):
     return {"funding_div": div, "confluence": conf}
 
 
-def trade_outcomes(df, entry_positions, direction, horizons_h, liq_p):
-    """Pour chaque entrée : (h, ret_marge_lev1, liquidé_L) pour L in (1,3,5,10).
-
-    La liquidation en chemin : excursion adverse ≥ 100/L − maint % (le
-    maint % du symbole) — sinon le ret marge = ret prix × L − coûts × L.
-    """
+def trade_outcomes(df, entry_positions, direction, horizons_h, liq_p,
+                   tf_hours: float = 1.0, funding_per_hour: float = 0.0):
+    """Pour chaque entrée : (h, {L: ret marge}) — liquidation en chemin au
+    seuil réel 100/L − maint %, funding réel pendant détention (× levier :
+    le notional est L× la marge), marge perdue = -100 % − fee si liquidé."""
     idx_ns = df.index.astype("datetime64[ns]").asi8
     opens, closes = df["open"].values, df["close"].values
     lows, highs = df["low"].values, df["high"].values
@@ -104,6 +103,7 @@ def trade_outcomes(df, entry_positions, direction, horizons_h, liq_p):
             price_ret = (closes[j] - entry) / entry * 100
             mae = ((lows[entry_i:j + 1].min() - entry) / entry * 100 if direction > 0
                    else (highs[entry_i:j + 1].max() - entry) / entry * 100)
+            hold_h = (idx_ns[j] - idx_ns[entry_i]) / 3.6e9
             per_lev = {}
             for L in (1, 3, 5, 10):
                 if max_lev < L:
@@ -113,7 +113,8 @@ def trade_outcomes(df, entry_positions, direction, horizons_h, liq_p):
                 if liq:
                     per_lev[L] = -100.0 - fee_liq * 100
                 else:
-                    per_lev[L] = price_ret * direction * L - COST * L
+                    per_lev[L] = (price_ret * direction * L - COST * L
+                                  - direction * funding_per_hour * hold_h * L)
             res.append((h, per_lev))
     return res
 
@@ -128,6 +129,22 @@ def main() -> int:
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
     btc = load_df(con, "BTCUSDT")
 
+    # funding réel par symbole (taux moyen par heure, depuis funding_history)
+    import statistics
+    funding_by_sym: dict[str, float] = {}
+    fby, fts = defaultdict(list), defaultdict(list)
+    for s, t, rate in con.execute("SELECT symbol, funding_time, rate FROM funding_history"):
+        try:
+            fby[s].append(float(rate)); fts[s].append(float(t))
+        except (TypeError, ValueError):
+            continue
+    for s, rates in fby.items():
+        ts = sorted(fts[s])
+        gaps = [(ts[i + 1] - ts[i]) / 3600000 for i in range(len(ts) - 1)
+                if 0 < ts[i + 1] - ts[i] < 40000000]
+        iv = statistics.median(gaps) if gaps else 8.0
+        funding_by_sym[s] = (statistics.mean(rates) * 100) / max(iv, 0.5)
+
     H_1H = (72, 720, 1440)       # 3j / 30j / 60j
     H_15M = (96, 576, 2880)      # 24h / 72h / 30j en barres 15m
 
@@ -138,14 +155,15 @@ def main() -> int:
     for sym in sorted(symbols):
         liq_p = lp.get(sym, {"max_lev": 0, "mm": 2.5, "fee": 0.025})
         df1h = load_df(con, sym)
-        if df1h is None or len(df1h) < 500:
+        if df1h is None or not data_ok(df1h):
             continue
         # —— signaux 1h : price + funding ——
         for fam, (d, ev) in price_signals_any(df1h, btc,
                                               {"failed_ath", "sweep", "vwap"}).items():
             pos = [int(df1h.index.searchsorted(t, side="right"))
                    for t in df1h.index[ev.fillna(False)]]
-            for h, per_lev in trade_outcomes(df1h, pos, d, H_1H, liq_p):
+            for h, per_lev in trade_outcomes(df1h, pos, d, H_1H, liq_p,
+                                            1.0, funding_by_sym.get(sym, 0.0)):
                 for L, ret in per_lev.items():
                     R[(fam, "1h", L, h)].append(ret)
                 n_events += 1
@@ -154,7 +172,8 @@ def main() -> int:
             for fam, mask in funding_signals_any(df1h, g).items():
                 pos = [int(df1h.index.searchsorted(t, side="right"))
                        for t in df1h.index[mask]]
-                for h, per_lev in trade_outcomes(df1h, pos, -1, H_1H, liq_p):
+                for h, per_lev in trade_outcomes(df1h, pos, -1, H_1H, liq_p,
+                                                1.0, funding_by_sym.get(sym, 0.0)):
                     for L, ret in per_lev.items():
                         R[(fam, "1h", L, h)].append(ret)
                     n_events += 1
@@ -173,11 +192,14 @@ def main() -> int:
             df[c] = pd.to_numeric(df[c])
         df = df.drop_duplicates("ts").set_index("ts").sort_index().pipe(
             lambda d: d.set_index(pd.to_datetime(d.index, unit="ms")))
+        if not data_ok(df):
+            continue
         sigs = price_signals_any(df, None, {"failed_ath", "sweep", "vwap"})
         for fam, (d, ev) in sigs.items():
             pos = [int(df.index.searchsorted(t, side="right"))
                    for t in df.index[ev.fillna(False)]]
-            for h, per_lev in trade_outcomes(df, pos, d, H_15M, liq_p):
+            for h, per_lev in trade_outcomes(df, pos, d, H_15M, liq_p,
+                                            0.25, funding_by_sym.get(sym, 0.0)):
                 for L, ret in per_lev.items():
                     R[(fam, "15m", L, h * 15 // 60)].append(ret)
                 n_events += 1
