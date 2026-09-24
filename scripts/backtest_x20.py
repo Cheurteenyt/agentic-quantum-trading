@@ -175,6 +175,74 @@ def main() -> int:
         "La baseline aveugle est le vrai juge : un signal ne vaut que son écart",
         "à cette baseline (WR et % de liquidés).",
     ]
+
+    # ——— STOP/TARGET : la géométrie du 20x (marche bougie par bougie) ———
+    # stop d'abord dans la même bougie = perte (conservateur). Cible 2:1.
+    STOPS = (0.8, 1.2, 1.6)
+    TARGETS = (1.6, 2.4, 3.2)
+    lines += ["", "## Géométrie STOP/TARGET à 20x (marche 15m, max 32 barres)", "",
+              "| Signal | Stop % | Target % | N | WR target | Espérance marge |", "|---|---|---|---|---|---|"]
+    n_combos_st = 0
+    con = sqlite3.connect(KDB)
+    for sym in sorted(symbols):
+        rows = con.execute(
+            "SELECT open_time, open, high, low, close, volume FROM klines "
+            "WHERE symbol=? AND interval='15m' ORDER BY open_time", (sym,)).fetchall()
+        if len(rows) < 10000:
+            continue
+        df15 = pd.DataFrame(rows, columns=["ts", "open", "high", "low", "close", "volume"])
+        for c in ("open", "high", "low", "close", "volume"):
+            df15[c] = pd.to_numeric(df15[c])
+        df15 = df15.drop_duplicates("ts").set_index("ts").sort_index().pipe(
+            lambda d: d.set_index(pd.to_datetime(d.index, unit="ms")))
+        closes15, opens15 = df15["close"].values, df15["open"].values
+        highs15, lows15 = df15["high"].values, df15["low"].values
+        idx15 = df15.index
+        for name, direction, ev in x20_signals(df15):
+            ev_ts = idx15[ev.fillna(False)]
+            for stop_pct in STOPS:
+                for tgt_pct in TARGETS:
+                    n_combos_st += 1
+                    wins = losses = 0
+                    ev_sum = 0.0
+                    n_ev = 0
+                    for ts in ev_ts:
+                        i = int(idx15.searchsorted(ts, side="right"))
+                        if i + 32 >= len(idx15):
+                            continue
+                        entry = opens15[i]
+                        stop_px = entry * (1 - stop_pct / 100) if direction > 0 \
+                            else entry * (1 + stop_pct / 100)
+                        tgt_px = entry * (1 + tgt_pct / 100) if direction > 0 \
+                            else entry * (1 - tgt_pct / 100)
+                        outcome = None
+                        for k in range(i, min(i + 32, len(idx15))):
+                            lo, hi = lows15[k], highs15[k]
+                            if direction > 0:
+                                if lo <= stop_px:
+                                    outcome = "stop"; break
+                                if hi >= tgt_px:
+                                    outcome = "target"; break
+                            else:
+                                if hi >= stop_px:
+                                    outcome = "stop"; break
+                                if lo <= tgt_px:
+                                    outcome = "target"; break
+                        if outcome is None:
+                            continue
+                        n_ev += 1
+                        if outcome == "target":
+                            wins += 1
+                            ev_sum += (tgt_pct * LEV - COST_NOTIONAL * LEV)
+                        else:
+                            losses += 1
+                            ev_sum += (-(stop_pct * LEV) - COST_NOTIONAL * LEV)
+                    if n_ev >= 30:
+                        wr = wins / n_ev * 100
+                        exp = ev_sum / n_ev
+                        lines.append(f"| {name} | {stop_pct} | {tgt_pct} | {n_ev} "
+                                     f"| {wr:.1f} % | {exp:+.1f} % |")
+    con.close()
     out = REPORTS / f"backtest-x20-{datetime.now(timezone.utc):%Y-%m-%d}.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[x20] {n_combos} combinaisons, {confirmed} confirmés -> {out}")
