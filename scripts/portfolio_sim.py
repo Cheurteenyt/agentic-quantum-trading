@@ -132,9 +132,10 @@ def collect_events(con: sqlite3.Connection, universe: str, gates: set[str],
 
 def run_sim(events: list[dict], capital: float, size: float,
             funding_hourly: dict[str, float], fee_bps: int, slip_bps: int,
-            oracle: bool = False) -> dict:
+            oracle: bool = False, size_fn=None) -> dict:
     """La simulation séquentielle. oracle=True : les trades voués à la
-    liquidation ne sont pas pris (plafond théorique, pnl=0, pas de frais)."""
+    liquidation ne sont pas pris (plafond théorique, pnl=0, pas de frais).
+    size_fn(e) -> taille (0-1) par trade : remplace le sizing fixe."""
     balance = capital
     peak = trough = balance
     max_dd = 0.0
@@ -148,7 +149,8 @@ def run_sim(events: list[dict], capital: float, size: float,
         e = events[i]
         if balance <= 1:
             break
-        margin_alloc = balance * size
+        trade_size = size_fn(e) if size_fn is not None else size
+        margin_alloc = balance * trade_size
         notional = margin_alloc * LEV
         fees = notional * (fee_bps + slip_bps) / 10000 * 2
         funding = notional * funding_hourly.get(e["sym"], 0.0) / 100 * HOLD_H
