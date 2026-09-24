@@ -147,16 +147,18 @@ def main() -> int:
     for (kind, h), rets in sorted(store.items()):
         if not kind.startswith("directe") or len(rets) < 10:
             continue
+        hh = kind.split("_")[1]
         wr = sum(1 for r in rets if r > 0) / len(rets) * 100
-        lines.append(f"| {h} | {len(rets)} | {wr:.1f} % | {sorted(rets)[len(rets)//2]:+.1f} % |")
+        lines.append(f"| {hh} | {len(rets)} | {wr:.1f} % | {sorted(rets)[len(rets)//2]:+.1f} % |")
 
     lines += ["", "## Entrée RETEST (rebond vers le niveau cassé)", "",
               "| Horizon | N | WR | Médiane marge |", "|---|---|---|---|"]
     for (kind, h), rets in sorted(store.items()):
         if not kind.startswith("retest") or len(rets) < 10:
             continue
+        hh = kind.split("_")[1]
         wr = sum(1 for r in rets if r > 0) / len(rets) * 100
-        lines.append(f"| {h} | {len(rets)} | {wr:.1f} % | {sorted(rets)[len(rets)//2]:+.1f} % |")
+        lines.append(f"| {hh} | {len(rets)} | {wr:.1f} % | {sorted(rets)[len(rets)//2]:+.1f} % |")
 
     lines += ["", "## Profondeur de cassure (entrée directe, horizons 720/1440h)", "",
               "| Profondeur | H | N | WR | Médiane |", "|---|---|---|---|---|"]
