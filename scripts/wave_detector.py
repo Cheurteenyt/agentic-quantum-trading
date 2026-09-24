@@ -186,9 +186,10 @@ def main() -> int:
             "FROM wave_flags").fetchall():
         updates = {}
         if ret24 is None and flagged_at <= time.time() - 24 * 3600 and venue == "aster":
-            updates["ret_24h"] = aster_ret_since(ticker, flagged_at, 24)
+            # ⚠️ les klines sont stockées sous TICKER+USDT (bug PONS corrigé)
+            updates["ret_24h"] = aster_ret_since(ticker + "USDT", flagged_at, 24)
         if ret72 is None and flagged_at <= time.time() - 72 * 3600 and venue == "aster":
-            updates["ret_72h"] = aster_ret_since(ticker, flagged_at, 72)
+            updates["ret_72h"] = aster_ret_since(ticker + "USDT", flagged_at, 72)
         for col, val in updates.items():
             if val is not None:
                 con.execute(f"UPDATE wave_flags SET {col} = ? WHERE ticker = ? AND flagged_at = ?",
