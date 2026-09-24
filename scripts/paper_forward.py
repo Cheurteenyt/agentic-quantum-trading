@@ -34,6 +34,8 @@ REPORTS = ROOT / "reports"
 
 # les 5 candidats de la campagne v5 : (signal, horizon_h, direction)
 CANDIDATES = [
+    ("funding_div_plus_vwap_short", 24, -1),   # la confluence vedette (v6)
+    ("funding_div_plus_vwap_short", 168, -1),
     ("funding_prix_divergence_short", 12, -1),
     ("funding_extreme_contre_courant", 168, -1),
     ("vwap_extreme_reprise_short", 1440, -1),
@@ -64,15 +66,14 @@ def load_env_funding_stats(con: sqlite3.Connection) -> dict[str, float]:
     return out
 
 
-def funding_div_events(con, sym: str, df: pd.DataFrame,
-                       fh_sym: pd.DataFrame) -> pd.DatetimeIndex:
+def funding_div_mask(df: pd.DataFrame, fh_sym: pd.DataFrame) -> pd.Series:
     """funding_prix_divergence_short : funding qui accélère + prix -3 %/24h."""
     rate = fh_sym.set_index("funding_time")["rate"].astype(float).sort_index()
     rate.index = pd.to_datetime(rate.index, unit="ms")
     aligned = rate.reindex(df.index, method="ffill", limit=8)
     accel = aligned.diff(3)
     pchg = df["close"].pct_change(24)
-    return df.index[((accel > 0) & (pchg < -0.03)).fillna(False)]
+    return ((accel > 0) & (pchg < -0.03)).fillna(False)
 
 
 def funding_extreme_events(fh_sym: pd.DataFrame) -> pd.DatetimeIndex:
@@ -111,10 +112,18 @@ def main() -> int:
             if df is None or len(df) < 400:
                 continue
             fh_sym = fh[fh.symbol == sym]
-            if name == "funding_prix_divergence_short":
+            if name in ("funding_prix_divergence_short",
+                        "funding_div_plus_vwap_short"):
                 if fh_sym.empty:
                     continue
-                ev = funding_div_events(con, sym, df, fh_sym)
+                mask = funding_div_mask(df, fh_sym)
+                if name == "funding_div_plus_vwap_short":
+                    tp = (df["high"] + df["low"] + df["close"]) / 3
+                    vwap = ((tp * df["volume"]).rolling(168).sum()
+                            / df["volume"].rolling(168).sum().replace(0, pd.NA))
+                    dev = ((df["close"] - vwap) / vwap).astype(float)
+                    mask = mask & (dev > 3 * dev.rolling(168).std()).fillna(False)
+                ev = df.index[mask]
             elif name == "funding_extreme_contre_courant":
                 if fh_sym.empty:
                     continue

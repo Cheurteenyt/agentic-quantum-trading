@@ -379,9 +379,23 @@ def main() -> int:
         rate_aligned = rate_h.reindex(df.index, method="ffill", limit=8)
         accel = rate_aligned.diff(3)
         pchg = df["close"].pct_change(24)
+        # déviation VWAP 7j (pour les combos d'épuisement)
+        tp = (df["high"] + df["low"] + df["close"]) / 3
+        vwap = ((tp * df["volume"]).rolling(168).sum()
+                / df["volume"].rolling(168).sum().replace(0, pd.NA))
+        dev = ((df["close"] - vwap) / vwap).astype(float)
+        dev_sd = dev.rolling(168).std()
+        vwap_haut = dev > 3 * dev_sd
+        vwap_bas = dev < -3 * dev_sd
         extra = {
             "funding_prix_divergence_short": (-1, (accel > 0) & (pchg < -0.03)),
             "funding_prix_divergence_long": (+1, (accel < 0) & (pchg > 0.03)),
+            # COMBINAISONS (confluence de nos 2 meilleurs marqueurs d'épuisement)
+            "funding_div_plus_vwap_short": (-1, (accel > 0) & vwap_haut),
+            "funding_extreme_plus_div_short": (-1, (accel > 0) & (pchg < -0.03)
+                                               & vwap_haut),
+            # miroir long jamais testé : foule shorte dans un pump
+            "funding_div_miroir_long": (+1, (accel < 0) & (pchg > 0.03)),
         }
         for sig, (d, mask) in extra.items():
             n_combos += 1
