@@ -52,7 +52,7 @@ def main() -> int:
     for sym in symbols:
         cursor = start_ms
         added = 0
-        for _ in range(12):  # 12 pages × 1500 = 18000 bougies max
+        for _ in range(30):  # 30 pages × 1500 = 45000 bougies max
             try:
                 page = fetch_page(sym, args.interval, cursor)
             except Exception as exc:  # noqa: BLE001

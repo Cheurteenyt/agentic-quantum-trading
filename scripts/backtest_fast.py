@@ -281,7 +281,7 @@ def main() -> int:
             continue
         idx_ns, opens, closes = pa
         i = int(np.searchsorted(idx_ns, ts_ms * 10**6, side="right"))
-        if i + max(horizons) >= len(idx_ns) or i == 0:
+        if i == 0 or i >= len(idx_ns):
             continue
         entry = opens[i]
         if entry <= 0:
@@ -289,6 +289,8 @@ def main() -> int:
         cost = 0.08 + slip_by_sym.get(sym, 10.0) / 100 * 2
         fh_ = funding_by_sym.get(sym, 0.0)
         for h in horizons:
+            # ⚠️ test PAR HORIZON (l'ancien skip max-horizons excluait les 90
+            # derniers jours = biais de survie qui gonflait le WR)
             j = i + h - 1
             if j >= len(idx_ns):
                 continue
