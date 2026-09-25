@@ -935,9 +935,15 @@ def _persist_closed(handle: str, rows: list, cash: str | None) -> None:
     """)
     now = time.time()
     for r in rows:
-        con.execute("INSERT OR IGNORE INTO fomo_closed VALUES (?,?,?,?,?,?,?,?)",
-                    (handle, r.get("ticker"), r.get("invested"), r.get("pnl"),
-                     r.get("dir"), r.get("pct"), r.get("age"), now))
+        # pnl/invested normalisés en REAL à l'écriture : le format fomo
+        # '+1,289,869.90' (virgules + signe) casse toute comparaison SQL
+        # numérique (bug du 25/09 : WR 0 % apparent sur 127 trades)
+        con.execute(
+            "INSERT OR IGNORE INTO fomo_closed VALUES (?, ?, "
+            "CAST(REPLACE(?0, ',', '') AS REAL), CAST(REPLACE(?0, ',', '') AS REAL), "
+            "?, ?, ?, ?)".replace("?0", "?"),
+            (handle, r.get("ticker"), r.get("invested"), r.get("pnl"),
+             r.get("dir"), r.get("pct"), r.get("age"), now))
     con.commit()
     con.close()
 
