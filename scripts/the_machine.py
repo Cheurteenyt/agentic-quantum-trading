@@ -166,7 +166,7 @@ def main() -> int:
             return s0
         if s == "cascade_meme":
             return size_meme(e)
-        return 0.10                     # survivor long
+        return 0.20                     # survivor long (1x = 0 risque de liq, le notional scale librement)
 
     r = run_stack(all_ev, CAPITAL, machine_fn, fh)
     mr = monthly_rows(r["trades"], CAPITAL)
