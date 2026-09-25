@@ -128,3 +128,4 @@ backend/services/onchain/aster/archive/research_artifacts/legacy_discovery_batch
 reports/*
 !reports/README.md
 *.bak-*
+backend/services/onchain/aster/archive/research_artifacts/
