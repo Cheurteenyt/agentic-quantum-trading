@@ -277,6 +277,15 @@ def main() -> int:
 
     # --- la table mensuelle de l'EMPILÉ ×2 + garde-fous ---
     mrows = monthly_rows(stack2["trades"], CAPITAL)
+    if not mrows:
+        lines += ["", "## Aucun trade ce soir — pas de table mensuelle.",
+                  "", "## VERDICT", "",
+                  "- pas de données : vérifier le fetch nocturne des klines"]
+        out = REPORTS / f"stacked-portfolio-{datetime.now(timezone.utc):%Y-%m-%d}.md"
+        REPORTS.mkdir(exist_ok=True)
+        out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print("[stack] aucun trade — klines absentes ? vérifier le fetch")
+        return 0
     prod = 1.0
     for r in mrows:
         prod *= (1 + r["roi"] / 100)

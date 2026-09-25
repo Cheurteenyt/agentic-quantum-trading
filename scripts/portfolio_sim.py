@@ -254,6 +254,14 @@ def main() -> int:
 
     mrows = monthly_rows(real["trades"], args.capital)
     orows = monthly_rows(oracle["trades"], args.capital)
+    if not mrows:
+        out = REPORTS / f"portfolio-sim-{datetime.now(timezone.utc):%Y-%m-%d}.md"
+        REPORTS.mkdir(exist_ok=True)
+        out.write_text("# LE PORTEFEUILLE — aucun trade ce soir "
+                       "(klines absentes ? vérifier le fetch nocturne)\n",
+                       encoding="utf-8")
+        print("[portfolio] aucun trade — klines absentes ? vérifier le fetch")
+        return 0
 
     # --- GARDE-FOUS ANTI-BUG ---
     checks: list[str] = []
