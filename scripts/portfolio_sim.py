@@ -187,6 +187,15 @@ def main() -> int:
     from scripts.anti_liq import collect_featured
     events = collect_featured(regime, args.universe)
     con.close()
+    # le MONITEUR DE MARGE : la frontière 10x suppose un MAE max < 9,5 % —
+    # si le MAE observé monte, le levier sûr baisse (règle : lev ≤ 100/(maxMAE+0,5))
+    maes = [e["mae_adverse"] for e in events]
+    if maes:
+        mae_max = max(maes)
+        lev_safe = 100 / (mae_max + 0.5)
+        print(f"[portfolio] MONITEUR MAE : max {mae_max:.2f} % "
+              f"→ levier sûr ≤ {lev_safe:.1f}x "
+              f"{'OK' if lev_safe >= 10 else '⚠ LA MARGE 10x EST MORDUE — baisser le levier'}")
 
     real = run_sim(events, args.capital, args.size, funding_hourly,
                    fee_bps, slip_bps, oracle=False)
