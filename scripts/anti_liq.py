@@ -178,7 +178,7 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
     while i < len(events):
         e = events[i]
         taken.append(e)
-        hold_end = e["ts_ms"] + HOLD_H * 3600 * 1000
+        hold_end = e["ts_ms"] + HOLD_H * 3600 * 10**9  # ts_ms = des NS (nom hérité)
         while i < len(events) and events[i]["ts_ms"] < hold_end:
             i += 1
     return taken

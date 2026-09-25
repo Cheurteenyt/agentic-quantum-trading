@@ -179,14 +179,14 @@ def run_sim(events: list[dict], capital: float, size: float,
         max_dd = max(max_dd, dd)
         trough = min(trough, balance)
 
-        exit_ms = e["ts_ms"] + HOLD_H * 3600 * 1000
+        exit_ms = e["ts_ms"] + HOLD_H * 3600 * 10**9   # ts_ms = des NS (nom hérité)
         equity.append((exit_ms, balance))
         trades.append({
             "sym": e["sym"],
             "exit_ts": datetime.fromtimestamp(exit_ms / 10**9, tz=timezone.utc),
             "pnl": pnl, "balance": balance, "liq": liq,
         })
-        hold_end = e["ts_ms"] + HOLD_H * 3600 * 1000
+        hold_end = e["ts_ms"] + HOLD_H * 3600 * 10**9  # ts_ms = des NS (nom hérité)
         while i < len(events) and events[i]["ts_ms"] < hold_end:
             i += 1
 

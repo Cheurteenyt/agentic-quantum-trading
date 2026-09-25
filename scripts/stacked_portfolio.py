@@ -173,13 +173,13 @@ def run_stack(events: list[dict], capital: float, size_fn,
         fund_tot += fund
         n += 1
         n_wins += pnl > 0
-        busy[e["strategy"]] = e["ts_ms"] + e["hold_h"] * 3600 * 1000
+        busy[e["strategy"]] = e["ts_ms"] + e["hold_h"] * 3600 * 10**9  # ts_ms = NS
 
         peak = max(peak, balance)
         dd = (peak - balance) / peak * 100 if peak > 0 else 0
         max_dd = max(max_dd, dd)
         trough = min(trough, balance)
-        exit_ms = e["ts_ms"] + e["hold_h"] * 3600 * 1000
+        exit_ms = e["ts_ms"] + e["hold_h"] * 3600 * 10**9  # ts_ms = NS
         trades.append({"sym": e["sym"], "strategy": e["strategy"],
                        "exit_ts": datetime.fromtimestamp(exit_ms / 10**9,
                                                          tz=timezone.utc),

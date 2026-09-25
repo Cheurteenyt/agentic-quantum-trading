@@ -88,7 +88,7 @@ def collect_squeeze(con: sqlite3.Connection) -> list[dict]:
     taken, i = [], 0
     while i < len(events):
         taken.append(events[i])
-        hold_end = events[i]["ts_ms"] + HOLD * 3600 * 1000
+        hold_end = events[i]["ts_ms"] + HOLD * 3600 * 10**9  # ts_ms = NS
         while i < len(events) and events[i]["ts_ms"] < hold_end:
             i += 1
     return taken
