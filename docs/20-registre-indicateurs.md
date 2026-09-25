@@ -14,8 +14,9 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 
 | Indicateur / stratégie | Script | Chiffres (100 $, 1 an, maker) | Verdict |
 |---|---|---|---|
-| **Stack ×2** (cascade gated + fdiv 1,5 % + confluence 1 %) | `stacked_portfolio.py` | **+334 %/an @ DD 23,4 %**, 9 liqs | LA frontière — la décorrélation confirmée |
+| **Stack ×2** (cascade gated + fdiv 1,5 % + **confluence EXACTE v5** 1 %) | `stacked_portfolio.py` + `confluence_exact.py` | **+351 %/an @ DD 20,5 %**, liq 9 | LA frontière — la confluence exacte (accel funding + dev > 3σ168) remplace la proxy (+16,6 $, -3 pts DD) |
 | **Cascade accélérée short 20x + AL gate** | `anti_liq.py` + `portfolio_sim.py` | +197 %/an @ DD 16,1 %, liqs 35→8, inverse $94 | Le signal roi, profil le plus lisse |
+| **Confluence exacte v5** (accel + vwap 3σ, short 24h, 3x) | `confluence_exact.py` | seule : +3,1 % @ DD 5,5 %, WR wallet 65,5 %, 0 liq | Le profil qualité — composant du stack |
 | **AL Score** (anti-liquidation, rangs roulants 90j, 6 features) | `anti_liq.py` | gradient monotone 4,1→19,9 % de liqs ; halve les liqs | Le seul conditionnement validé |
 | Oracle anti-liq (le plafond) | `stacked_portfolio.py --oracle` | +885 %/an @ DD 18,2 % | Plafond — proche du réel désormais |
 
