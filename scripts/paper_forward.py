@@ -78,11 +78,13 @@ def funding_div_mask(df: pd.DataFrame, fh_sym: pd.DataFrame) -> pd.Series:
 
 
 def funding_extreme_events(fh_sym: pd.DataFrame) -> pd.DatetimeIndex:
-    """funding_extreme_contre_courant : rate > p90 EXPANDING (anti look-ahead)."""
+    """funding_extreme_contre_courant : rate > p90 EXPANDING (anti look-ahead).
+    Index en MILLISECONDES explicites (ns vs ms = le searchsorted plantait
+    en lossy après le backfill profond du 25/09)."""
     rate = fh_sym["rate"].astype(float)
-    ts = fh_sym["funding_time"].astype(float)
+    ts = fh_sym["funding_time"].astype("int64")
     p90 = rate.expanding(min_periods=30).quantile(0.9)
-    return pd.DatetimeIndex(ts[(rate > p90).fillna(False)] * 10**6)
+    return pd.to_datetime(ts[(rate > p90).fillna(False)].values, unit="ms")
 
 
 def main() -> int:
@@ -171,6 +173,72 @@ def main() -> int:
                     (name, sym, horizon, direction, sig_ts, entry_ts, entry_price,
                      exit_ts, exit_price, ret, None, status, now))
                 opened += 1
+
+    # ——— le CANDIDAT QUALITÉ : cascade ∩ funding-rank-bas (25/09) ———
+    # le rang cross-sectionnel du funding parmi les 6 majeures À L'INSTANT
+    # du signal ; T1 (≤ 0,33) : WR 81 % backtest (n=21), ~2 trades/mois.
+    # La définition vient d'anti_liq (le collecteur discipliné unique).
+    try:
+        import numpy as _np
+        from scripts.anti_liq import add_rolling_scores, collect_featured
+        from scripts.portfolio_sim import MAJORS as _MAJORS
+        from scripts.portfolio_sim import btc_regime_series as _brs
+        _regime = _brs()
+        _casc = collect_featured(_regime, "majors")
+        add_rolling_scores(_casc)
+        _q66 = float(_np.nanquantile(
+            [e.get("al_score", float("nan"))
+             for e in _casc[:int(len(_casc) * 0.7)]], 2 / 3))
+        _gated = [e for e in _casc
+                  if not (_np.isfinite(e.get("al_score", float("nan")))
+                          and e["al_score"] >= _q66)]
+        _fts: dict[str, tuple[list, list]] = {}
+        for s, t, r in con.execute(
+                "SELECT symbol, funding_time, rate FROM funding_history "
+                "ORDER BY funding_time"):
+            try:
+                t = int(t)
+                ts, rt = _fts.setdefault(s, ([], []))
+                ts.append(t * 10**6 if t > 10**11 else t * 10**9)
+                rt.append(float(r))
+            except (TypeError, ValueError):
+                continue
+        _fresh = []
+        for e in _gated:
+            t0 = e["ts_ms"]
+            ranks, own = [], _np.nan
+            for s in _MAJORS:
+                ft = _fts.get(s)
+                if not ft or len(ft[0]) < 5:
+                    continue
+                pos = int(_np.searchsorted(_np.array(ft[0]), t0,
+                                           side="right")) - 1
+                if pos < 0:
+                    continue
+                if s == e["sym"]:
+                    own = ft[1][pos]
+                ranks.append(ft[1][pos])
+            rank = (float(_np.mean(_np.array(ranks) <= own))
+                    if ranks and _np.isfinite(own) else float("nan"))
+            if (_np.isfinite(rank) and rank <= 0.33
+                    and t0 / 10**6 >= now_ms - WINDOW_H * 3600 * 1000):
+                _fresh.append(e)
+        for e in _fresh:
+            sig_ts = int(e["ts_ms"])
+            if con.execute(
+                "SELECT 1 FROM paper_trades WHERE signal=? AND symbol=? "
+                "AND signal_ts=?",
+                ("cascade_funding_rank_low", e["sym"], sig_ts)).fetchone():
+                continue
+            sig_ms = sig_ts // 10**6          # ts_ms = des NS (nom hérité)
+            con.execute(
+                "INSERT OR IGNORE INTO paper_trades VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                ("cascade_funding_rank_low", e["sym"], 24, -1, sig_ms,
+                 sig_ms, float(e["entry"]), None, None, None, None,
+                 "open", now))
+            opened += 1
+    except Exception as _e:
+        print(f"[paper] candidat qualité : {_e}")
 
     # clôture des paper trades ouverts dont l'horizon est atteint
     open_rows = con.execute(
