@@ -127,10 +127,43 @@ def main() -> int:
 
     all_ev = sorted(gated + meme + surv, key=lambda e: e["ts_ms"])
 
+    # le poids QUALITÉ : les trades au funding le plus BAS des 6 majeures
+    # (l'offre réelle — WR 81 % backtest) sont surdimensionnés ×1,5
+    funding_ts: dict[str, tuple[list, list]] = {}
+    for s, t, r in con.execute(
+            "SELECT symbol, funding_time, rate FROM funding_history "
+            "ORDER BY funding_time"):
+        try:
+            t = int(t)
+            ts, rt = funding_ts.setdefault(s, ([], []))
+            ts.append(t * 10**6 if t > 10**11 else t * 10**9)
+            rt.append(float(r))
+        except (TypeError, ValueError):
+            continue
+    for e in gated:
+        ranks, own = [], np.nan
+        for s in MAJORS:
+            ft = funding_ts.get(s)
+            if not ft or len(ft[0]) < 5:
+                continue
+            pos = int(np.searchsorted(np.array(ft[0]), e["ts_ms"],
+                                      side="right")) - 1
+            if pos < 0:
+                continue
+            if s == e["sym"]:
+                own = ft[1][pos]
+            ranks.append(ft[1][pos])
+        e["fund_rank"] = (float(np.mean(np.array(ranks) <= own))
+                          if ranks and np.isfinite(own) else np.nan)
+
     def machine_fn(e, st=None):
         s = e.get("strategy")
         if s == "cascade_10x":
-            return size_cascade(e)
+            s0 = size_cascade(e)
+            if (np.isfinite(e.get("fund_rank", np.nan))
+                    and e["fund_rank"] <= 0.33):
+                return min(s0 * 1.5, 0.50)
+            return s0
         if s == "cascade_meme":
             return size_meme(e)
         return 0.10                     # survivor long
