@@ -34,6 +34,11 @@ REPORTS = ROOT / "reports"
 LEV = 3  # levier réaliste memecoins (plafond exchangeInfo)
 
 
+# ⚠ DIVERGENCE harnais (trouvée par l'audit Ariad 25/09) : cette copie
+# locale d'outcomes diffère du harnais v5 — exit à i+h (off-by-one),
+# SANS funding pendant détention ni filtre data_ok. Les verdicts
+# directionnels de la campagne exotique restent valables, les chiffres
+# précis ne sont pas comparables au harnais. Fichier one-shot non wired.
 def outcomes(df, entry_positions: list[int], direction: int,
              horizons=(1, 4, 24)) -> list[tuple[int, float]]:
     res = []

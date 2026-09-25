@@ -458,9 +458,6 @@ app.include_router(alpha_lab_router.router, prefix='/api/alpha', tags=["alpha"])
 if _HAS_ARKHAM_ROUTER:
     app.include_router(arkham_router.router, prefix="/api/arkham", tags=["arkham"])
 
-if _HAS_ARKHAM_ROUTER:
-    app.include_router(arkham_router.router, prefix="/api/arkham", tags=["arkham"])
-
 # =========================================================
 # ORDER FLOW — Footprint, Heatmap, Imbalance
 # =========================================================
