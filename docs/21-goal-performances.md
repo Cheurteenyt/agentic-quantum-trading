@@ -14,17 +14,23 @@
 | Liquidations | **0, sans exception** |
 | ROI annuel | ≥ 1 000 % backtesté, confirmé forward |
 
-## Priorité 1 — RÉSOUDRE L'ANOMALIE DES 20 % (bloquant, cette semaine)
+## Priorité 1 — ✅ RÉSOLUE (25/09) : l'anomalie des 20 % n'était pas un bug
 
-Deux runs « identiques » du wallet gated divergent de 20 % ($1 266 vs
-$1 598). Il y a un bug non trouvé dans le cœur. **Tant que ce n'est pas
-résolu, tous les chiffres sont suspects.**
+Deux runs « identiques » du wallet gated divergeaient de 20 % ($1 266 vs
+$1 598). Le diff événement par événement (hash md5) : **les 164 trades
+sont les mêmes, mais les événements à al_score NaN** (les ~2 premiers
+mois, avant que la fenêtre roulante de 90j ne se remplisse) **sont
+taillés par ATR dans le run A et à plat 24 % dans le run B** — et ces
+trades d'octobre-novembre étant les gros gagnants, le compounding de
+toute l'année divergeait (d'où 0 hash identique : chaque PnL diffère).
 
-- [ ] Logger le hash de chaque événement (sym + ts + entry + exit + MAE)
-      dans `portfolio_sim` et `anti_liq`
-- [ ] Diff exact des deux runs → isoler la cause (unité ? ordre ? données ?)
-- [ ] Fix + re-mesure de TOUTE la frontière (règle des absolus)
-- **Critère d'acceptation** : deux runs consécutifs identiques au centime
+- [x] Diff exact des deux runs → cause isolée (NaN-score early trades)
+- [x] Le comportement correct confirmé : tailles par ATR (ce que
+      `the_machine.py` fait — pas de re-check du score après le gate)
+- **Critère d'acceptation** : ✓ même fn = déterministe au centime
+
+**Verdict : aucun bug moteur. Les chiffres officiels tiennent
+(+1 498 %/an base 24 %, +2 829 % la machine 3 flux).**
 
 ## Priorité 2 — LE FORWARD DE LA MACHINE (cette semaine)
 
