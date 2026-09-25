@@ -14,10 +14,10 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 
 | Indicateur / stratégie | Script | Chiffres (100 $, 1 an, maker) | Verdict |
 |---|---|---|---|
-| **LA MACHINE — cascade gated 10x, 0 liq par construction, UN knob (la marge)** | `anti_liq.py` + `portfolio_sim.py` | marge 10 % (notional ×1) : +164 %/an @ DD 10,2 % · 20 % : +530 % @ 19,5 % · **30 % : +1 258 %/an @ DD 28,1 %, record mois +76,8 %** · 40 % : +2 550 % @ 36,0 %, record +105,6 % · 60 % : +7 397 % @ 49,7 % — WR 57,3 %, 3 mois négatifs partout, **0 liquidation** | **LA frontière officielle** — MAE max 7,84 % < ligne de mort 9,5 % ; le levier ≤ 100/(maxMAE+0,5) |
-| **Confluence exacte v5** (accel + vwap 3σ, short 24h, 3x) | `confluence_exact.py` | seule : +3,1 % @ DD 5,5 %, WR wallet 65,5 %, 0 liq | Profil qualité — CONTEXTE à 10x (ni ROI ni DD apportés au run hybride) |
-| **Flux lents (fdiv 12h + proxy conf)** | `stacked_portfolio.py` | quasi-plates à 3x ; NEUTRES à 10x | CONTEXTE — la décorrélation était un artefact d'échelle 3x |
-| **AL Score** (anti-liquidation, rangs roulants 90j, 6 features) | `anti_liq.py` | gradient monotone 4,1→19,9 % de liqs ; halve les liqs | Le seul conditionnement validé |
+| **LA MACHINE — cascade gated 10x, 0 liq par construction, DEUX knobs (marge + sizing vol-inverse)** | `anti_liq.py` + `portfolio_sim.py` + `stacked_portfolio.py` | **SIZING VOL-INVERSE (base 24 %) : +1 498 %/an @ DD 27,8 %, 0 liq** — +19 % vs le fixed à DD égale. L'échelle : base 30 % → +2 655 %/an @ DD 34,7 %, record mois **+100,2 %** · base 60 % équivalents — WR 57,3 %, 3 mois négatifs | **LA frontière** — size ∝ ATR : les cascades à haute volatilité sont les gagnantes (loi vol_haute confirmée 3×) ; le sizing standard (∝ 1/ATR) est REFUTÉ ici (ratio 12,9 vs 53,9) |
+| **La dimension sizing** | `stacked_portfolio.py` (size_fn à état : balance, dd) | vol-target standard ∝ 1/ATR : ratio 12,9 (réfuté) ; dd-throttle : coupe les rattrapages gagnants, ratio 6,5 (réfuté) | Le montant investi PAR trade est une dimension d'edge, pas un détail |
+| **Cascade accélérée short 10x + AL gate (sizing fixe)** | `anti_liq.py` + `portfolio_sim.py` | fixed 30 % : +1 258 %/an @ DD 28,1 %, 0 liq, record +76,8 % | La référence sans sizing dynamique |
+| **AL Score** (anti-liquidation, rangs roulants 90j, 6 features) | `anti_liq.py` | gradient monotone 4,1→19,9 % de liqs ; le gate exclut les monstres MAE 13 % | Le garde mécanique du 0-liq |
 
 ## CANDIDATS (forward en cours — le paper forward tranche)
 

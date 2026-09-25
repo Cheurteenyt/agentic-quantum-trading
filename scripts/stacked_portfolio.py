@@ -135,6 +135,15 @@ def collect_funding_strategies(con: sqlite3.Connection
     return fdiv, conf
 
 
+def _size_fn_arity(fn) -> int:
+    """Le nombre de params acceptés par un sizing fn (2 = avec état)."""
+    import inspect
+    try:
+        return len(inspect.signature(fn).parameters)
+    except (TypeError, ValueError):
+        return 1
+
+
 def run_stack(events: list[dict], capital: float, size_fn,
               funding_hourly: dict[str, float], oracle: bool = False) -> dict:
     """Le wallet multi-stratégies. size_fn(e) -> taille marge (0-1)."""
@@ -154,7 +163,16 @@ def run_stack(events: list[dict], capital: float, size_fn,
         liq_move = 100.0 / e["lev"] - 0.5
         if oracle and e["mae_adverse"] >= liq_move:
             continue                       # l'oracle ne le prend pas
-        sz = size_fn(e)
+        # le sizing peut recevoir l'état du wallet (balance, drawdown courant) :
+        # dispatch par introspection — un except TypeError masquerait les
+        # vraies erreurs internes du sizing
+        dd_now = (peak - balance) / peak * 100 if peak > 0 else 0.0
+        if size_fn is not None and _size_fn_arity(size_fn) >= 2:
+            sz = size_fn(e, {"balance": balance, "dd": dd_now, "peak": peak})
+        elif size_fn is not None:
+            sz = size_fn(e)
+        else:
+            sz = size
         if sz <= 0:
             continue
         margin = balance * sz
