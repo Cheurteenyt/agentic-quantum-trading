@@ -123,9 +123,6 @@ def main() -> int:
         e["strategy"] = "survivor_long"
         e["lev"] = 1
         e["fee_rt_bps"] = TAKER_RT
-    con.close()
-
-    all_ev = sorted(gated + meme + surv, key=lambda e: e["ts_ms"])
 
     # le poids QUALITÉ : les trades au funding le plus BAS des 6 majeures
     # (l'offre réelle — WR 81 % backtest) sont surdimensionnés ×1,5
@@ -155,6 +152,9 @@ def main() -> int:
             ranks.append(ft[1][pos])
         e["fund_rank"] = (float(np.mean(np.array(ranks) <= own))
                           if ranks and np.isfinite(own) else np.nan)
+    con.close()
+
+    all_ev = sorted(gated + meme + surv, key=lambda e: e["ts_ms"])
 
     def machine_fn(e, st=None):
         s = e.get("strategy")
