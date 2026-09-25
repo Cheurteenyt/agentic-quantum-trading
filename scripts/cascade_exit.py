@@ -47,12 +47,15 @@ DELAY = 0             # contrôle inverse : +6
 
 
 def recompute_exit(con: sqlite3.Connection, events: list[dict],
-                   mode: str, min_hold: int = 0, delay: int = 0
-                   ) -> list[dict]:
+                   mode: str, min_hold: int = 0, delay: int = 0,
+                   trail_pct: float = 0.015) -> list[dict]:
     """Recalcule l'exit de chaque événement cascade sur les klines.
     mode='fixed' : sortie à 24h pile (la référence).
     mode='green' : première bougie VERTE (close > open) entre
-    min_hold+delay et 24h ; sinon 24h. MAE et hold sur le chemin effectif."""
+    min_hold+delay et 24h ; sinon 24h.
+    mode='trail' : trailing stop — on suit le plus-bas (ll) depuis
+    l'entrée ; sortie au premier high ≥ ll×(1+trail_pct) (fill au
+    trigger, à l'open si gap), plafonné à 24h."""
     dfs = {s: load_df(con, s) for s in MAJORS}
     out = []
     for e in events:
@@ -66,15 +69,27 @@ def recompute_exit(con: sqlite3.Connection, events: list[dict],
         opens = df["open"].values
         closes = df["close"].values
         highs = df["high"].values
+        lows = df["low"].values
         exit_j = entry_i + MAX_HOLD - 1
+        exit_px = float(closes[exit_j])
         if mode == "green":
             for j in range(entry_i + min_hold + delay,
                            min(entry_i + MAX_HOLD, len(idx_ns))):
                 if closes[j] > opens[j]:
                     exit_j = j
                     break
+            exit_px = float(closes[exit_j])
+        elif mode == "trail":
+            ll = float(opens[entry_i])
+            end = min(entry_i + MAX_HOLD, len(idx_ns))
+            for j in range(entry_i, end):
+                ll = min(ll, float(lows[j]))
+                trigger = ll * (1 + trail_pct)
+                if highs[j] >= trigger:
+                    exit_j = j
+                    exit_px = float(max(opens[j], trigger))
+                    break
         hold_h = exit_j - entry_i + 1
-        exit_px = float(closes[exit_j])
         entry = e["entry"]
         out.append({
             "sym": e["sym"], "ts_ms": e["ts_ms"], "strategy": "cascade",
@@ -117,10 +132,14 @@ def main() -> int:
         "24h fixes (référence)": recompute_exit(con, base_events, "fixed"),
         "1re verte (hold 1-24h)": recompute_exit(con, base_events, "green",
                                                  min_hold=0),
-        "1re verte après ≥6h": recompute_exit(con, base_events, "green",
-                                              min_hold=6),
-        "CONTRÔLE : 1re verte +6h de délai": recompute_exit(
-            con, base_events, "green", min_hold=0, delay=6),
+        "TRAIL 1,0 %": recompute_exit(con, base_events, "trail",
+                                      trail_pct=0.010),
+        "TRAIL 1,5 %": recompute_exit(con, base_events, "trail",
+                                      trail_pct=0.015),
+        "TRAIL 2,5 %": recompute_exit(con, base_events, "trail",
+                                      trail_pct=0.025),
+        "CONTRÔLE : TRAIL 1,5 % inversé (5 %)": recompute_exit(
+            con, base_events, "trail", trail_pct=0.05),
     }
 
     con.close()
@@ -148,7 +167,7 @@ def main() -> int:
     best_label = max(results, key=lambda l: results[l]["balance"])
     best = results[best_label]
     ok_dir = best["balance"] > ref["balance"] * 1.05
-    ctrl = results["CONTRÔLE : 1re verte +6h de délai"]
+    ctrl = results["CONTRÔLE : TRAIL 1,5 % inversé (5 %)"]
     ok_inv = ctrl["balance"] > best["balance"]
     if ok_dir and not ok_inv:
         verdict = (f"L'EXIT SUR ÉPUISEMENT MARCHE — {best_label} bat les "
