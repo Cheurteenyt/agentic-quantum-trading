@@ -70,66 +70,6 @@ def btc_regime_series() -> pd.Series:
     return pd.Series([f"{t}/{v}" for t, v in zip(trend, vol)], index=btc.index)
 
 
-def collect_events(con: sqlite3.Connection, universe: str, gates: set[str],
-                   regime: pd.Series) -> list[dict]:
-    """Tous les événements cascade, filtrés par les gates demandés."""
-    if universe == "majors":
-        symbols = MAJORS
-    else:
-        symbols = [r[0] for r in con.execute(
-            "SELECT DISTINCT symbol FROM klines WHERE interval='1h' "
-            "ORDER BY symbol")]
-    events: list[dict] = []
-    for sym in symbols:
-        df = load_df(con, sym)
-        if df is None or len(df) < 500:
-            continue
-        close = df["close"]
-        ret1 = close.pct_change() * 100
-        ra = ret1.abs()
-        cascade = ((ret1 < 0) & (ret1.shift(1) < 0) & (ret1.shift(2) < 0)
-                   & (ra > ra.shift(1)) & (ra.shift(1) > ra.shift(2))).fillna(False)
-        opens = df["open"].values
-        highs = df["high"].values
-        idx = df.index
-        idx_ns = idx.astype("datetime64[ns]").asi8
-
-        # le cycle de vie : âge du coin + drawdown depuis l'ATH roulant
-        age_days = (idx_ns - idx_ns[0]) / (86400 * 10**9)
-        ath = pd.Series(highs, index=idx).cummax()
-        dd = (ath - close) / ath * 100
-
-        sym_regime = regime.reindex(idx, method="ffill", limit=48).fillna("?")
-
-        for t in np.where(cascade)[0]:
-            ei = t + 1
-            if ei + HOLD_H >= len(idx_ns):
-                continue
-            entry = opens[ei]
-            if entry <= 0:
-                continue
-            exit_j = ei + HOLD_H - 1
-            if exit_j >= len(idx_ns):
-                continue
-            exit_px = df["close"].values[exit_j]
-            # short : PnL prix = (entry - exit) / entry × notionnel
-            price_ret_short = (entry - exit_px) / entry * 100
-            mae_adverse = (highs[ei:exit_j + 1].max() - entry) / entry * 100
-            if "regime" in gates and sym_regime.iloc[t] == "haussier/vol_haute":
-                continue
-            if "lifecycle" in gates:
-                a, d = age_days[t], dd.iloc[t]
-                if not (7 <= a <= 90 and 20 <= d <= 50):
-                    continue
-            events.append({
-                "sym": sym, "ts_ms": int(idx_ns[ei]), "entry": entry,
-                "exit": exit_px, "price_ret_short": price_ret_short,
-                "mae_adverse": mae_adverse,
-            })
-    events.sort(key=lambda e: e["ts_ms"])
-    return events
-
-
 def run_sim(events: list[dict], capital: float, size: float,
             funding_hourly: dict[str, float], fee_bps: int, slip_bps: int,
             oracle: bool = False, size_fn=None) -> dict:
@@ -226,12 +166,9 @@ def main() -> int:
     ap.add_argument("--size", type=float, default=0.05,
                     help="%% de la balance alloué en marge par trade")
     ap.add_argument("--universe", choices=["majors", "all"], default="majors")
-    ap.add_argument("--gate", action="append", default=[],
-                    choices=["regime", "lifecycle"])
     ap.add_argument("--maker", action="store_true",
                     help="fills maker-only (GTX) : 2 bps/side, 0 slippage")
     args = ap.parse_args()
-    gates = set(args.gate)
     fee_bps, slip_bps = (MAKER_BPS, 0) if args.maker else (FEE_BPS, SLIP_BPS)
 
     con = sqlite3.connect(KDB)
@@ -244,7 +181,11 @@ def main() -> int:
     for s, rates in funding_hourly.items():
         funding_hourly[s] = sum(rates) / len(rates) * 100 / 8  # %/h (8h ref)
     regime = btc_regime_series()
-    events = collect_events(con, args.universe, gates, regime)
+    # UN SEUL collecteur cascade (anti_liq) — la divergence des deux
+    # collecteurs (warmup + features) produisait deux vérités (25/09)
+    # import paresseux : anti_liq importe run_sim de ce module
+    from scripts.anti_liq import collect_featured
+    events = collect_featured(regime, args.universe)
     con.close()
 
     real = run_sim(events, args.capital, args.size, funding_hourly,
@@ -302,7 +243,7 @@ def main() -> int:
     lines = [
         "# LE PORTEFEUILLE — cascade accélérée short 20x, hold 24h",
         f"{datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC — 1 an, "
-        f"univers {args.universe}, gates: {','.join(sorted(gates)) or 'aucun'}, "
+        f"univers {args.universe}, "
         f"exécution {'MAKER (GTX)' if args.maker else 'TAKER'}, "
         f"sizing {args.size*100:.0f} %, capital ${args.capital:,.0f}.",
         "", "## GARDE-FOUS ANTI-BUG", "",
@@ -350,7 +291,7 @@ def main() -> int:
     out = REPORTS / f"portfolio-sim-{datetime.now(timezone.utc):%Y-%m-%d}.md"
     REPORTS.mkdir(exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"[portfolio] {args.universe} gates={sorted(gates)} "
+    print(f"[portfolio] {args.universe} "
           f"{'maker' if args.maker else 'taker'} size={args.size:.0%} : "
           f"RÉEL ${args.capital:,.0f}→${real['balance']:,.2f} "
           f"({(real['balance']/args.capital-1)*100:+.1f}%/an, "
