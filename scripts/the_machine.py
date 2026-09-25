@@ -37,37 +37,9 @@ from scripts.stacked_portfolio import (  # noqa: E402
 REPORTS = ROOT / "reports"
 
 
-def main() -> int:
-    con = sqlite3.connect(KDB)
-    fh = funding_hourly_all()
-    fh_raw = pd.read_sql_query(
-        "SELECT symbol, funding_time, rate FROM funding_history", con)
-    regime = btc_regime_series()
-
-    # ——— flux 1 : cascade majeurs 10x, gated, vol-inverse ———
-    events = collect_featured(regime, "majors")
-    for e in events:
-        e["strategy"] = "cascade_10x"
-        e["lev"] = 10
-        e["hold_h"] = 24
-        e["fee_rt_bps"] = MAKER_RT
-    add_rolling_scores(events)
-    q66 = float(np.nanquantile(
-        [e.get("al_score", float("nan"))
-         for e in events[:int(len(events) * 0.7)]], 2 / 3))
-    gated = [e for e in events
-             if not (np.isfinite(e.get("al_score", float("nan")))
-                     and e["al_score"] >= q66)]
-    med_majors = float(np.median([e["atr_pct"] for e in gated]))
-    mae_gated = max(e["mae_adverse"] for e in gated)
-    lev_safe = 100 / (mae_gated + 0.5)
-
-    def size_cascade(e, st=None):
-        return min(max(0.24 * (e["atr_pct"] / med_majors), 0.08), 0.40)
-    for e in gated:
-        e["lev"] = 10
-
-    # ——— flux 2 : cascade memecoins 1x (levier mécanique) ———
+def collect_meme(con: sqlite3.Connection) -> list[dict]:
+    """Flux 2 : la cascade sur les memecoins (levier mécanique à calculer
+    par l'appelant via la distribution MAE)."""
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h' "
         "ORDER BY symbol") if r[0] not in MAJORS]
@@ -101,6 +73,41 @@ def main() -> int:
                          "mae_adverse": (highs[ei:ei + 24].max() - entry)
                          / entry * 100, "atr_pct": float(atr[ei])})
     meme.sort(key=lambda e: e["ts_ms"])
+    return meme
+
+
+def main() -> int:
+    con = sqlite3.connect(KDB)
+    fh = funding_hourly_all()
+    fh_raw = pd.read_sql_query(
+        "SELECT symbol, funding_time, rate FROM funding_history", con)
+    regime = btc_regime_series()
+
+    # ——— flux 1 : cascade majeurs 10x, gated, vol-inverse ———
+    events = collect_featured(regime, "majors")
+    for e in events:
+        e["strategy"] = "cascade_10x"
+        e["lev"] = 10
+        e["hold_h"] = 24
+        e["fee_rt_bps"] = MAKER_RT
+    add_rolling_scores(events)
+    q66 = float(np.nanquantile(
+        [e.get("al_score", float("nan"))
+         for e in events[:int(len(events) * 0.7)]], 2 / 3))
+    gated = [e for e in events
+             if not (np.isfinite(e.get("al_score", float("nan")))
+                     and e["al_score"] >= q66)]
+    med_majors = float(np.median([e["atr_pct"] for e in gated]))
+    mae_gated = max(e["mae_adverse"] for e in gated)
+    lev_safe = 100 / (mae_gated + 0.5)
+
+    def size_cascade(e, st=None):
+        return min(max(0.24 * (e["atr_pct"] / med_majors), 0.08), 0.40)
+    for e in gated:
+        e["lev"] = 10
+
+    # ——— flux 2 : cascade memecoins 1x (levier mécanique) ———
+    meme = collect_meme(con)
     mae_meme = max(e["mae_adverse"] for e in meme)
     lev_meme = max(1, int(100 / (mae_meme + 0.5)))
     med_meme = float(np.median([e["atr_pct"] for e in meme]))

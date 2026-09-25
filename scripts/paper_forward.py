@@ -240,6 +240,56 @@ def main() -> int:
     except Exception as _e:
         print(f"[paper] candidat qualité : {_e}")
 
+    # ——— LES 3 FLUX DE LA MACHINE (le forward du portefeuille officiel) ———
+    # cascade majeurs 10x gated + cascade memecoins 1x + survivor long 1x.
+    # Les trades paper portent le ret au niveau PRIX ; la table forward du
+    # rapport applique les tailles réelles (base × levier) à l'agrégation.
+    try:
+        from scripts.the_machine import collect_meme as _cm
+        from scripts.full_arsenal_2 import collect as _ca
+        from scripts.anti_liq import add_rolling_scores as _ars
+        from scripts.anti_liq import collect_featured as _cf
+        from scripts.portfolio_sim import btc_regime_series as _brs
+        _regime = _brs()
+        _casc = _cf(_regime, "majors")
+        _ars(_casc)
+        _q66 = float(_np.nanquantile(
+            [e.get("al_score", float("nan"))
+             for e in _casc[:int(len(_casc) * 0.7)]], 2 / 3))
+        _streams = {
+            "machine_cascade_majors": [
+                e for e in _casc
+                if not (_np.isfinite(e.get("al_score", float("nan")))
+                        and e["al_score"] >= _q66)],
+            "machine_cascade_meme": _cm(con),
+            "machine_survivor_long": _ca(con, fh).get(
+                "survivor_long_72h", []),
+        }
+        _specs = {"machine_cascade_majors": (24, -1),
+                  "machine_cascade_meme": (24, -1),
+                  "machine_survivor_long": (72, +1)}
+        _fresh_n = 0
+        for _sig, _evs in _streams.items():
+            _hold, _dir = _specs[_sig]
+            for e in _evs:
+                sig_ms = int(e["ts_ms"]) // 10**6   # ts_ms = des NS
+                if sig_ms < now_ms - WINDOW_H * 3600 * 1000:
+                    continue
+                if con.execute(
+                    "SELECT 1 FROM paper_trades WHERE signal=? AND symbol=? "
+                    "AND signal_ts=?", (_sig, e["sym"], sig_ms)).fetchone():
+                    continue
+                con.execute(
+                    "INSERT OR IGNORE INTO paper_trades VALUES "
+                    "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (_sig, e["sym"], _hold, _dir, sig_ms, sig_ms,
+                     float(e["entry"]), None, None, None, None, "open", now))
+                _fresh_n += 1
+        if _fresh_n:
+            print(f"[paper] machine streams : {_fresh_n} ouvertures fraîches")
+    except Exception as _e:
+        print(f"[paper] machine streams : {_e}")
+
     # clôture des paper trades ouverts dont l'horizon est atteint
     open_rows = con.execute(
             "SELECT rowid, signal, symbol, horizon_h, direction, entry_ts, "
@@ -292,6 +342,45 @@ def main() -> int:
             lines.append(f"- **{name} +{horizon}h** : {r[0]} trades, "
                          f"WR {r[1]*100:.0f} %, moyen {r[2]:+.2f} %, "
                          f"cumulé {r[3]:+.2f} %")
+    # ——— le PORTEFEUILLE MACHINE en forward (les tailles réelles) ———
+    _lev = {"machine_cascade_majors": 10, "machine_cascade_meme": 1,
+            "machine_survivor_long": 1}
+    _base = {"machine_cascade_majors": 0.24, "machine_cascade_meme": 0.10,
+             "machine_survivor_long": 0.10}
+    _mrows = con.execute(
+        "SELECT signal, symbol, direction, entry_ts, exit_ts, exit_price, "
+        "entry_price, ret_pct FROM paper_trades "
+        "WHERE signal LIKE 'machine_%' AND status='closed' "
+        "ORDER BY exit_ts").fetchall()
+    _bal = 100.0
+    _peak = _bal
+    _mdd = 0.0
+    _fmonth: dict[str, dict] = {}
+    for (sig, sym, d, ets, xts, xp, ep, ret) in _mrows:
+        if ret is None:
+            continue
+        frac = ret * _base.get(sig, 0.1) * _lev.get(sig, 1) / 100.0
+        _bal *= (1 + frac)
+        _peak = max(_peak, _bal)
+        _mdd = max(_mdd, (_peak - _bal) / _peak * 100)
+        m = datetime.fromtimestamp(xts / 1000, tz=timezone.utc).strftime("%Y-%m")
+        fm = _fmonth.setdefault(m, {"roi": 0.0, "n": 0})
+        fm["roi"] += frac * 100
+        fm["n"] += 1
+    _len_m = len(_mrows)
+    _lines_m = [f"- Balance forward (100 $ →) : **${_bal:,.2f}** "
+                f"sur {_len_m} trades clôturés, "
+                f"DD forward {_mdd:.1f} %"]
+    for m in sorted(_fmonth):
+        fm = _fmonth[m]
+        _lines_m.append(f"- {m} : {fm['roi']:+.1f} % ({fm['n']} trades)")
+    lines += ["", "## LE PORTEFEUILLE MACHINE EN FORWARD (tailles réelles)", ""]
+    lines += _lines_m
+    _open_n = con.execute(
+        "SELECT COUNT(*) FROM paper_trades WHERE "
+        "signal LIKE 'machine_%' AND status='open'").fetchone()[0]
+    lines += ["", f"Machine trades ouverts : {_open_n}"]
+
     out = (REPORTS / f"paper-forward-{datetime.now(timezone.utc):%Y-%m-%d-%H%M}.md")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[paper] {opened} ouvertures, {closed_n} clôtures -> {out}")
