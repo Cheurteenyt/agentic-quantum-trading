@@ -224,7 +224,7 @@ def main() -> int:
             lines.append(f"- **{name} +{horizon}h** : {r[0]} trades, "
                          f"WR {r[1]*100:.0f} %, moyen {r[2]:+.2f} %, "
                          f"cumulé {r[3]:+.2f} %")
-    out = REPORTS / f"paper-forward-{datetime.now(timezone.utc):%Y-%m-%d}.md"
+    out = (REPORTS / f"paper-forward-{datetime.now(timezone.utc):%Y-%m-%d-%H%M}.md")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[paper] {opened} ouvertures, {closed_n} clôtures -> {out}")
     con.close()

@@ -358,6 +358,16 @@ def trade_verdicts() -> dict:
                 )
                 if hit_ts else None
             )
+        existing = con.execute(
+            "SELECT verdict FROM x_call_verdicts WHERE call_id=?",
+            (call_id,)).fetchone()
+        # MONOTONIE : un verdict résolu ne revient JAMAIS en arrière. Le
+        # REPLACE brut a effacé les 34 verdicts résolus du registre (23/09)
+        # quand la ré-évaluation est redevenue en_cours. Première résolution
+        # gagne — pas de réécriture rétrospective, quel que soit le moteur.
+        if existing and existing[0] != "en_cours":
+            counts[verdict] = counts.get(verdict, 0) + 1
+            continue
         con.execute(
             "INSERT OR REPLACE INTO x_call_verdicts VALUES (?,?,?,?,?)",
             (call_id, verdict, resolved_ts, ENGINE_VERSION, _utc_now()),
