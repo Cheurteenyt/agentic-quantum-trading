@@ -161,7 +161,9 @@ def run_stack(events: list[dict], capital: float, size_fn,
         notional = margin * e["lev"]
         fees = notional * e["fee_rt_bps"] / 10000
         fund = notional * funding_hourly.get(e["sym"], 0.0) / 100 * e["hold_h"]
-        pnl = e["price_ret_short"] / 100 * notional + fund - fees
+        # fund_sign : +1 = short (reçoit le funding positif), -1 = long (le paie)
+        pnl = (e["price_ret_short"] / 100 * notional
+               + e.get("fund_sign", 1) * fund - fees)
         liq = e["mae_adverse"] >= liq_move or pnl <= -margin
         if liq:
             pnl = -margin
