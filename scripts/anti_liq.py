@@ -197,32 +197,25 @@ def tercile_lift(vals: np.ndarray, liq: np.ndarray) -> list[tuple[str, int, int,
     return out
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--universe", choices=["majors", "all"], default="majors")
-    args = ap.parse_args()
-    regime = btc_regime_series()
-    events = collect_featured(regime, args.universe)
-    liq_all = np.array([e["liq"] for e in events])
-    n_liq = int(liq_all.sum())
-    base_rate = n_liq / len(events) * 100
+# les features du score : haut = risqué / bas = risqué. v2 : cascade_depth
+# ajouté (profond = le bounce après la chute = le danger du short).
+RISK_UP = ("atr_pct", "vol24", "dd_pct")       # haut = risqué
+RISK_DOWN = ("btc_ret24", "vwap_dev", "cascade_depth")  # bas = risqué
 
-    # split PAR LE TEMPS 70/30
-    k = int(len(events) * 0.7)
-    train, val = events[:k], events[k:]
 
-    # --- PHASE 2 : le score composite à RANGS ROULANTS ---
-    # les niveaux absolus dérivent avec les régimes (le train ne transfère
-    # pas) → chaque feature est rangée contre SES 90 derniers jours, puis
-    # les rangs sont moyennés. Aucun look-ahead : fenêtre = événements
-    # antérieurs uniquement. v2 : cascade_depth ajouté (profond = rebond = liq).
-    RISK_UP = ("atr_pct", "vol24", "dd_pct")       # haut = risqué
-    RISK_DOWN = ("btc_ret24", "vwap_dev", "cascade_depth")  # bas = risqué
-    WIN_NS = 90 * 86400 * 10**9
+def add_rolling_scores(events: list[dict], win_days: int = 90,
+                       min_window: int = 50) -> None:
+    """Le score composite à RANGS ROULANTS, en place sur chaque événement.
+
+    Les niveaux absolus dérivent avec les régimes (les seuils absolus ne
+    transfèrent pas) → chaque feature est rangée contre SES `win_days`
+    derniers jours d'événements, puis les rangs sont moyennés. Aucun
+    look-ahead : la fenêtre = événements antérieurs uniquement."""
+    win_ns = win_days * 86400 * 10**9
     for i, e in enumerate(events):
-        lo = e["ts_ms"] - WIN_NS
+        lo = e["ts_ms"] - win_ns
         window = [p for p in events[:i] if p["ts_ms"] >= lo]
-        if len(window) < 50:
+        if len(window) < min_window:
             e["al_score"] = float("nan")
             continue
         ranks = []
@@ -241,6 +234,24 @@ def main() -> int:
                 continue
             ranks.append(float(np.mean(vals <= v)))
         e["al_score"] = float(np.mean(ranks))
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--universe", choices=["majors", "all"], default="majors")
+    args = ap.parse_args()
+    regime = btc_regime_series()
+    events = collect_featured(regime, args.universe)
+    liq_all = np.array([e["liq"] for e in events])
+    n_liq = int(liq_all.sum())
+    base_rate = n_liq / len(events) * 100
+
+    # split PAR LE TEMPS 70/30
+    k = int(len(events) * 0.7)
+    train, val = events[:k], events[k:]
+
+    # --- PHASE 2 : le score composite à rangs roulants ---
+    add_rolling_scores(events)
     tr_liq = np.array([e["liq"] for e in train])
     va_liq = np.array([e["liq"] for e in val])
 
