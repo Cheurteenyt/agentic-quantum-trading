@@ -14,11 +14,10 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 
 | Indicateur / stratégie | Script | Chiffres (100 $, 1 an, maker) | Verdict |
 |---|---|---|---|
-| **STACK 10x — LA FRONTIÈRE OFFICIELLE, 0 LIQUIDATION PAR CONSTRUCTION** | `stacked_portfolio.py` + `anti_liq.py` | ×1 : +164 %/an @ DD 10,2 % · ×2 : +530 % @ 19,5 % · **×3 : +1 258 %/an @ DD 28,1 %, record mois +76,8 %** · ×4 : +2 550 % @ 36,0 %, record +105,6 % — 3 mois négatifs partout | **La règle du user (0 liq) a débloqué la frontière** : MAE max 7,84 % sur 1 an → 10x = mort à 9,5 %, jamais atteinte. Le 20x détruisait de la valeur (8 morts gratuites) |
-| **Cascade accélérée short 20x→10x + AL gate** | `anti_liq.py` + `portfolio_sim.py` | +164 %/an @ DD 10,2 % (notional ×1), liqs 0 | Le signal roi — audité main, gate grid-validé, hold 24h quadruple-validé |
-| **Confluence exacte v5** (accel + vwap 3σ, short 24h, 3x) | `confluence_exact.py` | seule : +3,1 % @ DD 5,5 %, WR wallet 65,5 %, 0 liq | Le profil qualité — composant du stack |
+| **LA MACHINE — cascade gated 10x, 0 liq par construction, UN knob (la marge)** | `anti_liq.py` + `portfolio_sim.py` | marge 10 % (notional ×1) : +164 %/an @ DD 10,2 % · 20 % : +530 % @ 19,5 % · **30 % : +1 258 %/an @ DD 28,1 %, record mois +76,8 %** · 40 % : +2 550 % @ 36,0 %, record +105,6 % · 60 % : +7 397 % @ 49,7 % — WR 57,3 %, 3 mois négatifs partout, **0 liquidation** | **LA frontière officielle** — MAE max 7,84 % < ligne de mort 9,5 % ; le levier ≤ 100/(maxMAE+0,5) |
+| **Confluence exacte v5** (accel + vwap 3σ, short 24h, 3x) | `confluence_exact.py` | seule : +3,1 % @ DD 5,5 %, WR wallet 65,5 %, 0 liq | Profil qualité — CONTEXTE à 10x (ni ROI ni DD apportés au run hybride) |
+| **Flux lents (fdiv 12h + proxy conf)** | `stacked_portfolio.py` | quasi-plates à 3x ; NEUTRES à 10x | CONTEXTE — la décorrélation était un artefact d'échelle 3x |
 | **AL Score** (anti-liquidation, rangs roulants 90j, 6 features) | `anti_liq.py` | gradient monotone 4,1→19,9 % de liqs ; halve les liqs | Le seul conditionnement validé |
-| Oracle anti-liq (le plafond) | `stacked_portfolio.py --oracle` | +885 %/an @ DD 18,2 % (notional ×2, 20x) | Dépassé par la frontière 10x ×3 ! |
 
 ## CANDIDATS (forward en cours — le paper forward tranche)
 
