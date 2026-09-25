@@ -14,7 +14,7 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 
 | Indicateur / stratégie | Script | Chiffres (100 $, 1 an, maker) | Verdict |
 |---|---|---|---|
-| **Stack ×2** (cascade gated + fdiv 1,5 % + **confluence EXACTE v5** 1 %) | `stacked_portfolio.py` + `confluence_exact.py` | **+351 %/an @ DD 20,5 %**, liq 9 | LA frontière — la confluence exacte (accel funding + dev > 3σ168) remplace la proxy (+16,6 $, -3 pts DD) |
+| **Stack avec confluence EXACTE v5** — L'ÉCHELLE DE RE-LEVER | `stacked_portfolio.py` + `confluence_exact.py` | ×1,5 : +221 %/an @ DD 15,4 % · ×2 : **+351 % @ DD 20,5 %** · ×2,5 : +517 % @ DD 25,4 % · **×3 : +725 %/an @ DD 30,2 %** (100 → 825 $, 8 liqs) | LA frontière — le re-lever est le choix du user |
 | **Cascade accélérée short 20x + AL gate** | `anti_liq.py` + `portfolio_sim.py` | +197 %/an @ DD 16,1 %, liqs 35→8, inverse $94 | Le signal roi, profil le plus lisse |
 | **Confluence exacte v5** (accel + vwap 3σ, short 24h, 3x) | `confluence_exact.py` | seule : +3,1 % @ DD 5,5 %, WR wallet 65,5 %, 0 liq | Le profil qualité — composant du stack |
 | **AL Score** (anti-liquidation, rangs roulants 90j, 6 features) | `anti_liq.py` | gradient monotone 4,1→19,9 % de liqs ; halve les liqs | Le seul conditionnement validé |
