@@ -152,9 +152,38 @@ def main() -> int:
             ranks.append(ft[1][pos])
         e["fund_rank"] = (float(np.mean(np.array(ranks) <= own))
                           if ranks and np.isfinite(own) else np.nan)
+
+    # la CORRÉLATION croisée roulante des 6 majeures (le régime systémique) :
+    # corrélation haute = tout tombe ensemble = les cascades continuent ;
+    # corrélation basse = bruit idiosyncratique = elles rebondissent.
+    _majors_dfs = {s: load_df(con, s) for s in MAJORS}
+    _rets = {s: d["close"].pct_change().values for s, d in _majors_dfs.items()}
+    _idx = _majors_dfs["BTCUSDT"].index.astype("datetime64[ns]").asi8
     con.close()
 
     all_ev = sorted(gated + meme + surv, key=lambda e: e["ts_ms"])
+
+    _WIN = 168
+    for e in gated:
+        bi = int(np.searchsorted(_idx, e["ts_ms"], side="left"))
+        lo = bi - _WIN
+        if lo < 0:
+            e["corr"] = np.nan
+            continue
+        pairs = []
+        for i in range(len(MAJORS)):
+            for j in range(i + 1, len(MAJORS)):
+                a, b = _rets[MAJORS[i]][lo:bi], _rets[MAJORS[j]][lo:bi]
+                m = np.isfinite(a) & np.isfinite(b)
+                if m.sum() > 100:
+                    sa, sb = a[m] - np.mean(a[m]), b[m] - np.mean(b[m])
+                    if np.std(sa) * np.std(sb) > 0:
+                        pairs.append(np.mean(sa * sb) / (np.std(sa) * np.std(sb)))
+        e["corr"] = float(np.mean(pairs)) if pairs else np.nan
+    _c_hi = float(np.nanquantile(
+        [e.get("corr", np.nan) for e in gated[:int(len(gated) * 0.7)]], 0.66))
+    _c_lo = float(np.nanquantile(
+        [e.get("corr", np.nan) for e in gated[:int(len(gated) * 0.7)]], 0.33))
 
     def machine_fn(e, st=None):
         s = e.get("strategy")
@@ -163,6 +192,12 @@ def main() -> int:
             if (np.isfinite(e.get("fund_rank", np.nan))
                     and e["fund_rank"] <= 0.33):
                 return min(s0 * 1.5, 0.50)
+            c = e.get("corr", np.nan)
+            if np.isfinite(c):
+                if c > _c_hi:
+                    s0 = min(s0 * 2.0, 0.50)
+                elif c < _c_lo:
+                    s0 = max(s0 * 0.5, 0.05)
             return s0
         if s == "cascade_meme":
             return size_meme(e)
