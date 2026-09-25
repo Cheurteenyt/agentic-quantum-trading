@@ -154,10 +154,19 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
             fund_pct = fund_h * HOLD_H * 20 / 100
             pnl_pct = ret * 20 + fund_pct - fees_pct
             liq = mae >= LIQ_MOVE_PCT or pnl_pct <= -100
+            # le REGISTRE de liquidation : prix de mort exact + bougie
+            # où le high le franchit (le short meurt AU-DESSUS de l'entrée)
+            liq_price = entry * (1 + LIQ_MOVE_PCT / 100)
+            liq_ts = None
+            for j in range(ei, exit_j + 1):
+                if highs[j] >= liq_price:
+                    liq_ts = int(idx_ns[j])
+                    break
             events.append({
                 "sym": sym, "ts_ms": int(idx_ns[ei]), "entry": entry,
                 "exit": exit_px, "price_ret_short": ret, "mae_adverse": mae,
-                "liq": bool(liq),
+                "liq": bool(liq), "liq_price": liq_price,
+                "liq_ts_ms": liq_ts,
                 "atr_pct": float(atr_pct[t]), "vol24": float(vol24[t]),
                 "cascade_depth": float(depth3.iloc[t]), "accel": float(accel[t]),
                 "dd_pct": float(dd[t]), "vwap_dev": float(vwap_dev[t]),

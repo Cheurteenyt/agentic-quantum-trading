@@ -180,10 +180,19 @@ def run_stack(events: list[dict], capital: float, size_fn,
         max_dd = max(max_dd, dd)
         trough = min(trough, balance)
         exit_ms = e["ts_ms"] + e["hold_h"] * 3600 * 10**9  # ts_ms = NS
+        liq_ts_dt = None
+        if liq and e.get("liq_ts_ms"):
+            liq_ts_dt = datetime.fromtimestamp(e["liq_ts_ms"] / 10**9,
+                                               tz=timezone.utc)
         trades.append({"sym": e["sym"], "strategy": e["strategy"],
+                       "entry_ts": datetime.fromtimestamp(
+                           e["ts_ms"] / 10**9, tz=timezone.utc),
                        "exit_ts": datetime.fromtimestamp(exit_ms / 10**9,
                                                          tz=timezone.utc),
-                       "pnl": pnl, "balance": balance, "liq": liq})
+                       "pnl": pnl, "balance": balance, "liq": liq,
+                       "entry": e.get("entry"), "margin": margin,
+                       "liq_price": e.get("liq_price") if liq else None,
+                       "liq_ts": liq_ts_dt})
     return {"balance": balance, "max_dd": max_dd, "trough": trough,
             "trades": trades, "n": n, "n_liq": n_liq, "n_wins": n_wins,
             "fees": fees_tot, "funding": fund_tot}
@@ -276,6 +285,41 @@ def main() -> int:
     lines += bloc(stack2, "EMPILÉ ×2", CAPITAL)
     lines += ["", "## ORACLE anti-liq (×2, plafond)", ""]
     lines += bloc(oracle, "ORACLE ×2", CAPITAL)
+
+    # ——— LE REGISTRE DES LIQUIDATIONS — trade par trade, précis ———
+    liqs = [t for t in stack2["trades"] if t["liq"]]
+    if liqs:
+        lines += ["", "## REGISTRE DES LIQUIDATIONS — où, quand, combien", "",
+                  "| Stratégie | Symbole | Entrée | Prix d'entrée → prix de mort | "
+                  "Liquidé le | Perte | Balance après |",
+                  "|---|---|---|---|---|---|---|"]
+        for t in liqs:
+            lp = t.get("liq_price")
+            if lp is None and t.get("entry"):
+                # fallback : prix de mort théorique depuis le levier
+                lp = t["entry"] * (1 + (100 / 3 - 0.5) / 100)
+            lt = t.get("liq_ts")
+            lines.append(
+                f"| {t['strategy']} | {t['sym']} "
+                f"| {t['entry_ts']:%d/%m %H:%M} "
+                f"| ${t['entry']:,.4g} → ${lp:,.4g} "
+                f"| {lt:%d/%m %H:%M} " if lt else
+                f"| {t['strategy']} | {t['sym']} "
+                f"| {t['entry_ts']:%d/%m %H:%M} "
+                f"| ${t['entry']:,.4g} → ${lp:,.4g} "
+                f"| — "
+                f"| **-${t['margin']:,.2f}** | ${t['balance']:,.2f} |")
+        by_strat: dict[str, list] = {}
+        for t in liqs:
+            by_strat.setdefault(t["strategy"], []).append(t)
+        lines += ["", "### Par stratégie", ""]
+        for s, tl in sorted(by_strat.items()):
+            loss = sum(x["margin"] for x in tl)
+            hours = [ (x["liq_ts"] - x["entry_ts"]).total_seconds()/3600
+                      for x in tl if x["liq_ts"] ]
+            hm = f", mort après {np.mean(hours):.1f} h en moyenne" if hours else ""
+            lines.append(f"- **{s}** : {len(tl)} liquidations, "
+                         f"perte cumulée **${loss:,.2f}**{hm}")
 
     # --- la table mensuelle de l'EMPILÉ ×2 + garde-fous ---
     mrows = monthly_rows(stack2["trades"], CAPITAL)
