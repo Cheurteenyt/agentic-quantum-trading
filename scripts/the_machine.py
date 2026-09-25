@@ -118,11 +118,23 @@ def main() -> int:
         return min(max(0.10 * (e["atr_pct"] / med_meme), 0.02), 0.30)
 
     # ——— flux 3 : survivor long 72h 1x ———
+    # + le FILTRE ATR extrême : le décile supérieur (les LAB — les ×520 qui
+    # crashent -64 %) est écarté ; c'est lui qui portait le max-DD (26/09)
     surv = collect_arsenal(con, fh_raw).get("survivor_long_72h", [])
+    _p90 = float(np.nanquantile([e["atr_pct"] for e in surv], 0.90))
+    _n_extreme = len(surv)
+    surv = [e for e in surv if e["atr_pct"] <= _p90]
+    _n_extreme -= len(surv)
     for e in surv:
         e["strategy"] = "survivor_long"
         e["lev"] = 1
         e["fee_rt_bps"] = TAKER_RT
+
+    # le facteur global K : la calibration du DD sur la cible (25 %)
+    _K = 0.89
+    # le tilt corrélation (×2/×0,5) : 0 mois négatif mais +6 pts de DD —
+    # la variante agressive ; le défaut = la config spec (DD 24,8 %)
+    CORR_TILT = "--corr-tilt" in sys.argv
 
     # le poids QUALITÉ : les trades au funding le plus BAS des 6 majeures
     # (l'offre réelle — WR 81 % backtest) sont surdimensionnés ×1,5
@@ -188,20 +200,22 @@ def main() -> int:
     def machine_fn(e, st=None):
         s = e.get("strategy")
         if s == "cascade_10x":
-            s0 = size_cascade(e)
+            s0 = min(max(0.24 * _K * (e["atr_pct"] / med_majors), 0.08 * _K), 0.40 * _K)
             if (np.isfinite(e.get("fund_rank", np.nan))
                     and e["fund_rank"] <= 0.33):
-                return min(s0 * 1.5, 0.50)
-            c = e.get("corr", np.nan)
-            if np.isfinite(c):
-                if c > _c_hi:
-                    s0 = min(s0 * 2.0, 0.50)
-                elif c < _c_lo:
-                    s0 = max(s0 * 0.5, 0.05)
+                return min(s0 * 1.5, 0.50 * _K)
+            if CORR_TILT:
+                c = e.get("corr", np.nan)
+                if np.isfinite(c):
+                    if c > _c_hi:
+                        s0 = min(s0 * 2.0, 0.50 * _K)
+                    elif c < _c_lo:
+                        s0 = max(s0 * 0.5, 0.05 * _K)
             return s0
         if s == "cascade_meme":
-            return size_meme(e)
-        return 0.20                     # survivor long (1x = 0 risque de liq, le notional scale librement)
+            return min(max(0.10 * _K * (e["atr_pct"] / med_meme), 0.02 * _K),
+                       0.30 * _K)
+        return 0.20 * _K                # survivor long (1x = 0 risque de liq, le notional scale librement)
 
     r = run_stack(all_ev, CAPITAL, machine_fn, fh)
     mr = monthly_rows(r["trades"], CAPITAL)
