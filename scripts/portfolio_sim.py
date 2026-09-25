@@ -189,13 +189,25 @@ def main() -> int:
     con.close()
     # le MONITEUR DE MARGE : la frontière 10x suppose un MAE max < 9,5 % —
     # si le MAE observé monte, le levier sûr baisse (règle : lev ≤ 100/(maxMAE+0,5))
-    maes = [e["mae_adverse"] for e in events]
+    # il mesure la population GATED (celle qu'on trade réellement) — le gate
+    # AL exclut les monstres de volatilité (MAE 13 % vus hors gate)
+    from scripts.anti_liq import add_rolling_scores
+    add_rolling_scores(events)
+    thr = float(np.nanquantile(
+        [e.get("al_score", float("nan"))
+         for e in events[:int(len(events) * 0.7)]], 2 / 3))
+    gated = [e for e in events
+             if not (np.isfinite(e.get("al_score", float("nan")))
+                     and e["al_score"] >= thr)]
+    maes = [e["mae_adverse"] for e in gated]
+    maes_raw = [e["mae_adverse"] for e in events]
     if maes:
         mae_max = max(maes)
         lev_safe = 100 / (mae_max + 0.5)
-        print(f"[portfolio] MONITEUR MAE : max {mae_max:.2f} % "
-              f"→ levier sûr ≤ {lev_safe:.1f}x "
-              f"{'OK' if lev_safe >= 10 else '⚠ LA MARGE 10x EST MORDUE — baisser le levier'}")
+        print(f"[portfolio] MONITEUR MAE (gated, {len(gated)} trades) : "
+              f"max {mae_max:.2f} % → levier sûr ≤ {lev_safe:.1f}x "
+              f"{'OK — 10x tient' if lev_safe >= 10 else '⚠ LA MARGE 10x EST MORDUE — baisser le levier'}"
+              f" (brut hors gate : max {max(maes_raw):.2f} % — le gate les exclut)")
 
     real = run_sim(events, args.capital, args.size, funding_hourly,
                    fee_bps, slip_bps, oracle=False)
