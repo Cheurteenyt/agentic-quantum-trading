@@ -33,6 +33,7 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 | Piste | Chiffre qui la ferme | Date |
 |---|---|---|
 | Sorties anticipées TOUTES (1re verte, trailing 1/1,5/2,5 %) | monotone : trail 1 % -46 % → 24h fixe +197 % — chaque sortie sur rebond abandonne le drift | 25/09 |
+| EXTENSIONS des gagnants (48h/72h si gagne) | $297 → $250-$235 : le bounce de jours 2-3 à 20x mange le drift supplémentaire — 24h pile est l'optimum total | 25/09 |
 | Squeeze haussier (miroir de la cascade) | wallet $6,34, WR 44,9 %, détruit le stack | 25/09 |
 | Exit première verte (épuisement) | hold moyen 1,8 h, -5 % vs +197 % — les bounces sont micro, le drift domine à 24h | 25/09 |
 | Cascade × funding percentile | NUL même série profonde ; l'inverse gagne = anti-signal | 25/09 |
