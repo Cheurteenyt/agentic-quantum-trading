@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import sqlite3
 import sys
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -101,7 +100,10 @@ def main() -> int:
     fh = funding_hourly_all()
 
     # la baseline anti-dérive côté LONG : le blind long 24h sur les majeures
-    blinds: dict[str, dict] = defaultdict(lambda: {"n": 0, "w": 0, "s": 0.0})
+    # stats ROBUSTES : la moyenne pure est détruite par les barres glitchées
+    # (quelques -99 % de données) — médiane + moyenne tronquée à ±50 %
+    blind_rets: list[float] = []
+    n_glitch = 0
     for sym in MAJORS:
         df = load_df(con, sym)
         if df is None or len(df) < 500:
@@ -111,9 +113,16 @@ def main() -> int:
         for t in range(200, len(df) - HOLD):
             entry, exit_px = opens[t + 1], closes[t + HOLD]
             r = (exit_px - entry) / entry * 100
-            blinds["blind_long"]["n"] += 1
-            blinds["blind_long"]["w"] += r > 0
-            blinds["blind_long"]["s"] += r
+            if not np.isfinite(r):
+                continue
+            blind_rets.append(r)
+            if abs(r) > 50:
+                n_glitch += 1
+    blind_rets_arr = np.array(blind_rets)
+    clean = blind_rets_arr[np.abs(blind_rets_arr) <= 50]
+    blind_wr = float(np.mean(blind_rets_arr > 0) * 100)
+    blind_med = float(np.median(blind_rets_arr))
+    blind_trim = float(np.mean(clean))
     con.close()
 
     squeeze = collect_squeeze(sqlite3.connect(KDB))
@@ -126,11 +135,12 @@ def main() -> int:
         e["hold_h"] = 24
         e["fee_rt_bps"] = MAKER_RT
 
-    # stats brutes du squeeze (hors wallet)
+    # stats brutes du squeeze (hors wallet) — robustes comme la baseline
     n = len(squeeze)
-    raw_wr = sum(1 for e in squeeze if -e["price_ret_short"] > 0) / max(n, 1) * 100
-    raw_mean = sum(-e["price_ret_short"] for e in squeeze) / max(n, 1)
-    bl = blinds["blind_long"]
+    sq_rets = np.array([-e["price_ret_short"] for e in squeeze])
+    raw_wr = float(np.mean(sq_rets > 0) * 100)
+    raw_mean = float(np.mean(sq_rets))
+    raw_med = float(np.median(sq_rets))
 
     # le wallet séquentiel : squeeze seule / cascade seule / STACK
     sq_sim = run_stack(squeeze, CAPITAL, lambda e: 0.05, fh)
@@ -187,11 +197,13 @@ def main() -> int:
         f"{n} événements squeeze (majeures, hold 24h, sélection séquentielle).",
         "",
         "## Baseline anti-dérive côté LONG (blind long 24h, majeures)", "",
-        f"- blind long : WR {bl['w']/max(bl['n'],1)*100:.1f} % "
-        f"(n={bl['n']}), ret moyen {bl['s']/max(bl['n'],1)*100:+.3f} %/trade",
-        f"- squeeze-long brut : WR {raw_wr:.1f} %, ret moyen {raw_mean:+.3f} %/trade",
-        f"- **Δ brut vs blind : {(raw_mean - bl['s']/max(bl['n'],1)*100)*20:+.2f} % "
-        f"de marge/trade à 20x**",
+        f"- blind long : WR {blind_wr:.1f} % (n={len(blind_rets_arr)}), "
+        f"médiane {blind_med:+.3f} %/trade, moyenne tronquée {blind_trim:+.3f} % "
+        f"(barres glitchées |r|>50 % : {n_glitch})",
+        f"- squeeze-long brut : WR {raw_wr:.1f} %, médiane {raw_med:+.3f} %/trade, "
+        f"moyenne {raw_mean:+.3f} %",
+        f"- **Δ médian vs blind : {(raw_med - blind_med) * 20:+.2f} % de marge "
+        f"à 20x** (avant coûts {MAKER_RT * 20 / 100:.1f} % de marge)",
         "",
         "## Le wallet séquentiel (100 $, maker, funding réel)", "",
         bloc(sq_sim, "SQUEEZE seule (5 % flat)"),
