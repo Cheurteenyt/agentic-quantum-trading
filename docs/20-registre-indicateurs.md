@@ -14,11 +14,11 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 
 | Indicateur / stratégie | Script | Chiffres (100 $, 1 an, maker) | Verdict |
 |---|---|---|---|
-| **Stack avec confluence EXACTE v5** — L'ÉCHELLE DE RE-LEVER | `stacked_portfolio.py` + `confluence_exact.py` | ×1,5 : +221 %/an @ DD 15,4 % · ×2 : **+351 % @ DD 20,5 %** · ×2,5 : +517 % @ DD 25,4 % · **×3 : +725 %/an @ DD 30,2 %** (100 → 825 $, 8 liqs) | LA frontière — le re-lever est le choix du user |
-| **Cascade accélérée short 20x + AL gate** | `anti_liq.py` + `portfolio_sim.py` | +197 %/an @ DD 16,1 %, liqs 35→8, inverse $94 | Le signal roi, profil le plus lisse |
+| **STACK 10x — LA FRONTIÈRE OFFICIELLE, 0 LIQUIDATION PAR CONSTRUCTION** | `stacked_portfolio.py` + `anti_liq.py` | ×1 : +164 %/an @ DD 10,2 % · ×2 : +530 % @ 19,5 % · **×3 : +1 258 %/an @ DD 28,1 %, record mois +76,8 %** · ×4 : +2 550 % @ 36,0 %, record +105,6 % — 3 mois négatifs partout | **La règle du user (0 liq) a débloqué la frontière** : MAE max 7,84 % sur 1 an → 10x = mort à 9,5 %, jamais atteinte. Le 20x détruisait de la valeur (8 morts gratuites) |
+| **Cascade accélérée short 20x→10x + AL gate** | `anti_liq.py` + `portfolio_sim.py` | +164 %/an @ DD 10,2 % (notional ×1), liqs 0 | Le signal roi — audité main, gate grid-validé, hold 24h quadruple-validé |
 | **Confluence exacte v5** (accel + vwap 3σ, short 24h, 3x) | `confluence_exact.py` | seule : +3,1 % @ DD 5,5 %, WR wallet 65,5 %, 0 liq | Le profil qualité — composant du stack |
 | **AL Score** (anti-liquidation, rangs roulants 90j, 6 features) | `anti_liq.py` | gradient monotone 4,1→19,9 % de liqs ; halve les liqs | Le seul conditionnement validé |
-| Oracle anti-liq (le plafond) | `stacked_portfolio.py --oracle` | +885 %/an @ DD 18,2 % | Plafond — proche du réel désormais |
+| Oracle anti-liq (le plafond) | `stacked_portfolio.py --oracle` | +885 %/an @ DD 18,2 % (notional ×2, 20x) | Dépassé par la frontière 10x ×3 ! |
 
 ## CANDIDATS (forward en cours — le paper forward tranche)
 
