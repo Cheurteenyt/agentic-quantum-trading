@@ -1,13 +1,29 @@
 # 🗺️ CARTE DU PROJET — un seul endroit pour tout trouver
 
-> Mise à jour : 24/09/2026. Si un fichier bouge, cette carte bouge.
+> Mise à jour : 25/09/2026. Si un fichier bouge, cette carte bouge.
 > Doc d'architecture complète : `docs/02-architecture.md`.
+
+## 🏆 LA MACHINE & LE REGISTRE (l'état de la stratégie)
+
+- **Le portefeuille officiel** : `the_machine.py` (câblé nocturne) — cascade
+  majeurs 10x gated AL Score + sizing vol-inverse, cascade memecoins 1x,
+  survivor long 1x → **+2 829 %/an @ DD 27,8 %, 0 liquidation, 534 trades,
+  record mensuel +88,5 %, 2 mois négatifs légers/13** (backtest 1 an, le
+  paper forward 2×/jour juge sur le vivant).
+- **La règle gravée** : levier ≤ 100/(maxMAE + 0,5) — MAE max gated 7,84 %
+  → 10x = mort à 9,5 %, jamais atteinte (moniteur nocturne intégré).
+- **Le candidat qualité** : cascade ∩ funding-rank-bas — WR 81 %, DD 5,4 %,
+  0 liq, en accumulation forward (~2 trades/mois).
+- **Le registre vivant de tous les indicateurs** (VALIDÉ/CANDIDAT/CONTEXTE/NUL,
+  chiffres et dates) : `docs/20-registre-indicateurs.md`.
+- **La carte des scripts** : `scripts/README.md` (76 fichiers en 5 groupes,
+  la convention de travail).
 
 ## ⚙️ SERVICES SYSTEMD (qui tourne tout seul)
 
 | Service | Rythme | Rôle |
 |---|---|---|
-| `trading-agent-nightly` | 03h00 (42 étapes) | TOUTE la chaîne nocturne (voir unité) |
+| `trading-agent-nightly` | 03h00 (~70 étapes) | TOUTE la chaîne nocturne (voir unité) — **11 indicateurs maison câblés** |
 | `trading-agent-registre-noon` | 14h00 | Récolte X + liste privée + OI + scoring |
 | `aster-depth-collector` | 24/7 WS/REST | Carnets d'ordres → `depth.db` (15 symboles) |
 | `aster-liq-collector` | 24/7 WS | Liquidations → `klines.db:liq_events` |

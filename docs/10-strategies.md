@@ -7,6 +7,11 @@ updated: 2026-08-09
 
 # Stratégies et première campagne réelle
 
+> ⚠️ Ce document décrit la campagne backtest_v2 historique (août 2026).
+> **L'état ACTUEL des stratégies** (la machine 10x 0-liquidation, le
+> registre VALIDÉ/CANDIDAT/CONTEXTE/NUL avec chiffres et dates) :
+> **`docs/20-registre-indicateurs.md`** — la référence vivante.
+
 > Le moteur ne connait aucune strategie. Il recoit `evaluate(params, bars)`
 > et il juge. `backend/services/backtest_v2/strategies/` contient les
 > generateurs de rendements ; `scripts/run_campaign.py` les branche.

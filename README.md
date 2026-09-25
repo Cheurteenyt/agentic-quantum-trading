@@ -18,9 +18,25 @@ systematizes:
    realized skill), token flow panels, graduation discovery, clans, theses,
    age-of-coin lifecycle effects.
 
+## The Machine (current state)
+
+The validated core: an **accelerated-cascade short** on majors (3
+consecutive accelerating down-candles → short 24h), conditioned by a
+proprietary **anti-liquidation score** (rolling-rank composite of 6
+features), executed **maker-only at 10x** — where the leverage rule
+`lev ≤ 100/(maxMAE + 0.5)` guarantees **zero liquidations by
+construction** (observed max MAE 7.84% vs a 9.5% death line).
+
+Official 1-year backtest (100 USD, maker costs, real funding):
+**+2,829%/yr at 27.8% max drawdown, 0 liquidations, 534 trades, best
+month +88.5%, 2 light negative months out of 13.** A long-only survivor
+stream (coins >90d above their 90d price) and a memecoin cascade
+frequency stream complete the portfolio. Every indicator, verdict and
+date lives in `docs/20-registre-indicateurs.md` — the living registry.
+
 ## Discipline (the part that matters)
 
-- **6 large null results** recorded and archived: classic indicators,
+- **9+ large null results** recorded and archived: classic indicators,
   absorption/sweep patterns, extreme funding, the X crowd at +24h, x20
   directional scalping, funding-settlement drift. Every false door is closed
   with numbers, not opinions.
