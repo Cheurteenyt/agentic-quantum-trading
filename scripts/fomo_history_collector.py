@@ -1,0 +1,214 @@
+#!/usr/bin/env python
+"""LE COLLECTEUR D'HISTORIQUE fomo — la donnée on-chain complète.
+
+Sur fomo, les tokens sont des tokens SOLANA : leur historique de prix
+existe ON-CHAIN et GeckoTerminal l'indexe (les bougies OHLCV de chaque
+pool, paginées jusqu'à la création). C'est l'égalité de donnée avec
+Aster : le backtest fomo devient possible sur du complet et impartial.
+
+Le flux par token :
+  1. GT search par ticker → le mint + le pool principal
+  2. OHLCV 1m paginé (limit 1000, before_timestamp en arrière) → fomo_ohlcv
+  3. OHLCV 1h paginé (l'histoire longue)
+Le tout stocké dans fomo_ohlcv (la même table que le collector live).
+
+  .venv/bin/python scripts/fomo_history_collector.py            # tous les tickers fomo
+  .venv/bin/python scripts/fomo_history_collector.py --tickers GROK,DEBT
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sqlite3
+import time
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DB = ROOT / "data" / "fomo" / "fomo.db"
+GT = "https://api.geckoterminal.com/api/v2"
+H = {"User-Agent": "trading-agent/1.0", "Accept": "application/json"}
+SLEEP = 2.1          # le free tier GT : 30 appels/min
+
+
+def get(url: str) -> dict:
+    req = urllib.request.Request(url, headers=H)
+    import urllib.error
+    for attempt in (1, 2, 3, 4):
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 4:
+                time.sleep(65.0)          # le free tier GT : le cooldown complet
+                continue
+            if attempt == 4:
+                raise
+            time.sleep(2.0 * attempt)
+        except Exception:
+            if attempt == 4:
+                raise
+            time.sleep(2.0 * attempt)
+    return {}
+
+
+def fnum(x) -> float:
+    return float(str(x).replace("$", "").replace(",", "") or 0)
+
+
+def resolve_mint(ticker: str) -> tuple[str | None, str | None]:
+    """DexScreener search par ticker → (mint, pool principal).
+    Le search GT renvoie 404 — DexScreener est la source de résolution."""
+    try:
+        d = get(f"https://api.dexscreener.com/latest/dex/search?q={ticker}")
+    except Exception:
+        return None, None
+    sol_pairs = [p for p in (d.get("pairs") or [])
+                 if p.get("chainId") == "solana"]
+    pairs = [p for p in sol_pairs
+             if p.get("baseToken", {}).get("symbol", "").upper() == ticker]
+    if not pairs:
+        pairs = [p for p in sol_pairs
+                 if p.get("quoteToken", {}).get("symbol", "").upper() == ticker]
+        if pairs:
+            # le token est en QUOTE : le mint = quoteToken.address
+            fomo_pairs = [p for p in pairs if p.get("dexId") == "fomo"]
+            best = max(fomo_pairs or pairs,
+                       key=lambda x: (x.get("liquidity") or {}).get("usd", 0))
+            mint = best.get("quoteToken", {}).get("address")
+            return (mint, None) if mint else (None, None)
+    if not pairs:
+        return None, None
+    # le désambiguïsateur : plusieurs tokens portent le même ticker — le
+    # token NATIF fomo (dexId == "fomo") gagne, sinon la liquidité max
+    fomo_pairs = [p for p in pairs if p.get("dexId") == "fomo"]
+    pool_of = fomo_pairs or pairs
+    best = max(pool_of, key=lambda x: (x.get("liquidity") or {}).get("usd", 0))
+    mint = best.get("baseToken", {}).get("address")
+    return (mint, None) if mint else (None, None)
+
+
+def top_pool(mint: str) -> str | None:
+    d = get(f"{GT}/networks/solana/tokens/{mint}/pools")
+    pools = d.get("data", [])
+    if not pools:
+        return None
+    best = max(pools, key=lambda p: fnum(
+        p.get("attributes", {}).get("reserve_in_usd")))
+    pid = best.get("id", "")
+    return pid.split("solana_")[-1] if pid.startswith("solana_") else pid
+
+
+def store_candles(con: sqlite3.Connection, mint: str, period: str,
+                  ohlcv_list: list) -> int:
+    n = 0
+    for row in ohlcv_list:
+        t0, o, h, l, c = row[0], row[1], row[2], row[3], row[4]
+        v = row[5] if len(row) > 5 else 0
+        if not all(isinstance(x, (int, float)) for x in (t0, o, h, l, c)):
+            continue
+        cur = con.execute(
+            "SELECT 1 FROM fomo_ohlcv WHERE asset=? AND period=? AND time=?",
+            (mint, period, int(t0) * 1000)).fetchone()
+        if cur:
+            continue
+        con.execute(
+            "INSERT OR REPLACE INTO fomo_ohlcv VALUES (?,?,?,?,?,?,?,?,?)",
+            (mint, period, int(t0) * 1000, o, h, l, c, v, time.time()))
+        n += 1
+    con.commit()
+    return n
+
+
+def fetch_ohlcv(con: sqlite3.Connection, mint: str, pool: str,
+                aggregate: int, period: str, pages: int = 8) -> int:
+    total, before = 0, None
+    for _ in range(pages):
+        url = (f"{GT}/networks/solana/pools/{pool}/ohlcv/minute"
+               f"?aggregate={aggregate}&limit=1000")
+        if before:
+            url += f"&before_timestamp={before}"
+        try:
+            d = get(url)
+        except Exception:
+            break
+        lst = (d.get("data", {}).get("attributes", {}).get("ohlcv_list")
+               or [])
+        if not lst:
+            break
+        total += store_candles(con, mint, period, lst)
+        before = min(row[0] for row in lst)
+        time.sleep(SLEEP)
+        if len(lst) < 500:
+            break
+    return total
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tickers", default="",
+                    help="csv de tickers ; défaut = les tickers fomo connus")
+    ap.add_argument("--pages", type=int, default=8,
+                    help="pages de 1000 bougies par token (1m)")
+    args = ap.parse_args()
+
+    con = sqlite3.connect(DB)
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS fomo_tokens (
+        ticker TEXT PRIMARY KEY, mint TEXT, pool TEXT, resolved_at REAL);
+    CREATE TABLE IF NOT EXISTS fomo_ohlcv (
+        asset TEXT NOT NULL, period TEXT NOT NULL, time INTEGER NOT NULL,
+        open REAL, high REAL, low REAL, close REAL, volume REAL,
+        captured_at REAL NOT NULL,
+        PRIMARY KEY (asset, period, time));
+    """)
+    con.commit()
+
+    if args.tickers:
+        tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+    else:
+        tickers = sorted({r[0].upper() for r in con.execute(
+            "SELECT DISTINCT ticker FROM fomo_new_coins")
+            | {r[0].upper() for r in con.execute(
+                "SELECT DISTINCT ticker FROM fomo_positions")}})
+        tickers = [t for t in tickers if t and len(t) >= 2]
+
+    total = 0
+    for tk in tickers:
+        try:
+            row = con.execute("SELECT mint, pool FROM fomo_tokens WHERE ticker=?",
+                              (tk,)).fetchone()
+            if row and row[0]:
+                mint, pool = row
+            else:
+                mint, pool = resolve_mint(tk)
+                if not mint:
+                    print(f"[fomo-hist] {tk} : mint introuvable")
+                    continue
+                pool = top_pool(mint)
+                con.execute(
+                    "INSERT OR REPLACE INTO fomo_tokens VALUES (?,?,?,?)",
+                    (tk, mint, pool, time.time()))
+                con.commit()
+                time.sleep(SLEEP)
+            if not pool:
+                print(f"[fomo-hist] {tk} : pool introuvable")
+                continue
+            n1m = fetch_ohlcv(con, mint, pool, 1, "1m", args.pages)
+            n1h = fetch_ohlcv(con, mint, pool, 60, "1h", 3)
+            total += n1m + n1h
+            n_now = con.execute(
+                "SELECT COUNT(*) FROM fomo_ohlcv WHERE asset=?", (mint,)
+            ).fetchone()[0]
+            print(f"[fomo-hist] {tk} ({mint[:10]}…) : +{n1m + n1h} bougies, "
+                  f"total {n_now}")
+        except Exception as e:
+            print(f"[fomo-hist] {tk} : ERREUR {e}")
+        time.sleep(SLEEP)
+    con.close()
+    print(f"[fomo-hist] terminé : {total} nouvelles bougies")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
