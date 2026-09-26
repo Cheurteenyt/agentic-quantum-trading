@@ -95,6 +95,18 @@ def main() -> int:
                 pass
         print(f"[ticks] listeners sur {n_listeners} pages + reload — la collecte démarre")
 
+        # la ROTATION : naviguer à travers les pages token de nos mints —
+        # chaque page abonne ce token's prices → la couverture large
+        def rotation_mints():
+            mints = [r[0] for r in con.execute(
+                "SELECT DISTINCT mint FROM fomo_tokens WHERE mint IS NOT NULL")]
+            tk_mints = [r[0] for r in con.execute(
+                "SELECT DISTINCT asset FROM fomo_ohlcv WHERE period='1m'")]
+            return sorted(set(mints) | set(tk_mints))
+        rotation = rotation_mints()
+        rotation_idx = [0]
+        print(f"[ticks] rotation : {len(rotation)} mints à couvrir", flush=True)
+
         # le WATCHDOG : si les ticks s'arrêtent 5 min → reload (les sockets meurent)
         last_tick_ts = time.time()
         last_agg = 0
@@ -134,6 +146,16 @@ def main() -> int:
                 ).fetchone()[0]
                 print(f"[ticks] {n_frames[0]} ticks | {len(ticks)} mints en cours | "
                       f"{n_candles} bougies 1m, {n_mints} tokens", flush=True)
+                # la rotation : le token suivant de la liste (30s chacun)
+                if rotation:
+                    mint = rotation[rotation_idx[0] % len(rotation)]
+                    rotation_idx[0] += 1
+                    try:
+                        page.goto(f"https://fomo.family/tokens/solana/{mint}",
+                                  timeout=15000, wait_until="domcontentloaded")
+                        print(f"[ticks] rotation → {mint[:14]}…", flush=True)
+                    except Exception:
+                        pass
             except Exception as e:
                 print(f"[ticks] erreur d'agrégation : {e}", flush=True)
     finally:
