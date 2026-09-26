@@ -21,6 +21,8 @@ import argparse
 import json
 import sqlite3
 import time
+import urllib.error
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -33,7 +35,6 @@ SLEEP = 2.1          # le free tier GT : 30 appels/min
 
 def get(url: str) -> dict:
     req = urllib.request.Request(url, headers=H)
-    import urllib.error
     for attempt in (1, 2, 3, 4):
         try:
             with urllib.request.urlopen(req, timeout=20) as r:
@@ -42,9 +43,7 @@ def get(url: str) -> dict:
             if e.code == 429 and attempt < 4:
                 time.sleep(65.0)          # le free tier GT : le cooldown complet
                 continue
-            if attempt == 4:
-                raise
-            time.sleep(2.0 * attempt)
+            raise
         except Exception:
             if attempt == 4:
                 raise
