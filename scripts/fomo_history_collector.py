@@ -210,10 +210,11 @@ def main() -> int:
     if args.tickers:
         tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
     else:
-        tickers = sorted({r[0].upper() for r in con.execute(
-            "SELECT DISTINCT ticker FROM fomo_new_coins")
+        tickers = sorted(
+            {r[0].upper() for r in con.execute(
+                "SELECT DISTINCT ticker FROM fomo_new_coins")}
             | {r[0].upper() for r in con.execute(
-                "SELECT DISTINCT ticker FROM fomo_positions")}})
+                "SELECT DISTINCT ticker FROM fomo_positions")})
         tickers = [t for t in tickers if t and len(t) >= 2]
 
     total = 0
