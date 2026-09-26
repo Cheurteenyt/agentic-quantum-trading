@@ -28,12 +28,38 @@ from scripts import fomo_history_collector as fc  # noqa: E402
 REPORTS = ROOT / "reports"
 
 
+# les actifs de cotation/collatéral : jamais des tokens fomo
+QUOTE_MINTS = frozenset({
+    "So11111111111111111111111111111111111111112",  # SOL wrappé
+    "7vfCXTUXxzBN6xej7ucn7NNvi3orD1vs8HN4cBwpfA2Z",  # WETH Wormhole
+    "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",  # cbBTC Coinbase
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
+    "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",  # WBTC
+})
+
+
 def main() -> int:
     import subprocess
     # la fenêtre exclusive : le tick collector 24/7 stoppé pendant la passe
     subprocess.run(["systemctl", "--user", "stop", "fomo-tick-collector.service"],
                    capture_output=True)
-    time.sleep(5)
+    # l'arrêt VÉRIFIÉ : on attend l'inactivité réelle (max 30s) — un stop
+    # non vérifié = le collector écrit encore = « database is locked »
+    stopped = False
+    for _ in range(15):
+        r = subprocess.run(["systemctl", "--user", "is-active",
+                            "fomo-tick-collector.service"],
+                           capture_output=True, text=True)
+        if r.stdout.strip() != "active":
+            stopped = True
+            break
+        time.sleep(2)
+    if not stopped:
+        print("[master] ERREUR : le tick collector refuse de s'arrêter — abort",
+              flush=True)
+        return 1
+    time.sleep(3)
     try:
         return _run()
     finally:
@@ -64,12 +90,31 @@ def _run() -> int:
 
     mints = [r[0] for r in con.execute(
         "SELECT DISTINCT asset FROM fomo_ohlcv ORDER BY asset")]
+    _n0 = len(mints)
+    mints = [m for m in mints
+             if not m.startswith("0x")
+             and m not in QUOTE_MINTS
+             and len(m) >= 32]
+    if len(mints) < _n0:
+        print(f"[master] {_n0 - len(mints)} faux mints filtrés (SOL wrappé/EVM)",
+              flush=True)
     print(f"[master] {len(mints)} mints à traiter", flush=True)
 
     coverage = []
     t0 = time.time()
+    skipped = 0
     for idx, mint in enumerate(mints):
         try:
+            # le TOP-UP SÉLECTIF : un token frais (15m < 2h) et déjà profond
+            # = skip — le budget GT (30 appels/min) va aux nouveaux/secs.
+            # Sans ça, chaque passe re-télécharge 35 vies complètes = 30 min.
+            _row = con.execute(
+                "SELECT MAX(time), COUNT(*) FROM fomo_ohlcv "
+                "WHERE asset=? AND period='15m'", (mint,)).fetchone()
+            _last, _n15 = (_row[0] or 0), _row[1] or 0
+            if _last and _n15 >= 100 and (time.time() - _last / 1000) < 7200:
+                skipped += 1
+                continue
             # le ticker : le mapping existant ou DexScreener
             tk_row = con.execute("SELECT ticker FROM fomo_tokens WHERE mint=?",
                                  (mint,)).fetchone()
@@ -127,7 +172,7 @@ def _run() -> int:
     out = REPORTS / f"master-backfill-{datetime.now(timezone.utc):%Y-%m-%d}.md"
     REPORTS.mkdir(exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"[master] {len(ok)}/{len(mints)} tokens avec l'historique, "
+    print(f"[master] {len(ok)}/{len(mints)} tokens avec l'historique ({skipped} frais skippés), "
           f"{total_candles:,} bougies 1m cumulées → {out}")
     return 0
 

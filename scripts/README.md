@@ -48,6 +48,8 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `refresh_aster_cache.py` | caches Aster (funding agrégés, tickers) |
 | `fetch_klines.py` / `fetch_deep_klines.py` | bougies 1h/15m (1 an+) |
 | `whale_radar.py` / `whale_flow.py` / `fomo_harvest.py` | la couche fomo |
+| `fomo_tick_collector.py` | ticks fomo 24/7 → 1m OHLCV (flock anti-orphan, filtre QUOTE_MINTS) |
+| `fomo_history_collector.py` / `fomo_master_backfill.py` | backfill GT via mapping `_TF` (minute 1/5/15, hour 1h/4h) + top-up sélectif |
 | `x_harvest.py` / `fetch_x_posts.py` / `score_x_calls.py` | la couche X |
 | `aster_oi_history.py` | open interest (maison) |
 | `basis_guard.py` / `flow_snapshot.py` | basis + flow |

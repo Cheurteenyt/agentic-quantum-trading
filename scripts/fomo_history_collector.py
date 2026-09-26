@@ -138,12 +138,20 @@ def store_candles(con: sqlite3.Connection, mint: str, period: str,
     return n
 
 
+# le mapping period → (timeframe GT, aggregate GT) : minute n'accepte
+# que 1/5/15 — la 1h DOIT passer par ohlcv/hour?aggregate=1 (l'URL
+# « minute?aggregate=60 » était rejetée → zéro bougie 1h en silence)
+_TF = {"1m": ("minute", 1), "5m": ("minute", 5), "15m": ("minute", 15),
+       "1h": ("hour", 1), "4h": ("hour", 4), "1d": ("day", 1)}
+
+
 def fetch_ohlcv(con: sqlite3.Connection, mint: str, pool: str,
                 aggregate: int, period: str, pages: int = 8) -> int:
     total, before = 0, None
+    tf, agg = _TF.get(period, ("minute", aggregate))
     for _ in range(pages):
-        url = (f"{GT}/networks/solana/pools/{pool}/ohlcv/minute"
-               f"?aggregate={aggregate}&limit=1000")
+        url = (f"{GT}/networks/solana/pools/{pool}/ohlcv/{tf}"
+               f"?aggregate={agg}&limit=1000")
         if before:
             url += f"&before_timestamp={before}"
         try:
@@ -170,6 +178,8 @@ def main() -> int:
                     help="pages de 1000 bougies par token (1m)")
     ap.add_argument("--mints", default="",
                     help="csv de mints (la résolution inverse : mint → ticker)")
+    ap.add_argument("--tickers-file", default="",
+                    help="fichier avec un ticker par ligne (l'univers complet)")
     args = ap.parse_args()
 
     con = sqlite3.connect(DB)
@@ -209,6 +219,10 @@ def main() -> int:
         return 0
     if args.tickers:
         tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+    elif args.tickers_file:
+        tf = Path(args.tickers_file)
+        tickers = [t.strip().upper() for t in tf.read_text().splitlines()
+                   if t.strip() and len(t.strip()) >= 2]
     else:
         tickers = sorted(
             {r[0].upper() for r in con.execute(

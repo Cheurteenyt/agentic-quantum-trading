@@ -28,6 +28,37 @@ from scripts.fomo_harvest import _connect_cdp  # noqa: E402
 
 DB = ROOT / "data" / "fomo" / "fomo.db"
 
+# l'ANTI-DOUBLE-INSTANCE : un verrou exclusif dès l'import — si un
+# processus vit déjà, celui-ci sort (les orphelins tiennent la DB et
+# provoquent les « database is locked » du backfill)
+import fcntl  # noqa: E402
+_lock_fh = open(ROOT / "data" / "fomo" / ".collector.lock", "w")
+try:
+    fcntl.flock(_lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    print("[ticks] une autre instance tourne déjà — sortie", flush=True)
+    sys.exit(0)
+
+QUOTE_MINTS = frozenset({
+    "So11111111111111111111111111111111111111112",  # SOL wrappé
+    "7vfCXTUXxzBN6xej7ucn7NNvi3orD1vs8HN4cBwpfA2Z",  # WETH Wormhole
+    "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",  # cbBTC Coinbase
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
+    "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",  # WBTC
+})
+
+
+def _is_tradeable_mint(mint: str) -> bool:
+    """Le filtre des faux mints : les actifs de cotation/collatéral
+    (SOL, WETH, cbBTC, stablecoins — pas des tokens fomo), les
+    adresses EVM 0x…, les ordures trop courtes."""
+    if not mint or len(mint) < 32:
+        return False
+    if mint in QUOTE_MINTS or mint.startswith("0x"):
+        return False
+    return True
+
 
 def main() -> int:
     con = sqlite3.connect(DB, check_same_thread=False)   # les threads partagent la connexion
@@ -90,7 +121,7 @@ def main() -> int:
                 pay = j.get("payload", {})
                 px = pay.get("priceUsd")
                 ts = pay.get("timestamp")
-                if mint and px and ts:
+                if mint and px and ts and _is_tradeable_mint(mint):
                     con.execute(
                         "INSERT OR IGNORE INTO fomo_ticks VALUES (?,?,?,?)",
                         (mint, int(ts), float(px), time.time()))
@@ -148,11 +179,29 @@ def main() -> int:
         rotation_idx = [0]
         print(f"[ticks] rotation : {len(rotation)} mints à couvrir", flush=True)
 
-        # le WATCHDOG : si les ticks s'arrêtent 5 min → reload (les sockets meurent)
+        # le WATCHDOG PROACTIF : recréer la page toutes les 4 min AVANT que
+        # les WS meurent (les connexions fomo ont un timeout ~5 min)
         last_tick_ts = time.time()
         last_agg = 0
+        page_refresh = time.time()
         while True:
             time.sleep(30)
+            # le rafraîchissement proactif : toutes les 4 min, nouvelle page
+            if time.time() - page_refresh > 240:
+                try:
+                    page.close()
+                except Exception:
+                    pass
+                page = ctx.new_page()
+                def on_ws_new(ws):
+                    ws.on("framereceived", on_frame)
+                try:
+                    page.on("websocket", on_ws_new)
+                except Exception:
+                    pass
+                page.goto(BASE, timeout=15000, wait_until="domcontentloaded")
+                page_refresh = time.time()
+                print("[ticks] page recréée — les sockets sont neufs", flush=True)
             if time.time() - last_tick_ref[0] > 300:
                 print("[ticks] WATCHDOG : plus de ticks depuis 5 min — reload des pages",
                       flush=True)
