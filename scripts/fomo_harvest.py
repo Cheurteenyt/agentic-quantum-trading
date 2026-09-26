@@ -670,6 +670,10 @@ def _persist_tokens(tab: str, rows: list) -> None:
         mc TEXT, price TEXT, vol TEXT, age TEXT, dir TEXT,
         change_pct TEXT, bonding_pct TEXT, captured_at REAL NOT NULL,
         PRIMARY KEY (ticker, tab, captured_at));
+    CREATE TABLE IF NOT EXISTS fomo_price_history (
+        ticker TEXT NOT NULL, captured_at REAL NOT NULL,
+        mc REAL, price REAL, dir TEXT, change_pct REAL,
+        PRIMARY KEY (ticker, captured_at));
     """)
     now = time.time()
     for r in rows:
@@ -677,6 +681,21 @@ def _persist_tokens(tab: str, rows: list) -> None:
                     (r.get("ticker"), tab, r.get("mc"), r.get("price"), r.get("vol"),
                      r.get("age"), r.get("dir"), r.get("change_pct"),
                      r.get("bonding_pct"), now))
+        # la SÉRIE TEMPORELLE : chaque scan ajoute une ligne — l'UI fomo
+        # n'expose que les gains (100 % WR affiché = sélection), nos propres
+        # séries sont la seule donnée impartiale pour backtester
+        try:
+            mc_f = float(str(r.get("mc", "")).replace("$", "").replace(",", "") or 0)
+            px_f = float(str(r.get("price", "")).replace("$", "").replace(",", "") or 0)
+            chg = str(r.get("change_pct", "")).replace("%", "").strip()
+            chg_f = float(chg) if chg else None
+            if mc_f > 0 and px_f > 0:
+                con.execute(
+                    "INSERT OR IGNORE INTO fomo_price_history VALUES (?,?,?,?,?,?)",
+                    (str(r.get("ticker", "")).upper(), now, mc_f, px_f,
+                     r.get("dir"), chg_f))
+        except (TypeError, ValueError):
+            continue
     con.commit()
     con.close()
 
