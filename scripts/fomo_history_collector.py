@@ -51,6 +51,25 @@ def get(url: str) -> dict:
     return {}
 
 
+
+def resolve_ticker(mint: str) -> str | None:
+    """DexScreener par mint → le ticker (le symbol du token)."""
+    try:
+        d = get(f"https://api.dexscreener.com/latest/dex/tokens/{mint}")
+    except Exception:
+        return None
+    pairs = d.get("pairs") or []
+    for p in pairs:
+        bt = p.get("baseToken", {})
+        if bt.get("address") == mint and bt.get("symbol"):
+            return bt["symbol"]
+    for p in pairs:
+        qt = p.get("quoteToken", {})
+        if qt.get("address") == mint and qt.get("symbol"):
+            return qt["symbol"]
+    return None
+
+
 def fnum(x) -> float:
     return float(str(x).replace("$", "").replace(",", "") or 0)
 
@@ -149,6 +168,8 @@ def main() -> int:
                     help="csv de tickers ; défaut = les tickers fomo connus")
     ap.add_argument("--pages", type=int, default=8,
                     help="pages de 1000 bougies par token (1m)")
+    ap.add_argument("--mints", default="",
+                    help="csv de mints (la résolution inverse : mint → ticker)")
     args = ap.parse_args()
 
     con = sqlite3.connect(DB)
@@ -163,6 +184,29 @@ def main() -> int:
     """)
     con.commit()
 
+    if args.mints:
+        mints = [m.strip() for m in args.mints.split(",") if m.strip()]
+        con2 = con
+        total_m = 0
+        for mint in mints:
+            tk = resolve_ticker(mint)
+            pool = top_pool(mint)
+            if tk:
+                con.execute(
+                    "INSERT OR REPLACE INTO fomo_tokens VALUES (?,?,?,?)",
+                    (tk.upper(), mint, pool, time.time()))
+            n1m = fetch_ohlcv(con, mint, pool, 1, "1m", args.pages)
+            n15 = fetch_ohlcv(con, mint, pool, 15, "15m", 3)
+            n1h = fetch_ohlcv(con, mint, pool, 60, "1h", 3)
+            total_m += n1m + n15 + n1h
+            print(f"[fomo-hist] {tk or mint[:10]} ({mint[:10]}…) : "
+                  f"+{n1m + n15 + n1h} bougies")
+            time.sleep(SLEEP)
+        con.commit()
+        con2.close() if False else None
+        print(f"[fomo-hist] mode mints terminé : {total_m} bougies")
+        con.close()
+        return 0
     if args.tickers:
         tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
     else:
