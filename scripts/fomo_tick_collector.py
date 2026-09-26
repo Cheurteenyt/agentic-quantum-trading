@@ -30,7 +30,7 @@ DB = ROOT / "data" / "fomo" / "fomo.db"
 
 
 def main() -> int:
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, check_same_thread=False)   # les threads partagent la connexion
     con.executescript("""
     CREATE TABLE IF NOT EXISTS fomo_ticks (
         mint TEXT NOT NULL, ts_s INTEGER NOT NULL, priceUsd REAL NOT NULL,
@@ -46,6 +46,40 @@ def main() -> int:
     ticks: dict[str, list] = {}
     n_frames = [0]
     last_tick_ref = [time.time()]
+    known_mints = {r[0] for r in con.execute("SELECT DISTINCT asset FROM fomo_ohlcv")}
+    backfill_q: list[str] = []
+    import threading
+    stop_flag = [False]
+
+    def backfill_worker():
+        """Le backfill GT de chaque nouveau mint détecté (sa vie complète)."""
+        from scripts import fomo_history_collector as fc
+        while not stop_flag[0]:
+            if not backfill_q:
+                time.sleep(5)
+                continue
+            time.sleep(3)                     # le rythme : le tick 24/7 écrit toutes les 30s
+            mint = backfill_q.pop(0)
+            try:
+                hcon = sqlite3.connect(DB, timeout=45)
+                hcon.execute("PRAGMA busy_timeout=45000")   # la db est DÉJÀ en WAL — le pragma ici re-verrouille
+                pool = fc.top_pool(mint)
+                if pool:
+                    n1 = fc.fetch_ohlcv(con, mint, pool, 1, "1m", 6)
+                    n2 = fc.fetch_ohlcv(con, mint, pool, 15, "15m", 3)
+                    con.commit()
+                    tk = fc.resolve_ticker(mint) or mint[:10]
+                    hcon.execute(
+                        "INSERT OR REPLACE INTO fomo_tokens VALUES (?,?,?,?)",
+                        (tk.upper(), mint, pool, time.time()))
+                    hcon.commit()
+                    print(f"[ticks] BACKFILL {tk} ({mint[:12]}…) : "
+                          f"+{n1 + n2} bougies — la vie complète en base",
+                          flush=True)
+            except Exception as e:
+                print(f"[ticks] backfill {mint[:12]}… : {e}", flush=True)
+
+    threading.Thread(target=backfill_worker, daemon=True).start()
 
     def on_frame(f, con=con):
         p = f.payload if hasattr(f, "payload") else str(f)
@@ -63,6 +97,13 @@ def main() -> int:
                     ticks.setdefault(mint, []).append((int(ts), float(px)))
                     n_frames[0] += 1
                     last_tick_ref[0] = time.time()
+                    # l'AUTO-DÉTECTION : un mint jamais vu = un nouveau
+                    # token → sa vie complète backfillée par GT en fond
+                    if mint not in known_mints and mint not in backfill_q:
+                        known_mints.add(mint)
+                        backfill_q.append(mint)
+                        print(f"[ticks] NOUVEAU TOKEN : {mint[:14]}…",
+                              flush=True)
         except Exception:
             pass
 
