@@ -157,8 +157,8 @@ def main() -> int:
                     # horizon déjà écoulé : clôture immédiate au prix réel
                     j = min(entry_i + horizon - 1, len(df.index) - 1)
                     exit_price = float(df["close"].iloc[j])
-                    exit_ts = int(df.index[j].timestamp() * 1000)
-                    hold_h = (df.index[j] - df.index[entry_i]).total_seconds() / 3600
+                    exit_ts = exit_ts_ms   # l'heure de prix réelle = entry + hold
+                    hold_h = (exit_ts_ms - entry_ts) / 3600000.0
                     ret = ((exit_price - entry_price) / entry_price * 100 * direction
                            - COST_PCT
                            - direction * funding_stats.get(sym, 0.0) * hold_h)
@@ -316,12 +316,13 @@ def main() -> int:
         if now_ms < exit_ts_ms:
             continue
         target = pd.Timestamp(exit_ts_ms, unit="ms")
-        j = int(df.index.searchsorted(target, side="left"))
-        j = min(j, len(df.index) - 1)
+        # convention backtest (closes[ei+hold-1]) : le prix à T+hold est la
+        # close de la bougie ouverte à T+hold-1h — pas celle d'après.
+        j = int(df.index.searchsorted(target, side="left")) - 1
+        j = max(min(j, len(df.index) - 1), 0)
         exit_price = float(df["close"].iloc[j])
-        exit_ts = int(df.index[j].timestamp() * 1000)
-        entry_dt = pd.Timestamp(entry_ts, unit="ms")
-        hold_h = (df.index[j] - entry_dt).total_seconds() / 3600
+        exit_ts = exit_ts_ms
+        hold_h = (exit_ts_ms - entry_ts) / 3600000.0
         ret = ((exit_price - entry_price) / entry_price * 100 * direction
                - COST_PCT
                - direction * funding_stats.get(sym, 0.0) * hold_h)
@@ -362,16 +363,22 @@ def main() -> int:
              "machine_survivor_long": 0.10, "machine_vol_spike_6h": 0.10}
     _mrows = con.execute(
         "SELECT signal, symbol, direction, entry_ts, exit_ts, exit_price, "
-        "entry_price, ret_pct FROM paper_trades "
-        "WHERE signal LIKE 'machine_%' AND status='closed' "
-        "ORDER BY exit_ts").fetchall()
+        "entry_price, ret_pct, status FROM paper_trades "
+        "WHERE signal LIKE 'machine_%' "
+        "ORDER BY entry_ts, rowid").fetchall()
     _bal = 100.0
     _peak = _bal
     _mdd = 0.0
     _fmonth: dict[str, dict] = {}
-    for (sig, sym, d, ets, xts, xp, ep, ret) in _mrows:
-        if ret is None:
-            continue
+    _busy: dict[str, int] = {}   # créneaux run_stack : 1 slot par flux
+    _nplayed = 0
+    for (sig, sym, d, ets, xts, xp, ep, ret, st) in _mrows:
+        if _busy.get(sig, -(1 << 62)) > ets:
+            continue             # flux occupé à l'entrée : non joué (run_stack)
+        _busy[sig] = xts if xts is not None else (1 << 62)
+        if st != "closed" or ret is None:
+            continue             # ouvert : occupe le slot, PnL latent non compté
+        _nplayed += 1
         frac = ret * _base.get(sig, 0.1) * _lev.get(sig, 1) / 100.0
         _bal *= (1 + frac)
         _peak = max(_peak, _bal)
@@ -380,7 +387,7 @@ def main() -> int:
         fm = _fmonth.setdefault(m, {"roi": 0.0, "n": 0})
         fm["roi"] += frac * 100
         fm["n"] += 1
-    _len_m = len(_mrows)
+    _len_m = _nplayed
     _lines_m = [f"- Balance forward (100 $ →) : **${_bal:,.2f}** "
                 f"sur {_len_m} trades clôturés, "
                 f"DD forward {_mdd:.1f} %"]
