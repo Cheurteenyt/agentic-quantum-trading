@@ -41,6 +41,7 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 | Squeeze haussier (miroir de la cascade) | wallet $6,34, WR 44,9 %, détruit le stack | 25/09 |
 | Exit première verte (épuisement) | hold moyen 1,8 h, -5 % vs +197 % — les bounces sont micro, le drift domine à 24h | 25/09 |
 | Cascade × funding percentile | NUL même série profonde ; l'inverse gagne = anti-signal | 25/09 |
+| **STRUCTURE funding (velocity 8h/24h, dispersion cross-section, level)** — `funding_dimension_study.py` | gradient map ex-ante sur 165 cascades gated (train 115/val 50, seuils TRAIN) : dispersion INVERSE (TRAIN T3 +10,8 → VAL T3 −0,3, non-monotone), velocity_8h garde sa direction d'espérance (VAL T1 +5,9 → T3 +1,6, liqs 17 % en T3 VAL) mais rate la barre pré-enregistrée (gap WR VAL < 5 pts, buckets n=12-20), level INVERSE (confirme fund7). Sizing ×{0.75,1,1.25} funding_rank : $2 916 vs baseline $4 005 (contrôle inverse $5 361 = chance de chemin, ambigu → non-adoptable) ; diagnostic velocity : $3 173, échoue aussi | 27/09 |
 | 20x taker (directionnel) | frais 5,6 % marge/RT ; -60 %/an | 24/09 |
 | Memecoins à 20x | 26-43 % liquidés = loterie, même avec AL Score | 24/09 |
 | Foule X (calls publics) | WR 50 % pile, inverse symétrique | 23/09 |
