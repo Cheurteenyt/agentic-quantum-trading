@@ -44,11 +44,14 @@ def one(con: sqlite3.Connection, sql: str, params: tuple = ()) -> object:
     return con.execute(sql, params).fetchone()
 
 
+INTERVAL = '1h'  # écrasé par --interval
+
+
 def sim_symbols_1h(con: sqlite3.Connection) -> list[tuple[str, int, int]]:
     """(symbol, min_open_time, max_open_time) de toutes les series 1h du sim."""
     rows = con.execute(
         "SELECT symbol, MIN(open_time), MAX(open_time) FROM klines "
-        "WHERE interval = '1h' GROUP BY symbol ORDER BY symbol"
+        f"WHERE interval = '{INTERVAL}' GROUP BY symbol ORDER BY symbol"
     ).fetchall()
     return [(r[0], int(r[1]), int(r[2])) for r in rows]
 
@@ -60,7 +63,7 @@ def fetch_page_with_429_retry(
     for attempt in range(MAX_RETRIES_429):
         try:
             return fk.fetch_klines(
-                symbol, interval="1h", limit=limit,
+                symbol, interval=INTERVAL, limit=limit,
                 start_time=start_time, timeout=timeout,
             )
         except fk.AsterFetchError as exc:
@@ -171,7 +174,9 @@ def main() -> int:
     ap.add_argument("--symbols", default="", help="Restreindre (CSV).")
     ap.add_argument("--sleep", type=float, default=DEFAULT_SLEEP_S)
     ap.add_argument("--timeout", type=float, default=fk.DEFAULT_TIMEOUT)
+    ap.add_argument("--interval", default="1h", choices=["1m", "5m", "15m", "1h"])
     args = ap.parse_args()
+    INTERVAL = args.interval
     syms = [s for s in args.symbols.split(",") if s.strip()] or None
     return run(syms, args.sleep, args.timeout, dry_run=not args.run)
 
