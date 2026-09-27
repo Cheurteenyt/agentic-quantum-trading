@@ -214,3 +214,15 @@ Alors :
 - réponse rapide
 - ciblage précis
 - zéro perte de tokens
+
+# ⚡ MODE PARALLÈLE (subagents) — par défaut
+
+Le user veut de la VITESSE : dès qu'une tâche a ≥ 2 flux indépendants,
+les dispatcher en Agent parallèles (UN SEUL message, plusieurs appels Agent).
+- Le thread principal garde : coordination, services systemd, git push final.
+- Long/network (backfills, collectes) → Bash en run_in_background, JAMAIS bloquant.
+- Analyse/read-only sur une DB + écritures sur une AUTRE DB : parallèle OK.
+- Deux écrivains sur la MÊME DB : jamais en parallèle (WAL ou pas).
+- Pattern éprouvé : 1 background bash + 2 agents courts (analyse, docs+git).
+- Chaque agent : prompt autoportant (chemins quotés, .venv/bin/python,
+  interdictions explicites, format de réponse chiffré, ~12 lignes max).
