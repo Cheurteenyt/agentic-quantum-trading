@@ -62,6 +62,17 @@ FRESH_WINDOW_S = 6 * 3600        # détecté FRAIS = première apparition < 6h
 ANTI_RUG_TRIGGER = 0.65          # multiple < 0.65 × max (le -35 % de garde)
 ANTI_RUG_MIN_MAX = 1.2           # …et seulement si le max ≥ 1.2
 
+# ── LA RÉPLICATION PASSIVE derek518 (rapport derek-replication 2026-09-27) ──
+# achats derek518 ≥ $5k sur un token âgé ≥ 7j, entrée ≤ 15 min après son swap,
+# hold 24h + garde anti-rug (les CONSTANTES du dessus), ≤ 10 positions OPEN.
+SWAPS_DB = ROOT / "data" / "fomo" / "fomo_swaps.db"  # LECTURE SEULE (mode=ro)
+REPL_RULE = "replication_derek"
+DEREK_HANDLE = "derek518"        # _swaps_meta = le cache handle→user_id fait foi
+REPL_MIN_USD = 5000.0            # achat derek ≥ $5k
+REPL_MIN_AGE_S = 7 * 86400       # token âgé ≥ 7j (1re bougie 1h du mint)
+REPL_ENTRY_WINDOW_S = 900        # entrée ≤ 15 min après son swap
+REPL_MAX_OPEN = 10               # ≤ 10 positions simultanées (exposition bornée)
+
 
 def open_live() -> sqlite3.Connection:
     con = sqlite3.connect(f"file:{LIVE_DB}?mode=ro", uri=True, timeout=45)
@@ -85,6 +96,15 @@ def open_paper() -> sqlite3.Connection:
     CREATE INDEX IF NOT EXISTS idx_paper_mint
         ON fomo_paper_trades (mint, status);
     """)
+    # la réplication derek : l'IDEMPOTENCE par swap_id (PK métier) — un swap
+    # déjà répliqué ne se ré-ouvre JAMAIS, même re-scanné après coup
+    cols = {r[1] for r in con.execute("PRAGMA table_info(fomo_paper_trades)")}
+    if "swap_id" not in cols:
+        con.execute("ALTER TABLE fomo_paper_trades ADD COLUMN swap_id TEXT")
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_paper_swap "
+                "ON fomo_paper_trades (swap_id) WHERE swap_id IS NOT NULL")
+    con.execute("CREATE TABLE IF NOT EXISTS fomo_paper_state "
+                "(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
     con.commit()
     return con
 
@@ -147,6 +167,97 @@ def resolve_ticker(con_live: sqlite3.Connection, mint: str) -> str:
     return (r[0] or mint[:10]).upper() if r else mint[:10]
 
 
+def open_swaps() -> sqlite3.Connection:
+    con = sqlite3.connect(f"file:{SWAPS_DB}?mode=ro", uri=True, timeout=45)
+    con.execute("PRAGMA busy_timeout=45000")
+    return con
+
+
+def replication_derek(con: sqlite3.Connection, con_live: sqlite3.Connection,
+                      con_swaps: sqlite3.Connection, now: float):
+    """La règle 'replication_derek' : répliquer PASSIF les achats derek518.
+
+    Swaps frais du collector (fomo_swaps.db en mode=ro, page 1 = les plus
+    frais) : buy ≥ $5k, token âgé ≥ 7j (1re bougie 1h), entrée ≤ 15 min
+    après le swap → OPEN rule='replication_derek', horizon='24h' → la
+    SORTIE est gérée par la boucle commune (hold 24h + garde anti-rug,
+    MÊME convention last_price/max_since_entry que les autres règles).
+    Idempotent : swap_id en PK métier ; la fenêtre par défaut (1re passe)
+    = now-15min → strictement forward-only, aucun backfill du passé.
+    → (ouverts, sautés hors-fenêtre/filtre, sautés cap)
+    """
+    r = con_swaps.execute("SELECT user_id FROM _swaps_meta WHERE handle=?",
+                          (DEREK_HANDLE,)).fetchone()
+    if not r:
+        print("[repl] derek518 absent du cache _swaps_meta — skip", flush=True)
+        return 0, 0, 0
+    uid = r[0]
+    last = con.execute("SELECT value FROM fomo_paper_state "
+                       "WHERE key='derek_last_ts'").fetchone()
+    since = float(last[0]) if last else now - REPL_ENTRY_WINDOW_S
+    rows = con_swaps.execute(
+        "SELECT swap_id, mint, ts, size_usd FROM fomo_swaps "
+        "WHERE user_id=? AND side='buy' AND size_usd>=? AND ts>? AND ts<=? "
+        "ORDER BY ts", (uid, REPL_MIN_USD, since - 120, now)).fetchall()
+    n_open = con.execute(
+        "SELECT COUNT(*) FROM fomo_paper_trades "
+        "WHERE rule=? AND status='OPEN'", (REPL_RULE,)).fetchone()[0]
+    seen = {x[0] for x in con.execute(
+        "SELECT swap_id FROM fomo_paper_trades WHERE swap_id IS NOT NULL")}
+    opened = skipped = capped = 0
+    newest = since
+    for swap_id, mint, ts, size_usd in rows:
+        newest = max(newest, float(ts))
+        if swap_id in seen or not _is_tradeable_mint(mint):
+            continue  # déjà répliqué / faux mint = jamais ré-ouvert
+        if now - ts > REPL_ENTRY_WINDOW_S:
+            skipped += 1  # entrée > 15 min après le swap = hors règle validée
+            continue
+        if n_open >= REPL_MAX_OPEN:
+            capped += 1   # exposition bornée : skip, noté (pas de file)
+            continue
+        r = con_live.execute(
+            "SELECT MIN(time) FROM fomo_ohlcv WHERE asset=? AND period='1h'",
+            (mint,)).fetchone()
+        if not r or not r[0] or now - r[0] / 1000.0 < REPL_MIN_AGE_S:
+            skipped += 1  # age < 7j ou pas de 1re bougie 1h = non vérifiable
+            continue
+        # l'entrée = le dernier close 1h, sinon le dernier tick
+        r = con_live.execute(
+            "SELECT time, close FROM fomo_ohlcv WHERE asset=? AND period='1h' "
+            "ORDER BY time DESC LIMIT 1", (mint,)).fetchone()
+        ts_px = r[0] / 1000.0 if r and r[0] else None
+        px = float(r[1]) if r and r[1] else None
+        if not px:
+            r = con_live.execute(
+                "SELECT ts_s, priceUsd FROM fomo_ticks WHERE mint=? "
+                "ORDER BY ts_s DESC LIMIT 1", (mint,)).fetchone()
+            if r and r[1]:
+                ts_px, px = float(r[0]), float(r[1])
+        if not px or px <= 0 or not ts_px or now - ts_px > 2 * 3600:
+            skipped += 1  # pas de prix vivant = pas d'entrée (fake forward)
+            continue
+        tk = resolve_ticker(con_live, mint)
+        con.execute(
+            "INSERT INTO fomo_paper_trades (mint, ticker, rule, horizon, "
+            "entry_ts, entry_price, status, opened_at, swap_id) "
+            "VALUES (?,?,?,?,?,?, 'OPEN', ?, ?)",
+            (mint, tk, REPL_RULE, "24h", now, px, now, swap_id))
+        con.commit()  # COMMIT explicite par swap (pas de transaction fantôme)
+        seen.add(swap_id)
+        n_open += 1
+        opened += 1
+        print(f"[repl] OPEN derek518 {tk} ({mint[:12]}…) "
+              f"swap={size_usd:.0f}$ @ {px:.8g} (hold 24h)", flush=True)
+    if newest > since:
+        con.execute("INSERT INTO fomo_paper_state (key, value) "
+                    "VALUES ('derek_last_ts', ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (str(newest),))
+        con.commit()
+    return opened, skipped, capped
+
+
 def run_pass() -> None:
     now = time.time()
     con_live = open_live()
@@ -180,6 +291,11 @@ def run_pass() -> None:
         n_opened += 1
         print(f"[paper] OPEN {tk} ({mint[:12]}…) @ {px:.8g} "
               f"× 3 règles 24h/48h/72h", flush=True)
+
+    # ── LA RÉPLICATION derek518 : les swaps frais → OPEN (idempotent) ──
+    con_swaps = open_swaps()
+    rep_open, rep_skip, rep_cap = replication_derek(con, con_live, con_swaps, now)
+    con_swaps.close()
 
     # ── LA SORTIE : la gestion de chaque trade OPEN ──
     n_closed_rug, n_closed_horizon = 0, 0
@@ -233,8 +349,9 @@ def run_pass() -> None:
         "SELECT COUNT(*) FROM fomo_paper_trades WHERE status='OPEN'").fetchone()[0]
     n_tot = con.execute("SELECT COUNT(*) FROM fomo_paper_trades").fetchone()[0]
     print(f"[paper] passe : +{n_opened} mints ouverts, {n_skipped} sautés "
-          f"(prix > 2h), {n_closed_rug} anti-rug, {n_closed_horizon} horizon"
-          f" — ledger {n_tot} lignes ({n_open} OPEN)", flush=True)
+          f"(prix > 2h), {n_closed_rug} anti-rug, {n_closed_horizon} horizon, "
+          f"repl +{rep_open} (derek518 : {rep_skip} hors-fenêtre/filtre, "
+          f"{rep_cap} cap) — ledger {n_tot} lignes ({n_open} OPEN)", flush=True)
     con.close()
     con_live.close()
 
@@ -264,6 +381,12 @@ def report() -> None:
         mean = (sum(closed) / len(closed)) if closed else 0.0
         print(f"{rule:<10}{n:>5}{o or 0:>6}{wr:>7.1f}%"
               f"{med:>9.2f}x{mean:>9.2f}x")
+    # la ligne dédiée réplication : sépare derek518 des règles de détection
+    rep = con.execute(
+        "SELECT COUNT(*), SUM(status='OPEN') FROM fomo_paper_trades "
+        "WHERE rule='replication_derek'").fetchone()
+    print(f"REPLICATION derek518 : {rep[1] or 0} OPEN / {REPL_MAX_OPEN} cap, "
+          f"{rep[0]} trades au total (idempotent par swap_id, hold 24h+anti-rug)")
     opens = con.execute(
         "SELECT ticker, rule, multiple, max_multiple FROM fomo_paper_trades "
         "WHERE status='OPEN' ORDER BY max_multiple DESC LIMIT 12").fetchall()
