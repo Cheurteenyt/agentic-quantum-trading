@@ -67,8 +67,39 @@ def upsert_token_retry(con: sqlite3.Connection, jwt: str, mint: str):
     return 0, last
 
 
+DEAD_SKIP_S = 12 * 3600
+
+
+def _dead_table(con: sqlite3.Connection) -> None:
+    con.execute("""CREATE TABLE IF NOT EXISTS topup_dead (
+        mint TEXT PRIMARY KEY, last_zero REAL)""")
+
+
+def _dead_filter(con: sqlite3.Connection, mints: list[str]) -> list[str]:
+    """Les tokens morts (0 bougie récoltée au dernier essai) sortent
+    12 h — sinon ils re-déclenchent à chaque passe pour toujours."""
+    _dead_table(con)
+    rows = dict(con.execute("SELECT mint, last_zero FROM topup_dead"))
+    now = time.time()
+    keep, revive = [], []
+    for m in mints:
+        lz = rows.get(m)
+        if lz and now - lz < DEAD_SKIP_S:
+            continue
+        keep.append(m)
+        if lz:
+            revive.append(m)
+    if revive:
+        con.executemany("DELETE FROM topup_dead WHERE mint=?",
+                        [(m,) for m in revive])
+        con.commit()
+    return keep
+
+
 def one_pass(con: sqlite3.Connection, jwt: str, mints: list[str]) -> int:
     t0, tot, fails = time.time(), 0, []
+    dead_now = []
+    mints = _dead_filter(con, mints)
     for i, mint in enumerate(mints):
         n, err = upsert_token_retry(con, jwt, mint)
         if err:
@@ -76,8 +107,17 @@ def one_pass(con: sqlite3.Connection, jwt: str, mints: list[str]) -> int:
             print(f"  [{i+1}/{len(mints)}] {mint[:10]}… : ÉCHEC {err}",
                   flush=True)
             continue
+        if n == 0:
+            dead_now.append(mint)
+        else:
+            con.execute("DELETE FROM topup_dead WHERE mint=?", (mint,))
         tot += n
         print(f"  [{i+1}/{len(mints)}] {mint[:10]}… : +{n}", flush=True)
+    if dead_now:
+        con.executemany(
+            "INSERT OR REPLACE INTO topup_dead VALUES (?,?)",
+            [(m, time.time()) for m in dead_now])
+        con.commit()
     print(f"[topup] passe : {tot} bougies upsertées en {time.time()-t0:.0f}s, "
           f"{len(fails)} échec(s) résiduel(s)", flush=True)
     for mint, err in fails:
@@ -100,6 +140,28 @@ def main() -> int:
     mints = (token_list(con) if args.all
              else [m.strip() for m in args.mints.split(",") if m.strip()
                    and not m.startswith("0x") and m not in QUOTE_MINTS])
+    # le TOP-UP SÉLECTIF : sans ça, chaque passe re-récupère 690 mints ×
+    # 3 périodes (~10 000 appels mobula/jour) pour des bougies déjà à jour.
+    # On ne garde que les tokens PÉRIMÉS : 1m plus vieux que 40 min OU
+    # 15m plus vieux que 3 h (les inactifs et les morts sortent seuls).
+    if args.all:
+        fresh = []
+        now_ms = time.time() * 1000
+        for mint in mints:
+            last1m = con.execute(
+                "SELECT MAX(time) FROM fomo_ohlcv WHERE asset=? AND period='1m'",
+                (mint,)).fetchone()[0]
+            last15 = con.execute(
+                "SELECT MAX(time) FROM fomo_ohlcv WHERE asset=? AND period='15m'",
+                (mint,)).fetchone()[0]
+            stale1m = (not last1m) or (now_ms - last1m) > 40 * 60 * 1000
+            stale15 = (not last15) or (now_ms - last15) > 3 * 60 * 60 * 1000
+            if stale1m or stale15:
+                fresh.append(mint)
+        n_skipped = len(mints) - len(fresh)
+        mints = fresh
+        print(f"[topup] {n_skipped} mints à jour skippés, "
+              f"{len(mints)} périmés à rattraper", flush=True)
     print(f"[topup] {len(mints)} mints × {list(TOPUP)} — JWT frais…", flush=True)
     jwt = fresh_jwt()
     if not jwt:
