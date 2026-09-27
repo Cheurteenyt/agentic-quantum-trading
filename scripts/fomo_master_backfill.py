@@ -24,6 +24,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts import fomo_history_collector as fc  # noqa: E402
+from scripts import fomo_ohlcv_backfill as mob  # noqa: E402
 
 REPORTS = ROOT / "reports"
 
@@ -100,6 +101,10 @@ def _run() -> int:
               flush=True)
     print(f"[master] {len(mints)} mints à traiter", flush=True)
 
+    jwt = mob.fresh_jwt()
+    if not jwt:
+        print("[master] pas de JWT mobula — repli GT intégral",
+              flush=True)
     coverage = []
     t0 = time.time()
     skipped = 0
@@ -130,10 +135,21 @@ def _run() -> int:
                         (ticker.upper(), mint, pool, time.time()))
             con.commit()
 
-            # l'OHLCV profond : 1m (6 pages), 15m (3), 1h (3)
-            n1m = fc.fetch_ohlcv(con, mint, pool, 1, "1m", 6)
-            n15 = fc.fetch_ohlcv(con, mint, pool, 15, "15m", 3)
-            n1h = fc.fetch_ohlcv(con, mint, pool, 60, "1h", 3)
+            # l'OHLCV profond : MOBULA d'abord (l'endpoint du chart de
+            # l'app, 2000 bougies/appel — 347k bougies en 2 min au 1er run,
+            # la profondeur remonte 16 mois avant GT), GT en repli.
+            n1m = n15 = n1h = 0
+            if jwt:
+                try:
+                    n1m = mob.backfill_period(con, jwt, mint, "1m", 6)
+                    n15 = mob.backfill_period(con, jwt, mint, "15m", 3)
+                    n1h = mob.backfill_period(con, jwt, mint, "1h", 3)
+                except Exception:
+                    n1m = n15 = n1h = 0
+            if not (n1m or n15 or n1h):
+                n1m = fc.fetch_ohlcv(con, mint, pool, 1, "1m", 6)
+                n15 = fc.fetch_ohlcv(con, mint, pool, 15, "15m", 3)
+                n1h = fc.fetch_ohlcv(con, mint, pool, 60, "1h", 3)
             tot = con.execute(
                 "SELECT COUNT(*), datetime(MIN(time)/1000,'unixepoch'), "
                 "datetime(MAX(time)/1000,'unixepoch') FROM fomo_ohlcv "
