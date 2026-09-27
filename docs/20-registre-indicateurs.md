@@ -138,3 +138,12 @@ Rapport : reports/h1-absorption-2026-09-27.md (script : scripts/h1_absorption_te
 | **sweep_vol** (low d'une des 6 bougies avant l'entrée casse le plus-bas des 48h avec volume >2× sa moyenne 20) — H3 pré-enregistrée dans flow-audit-2026-09-27 | Même corpus ; outcome = max(high 4-12h post-entrée) − entrée. Buckets bounce no-sweep→2-3×→3-5×→≥5× : TRAIN **0.97/1.62/1.08/−0.39** (NON monotone, la queue ≥5× est NÉGATIVE), VAL **1.15/0.98/2.77/1.03** (NON). n buckets 3-5×/≥5× = 3-4/split — sous-puissant ET direction instable | **NUL** — H3 close ; hint post-hoc H3bis (sweep ≥2× → MAE 24h du short : TRAIN 2.66 vs 1.84 %, VAL 3.00 vs 1.84 %, espérance VAL sweep négative −27.3/−13.7/−6.6) = **CONTEXTE**, à pré-enregistrer avant re-test |
 
 Rapport : reports/h2-h3-cvd-2026-09-27.md (script : scripts/h2_h3_cvd_test.py — the_machine.py intact, klines.db 1h lecture-seule, backfill 15m non touché). Leçon confirmée : la dynamique (pente/divergence) bat la moyenne, mais la FORME prédite à l'avance reste la seule publiable — les 2 hints inversés attendent leur pré-enregistrement.
+
+## 27/09 très tard — QUBO des poids (CANDIDAT) + wall-clock (CONTEXTE)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **QUBO discrétisé des poids** (Markowitz discretisé, m=3 bits/flux, Q = covariance des PnL mensuels TRAIN, annealing classique — la formulation se branche telle quelle sur QAOA ; QAE/QITE = pricing d'options = pas notre marché) | poids trouvés [majors 0,857, meme 0,857, survivor 2,0, vol_spike 1,143] ; annealing = grille exhaustive convergents 14/14 λ ; choix TRAIN uniquement (μ,Σ 9 mois, split 10/06/26) ; **VAL : +77,1 % vs main +59,9 % — hors échantillon gagné** ; **FULL : $4 639 (+4 539 %/an @ DD 23,4 %, 0 liq, 1 nég) vs $4 005 (+3 905 @ 24,8)** — +634 pts à DD PLUS BAS ; trade-off : record +78,7 % (< cible 80 %), pire mois -14,4 % | **CANDIDAT** — paper-forward 2-4 semaines des poids QUBO en parallèle de la config main avant promotion ; m=4 bits ensuite |
+| wall-clock des cascades (l'heure d'entrée UTC, buckets 4h) | rho rangs TRAIN→VAL 0,60 mais incohérent entre années (rho -0,10 — le gradient TRAIN = un artefact du régime 2025) ; la fenêtre funding ±1h : signe qui bascule ; ±28 pts de WR détectables/bucket, aucun p<0,10 | **CONTEXTE** — le hint H2/H3 est enterré |
+
+Rapports : reports/qubo-sizing-2026-09-27.md, reports/wallclock-cascades-2026-09-27.md.
