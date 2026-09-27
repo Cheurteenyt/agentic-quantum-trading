@@ -129,3 +129,4 @@ reports/*
 !reports/README.md
 *.bak-*
 backend/services/onchain/aster/archive/research_artifacts/
+scripts/.gt_pool_cache.json
