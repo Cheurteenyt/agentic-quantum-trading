@@ -1,34 +1,47 @@
 # 🗺️ CARTE DU PROJET — un seul endroit pour tout trouver
 
-> Mise à jour : 25/09/2026. Si un fichier bouge, cette carte bouge.
+> Mise à jour : 27/09/2026. Si un fichier bouge, cette carte bouge.
 > Doc d'architecture complète : `docs/02-architecture.md`.
 
 ## 🏆 LA MACHINE & LE REGISTRE (l'état de la stratégie)
 
-- **Le portefeuille officiel** : `the_machine.py` (câblé nocturne) — cascade
-  majeurs 10x gated AL Score + sizing vol-inverse, cascade memecoins 1x,
-  survivor long 1x → **+2 829 %/an @ DD 27,8 %, 0 liquidation, 534 trades,
-  record mensuel +88,5 %, 2 mois négatifs légers/13** (backtest 1 an, le
-  paper forward 2×/jour juge sur le vivant).
+- **Le portefeuille officiel** : `the_machine.py` (câblé nocturne) —
+  **4 flux** : cascade majeurs gated AL Score + sizing vol-inverse,
+  cascade memecoins 1x, survivor long 1x, vol_spike_6h (câblé 27/09) →
+  **main : +3 905 %/an @ DD 24,8 %, 0 liquidation** ; 2 candidats QUBO en
+  paper forward parallèle (`qubo_forward_tracker.py`) : **QUBO joint
+  poids×levier +5 082 %/an @ DD 23,3 %, record +83,7 %** (marge MAE 9 %
+  surveillée) — la table des 3 configs : `docs/21-goal-performances.md`.
 - **La règle gravée** : levier ≤ 100/(maxMAE + 0,5) — MAE max gated 7,84 %
-  → 10x = mort à 9,5 %, jamais atteinte (moniteur nocturne intégré).
+  → 11x = mort à 8,59 %, marge 9 %, moniteur nocturne intégré.
 - **Le candidat qualité** : cascade ∩ funding-rank-bas — WR 81 %, DD 5,4 %,
   0 liq, en accumulation forward (~2 trades/mois).
 - **Le registre vivant de tous les indicateurs** (VALIDÉ/CANDIDAT/CONTEXTE/NUL,
   chiffres et dates) : `docs/20-registre-indicateurs.md`.
-- **La carte des scripts** : `scripts/README.md` (76 fichiers en 5 groupes,
+- **La carte des scripts** : `scripts/README.md` (135 fichiers en 6 groupes,
   la convention de travail).
 
-## ⚙️ SERVICES SYSTEMD (qui tourne tout seul)
+## 🔁 LES COLLECTEURS QUI TOURNENT 24/7 (systemd user)
 
 | Service | Rythme | Rôle |
 |---|---|---|
-| `trading-agent-nightly` | 03h00 (~70 étapes) | TOUTE la chaîne nocturne (voir unité) — **11 indicateurs maison câblés** |
-| `trading-agent-registre-noon` | 14h00 | Récolte X + liste privée + OI + scoring |
 | `aster-depth-collector` | 24/7 WS/REST | Carnets d'ordres → `depth.db` (15 symboles) |
 | `aster-liq-collector` | 24/7 WS | Liquidations → `klines.db:liq_events` |
+| `fomo-tick-collector` | 24/7 | Ticks fomo → 1m OHLCV (flock anti-orphan, filtre QUOTE_MINTS) |
+| `fomo-mobula-topup` | 15 min | Rattrapage bougies mobula sans navigateur (`fomo_mobula_topup.py`) |
+| `fomo-paper-forward` | 15 min | Ledger forward des lancements (`fomo_paper_forward.py`) |
+| `oi-collector` | 15 min | OI Aster → `klines.db:oi_history` (`oi_collector.py`) |
+| `fomo-swaps-fresh` | 1 h | Page 1 des 13 baleines (`fomo_swaps_collector.py`) |
 | `fomo-browser` | permanent | Chromium caché (special:fomo) + CDP :9222 |
+| `trading-agent-nightly` | 03h00 (~70 étapes) | TOUTE la chaîne nocturne (voir unité) — les indicateurs câblés |
+| `trading-agent-registre-noon` | 14h00 | Récolte X + liste privée + OI + scoring |
 | `depth-heatmap` / `liquidation-watcher` | périodique | Rapports visuels |
+
+## 🤖 LES AGENTS (.zcode/agents/)
+
+`quant-researcher.md` · `fomo-data-engineer.md` · `bug-hunter.md` ·
+`discord-bot.md` — le mode parallèle est codifié dans `AGENTS.md`
+(dès que ≥ 2 flux indépendants : dispatch en agents parallèles).
 
 ## 📜 SCRIPTS VIVANTS par domaine (`scripts/`)
 
@@ -87,10 +100,11 @@
 - `backend/.../legacy_discovery_batches/` — les 442 Mo de CSV de juin (source de
   `legacy_lanes.db`)
 
-## 📚 DOCS (`docs/` — 01 → 18 numérotés + archive)
+## 📚 DOCS (`docs/` — 00 → 21 numérotés + archive)
 `03-methodology.md` (règle pré-enregistrée) · `07-backtest-engine.md` (l'alarme
 taux d'acceptation) · `17-mmt-m5.md` (indicateurs MMT) · `18-roadmap-memecoin-x.md`
-(le pivot complet)
+(le pivot complet) · `20-registre-indicateurs.md` (le registre vivant) ·
+`21-goal-performances.md` (l'état de la machine et les 5 chantiers)
 
 ## 🚫 RÈGLES
 - Aucun ordre autonome — exécution = le user seul

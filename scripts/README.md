@@ -71,6 +71,68 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 `registre_board.py` · `save_aster_key.py` · `telegram_notify.py` ·
 `security/validate_tailscale_acl.py`
 
+## 6. LA SESSION DU 27/09 — les nouveaux scripts (tout reste, verdicts dans docs/20)
+
+### 6a. Recherche quant (verdicts rendus, briques réutilisables)
+
+| Fichier | Une ligne |
+|---|---|
+| `qubo_sizing.py` | QUBO discrétisé des poids (annealing, Q = cov TRAIN) — CANDIDAT +4 539 % @ 23,4 % |
+| `qubo_joint_lev.py` | QUBO joint poids×levier (plafonds MAE par flux) — CANDIDAT **+5 082 % @ 23,3 %**, record +83,7 % |
+| `qubo_per_symbol.py` | QUBO par symbole dans le flux majors (granularité 6 majeures) |
+| `conditional_sizing.py` | sizing conditionnel par régime (jamais gate sec) — NUL (contrôle inverse ambigu) |
+| `funding_dimension_study.py` | structure funding (velocity/dispersion/level) — NUL |
+| `tilt_frontier.py` | frontière du multiplicateur tilt × meme — point final ×1,10 + meme ×0,5 |
+| `tilt_volspike_test.py` | tilt × vol-spike + survivor ×2.0 — les derniers raffinements 4 flux |
+| `h1_absorption_test.py` | H1 buy_ratio — NUL (aucun sizing branché) |
+| `h2_h3_cvd_test.py` | H2 pente CVD + H3 sweep volumique — NUL/NUL |
+| `capitulation_sweep_test.py` | H2bis capitulation + H3bis sweep (pré-enregistrés) — NUL / CONTEXTE |
+| `wallclock_cascades.py` | l'heure d'entrée des cascades — CONTEXTE (artefact de régime) |
+| `recascade_study.py` | re-cascades ≤ 7j (tag ex-ante) — CONTEXTE |
+| `wallet_dd_guard.py` | garde drawdown wallet (désengagement prop-firm) — NUL 12/12 |
+| `funding_hold_surv_map.py` | hold étendu funding-conditionnel NUL + carte hold survivor (72h confirmé) |
+| `survivor_meme_test.py` | TAIL survivor (ATR > p90) flat — CANDIDAT avec réserve de concentration |
+| `tail_machine_confirm.py` | TAIL au sizing machine réel — FAIL critère pré-enregistré → CONTEXTE |
+| `p5_frequency_test.py` | les flux de fréquence P5 — vol_spike_6h CANDIDAT (câblé 4e flux) |
+| `volspike_meme_test.py` | vol_spike sur memecoins — CANDIDAT confirmé (flux memecoin natif, majors ~1 %) |
+| `carte_meme_hold.py` | carte hold × levier du flux meme — DÉGRADÉ (ne PAS lever) |
+| `autopsie_mois_negatifs.py` | séparateurs des mois négatifs (fund7, fresh-peak) — profil n=1 |
+| `fomo_lifecycle_study.py` / `fomo_lifecycle_v2.py` | lifecycle des lancements (v2 sur le corpus profond mobula) |
+
+### 6b. Data fomo
+
+| Fichier | Une ligne |
+|---|---|
+| `fomo_ohlcv_backfill.py` | backfill OHLCV via l'endpoint mobula de l'app (le crack 27/09 : 347k → 2,89M bougies) |
+| `fomo_mobula_topup.py` | rattrapage de bougies sans navigateur — timer 15 min |
+| `fomo_bonding_phase_study.py` | la phase bonding (premier gisement : les ×10 pré-pool) |
+| `fomo_bonding_resolve.py` | la boucle bonding : tickers → mints → OHLCV mobula (collecteur réparé, âge + overlap) |
+| `fomo_bonding_test.py` | mobula inclut-il la phase bonding ? (oui — le bonding est couvert) |
+| `bonding_signal_study.py` | signaux bonding × trades |
+| `fomo_swaps_collector.py` (+ `_resolve` / `_store`) | swaps des 13 baleines (pagination lastSwapId crackée, 12 562 swaps) |
+| `swaps_forward_study.py` | l'edge de réplication skill-weighted des swaps |
+| `fomo_paper_forward.py` | le ledger forward des lancements (entrée à la naissance, anti-rug) — timer 15 min |
+
+### 6c. Infra & collecteurs
+
+| Fichier | Une ligne |
+|---|---|
+| `qubo_forward_tracker.py` | les 3 configs machine (main / QUBO poids / QUBO joint) sur les MÊMES trades paper |
+| `oi_collector.py` | OI Aster toutes les 15 min → `klines.db` (timer) |
+| `flow_audit.py` | audit lecture-seule de la couche flow — les 2 bugs CRITIQUES de la chaîne forward patchés |
+| `backfill_taker_volume.py` | backfill CVD (taker buy volume) + quote volume dans `klines.db` |
+| `fetch_klines.py` | v2 : taker buy volume (CVD 1h + 15m à 100 %) |
+| `mechanism_probe.py` | patché (audit Ariad) — champs fund7/vol7/liq24h loggés (la sonde P3) |
+
+### 6d. Les tests d'octobre (pré-enregistrés AVANT le tir)
+
+| Fichier | Tir |
+|---|---|
+| `oi_quadrant_test.py` | quadrant OI × prix (H4/H5) — **06-07/10** |
+| `whaleflow_join_test.py` | whale_flow × prix (J+14) — **08/10** |
+| `depth_indicator_prototype.py` | géométrie 0-liquidation sur le micro-drift d'imbalance — prototype prêt |
+| `backtest_depth.py` | le gate depth — la porte micro-structure du 20x |
+
 ---
 
 **Le nocturne** (`trading-agent-nightly.service`, 03h01) exécute ~70 étapes :
