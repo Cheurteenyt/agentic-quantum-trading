@@ -56,7 +56,10 @@ def _jwt_exp(tok: str) -> int:
         return 0
 
 
-def fresh_jwt() -> str:
+_JWT_CACHE = ROOT / "data" / "fomo" / "jwt_cache.json"
+
+
+def _fresh_jwt_daemon() -> str:
     """Le JWT privy frais du daemon fomo (CDP :9222, localStorage).
 
     ⚠️ le plus LONG n'est pas le bon : privy:id_token est périmé —
@@ -91,6 +94,37 @@ def fresh_jwt() -> str:
         if key in cand:
             return cand[key][1]
     return cand[sorted(cand, key=lambda k: -cand[k][0])[0]][1] if cand else ""
+
+
+def fresh_jwt(retries: int = 3) -> str:
+    """Le JWT frais AVEC résilience : le daemon browser crash et se
+    relance en ~15 s (7 restarts au compteur) — retry CDP ×3 puis repli
+    sur le cache disque tant que l'exp est valide."""
+    last_err: Exception | None = None
+    for attempt in range(retries):
+        try:
+            tok = _fresh_jwt_daemon()
+            if tok:
+                try:
+                    _JWT_CACHE.write_text(json.dumps(
+                        {"token": tok, "exp": _jwt_exp(tok)}))
+                except Exception:
+                    pass
+                return tok
+        except Exception as e:
+            last_err = e
+        time.sleep(10)
+    try:
+        d = json.loads(_JWT_CACHE.read_text())
+        if d.get("exp", 0) > time.time() + 60:
+            print("[mobula] daemon CDP injoignable — JWT du cache (valide)",
+                  flush=True)
+            return d["token"]
+    except Exception:
+        pass
+    if last_err:
+        raise last_err
+    return ""
 
 
 def call(jwt: str, mint: str, period: str, frm: int, to: int,

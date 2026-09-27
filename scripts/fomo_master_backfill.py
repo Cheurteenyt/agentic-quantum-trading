@@ -43,8 +43,10 @@ QUOTE_MINTS = frozenset({
 def main() -> int:
     import subprocess
     # la fenêtre exclusive : le tick collector 24/7 stoppé pendant la passe
-    subprocess.run(["systemctl", "--user", "stop", "fomo-tick-collector.service"],
-                   capture_output=True)
+    subprocess.run(["systemctl", "--user", "stop",
+                    "fomo-tick-collector.service",
+                    "fomo-mobula-topup.timer",
+                    "fomo-mobula-topup.service"], capture_output=True)
     # l'arrêt VÉRIFIÉ : on attend l'inactivité réelle (max 30s) — un stop
     # non vérifié = le collector écrit encore = « database is locked »
     stopped = False
@@ -66,7 +68,9 @@ def main() -> int:
     finally:
         subprocess.run(["systemctl", "--user", "start",
                         "fomo-tick-collector.service"], capture_output=True)
-        print("[master] tick collector relancé", flush=True)
+        subprocess.run(["systemctl", "--user", "start",
+                        "fomo-mobula-topup.timer"], capture_output=True)
+        print("[master] tick collector + top-up timer relancés", flush=True)
 
 
 def _run() -> int:
