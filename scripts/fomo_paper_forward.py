@@ -202,10 +202,14 @@ def run_pass() -> None:
             if mult < ANTI_RUG_TRIGGER * max_m and max_m >= ANTI_RUG_MIN_MAX:
                 # le GARDE ANTI-RUG : le trailing ne sert que de garde —
                 # il écrase l'horizon (un rug = on sort, les 3 règles)
+                # le GARDE ANTI-RUG : le trailing ne sert que de garde —
+                # il écrase l'horizon (un rug = on sort, les 3 règles).
+                # rule reste INTACT : l'écraser fausserait le WR par règle
+                # (chaque bucket ne garderait que les survivants anti-rug)
                 con.execute(
                     "UPDATE fomo_paper_trades SET exit_ts=?, exit_price=?, "
                     "multiple=?, max_multiple=?, status='CLOSED', "
-                    "rule='anti-rug', closed_at=? WHERE id=?",
+                    "closed_at=? WHERE id=?",
                     (ts_px, px, mult, max_m, now, tid))
                 n_closed_rug += 1
                 print(f"[paper] CLOSED anti-rug {tk} {rule} "

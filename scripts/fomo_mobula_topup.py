@@ -92,32 +92,39 @@ def _dead_filter(con: sqlite3.Connection, mints: list[str]) -> list[str]:
     if revive:
         con.executemany("DELETE FROM topup_dead WHERE mint=?",
                         [(m,) for m in revive])
-        con.commit()
+    con.commit()  # la table + les revivals survivent même à un kill du timer
     return keep
 
 
-def one_pass(con: sqlite3.Connection, jwt: str, mints: list[str]) -> int:
+PASS_BUDGET_S = 480.0  # < TimeoutStartSec=600 : la passe rend la main AVANT le kill
+
+
+def one_pass(con: sqlite3.Connection, jwt: str, mints: list[str],
+             budget_s: float = PASS_BUDGET_S) -> int:
     t0, tot, fails = time.time(), 0, []
-    dead_now = []
     mints = _dead_filter(con, mints)
     for i, mint in enumerate(mints):
+        if i and time.time() - t0 > budget_s:
+            print(f"[topup] budget {budget_s:.0f}s atteint — "
+                  f"{len(mints) - i} mints restants pour la prochaine passe",
+                  flush=True)
+            break
         n, err = upsert_token_retry(con, jwt, mint)
         if err:
             fails.append((mint, str(err)))
             print(f"  [{i+1}/{len(mints)}] {mint[:10]}… : ÉCHEC {err}",
                   flush=True)
             continue
+        # le marquage mort/vivant est commité PAR TOKEN : un kill du timer
+        # (timeout systemd) ne repart pas de zéro à la passe suivante
         if n == 0:
-            dead_now.append(mint)
+            con.execute("INSERT OR REPLACE INTO topup_dead VALUES (?,?)",
+                        (mint, time.time()))
         else:
             con.execute("DELETE FROM topup_dead WHERE mint=?", (mint,))
+        con.commit()
         tot += n
         print(f"  [{i+1}/{len(mints)}] {mint[:10]}… : +{n}", flush=True)
-    if dead_now:
-        con.executemany(
-            "INSERT OR REPLACE INTO topup_dead VALUES (?,?)",
-            [(m, time.time()) for m in dead_now])
-        con.commit()
     print(f"[topup] passe : {tot} bougies upsertées en {time.time()-t0:.0f}s, "
           f"{len(fails)} échec(s) résiduel(s)", flush=True)
     for mint, err in fails:
