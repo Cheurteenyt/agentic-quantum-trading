@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """H1 — L'ABSORPTION À L'ENTRÉE CASCADE (pré-enregistrée reports/flow-audit-2026-09-27.md).
 
 Hypothèse figée AVANT la data : buy_ratio = taker_buy_volume / volume, moyenne
@@ -30,7 +32,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"

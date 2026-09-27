@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """ÉTUDE WHALE ATTENTION — l'entrée d'une baleine change-t-elle le RÉGIME du token ?
 
 Suite de swaps_forward_v2 (PASS : edge post-achat +8,4% tenu en VAL). v2 testait
@@ -43,7 +45,7 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SWAPS_DB = ROOT / "data" / "fomo" / "fomo_swaps.db"  # LECTURE SEULE (mode=ro)
 FOMO_DB = ROOT / "data" / "fomo" / "fomo.db"         # LECTURE SEULE (mode=ro)
 REPORT = ROOT / "reports" / "whale-attention-2026-09-28.md"

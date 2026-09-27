@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """L'ÉTUDE DES LANCEMENTS fomo — la coupe transversale des vies complètes.
 
 Chaque token fomo a sa vie complète en bougies 1m/5m/15m/1h dans
@@ -24,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DB = ROOT / "data" / "fomo" / "fomo.db"
 REPORTS = ROOT / "reports"
 

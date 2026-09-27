@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (importe lifecycle_v3_scale resté à scripts/ : sys.path repointé)
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """FOMO hybrid hold — backtest de la regle hybride 24h/72h (lecture seule).
 
 Question (suite de lifecycle-v3-2026-09-28.md) : la cohorte swap baleine >10k$
@@ -36,7 +39,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lifecycle_v3_scale import (  # noqa: E402
     ROOT, DB, SWAPS_DB, MS_H, ACTIVE_WINDOW_MS, MIN_CANDLES_1H,
     BIRTH_TOLERANCE_MS, MIN_LIFE_BACKTEST_H, MEAN_CLIP,

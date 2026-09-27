@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """LE TEST DE FRACTALITÉ DU CASCADE — 15m/30m vs le champion 1h/24h.
 
 Question : le signal cascade (3 bougies de baisse consécutives avec
@@ -35,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORT = ROOT / "reports" / "cascade-fractal-2026-09-28.md"
 

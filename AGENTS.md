@@ -226,3 +226,15 @@ les dispatcher en Agent parallèles (UN SEUL message, plusieurs appels Agent).
 - Pattern éprouvé : 1 background bash + 2 agents courts (analyse, docs+git).
 - Chaque agent : prompt autoportant (chemins quotés, .venv/bin/python,
   interdictions explicites, format de réponse chiffré, ~12 lignes max).
+
+# ⚡ CONVENTION SCRIPTS (études & racine de scripts/) — depuis le 28/09
+
+- Les one-shots d'études naissent dans `scripts/studies/` (ou directement
+  dans `scripts/archive_studies/` si la doctrine est déjà close) ; seuls les
+  scripts PERMANENTS (collecteurs, the_machine, paper_forward, harnais,
+  briques du nocturne) restent à la racine de `scripts/`.
+- Une étude CLOSE (verdict NUL/CONTEXTE/fermé dans docs/20-registre-indicateurs.md)
+  est archivée par `git mv` dans `scripts/archive_studies/` avec l'en-tête
+  `# ARCHIVÉ (date)` — on ne supprime jamais, on re-catégorise.
+- Condition d'archivage : verdict rendu ET aucun fichier vivant ne l'importe
+  (grep avant de déplacer). Carte racine : `scripts/README.md`.

@@ -1,12 +1,13 @@
 # scripts/ — LA CARTE
 
 **Comment on travaille** (la convention) : toute nouvelle idée d'indicateur
-naît en one-shot dans `scripts/` → discipline complète (baseline, train/val
+naît en one-shot (`scripts/studies/`, ou racine si la brique est destinée
+au nocturne) → discipline complète (baseline, train/val
 temporel, wallet séquentiel, contrôle inverse, BLOC STATS) → verdict
 inscrit dans `docs/20-registre-indicateurs.md` → si CANDIDAT/VALIDÉ, le
 script est **câblé au nocturne** (`trading-agent-nightly.service`) ; sinon
-il reste avec son verdict rendu, on ne supprime jamais. Après tout fix
-d'échelle/unité : les ABSOLUS sont re-mesurés.
+il est **archivé dans `scripts/archive_studies/`** (§7), on ne supprime
+jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 
 **La vérité** : `docs/20-registre-indicateurs.md` (statuts, chiffres, dates).
 **Le graphe** : Ariad (MCP) — notes d'architecture liées au code.
@@ -72,7 +73,11 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 `registre_board.py` · `save_aster_key.py` · `telegram_notify.py` ·
 `security/validate_tailscale_acl.py`
 
-## 6. LA SESSION DU 27-28/09 — les nouveaux scripts (tout reste, verdicts dans docs/20)
+## 6. LA SESSION DU 27-28/09 — les nouveaux scripts (verdicts dans docs/20)
+
+> **28/09** : les one-shots closes de cette session sont archivés dans
+> `scripts/archive_studies/` — les noms ci-dessous y pointent désormais
+> (liste verdict-par-verdict en §7).
 
 ### 6a. Recherche quant (verdicts rendus, briques réutilisables)
 
@@ -138,6 +143,48 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `wall_detector.py` | les murs du carnet (PULL 91-98 % vs HIT, divergence 27 bp — HIT = continuation, PULL = faiblesse) — PROTOTYPE 4,3 j, **re-tir 06-07/10** |
 | `depth_indicator_prototype.py` | géométrie 0-liquidation sur le micro-drift d'imbalance — prototype prêt |
 | `backtest_depth.py` | le gate depth — la porte micro-structure du 20x |
+
+## 7. ARCHIVE ÉTUDES (`scripts/archive_studies/`) — le 28/09
+
+Les one-shots d'études CLOSES (verdict NUL/CONTEXTE/fermé ET aucun import
+d'un fichier vivant) y sont déplacés tels quels, chacun avec en tête :
+`# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md`.
+Les imports croisés entre archivés ont un fallback `scripts.archive_studies.*`,
+les `ROOT = parents[1]` ont été ajustés d'un cran → ré-exécutables. La racine
+de `scripts/` reste = les permanents (noyau, collecteurs, machine, harnais,
+candidats forward). **Règle d'archivage** : verdict rendu ET aucun fichier
+vivant ne l'importe.
+
+| Script (archivé) | Une ligne — le verdict |
+|---|---|
+| `conditional_sizing.py` | sizing conditionnel par régime — NUL (contrôle inverse ambigu) |
+| `funding_dimension_study.py` | structure funding (velocity/dispersion/level) — NUL |
+| `h1_absorption_test.py` | H1 buy_ratio — NUL (hint inverse → CONTEXTE de H2) |
+| `h2_h3_cvd_test.py` | H2 pente CVD + H3 sweep volumique — NUL/NUL (hints post-hoc → CONTEXTE) |
+| `capitulation_sweep_test.py` | H2bis capitulation + H3bis sweep (pré-enregistrés) — NUL / CONTEXTE |
+| `wallclock_cascades.py` | heure d'entrée des cascades — CONTEXTE (artefact du régime 2025) |
+| `recascade_study.py` | re-cascades ≤ 7j (tag ex-ante) — CONTEXTE (ni continuation premium ni épuisement) |
+| `funding_hold_surv_map.py` | hold étendu funding-conditionnel — NUL (le hold 24h reste l'optimum) ; carte hold survivor : 72h confirmé |
+| `wallet_dd_guard.py` | garde drawdown wallet (prop-firm) — NUL 12/12 (couper en DD coupe le rebond) |
+| `tail_machine_confirm.py` | TAIL survivor au sizing machine réel — FAIL critère pré-enregistré → CONTEXTE |
+| `tilt_volspike_test.py` | tilt × vol-spike + survivor ×2.0 — VERDICT OFF (aucun adopté), survivor garde p90 ; la frontière reste `tilt_frontier.py` |
+| `hybrid_hold_test.py` | hold hybride 24h/72h conditionné au swap baleine — NUL (la doctrine hold24h tient) |
+| `whale_attention_test.py` | l'attention baleine change-t-elle le régime du token — FAIL (hint anti-filtre post-T0 0-7j) |
+| `cascade_fractal_test.py` | cascade 15m/30m vs champion 1h/24h — NUL (mur des coûts ; fractalité de fréquence ≠ fractalité d'espérance) |
+| `carte_meme_hold.py` | carte hold × levier du flux meme — DÉGRADÉ (ne PAS lever) |
+| `swaps_forward_study.py` | swaps → forward v1 — remplacé par `swaps_forward_v2.py` (PASS) |
+| `derek_replication_test.py` | réplication derek518 (étude, +88 %/26 j) — close ; le forward vit dans `fomo_paper_forward.py` (règle `replication_derek`) |
+| `qubo_per_symbol.py` | QUBO par symbole (flux majors) — CONTEXTE |
+| `autopsie_mois_negatifs.py` | séparateurs des mois négatifs (fund7, fresh-peak) — profil n=1 (sonde P3 en octobre) |
+| `fomo_lifecycle_study.py` | lifecycle v1 — re-catégorisé (métriques 15m sous-estiment les pumps <15 min), remplacé par v2 |
+| `fomo_launch_study.py` | première étude launches (5 tokens) — remplacée par lifecycle v2/v3 |
+
+**Exceptions gardées à la racine malgré un verdict non-VALIDÉ** :
+`k_scan.py` (CANDIDAT à arbitrer), `survivor_meme_test.py` + `volspike_meme_test.py`
+(vivant — l'un importe l'autre), `lifecycle_v3_scale.py` + `fomo_lifecycle_v2.py`
+(doctrine vivante), `depth_indicator_prototype.py` + `wall_detector.py`
+(re-tir 06-07/10), `tilt_frontier.py`, `qubo_sizing.py` / `qubo_joint_lev.py`
+(CANDIDATS en paper forward), `p5_frequency_test.py` (vol_spike câblé 4e flux).
 
 ---
 

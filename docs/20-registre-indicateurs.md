@@ -12,6 +12,18 @@ Les chiffres ci-dessous sont les chiffres corrigés. (Les entrées du 27/09
 ci-dessous sont cohérentes avec cette re-mesure ; le résumé d'état :
 `docs/21-goal-performances.md`.)
 
+> **28/09 — ARCHIVAGE** : les scripts d'études closes vivent désormais dans
+> `scripts/archive_studies/` (un en-tête `# ARCHIVÉ (28/09)` + le verdict dans
+> `scripts/README.md` §7). Les noms de scripts cités ci-dessous
+> (`h1_absorption_test.py`, `h2_h3_cvd_test.py`, `capitulation_sweep_test.py`,
+> `wallclock_cascades.py`, `recascade_study.py`, `funding_dimension_study.py`,
+> `wallet_dd_guard.py`, `tail_machine_confirm.py`, `funding_hold_surv_map.py`,
+> `hybrid_hold_test.py`, `cascade_fractal_test.py`, `carte_meme_hold.py`,
+> `conditional_sizing.py`, `qubo_per_symbol.py`, `autopsie_mois_negatifs.py`,
+> `swaps_forward_study.py`, `derek_replication_test.py`,
+> `fomo_lifecycle_study.py`, `fomo_launch_study.py`, `tilt_volspike_test.py`,
+> `whale_attention_test.py`) y pointent désormais.
+
 > **Index du 27/09** — la journée la plus dense du registre : 19+ verdicts
 > consommés (16 nuls/contextes, 3 candidats), alimentée par 6+ agents.
 > Ordre des entrées : tilt × meme (frontière) → session parallèle Aster
@@ -224,3 +236,19 @@ Rapports : reports/k-scan-2026-09-27.md, reports/meme-universe-audit-2026-09-27.
 | **Réplication derek518** (`derek_replication_test.py`, wallet séquentiel) | **+88 %/26 j @ DD 6,4 %, WR 72 %** — ROBUSTE : sans le top-1 +88,4 %, sans le top-3 +76,8 % ; 0/72 anti-rug déclenché (age ≥ 7j élimine la forme pump-rug) ; **RÉSERVE : 26 jours = 1 régime** ; la règle `replication_derek` est CÂBLÉE dans `fomo_paper_forward.py` (idempotent par swap_id, ≤ 10 positions, garde anti-rug) | **CANDIDAT** — **le verdict forward à ≥ 5 CLOSED** |
 
 Rapports : reports/wall-detector-2026-09-27.md, reports/blocktrades-2026-09-27.md, reports/swaps-forward-v2-2026-09-27.md, reports/derek-replication-2026-09-27.md, reports/derek-wiring-2026-09-27.md (scripts : scripts/wall_detector.py — depth.db lecture-seule ; scripts/fomo_paper_forward.py édité pour la règle replication_derek).
+
+## 28/09 — hold hybride 24h/72h conditionné au swap baleine (NUL) — suite lifecycle v3
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **hold hybride** (entrée à la naissance = close 1re bougie non plate, hold 24h par défaut ; extension 72h SI un swap baleine ≥ $10k côté BUY a eu lieu dans [entrée, entrée+24h] ; décision ex-ante à t+24h, lag 1h testé ; N=1246, ancres v3 reproduites 1.44x/63 %/pire 0.020x) | Déclencheur quasi muet : **21/1246 étendus (1,7 %)** — seuls 99 mints ont un BUY ≥ $10k, 21/136 de la cohorte v3 >10k$ seulement (cohorte définie EX-POST : max sur vie entière, tous côtés). Sur les 21 étendus, l'extension est tendance NÉGATIVE : 8 mieux / 13 pire (p binomial 0,38), hold24h méd 12,15x → 72h 6,86x ; médiane corpus inchangée 1,44x, moyenne 10,14 → 10,05x. Sensibilité tous côtés (33 étendus) : 10/23, p=0,035 — significativement PIRE. hold72h pur reste derrière partout (1,19x, WR 59 %, pire 0,011x). Wallet spot 5 %/1 créneau (taker 0,09 %+slippage 0,5 %/côté, DD 19,5 %, 0 liq spot) : l'hybride est SOUS le baseline ($1,39e11 vs $2,21e11 cap 10x — montants absolus fantaisistes, survivorship ; seul l'ordre relatif vaut, garde-fou composé-des-mois : record mois +87 265 %) | **NUL** — la doctrine hold24h tient ; l'edge v3 de la cohorte >10k$ était ex-post, non capturable ex-ante à t+24h. La piste baleine ≥ $10k$ reste ouverte UNIQUEMENT en détection temps réel (flux swaps-fresh, cf. replication_derek déjà câblée), à re-tester si le backfill swaps couvre plus de mints |
+
+Rapport : reports/hybrid-hold-2026-09-28.md (script : scripts/hybrid_hold_test.py — briques importées de lifecycle_v3_scale.py, fomo.db + fomo_swaps.db lecture-seule, ts swaps = SECONDS vérifié).
+
+## 28/09 — test de FRACTALITÉ du cascade (15m/30m vs champion 1h/24h) — NUL
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **cascade accéléré sur TF-court** (définition EXACTE anti_liq.py — 3 bougies de baisse + accélération \|r\| — transposée aux barres 15m/30m, entrée open t+1, MAE highs, séquentiel global, taker 0,18 % RT, split 70/30 temps, levier 0-liq TRAIN, 1 touché VAL = morte ; 30m = resample exact du 15m natif ; univers BTC/ETH/SOL/DOGE pleine année — BNB 31 j, XRP absent) | **Fréquence fractale OUI : 745/379/183 événements brut/symbole/an (15m/30m/1h) = 4,07×/2,08× — le pattern SE REPRODUIT. Edge NON : edge net TRAIN négatif PARTOUT (15m/1h −0,173, 15m/2h −0,167, 15m/4h −0,140, 30m/1h −0,152, 30m/2h −0,156, 30m/4h −0,115, 1h/1h −0,106, 1h/2h −0,060 vs mur 0,18 % RT ; 1h/4h +0,058 TR mais VAL −0,316) — ret brut ≈ 0,0 % en hold 1-4h vs +0,53 % à 24h : le rebond post-cascade est un phénomène d'échelle JOUR, pas heures. MAE 15m/1h max TRAIN 6,38 % (p95 1,38) → plafond 14,5x — le levier montait, l'espérance ne suit pas. Baseline même-code 1h/24h NON-gatée : 236 trades/an (wallclock 230 ✓), ret +0,53 %, mais 1 MAE VAL 13,08 % ≥ plafond 8,61 % → le champion officiel tient à 10x GRÂCE au gate AL (MAE gated 7,84 %), le gate est PORTEUR | **NUL** (cascade TF-court, mur des coûts) — 0 cellule vivante, aucun run wallet, rien au stack ; le champion 1h/24h gaté reste le seul flux cascade ; la fractalité de fréquence NE vaut PAS fractalité d'espérance |
+
+Rapport : reports/cascade-fractal-2026-09-28.md (script : scripts/cascade_fractal_test.py — klines.db lecture-seule, 15m natif 187k bougies, funding_history as-of).

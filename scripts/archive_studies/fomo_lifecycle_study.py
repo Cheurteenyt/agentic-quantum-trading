@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
 """FOMO lifecycle study — lecture seule de data/fomo/fomo.db.
 
 Pour chaque mint fomo avec >= 500 bougies '1m' OU >= 200 bougies '15m' :
@@ -16,7 +17,7 @@ import sqlite3
 import statistics
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 DB = ROOT / "data" / "fomo" / "fomo.db"
 OUT = ROOT / "reports" / "fomo-lifecycle-2026-09-27.md"
 

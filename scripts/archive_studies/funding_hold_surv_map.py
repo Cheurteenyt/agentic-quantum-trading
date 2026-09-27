@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """LE HOLD ÉTENDU FUNDING-CONDITIONNEL + LA CARTE HOLD DU SURVIVOR.
 
 La machine hold 24h fixe sur les cascades (l'optimum de la famille exit :
@@ -51,7 +53,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402

@@ -220,3 +220,17 @@ retrouver que ces lanes ne sont pas exploitables — 99,6 % rejetées pour
 
 **S'il retrouve +924 828 USD, c'est le moteur qui est cassé.** C'est le premier
 test à écrire, avant toute stratégie.
+
+## CARTE DES BASES VIVANTES (28/09)
+
+| Base | Contenu | Écrivains (timers) |
+|---|---|---|
+| `data/warehouse/klines.db` | klines 1h+15m (CVD taker 100 %), funding_history, liq_events, oi_history (15 min), block_trades+tape_1m (15 min), signal_events, paper_trades (le forward Aster), flow_events, lifecycle_map | fetch_klines (nocturne), oi-collector, aster-blocktrades, paper_forward (nocturne) |
+| `data/warehouse/depth.db` | depth_bins 500 niveaux × 15 symboles (24/7, ~30 M lignes) — maturité 14 j le 06-07/10 | aster-depth-collector |
+| `data/fomo/fomo.db` | fomo_ohlcv (1 353+ mints, 6,79 M bougies — mobula), fomo_tokens, fomo_ticks, fomo_new_coins (age_minutes), fomo_positions/closed/events, whale_flow, fomo_price_history | tick collector 24/7, mobula-topup 15 min (sélectif + topup_dead), harvest nocturne |
+| `data/fomo/fomo_swaps.db` | 12 562+ swaps baleines (13 traders, pagination lastSwapId) | fomo-swaps-fresh (horaire) |
+| `data/fomo/fomo_paper.db` | le ledger forward fomo (102+ trades : 3 horizons + anti-rug + replication_derek) | fomo-paper-forward 15 min |
+| `data/warehouse/x_posts.db` | le registre X (les récoltes midi/nuit) | X harvest |
+| **archivées** | backtest.db (legacy juin), klines_audit_*.db (side-DB d'audits), x.db/onchain.db (0 octet) | — |
+
+LA RÈGLE DE CONFLIT : un écrivain par DB — les passes lourdes (backfills) prennent la fenêtre exclusive (stop systemd VÉRIFIÉ), les passes courtes coexistent via WAL + busy_timeout.

@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """TILT × VOL-SPIKE + SURVIVOR ×2.0 — les deux derniers raffinements de la
 machine 4 flux (baseline --vol-spike : $4,004.94 = +3 905 %/an @ DD 24,8 %,
 0 liq, record +90,8 %, 1 mois négatif).
@@ -52,7 +54,7 @@ from urllib.parse import quote
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.portfolio_sim import KDB, MAJORS  # noqa: E402

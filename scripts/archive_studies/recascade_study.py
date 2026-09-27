@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (importe wallclock_cascades — archivé lui aussi : fallback scripts.archive_studies)
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """RE-CASCADE DES CASCADES — le 2e feu sur le même symbole ≤ 7j (27/09).
 
 Le corpus : les 230 events cascade majors du sim (anti_liq.collect_featured
@@ -43,16 +46,21 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.anti_liq import collect_featured as _collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.portfolio_sim import KDB, MAJORS, btc_regime_series  # noqa: E402
 from scripts.stacked_portfolio import MAKER_RT  # noqa: E402
-import scripts.wallclock_cascades as wc  # noqa: E402
-from scripts.wallclock_cascades import (  # noqa: E402
-    binom_two_sided, mdd_detectable, run_machine, stats_block)
+try:  # wallclock_cascades archivé le 28/09 (même dossier que ce fichier)
+    import scripts.wallclock_cascades as wc  # noqa: E402
+    from scripts.wallclock_cascades import (  # noqa: E402
+        binom_two_sided, mdd_detectable, run_machine, stats_block)
+except ImportError:
+    import scripts.archive_studies.wallclock_cascades as wc  # noqa: E402
+    from scripts.archive_studies.wallclock_cascades import (  # noqa: E402
+        binom_two_sided, mdd_detectable, run_machine, stats_block)
 
 REPORTS = ROOT / "reports"
 DAY_NS = 24 * 3600 * 10**9

@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """RÉPLICATION DEREK518 → WALLET SÉQUENTIEL (post swaps-forward-v2 PASS).
 
 La règle candidate de reports/swaps-forward-v2-2026-09-27.md :
@@ -30,7 +32,7 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SWAPS_DB = ROOT / "data" / "fomo" / "fomo_swaps.db"  # LECTURE SEULE (mode=ro)
 FOMO_DB = ROOT / "data" / "fomo" / "fomo.db"         # LECTURE SEULE (mode=ro)
 REPORT = ROOT / "reports" / "derek-replication-2026-09-27.md"

@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """QUBO PAR SYMBOLE — la granularité dans le flux majors (6 majeures).
 
 Le QUBO joint (scripts/qubo_joint_lev.py) = $5,181.86 FULL (+5082 %/an,
@@ -42,7 +44,7 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.portfolio_sim import MAJORS, monthly_rows  # noqa: E402

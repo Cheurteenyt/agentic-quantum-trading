@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (importe h2_h3_cvd_test — archivé lui aussi : fallback scripts.archive_studies)
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """H2bis (CAPITULATION) + H3bis (SWEEP) — PRÉ-ENREGISTREMENT ÉCRIT AVANT
 TOUT CALCUL (le rapport reprend ce bloc verbatim en tête).
 
@@ -64,15 +67,19 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
 
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
-from scripts.h2_h3_cvd_test import (  # noqa: E402
-    LIQ_MOVE_10X, attach_cvd_features, bloc, build_machine, exp_pct, monotone)
+try:  # h2_h3_cvd_test archivé le 28/09 (même dossier que ce fichier)
+    from scripts.h2_h3_cvd_test import (  # noqa: E402
+        LIQ_MOVE_10X, attach_cvd_features, bloc, build_machine, exp_pct, monotone)
+except ImportError:
+    from scripts.archive_studies.h2_h3_cvd_test import (  # noqa: E402
+        LIQ_MOVE_10X, attach_cvd_features, bloc, build_machine, exp_pct, monotone)
 from scripts.portfolio_sim import btc_regime_series  # noqa: E402
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, funding_hourly_all, monthly_rows, run_stack)

@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """LA CARTE hold x levier du flux CASCADE MEMECOINS (le flux 2 de the_machine).
 
 La frontiere conjointe hold x levier a ete cartographiee pour les MAJEURES
@@ -34,7 +36,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.backtest_indicators import load_df  # noqa: E402

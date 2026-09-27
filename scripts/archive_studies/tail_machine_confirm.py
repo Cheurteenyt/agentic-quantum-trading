@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ARCHIVÉ (28/09) : verdict NUL/CONTEXTE — voir docs/20-registre-indicateurs.md
+# (déplacé scripts/ → scripts/archive_studies/ : sys.path/ROOT ajustés d'un cran, ré-exécutable)
 """LA TAIL AU SIZING MACHINE — la confirmation pré-enregistrée (27/09).
 
 Contexte : la TAIL du survivor (les events ATR > p90 jetés par le gate
@@ -45,7 +47,7 @@ from urllib.parse import quote
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 # ——— LECTURE SEULE : tout connect sur un .db du warehouse passe en
