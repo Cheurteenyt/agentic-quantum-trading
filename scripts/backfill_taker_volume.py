@@ -81,7 +81,7 @@ def backfill_symbol(
 ) -> dict:
     """Re-fetch 1h de min_ts -> max_ts et UPDATE taker/quote sur les lignes
     existantes. Retourne des compteurs."""
-    step = fk.interval_ms("1h")
+    step = fk.interval_ms(INTERVAL)
     lim = fk.MAX_LIMIT
     start_time = min_ts
     requests = 0
@@ -104,7 +104,7 @@ def backfill_symbol(
         if not dry_run:
             cur = con.executemany(
                 "UPDATE klines SET taker_buy_volume = ?, quote_volume = ?, "
-                "fetched_at = ? WHERE symbol = ? AND interval = '1h' "
+                f"fetched_at = ? WHERE symbol = ? AND interval = '{INTERVAL}' "
                 "AND open_time = ?",
                 updates,
             )
@@ -122,7 +122,7 @@ def backfill_symbol(
             break
     # coverage residuelle (lignes sans taker)
     remaining = one(
-        con, "SELECT COUNT(*) FROM klines WHERE symbol = ? AND interval = '1h' "
+        con, f"SELECT COUNT(*) FROM klines WHERE symbol = ? AND interval = '{INTERVAL}' "
              "AND taker_buy_volume IS NULL", (symbol,))[0]
     return {"requests": requests, "fetched": fetched, "updated": updated,
             "remaining_null": int(remaining)}
@@ -135,8 +135,8 @@ def run(symbols: list[str] | None, sleep_s: float, timeout: float, dry_run: bool
         if symbols:
             wanted = {s.strip().upper() for s in symbols}
             series = [s for s in series if s[0] in wanted]
-        total_rows = one(con, "SELECT COUNT(*) FROM klines WHERE interval='1h'")[0]
-        print(f"=== Backfill CVD 1h — {len(series)} symbole(s), {total_rows} bougies ===",
+        total_rows = one(con, f"SELECT COUNT(*) FROM klines WHERE interval='{INTERVAL}'")[0]
+        print(f"=== Backfill CVD {INTERVAL} — {len(series)} symbole(s), {total_rows} bougies ===",
               flush=True)
         print(f"  base : {DB_PATH} | sleep {sleep_s}s | dry_run={dry_run}", flush=True)
 
@@ -155,7 +155,7 @@ def run(symbols: list[str] | None, sleep_s: float, timeout: float, dry_run: bool
                   f"maj={res['updated']:<6} couverture={cov:5.1f}% "
                   f"(NULL restants: {res['remaining_null']})", flush=True)
 
-        left = one(con, "SELECT COUNT(*) FROM klines WHERE interval='1h' AND "
+        left = one(con, "SELECT COUNT(*) FROM klines WHERE interval='{INTERVAL}' AND "
                         "taker_buy_volume IS NULL")[0]
         done = total_rows - left
         pct = 100.0 * done / total_rows if total_rows else 0.0
@@ -176,6 +176,7 @@ def main() -> int:
     ap.add_argument("--timeout", type=float, default=fk.DEFAULT_TIMEOUT)
     ap.add_argument("--interval", default="1h", choices=["1m", "5m", "15m", "1h"])
     args = ap.parse_args()
+    global INTERVAL                     # sinon l'assignation est LOCALE
     INTERVAL = args.interval
     syms = [s for s in args.symbols.split(",") if s.strip()] or None
     return run(syms, args.sleep, args.timeout, dry_run=not args.run)
