@@ -28,6 +28,25 @@ holds 24h/72h/6h = des optimums mesurés (design evidence-locked,
 `funding_hold_surv_map.py`) ; les 3 configs avancent côte à côte sur les
 MÊMES trades paper (`qubo_forward_tracker.py`).
 
+## Le volet institutionnel (état au 28/09) — 5 couches, toutes datées de tir
+
+La couche institutionnelle fine est en place : **5 couches** (murs, prints,
+OI H4/H5, sonde liq, whale_flow), chacune avec sa date de tir — plus la
+boucle réplication derek518 câblée au forward.
+
+| Couche | Outil | Tir |
+|---|---|---|
+| les murs du carnet | `wall_detector.py` (PROTOTYPE 4,3 j non-mature) | **re-tir 06-07/10** |
+| les gros prints | `aster_blocktrades.py` (timer 15 min câblé) — le fade = **détecteur d'absorption**, pas de continuation | le cross prints × OI squeeze dans **2 semaines** |
+| OI × prix (H4/H5) | `oi_quadrant_test.py` | **06-07/10** |
+| sonde liq | `liq_storm.py` | ~**10/10** |
+| whale_flow × prix | `whaleflow_join_test.py` | **08/10** |
+
+Et la **boucle réplication derek518** : swaps-forward v2 PASS → wallet test
+CANDIDAT (+88 %/26 j @ DD 6,4 %, robuste sans le top-3) → la règle
+`replication_derek` câblée dans `fomo_paper_forward.py` — **le verdict
+forward à ≥ 5 CLOSED**.
+
 ## Priorité 1 — ✅ RÉSOLUE (25/09) : l'anomalie des 20 % n'était pas un bug
 
 Deux runs « identiques » du wallet gated divergeaient de 20 % ($1 266 vs

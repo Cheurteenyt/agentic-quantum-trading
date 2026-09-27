@@ -52,6 +52,7 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `fomo_history_collector.py` / `fomo_master_backfill.py` | backfill GT via mapping `_TF` (minute 1/5/15, hour 1h/4h) + top-up sélectif |
 | `x_harvest.py` / `fetch_x_posts.py` / `score_x_calls.py` | la couche X |
 | `aster_oi_history.py` | open interest (maison) |
+| `aster_blocktrades.py` | gros prints aggTrades (seuils adaptatifs BTC 99k/ETH 23k/SOL 2k) — timer 15 min |
 | `basis_guard.py` / `flow_snapshot.py` | basis + flow |
 
 ## 4. LA RECHERCHE — one-shots à verdict rendu (on ne supprime pas)
@@ -71,7 +72,7 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 `registre_board.py` · `save_aster_key.py` · `telegram_notify.py` ·
 `security/validate_tailscale_acl.py`
 
-## 6. LA SESSION DU 27/09 — les nouveaux scripts (tout reste, verdicts dans docs/20)
+## 6. LA SESSION DU 27-28/09 — les nouveaux scripts (tout reste, verdicts dans docs/20)
 
 ### 6a. Recherche quant (verdicts rendus, briques réutilisables)
 
@@ -98,6 +99,8 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `carte_meme_hold.py` | carte hold × levier du flux meme — DÉGRADÉ (ne PAS lever) |
 | `autopsie_mois_negatifs.py` | séparateurs des mois négatifs (fund7, fresh-peak) — profil n=1 |
 | `fomo_lifecycle_study.py` / `fomo_lifecycle_v2.py` | lifecycle des lancements (v2 sur le corpus profond mobula) |
+| `k_scan.py` | le multiplicateur de taille absolu K (le dernier paramètre libre) — K=0,95 = **+6 419 %/an @ DD 24,9 %**, CANDIDAT à arbitrer |
+| `meme_universe_audit.py` | audit de complétude de l'univers meme — 4 tier-1 câblés au nocturne (DRAM/PIEVERSE/VIRTUAL/MELANIA, +313 events/an), 2 tickers périmés corrigés |
 
 ### 6b. Data fomo
 
@@ -111,7 +114,9 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `bonding_signal_study.py` | signaux bonding × trades |
 | `fomo_swaps_collector.py` (+ `_resolve` / `_store`) | swaps des 13 baleines (pagination lastSwapId crackée, 12 562 swaps) |
 | `swaps_forward_study.py` | l'edge de réplication skill-weighted des swaps |
-| `fomo_paper_forward.py` | le ledger forward des lancements (entrée à la naissance, anti-rug) — timer 15 min |
+| `swaps_forward_v2.py` | re-run post-backfill complet (2 233 events) — **PASS** (edge +8,4 %, TRAIN +6,7 → VAL +12,3 %) |
+| `derek_replication_test.py` | wallet séquentiel de réplication derek518 — CANDIDAT (+88 %/26 j @ DD 6,4 %, robuste sans le top-3) |
+| `fomo_paper_forward.py` | le ledger forward des lancements (entrée à la naissance, anti-rug) + la règle `replication_derek` câblée (verdict à ≥ 5 CLOSED) — timer 15 min |
 
 ### 6c. Infra & collecteurs
 
@@ -130,6 +135,7 @@ d'échelle/unité : les ABSOLUS sont re-mesurés.
 |---|---|
 | `oi_quadrant_test.py` | quadrant OI × prix (H4/H5) — **06-07/10** |
 | `whaleflow_join_test.py` | whale_flow × prix (J+14) — **08/10** |
+| `wall_detector.py` | les murs du carnet (PULL 91-98 % vs HIT, divergence 27 bp — HIT = continuation, PULL = faiblesse) — PROTOTYPE 4,3 j, **re-tir 06-07/10** |
 | `depth_indicator_prototype.py` | géométrie 0-liquidation sur le micro-drift d'imbalance — prototype prêt |
 | `backtest_depth.py` | le gate depth — la porte micro-structure du 20x |
 

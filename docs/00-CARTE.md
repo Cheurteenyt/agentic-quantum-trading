@@ -1,6 +1,6 @@
 # 🗺️ CARTE DU PROJET — un seul endroit pour tout trouver
 
-> Mise à jour : 27/09/2026. Si un fichier bouge, cette carte bouge.
+> Mise à jour : 28/09/2026. Si un fichier bouge, cette carte bouge.
 > Doc d'architecture complète : `docs/02-architecture.md`.
 
 ## 🏆 LA MACHINE & LE REGISTRE (l'état de la stratégie)
@@ -18,8 +18,10 @@
   0 liq, en accumulation forward (~2 trades/mois).
 - **Le registre vivant de tous les indicateurs** (VALIDÉ/CANDIDAT/CONTEXTE/NUL,
   chiffres et dates) : `docs/20-registre-indicateurs.md`.
-- **La carte des scripts** : `scripts/README.md` (135 fichiers en 6 groupes,
-  la convention de travail).
+- **La carte des scripts** : `scripts/README.md` (136 fichiers en 6 groupes,
+  la convention de travail) — la couche institutionnelle fine 27-28/09 :
+  murs (`wall_detector.py`), prints (`aster_blocktrades.py`, timer 15 min),
+  réplication derek518 (`replication_derek` dans `fomo_paper_forward.py`).
 
 ## 🔁 LES COLLECTEURS QUI TOURNENT 24/7 (systemd user)
 
