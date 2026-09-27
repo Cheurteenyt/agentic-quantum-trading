@@ -26,7 +26,8 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 
 | Composant | Script | État |
 |---|---|---|
-| funding_divergence +12h, confluence +24h (composants du stack) | `stacked_portfolio.py` | Réhabilitées post-fix (quasi-plates -1,8/-4,5 %, DD 5-6 %) — leur valeur = la décorrélation ; paper forward 2×/jour |
+| confluence +24h (composante restante du stack, forward encore ouvert) | `stacked_portfolio.py` | Réhabilitée post-fix (quasi-plate, DD 5-6 %) — valeur = la décorrélation ; paper forward 2×/jour tranche (fdiv, l'autre composante, est passée NUL le 27/09 — voir NULS) |
+| **Frontière tilt × meme** (multiplicateur tilt corr p66/p33 ×1,10 + notional meme ×0,5 sur la config codifiée) | `tilt_frontier.py` | +2 710 %/an @ DD 27,2 %, 0 liq, 1 mois nég, record +77,5 %, pire -3,8 % ; garde-fous OK sur 23 points ; **CANDIDAT** — câblage au paper forward avant promotion VALIDÉ (la config codifiée +2 653 % @ 24,8 % reste la référence jusqu'au verdict) |
 | LIQ-STORM (tempêtes de liquidations) | `liq_storm.py` | Descriptif ; ratio long/short 2,0× ; backtest à 3-4 semaines |
 | whale_flow × prix (flux skill-weighted) | `whale_flow.py` | J+14 ≈ 8/10 |
 
@@ -34,6 +35,7 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 
 | Piste | Chiffre qui la ferme | Date |
 |---|---|---|
+| **funding_divergence +12h (short continuation)** — DÉGRADÉ du CANDIDAT | Forward (paper, 63 fermés) : **WR 19,0 % (12/63), -3,12 %/trade, cumulé -196,7 %** vs backtest WR net 43,4 % (VAL temporelle 39,1 %, -0,84 %/trade) — binomial exact p = **4,3e-05**, Welch t = -3,9 : dégradation RÉELLE, pas le bruit d'un petit N ; déjà net-négatif en backtest à taker (-0,39 %/trade) — re-catégorisé, PAS supprimé (l'entrée historique reste ci-dessus et au registre du 26/09) | 27/09 |
 | Sorties anticipées TOUTES (1re verte, trailing 1/1,5/2,5 %) | monotone : trail 1 % -46 % → 24h fixe +197 % — chaque sortie sur rebond abandonne le drift | 25/09 |
 | EXTENSIONS des gagnants (48h/72h si gagne) | $297 → $250-$235 : le bounce de jours 2-3 à 20x mange le drift supplémentaire — 24h pile est l'optimum total | 25/09 |
 | Squeeze haussier (miroir de la cascade) | wallet $6,34, WR 44,9 %, détruit le stack | 25/09 |
@@ -84,6 +86,16 @@ Les chiffres ci-dessous sont les chiffres corrigés.
 3. La première verte / le re-break / le squeeze : chaque rebond micro est un faux signal de fin.
 4. Le maker (GTX) n'est pas une option — c'est la condition d'existence du 20x.
 5. Cross-check deux implémentations indépendantes sur les mêmes événements avant de croire un chiffre.
+
+## 27/09 — la frontière tilt × meme (tilt_frontier.py) + les preuves forward meme/fdiv
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **Frontière du multiplicateur tilt** (corr p66/p33 v4 INCHANGÉS sur 70 % train, seul le multiplicateur bouge, meme ∈ {1, 0.5, 0}) | 23 points, TOUS 0 liq, garde-fous composé/PnL OK partout. Baseline reproduite à l'identique (+2 653 % @ 24,8). Tilt ×0,5 (INVERSE : booster corr bas) = TOXIQUE (+1 850 % @ DD 35,3 %). Sommet ≤ 28 % DD : **×1,10 → +2 779 % @ 27,2 %** ; ×1,2 saute à 29,7 %, ×1,5-2,0 = 30,9 %. Le chemin codifié ×2/×0,5 donne +4 006 % @ 30,9 %, 0 mois nég — l'audit cité +8 560 % @ 34,8 % n'est réproductible par AUCUNE variante (sans plafond : DD 49,5 %) : chiffre non archivé, le chiffrage tilt_frontier fait foi | FRONTIÈRE — point final recommandé **tilt ×1,10 + meme ×0,5 : +2 710 %/an @ DD 27,2 %, 1 mois nég, record +77,5 %, pire -3,8 %, 0 liq** (si DD ≤ 25 strict : tilt ×0 + meme ×0,5 = +2 587 % @ 24,7 %) |
+| **Réduction meme (preuve forward)** | machine_cascade_meme forward : **9 fermés, 0 gagnant, -48,8 % cumulé** (22→25/09) vs backtest WR 51,4 % → P(0/9) = **0,0015** — significatif, confirme le DÉGRADÉ (edge mort depuis juin). Backtest : ×0,5 coûte 66 pts/an et garde 1 mois nég ; ×0,0 coûte 184 pts ET AJOUTE un mois négatif (2) — l'année backtest contient l'edge pré-juin → **×0,5 recommandé, ×0 refusé en l'état** | RÉDUCTION APPLIQUÉE AU CANDIDAT |
+| **fdiv : N suffisant, dégradation significative** | binomial p = 4,3e-05 (<< 0,01) sur 63 trades : ce n'est PAS le bruit d'un petit N. La VAL temporelle du backtest déclinait déjà (WR 39,1 %, -0,84 %/trade) ; le forward la prolonge (-3,12 %/trade). fdiv → **NUL** (re-catégorisé, preuve datée) | NUL (dégradé du CANDIDAT) |
+
+Rapport : reports/tilt-frontier-meme-2026-09-27.md (script : scripts/tilt_frontier.py — n'importe QUE les briques, the_machine.py intact).
 
 ## 27/09 — session parallèle (3 agents Aster) : vol_spike PASS, flux meme affaibli, autopsie des mois
 

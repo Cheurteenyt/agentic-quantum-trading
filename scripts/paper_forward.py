@@ -240,8 +240,9 @@ def main() -> int:
     except Exception as _e:
         print(f"[paper] candidat qualité : {_e}")
 
-    # ——— LES 3 FLUX DE LA MACHINE (le forward du portefeuille officiel) ———
-    # cascade majeurs 10x gated + cascade memecoins 1x + survivor long 1x.
+    # ——— LES FLUX DE LA MACHINE (le forward du portefeuille officiel) ———
+    # cascade majeurs 10x gated + cascade memecoins 1x + survivor long 1x
+    # + vol_spike_6h 1x (expérimental, flag --vol-spike côté machine).
     # Les trades paper portent le ret au niveau PRIX ; la table forward du
     # rapport applique les tailles réelles (base × levier) à l'agrégation.
     try:
@@ -268,10 +269,22 @@ def main() -> int:
         _specs = {"machine_cascade_majors": (24, -1),
                   "machine_cascade_meme": (24, -1),
                   "machine_survivor_long": (72, +1)}
+        # flux 4 (expérimental --vol-spike côté machine) : vol_spike_6h,
+        # même collecteur p5 validé (seuils non re-tunés) — direction PAR
+        # ÉVÉNEMENT (fund_sign +1 = short → direction -1).
+        try:
+            from scripts.p5_frequency_test import collect_vol_spike as _cvs
+            _streams["machine_vol_spike_6h"] = _cvs(con, hold=6)
+        except Exception as _e2:
+            print(f"[paper] vol_spike collect : {_e2}")
+            _streams["machine_vol_spike_6h"] = []
+        _specs["machine_vol_spike_6h"] = (6, None)   # None = dir par event
         _fresh_n = 0
         for _sig, _evs in _streams.items():
             _hold, _dir = _specs[_sig]
             for e in _evs:
+                _dir_e = (-int(e.get("fund_sign", 1)) if _dir is None
+                          else _dir)
                 sig_ms = int(e["ts_ms"]) // 10**6   # ts_ms = des NS
                 if sig_ms < now_ms - WINDOW_H * 3600 * 1000:
                     continue
@@ -282,7 +295,7 @@ def main() -> int:
                 con.execute(
                     "INSERT OR IGNORE INTO paper_trades VALUES "
                     "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (_sig, e["sym"], _hold, _dir, sig_ms, sig_ms,
+                    (_sig, e["sym"], _hold, _dir_e, sig_ms, sig_ms,
                      float(e["entry"]), None, None, None, None, "open", now))
                 _fresh_n += 1
         if _fresh_n:
@@ -342,11 +355,11 @@ def main() -> int:
             lines.append(f"- **{name} +{horizon}h** : {r[0]} trades, "
                          f"WR {r[1]*100:.0f} %, moyen {r[2]:+.2f} %, "
                          f"cumulé {r[3]:+.2f} %")
-    # ——— le PORTEFEUILLE MACHINE en forward (les tailles réelles) ———
+    # ——— LE PORTEFEUILLE MACHINE en forward (les tailles réelles) ———
     _lev = {"machine_cascade_majors": 10, "machine_cascade_meme": 1,
-            "machine_survivor_long": 1}
+            "machine_survivor_long": 1, "machine_vol_spike_6h": 1}
     _base = {"machine_cascade_majors": 0.24, "machine_cascade_meme": 0.10,
-             "machine_survivor_long": 0.10}
+             "machine_survivor_long": 0.10, "machine_vol_spike_6h": 0.10}
     _mrows = con.execute(
         "SELECT signal, symbol, direction, entry_ts, exit_ts, exit_price, "
         "entry_price, ret_pct FROM paper_trades "

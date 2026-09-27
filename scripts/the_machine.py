@@ -8,11 +8,18 @@ La frontière validée de la session du 25/09, codifiée :
      de fréquence (285 trades/an, WR 51,5 %)
   3. SURVIVOR LONG 72h 1x (coins >90j au-dessus de leur prix-90j) — le
      flux long décorrelé (MAE max 94,5 % → 1x obligatoire)
+  4. VOL-SPIKE REVERSION 6h 1x — EXPÉRIMENTAL, flag CLI --vol-spike
+     (DÉFAUT OFF : la config officielle 3 flux reste bit-reproductible).
+     Le seul flux P5 qui passe (p5_frequency_test 27/09) : fade du range
+     ≥ 4× médiane 14j, gate ATR-décile, corr cascade -0,22 — la logique
+     de signal est RÉUTILISÉE telle quelle (collect_vol_spike), seuils
+     p5 non re-tunés.
 
 Garde-fous : MAE monitor (levier sûr ≤ 100/(maxMAE+0,5)), composé des
 mois vs balance finale, somme des PnL mensuels.
 
   .venv/bin/python scripts/the_machine.py
+  .venv/bin/python scripts/the_machine.py --vol-spike   # 4e flux (test)
 """
 from __future__ import annotations
 
@@ -130,6 +137,27 @@ def main() -> int:
         e["lev"] = 1
         e["fee_rt_bps"] = TAKER_RT
 
+    # ——— flux 4 (EXPÉRIMENTAL, --vol-spike) : vol-spike reversion 6h 1x ———
+    # p5_frequency_test 27/09 : le seul flux de fréquence P5 qui passe
+    # (N 820/an, WR 53,7 %, +0,012 $/trade taker, corr cascade -0,22).
+    # Import LAZY : p5_frequency_test importe the_machine (collect_meme) —
+    # un import module-top créerait un cycle. Flag OFF = zéro collecte, la
+    # config officielle 3 flux reste bit-reproductible.
+    VOL_SPIKE = "--vol-spike" in sys.argv
+    spike: list[dict] = []
+    med_spike = float("nan")
+    mae_spike = 0.0
+    if VOL_SPIKE:
+        from scripts.p5_frequency_test import collect_vol_spike  # noqa: E402
+        spike = collect_vol_spike(con, hold=6)   # seuils p5 : 4×/2,5 %/gate ATR
+        for e in spike:
+            e["strategy"] = "vol_spike_6h"
+            e["lev"] = 1
+            e["fee_rt_bps"] = TAKER_RT
+        if spike:
+            mae_spike = max(e["mae_adverse"] for e in spike)
+            med_spike = float(np.median([e["atr_pct"] for e in spike]))
+
     # le facteur global K : la calibration du DD sur la cible (25 %)
     _K = 0.89
     # le tilt corrélation (×2/×0,5) : 0 mois négatif mais +6 pts de DD —
@@ -173,7 +201,7 @@ def main() -> int:
     _idx = _majors_dfs["BTCUSDT"].index.astype("datetime64[ns]").asi8
     con.close()
 
-    all_ev = sorted(gated + meme + surv, key=lambda e: e["ts_ms"])
+    all_ev = sorted(gated + meme + surv + spike, key=lambda e: e["ts_ms"])
 
     _WIN = 168
     for e in gated:
@@ -215,6 +243,10 @@ def main() -> int:
         if s == "cascade_meme":
             return min(max(0.10 * _K * (e["atr_pct"] / med_meme), 0.02 * _K),
                        0.30 * _K)
+        if s == "vol_spike_6h":
+            # même sizing vol-inverse que les flux 1x (base machine 10 %)
+            return min(max(0.10 * _K * (e["atr_pct"] / med_spike), 0.02 * _K),
+                       0.30 * _K)
         return 0.20 * _K                # survivor long (1x = 0 risque de liq, le notional scale librement)
 
     r = run_stack(all_ev, CAPITAL, machine_fn, fh)
@@ -234,12 +266,14 @@ def main() -> int:
     rec = max(rois_m) if mr else 0.0
     worst = min(rois_m) if mr else 0.0
 
+    _flux4 = (" + vol_spike_6h 1x (EXPÉRIMENTAL --vol-spike)" if VOL_SPIKE
+              else "")
     lines = [
         "# LA MACHINE — le portefeuille officiel",
         f"{datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC — "
         f"cascade 10x (gate AL p66={q66:.2f}, vol-inverse base 24 %, "
         f"MAE gated {mae_gated:.2f} % → levier sûr {lev_safe:.1f}x) + "
-        f"cascade memecoins {lev_meme}x + survivor 1x.", "",
+        f"cascade memecoins {lev_meme}x + survivor 1x{_flux4}.", "",
         "## BLOC STATS OFFICIEL", "",
         "| Stat | Valeur |", "|---|---|",
         f"| Wallet initial → final | ${CAPITAL:,.0f} → **${r['balance']:,.2f}** |",
@@ -270,13 +304,18 @@ def main() -> int:
               f"- MAE max memecoins : {mae_meme:.1f} % → levier {lev_meme}x",
               "", "Règle gravée : levier ≤ 100/(maxMAE + 0,5). La marge de",
               "sécurité est empirique (1 an) — le moniteur la garde."]
+    if VOL_SPIKE:
+        lines.append(f"- MAE max vol_spike_6h : {mae_spike:.1f} % → "
+                     f"levier 1x (sûr ≤ {100 / (mae_spike + 0.5):.0f}x)")
 
-    out = REPORTS / f"the-machine-{datetime.now(timezone.utc):%Y-%m-%d}.md"
+    _sfx = "-volspike" if VOL_SPIKE else ""   # l'officiel 3 flux n'est jamais écrasé
+    out = REPORTS / f"the-machine-{datetime.now(timezone.utc):%Y-%m-%d}{_sfx}.md"
     REPORTS.mkdir(exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[machine] ${CAPITAL:,.0f} → ${r['balance']:,.2f} "
           f"({roi:+.0f} %/an), DD {r['max_dd']:.1f} %, liq {r['n_liq']}, "
-          f"{r['n']} trades, record mois {rec:+.1f} %, {neg} mois négatifs")
+          f"{r['n']} trades, record mois {rec:+.1f} %, {neg} mois négatifs"
+          + (" | 4e flux vol_spike_6h ON" if VOL_SPIKE else ""))
     print(f"[machine] garde-fous : composé {gap_c*100:.3f} %, "
           f"PnL ${gap_p:.4f} | MAE gated {mae_gated:.2f} % "
           f"(levier sûr {lev_safe:.1f}x)")
