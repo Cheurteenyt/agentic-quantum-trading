@@ -499,10 +499,29 @@ def _open_tokens_panel(page, tab: str = "trending") -> bool:
     return clicked
 
 
+SCROLL_TOKENS_SIDEBAR = """
+() => {
+  for (const e of document.querySelectorAll("div")) {
+    if (e.scrollHeight > e.clientHeight + 100 && e.clientHeight > 150
+        && e.clientWidth < 420 && /MC/.test(e.innerText || "")) {
+      e.scrollTop += 450;
+      return true;
+    }
+  }
+  return false;
+}"""
+
+
 def mine_tokens(tab: str = "trending", scrolls: int = 8, debug: bool = False) -> dict:
     """Panneau Tokens : découverte des coins (trending / most held /
     graduated / bonding) — la couche amont de listing_watcher : un coin qui
-    monte ici peut lister sur Aster demain."""
+    monte ici peut lister sur Aster demain.
+
+    La sidebar VIRTUALISE dans son propre conteneur : window.scrollBy ne
+    scrollait que la page derrière → seuls les ~15 tokens visibles à
+    l'ouverture étaient captés (→ overlap inter-nuits = 0, la sidebar bonding
+    churnant en quelques heures). On scroll le conteneur sidebar et on
+    accumule les lignes à chaque pas (dernière occurrence = plus fraîche)."""
     pw, browser = _connect_cdp()
     if browser is None:
         raise RuntimeError("daemon CDP requis pour --tokens")
@@ -510,10 +529,20 @@ def mine_tokens(tab: str = "trending", scrolls: int = 8, debug: bool = False) ->
         ctx = _ctx_of(browser)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         tab_clicked = _open_tokens_panel(page, tab)
+        rows_by_ticker: dict = {}
+
+        def _harvest_visible() -> None:
+            for r in (page.evaluate(EXTRACT_TOKENS_JS) or []):
+                if r.get("ticker"):
+                    rows_by_ticker[r["ticker"]] = r
+
+        _harvest_visible()
         for _ in range(scrolls):
-            page.evaluate("window.scrollBy(0, 700)")
+            if not page.evaluate(SCROLL_TOKENS_SIDEBAR):
+                break  # bas de la liste atteint
             page.wait_for_timeout(400)
-        rows = page.evaluate(EXTRACT_TOKENS_JS) or []
+            _harvest_visible()
+        rows = list(rows_by_ticker.values())
         out = {"tab": tab, "tab_clicked": tab_clicked, "rows": rows, "n": len(rows)}
         if debug or not rows:
             out["debug_body"] = (page.evaluate("document.body.innerText") or "")[:3500]
@@ -658,12 +687,27 @@ EXTRACT_TOKENS_JS = """
 """
 
 
-def _persist_tokens(tab: str, rows: list) -> None:
+_AGE_UNITS_MIN = {"m": 1, "h": 60, "d": 1440, "w": 10080, "mo": 43200, "y": 525600}
+
+
+def _age_to_minutes(age) -> int | None:
+    """Âge sidebar -> MINUTES : 5m→5, 2h→120, 3d→4320, 1w→10080. None sinon."""
+    if not age:
+        return None
+    m = re.fullmatch(r"(\d+)(m|h|d|w|mo|y)", str(age).strip())
+    return int(m.group(1)) * _AGE_UNITS_MIN[m.group(2)] if m else None
+
+
+def _persist_tokens(tab: str, rows: list) -> dict:
     """Entrepôt cumulatif des couches découverte (bonding/graduated/trending)
-    — un ticker absent de la capture précédente = une nouveauté à surveiller."""
+    — un ticker absent de la capture précédente = une nouveauté à surveiller.
+    Mesure aussi l'OVERLAP vs les tickers captés sur les 48h précédentes
+    (le signal ex-ante bonding_pct → perf exige des re-captures du même token)
+    et retourne {"overlap": {...}} avec la liste STALE (hors écran)."""
     import sqlite3
     db = ROOT / "data" / "fomo" / "fomo.db"
-    con = sqlite3.connect(db)
+    con = sqlite3.connect(db, timeout=30)
+    con.execute("PRAGMA busy_timeout=30000")
     con.executescript("""
     CREATE TABLE IF NOT EXISTS fomo_new_coins (
         ticker TEXT NOT NULL, tab TEXT NOT NULL,
@@ -675,12 +719,20 @@ def _persist_tokens(tab: str, rows: list) -> None:
         mc REAL, price REAL, dir TEXT, change_pct REAL,
         PRIMARY KEY (ticker, captured_at));
     """)
+    # migration douce : âge normalisé en MINUTES (age brut gardé en TEXT,
+    # les anciennes lignes sans age lisible restent NULL)
+    cols = {r[1] for r in con.execute("PRAGMA table_info(fomo_new_coins)")}
+    if "age_minutes" not in cols:
+        con.execute("ALTER TABLE fomo_new_coins ADD COLUMN age_minutes INTEGER")
+        con.commit()
     now = time.time()
     for r in rows:
-        con.execute("INSERT OR IGNORE INTO fomo_new_coins VALUES (?,?,?,?,?,?,?,?,?,?)",
+        con.execute("""INSERT OR IGNORE INTO fomo_new_coins
+            (ticker, tab, mc, price, vol, age, dir, change_pct, bonding_pct,
+             captured_at, age_minutes) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                     (r.get("ticker"), tab, r.get("mc"), r.get("price"), r.get("vol"),
                      r.get("age"), r.get("dir"), r.get("change_pct"),
-                     r.get("bonding_pct"), now))
+                     r.get("bonding_pct"), now, _age_to_minutes(r.get("age"))))
         # la SÉRIE TEMPORELLE : chaque scan ajoute une ligne — l'UI fomo
         # n'expose que les gains (100 % WR affiché = sélection), nos propres
         # séries sont la seule donnée impartiale pour backtester
@@ -697,7 +749,34 @@ def _persist_tokens(tab: str, rows: list) -> None:
         except (TypeError, ValueError):
             continue
     con.commit()
+    # — MESURE D'OVERLAP : tickers du même tab vus sur les 48h précédentes —
+    prior = {t for (t,) in con.execute(
+        "SELECT DISTINCT ticker FROM fomo_new_coins "
+        "WHERE tab=? AND captured_at>=? AND captured_at<?",
+        (tab, now - 48 * 3600, now))}
+    captured = {str(r.get("ticker")) for r in rows if r.get("ticker")}
+    stale = []
+    for t in sorted(prior - captured):
+        r = con.execute(
+            "SELECT bonding_pct, age, mc, captured_at FROM fomo_new_coins "
+            "WHERE tab=? AND ticker=? ORDER BY captured_at DESC LIMIT 1",
+            (tab, t)).fetchone()
+        stale.append({"ticker": t, "last_bonding_pct": r[0], "last_age": r[1],
+                      "last_mc": r[2],
+                      "last_seen_h": round((now - r[3]) / 3600, 1)})
+    ov = {"n_total": len(captured), "n_prior_48h": len(prior),
+          "n_overlap": len(prior & captured),
+          "stale_offscreen": stale}
+    # flag mesurable chaque nuit (rapport nocturne)
+    log = ROOT / "data" / "fomo" / "overlap_log.tsv"
+    if not log.exists():
+        with open(log, "a") as f:
+            f.write("ts\ttab\tn_total\tn_prior_48h\tn_overlap\n")
+    with open(log, "a") as f:
+        f.write(f"{now:.0f}\t{tab}\t{ov['n_total']}\t{ov['n_prior_48h']}"
+                f"\t{ov['n_overlap']}\n")
     con.close()
+    return {"overlap": ov}
 
 
 PROBE_CLICKS = {
@@ -1206,7 +1285,12 @@ def main() -> int:
         return 0
     if args.tokens:
         res = mine_tokens(args.tokens, debug=True)
-        _persist_tokens(args.tokens, res["rows"])
+        ov = _persist_tokens(args.tokens, res["rows"])
+        res.update(ov)
+        o = ov["overlap"]
+        print(f"OVERLAP {args.tokens}: {o['n_overlap']}/{o['n_total']} vs 48h "
+              f"(prior={o['n_prior_48h']}, stale_offscreen={len(o['stale_offscreen'])})",
+              file=sys.stderr)
         print(json.dumps(res, indent=1, ensure_ascii=False))
         return 0
     if args.probe:

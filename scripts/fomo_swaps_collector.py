@@ -1,8 +1,10 @@
 """Collector swaps baleines fomo — pagination lastSwapId (decouverte 2026-09-27).
-Pour chaque trader: resolve userId (in-page CDP), fetch TOUTES les pages
-(?limit=100&lastSwapId=<dernier id page precedente>), INSERT OR IGNORE,
-commit par page. DB: data/fomo/fomo_swaps.db. Lecture seule fomo.db (tickers)."""
-import json, sqlite3, sys, time, datetime
+Pour chaque trader: resolve userId (in-page CDP, cache _swaps_meta), fetch les
+pages (?limit=100&lastSwapId=<dernier id page precedente>), INSERT OR IGNORE,
+commit par page. DB: data/fomo/fomo_swaps.db. Lecture seule fomo.db (tickers).
+--fresh : mode RECURRENT page-1-only (100 swaps les plus frais par trader,
+pas de pagination) — cadence proposee : horaire (timer systemd user)."""
+import argparse, json, sqlite3, sys, time, datetime
 sys.path.insert(0, "scripts")
 from fomo_ohlcv_backfill import fresh_jwt
 from playwright.sync_api import sync_playwright
@@ -14,7 +16,12 @@ QUOTE = {"So11111111111111111111111111111111111111112",
 HANDLES = ["unipcs", "pointfarmcap", "ogle", "RugDalio", "frankdegods",
            "frogmanhaha", "dingalingts", "picadura", "ethersole", "cryptolyxe",
            "heeshilio", "derek518", "sadcrissy"]  # 10 utiles, backups si resolve fail
-MAX_PAGES, PAGE = 40, 100
+ap = argparse.ArgumentParser(description="Collector swaps baleines fomo")
+ap.add_argument("--fresh", action="store_true",
+                help="page 1 uniquement (100 swaps les plus frais par trader) "
+                     "— mode recurrent, INSERT OR IGNORE, cadence horaire")
+ARGS = ap.parse_args()
+MAX_PAGES, PAGE = (1 if ARGS.fresh else 40), 100
 SWDB = "/run/media/cheurteen/Jeux SSD/trading-agent/data/fomo/fomo_swaps.db"
 FDB = "/run/media/cheurteen/Jeux SSD/trading-agent/data/fomo/fomo.db"
 
@@ -57,9 +64,15 @@ with sync_playwright() as p:
         except Exception:
             return r["status"], {}
 
-    # 1. resolution handle -> userId
+    # 1. resolution handle -> userId (--fresh : cache _swaps_meta d'abord,
+    #    on ne resolve en live que les handles inconnus)
     users = {}
+    cached = dict(db.execute("SELECT handle, user_id FROM _swaps_meta").fetchall()) \
+        if ARGS.fresh else {}
     for h in HANDLES:
+        if cached.get(h):
+            users[h] = cached[h]
+            continue
         st, ro = f(f"https://prod-api.fomo.family/v2/users/userHandle/{h}")
         uid = ro.get("id") or (ro.get("user") or {}).get("id")
         if uid:
