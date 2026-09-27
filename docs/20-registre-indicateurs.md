@@ -204,3 +204,12 @@ Rapport : reports/tail-machine-confirm-2026-09-27.md (script : scripts/tail_mach
 | **carte hold du survivor** (signal verbatim répliqué bit-identique à collect_arsenal, 1 554 events, gate ATR p90 2,90 % figé ; holds 48/72/96/120h, LONG 1x intuable, ensemble commun 1 358 events appariés) | Espérance appariée MONTE avec le hold : +0,032 / +0,052 / +0,074 / **+0,102** $ (le drift long bat le funding payé) mais le créneau 1 slot fait tomber N/an 10→4 : ROI/an **+11,0 / +15,7 / +13,9 / +9,6 %**, DD 2,1 / 2,1 / 1,7 / 3,0 %, 0 liq et 0 rug partout (MAE max ~31 %, pire trade -28,8 %). 96h : meilleure WR wallet (52,4 % vs 47,1 %) mais ROI inférieur. Corr max avec les 4 flux : survivor 72h self 1,00, autres ≤ 0,70. TRAIN/VAL : VAL 72h +9,76 $ vs 96h +12,03 $ (bruit, N=29/21) | **NUL (changement)** — 72h CONFIRMÉ point de tangence fréquence × espérance ; la carte est le garde-fou anti-dérive du hold survivor (ne jamais l'étendre sans re-test) |
 
 Rapport : reports/funding-hold-survivor-2026-09-27.md (script : scripts/funding_hold_surv_map.py — briques importées de anti_liq/stacked_portfolio/p5_frequency_test/full_arsenal_2, aucun fichier officiel édité, klines.db lecture-seule, garde-fous composé-des-mois 0,000 % sur les 8 wallets).
+
+## 27/09 nuit — K scan (CANDIDAT à arbitrer) + univers meme (4 tier-1 câblés)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **K scan** (le dernier paramètre libre : le multiplicateur de taille absolu, calibré à la main 0,89) | K=0,95 sur la cellule jointe = **$6 519 (+6 419 %/an @ DD 24,9 %, 0 liq, record +90,0 %, 1 nég)** — +25,8 % de balance pour +1,6 pt DD, choisi TRAIN, confirmé VAL (DD 19,7) ; théorème d'échelle vérifié (1 356 trades identiques, 0 liq/18 runs) ; K=1,00 = +7 766 % MAIS DD 26,2 % > 25 rejeté ; trade-off : pire mois -14,3 % | **CANDIDAT** — à arbitrer : K=0,95 @ DD 24,9 % (marge 0,1 pt) vs K=0,89 @ 23,3 % |
+| **Univers meme audit** | le collecteur nocturne ne découvre RIEN (11 symboles codés en dur) ; 4 tier-1 ajoutables : DRAM (+117/an, esp +0,87), PIEVERSE (+67, +2,20), VIRTUAL (+85, +1,14), MELANIA (+44, +1,82) = +313 events/an, 0 MAE fatal ; exclus à espérance négative : PEPE/USELESS/SHIB/BONK/PUMP ; 2 tickers périmés corrigés (BONKUSDT→1000BONK, FLOKIUSDT→1000FLOKI) | **CANDIDAT** — câblé au nocturne, re-juger sur VAL après 30 j |
+
+Rapports : reports/k-scan-2026-09-27.md, reports/meme-universe-audit-2026-09-27.md.
