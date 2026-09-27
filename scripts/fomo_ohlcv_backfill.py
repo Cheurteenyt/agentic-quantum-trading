@@ -70,17 +70,30 @@ def _fresh_jwt_daemon() -> str:
         browser = pw.chromium.connect_over_cdp("http://127.0.0.1:9222",
                                                timeout=8000)
         ctx = browser.contexts[0] if browser.contexts else browser
-        page = ctx.new_page()
+        # RÉUTILISER une page déjà sur fomo.family (le collector en garde
+        # une en permanence) — créer/naviguer/fermer une page nouvelle =
+        # la fenêtre qui « s'affiche et disparaît » toutes les 15 min.
+        page, created = None, False
+        for cand in ctx.pages:
+            if "fomo.family" in (cand.url or ""):
+                page = cand
+                break
+        if page is None:
+            page = ctx.new_page()
+            created = True
+            try:
+                page.goto("https://fomo.family",
+                          wait_until="domcontentloaded", timeout=20000)
+                page.wait_for_timeout(1500)
+            except Exception:
+                pass
         try:
-            page.goto("https://fomo.family", wait_until="domcontentloaded",
-                      timeout=20000)
-            page.wait_for_timeout(1500)
-        except Exception:
-            pass
-        vals = page.evaluate(
-            "() => Object.entries(localStorage)"
-            ".filter(([k, v]) => v && v.length < 5000)")
-        page.close()
+            vals = page.evaluate(
+                "() => Object.entries(localStorage)"
+                ".filter(([k, v]) => v && v.length < 5000)")
+        finally:
+            if created:
+                page.close()
     finally:
         pw.stop()
     now = time.time()

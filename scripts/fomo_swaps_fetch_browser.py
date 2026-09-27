@@ -10,8 +10,17 @@ USERS = {"unipcs": "36adb85a-c0fd-5fa8-916d-8fdc32fe4237",
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
     ctx = b.contexts[0]
-    page = ctx.new_page()
-    page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=45000)
+    # réutiliser une page fomo.family existante — créer/fermer une page
+    # nouvelle = la fenêtre qui s'affiche et disparaît
+    page, created = None, False
+    for cand in ctx.pages:
+        if "fomo.family" in (cand.url or ""):
+            page = cand
+            break
+    if page is None:
+        page = ctx.new_page()
+        created = True
+        page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(4000)
     out = {}
     for h, uid in USERS.items():
@@ -35,4 +44,5 @@ with sync_playwright() as p:
             print("parse err:", e, res["body"][:300])
             out[h] = {"raw": res["body"][:5000], "status": res["status"]}
     json.dump(out, open("/tmp/fomo_swaps_browser.json", "w"))
-    page.close()
+    if created:
+        page.close()
