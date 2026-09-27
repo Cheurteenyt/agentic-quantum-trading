@@ -46,8 +46,8 @@ def _oi_velocity() -> dict[str, float]:
         con = sqlite3.connect(KDB)
         for (sym,) in con.execute("SELECT DISTINCT symbol FROM oi_history"):
             pts = con.execute(
-                "SELECT open_interest, captured_at FROM oi_history "
-                "WHERE symbol = ? ORDER BY captured_at DESC LIMIT 2",
+                "SELECT open_interest, captured_at_ms FROM oi_history "
+                "WHERE symbol = ? ORDER BY captured_at_ms DESC LIMIT 2",
                 (sym,)).fetchall()
             if len(pts) == 2 and pts[1][0]:
                 out[sym[:-4]] = (pts[0][0] - pts[1][0]) / pts[1][0] * 100

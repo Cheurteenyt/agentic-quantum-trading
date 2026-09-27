@@ -121,3 +121,20 @@ Rapports : reports/p5-frequency-streams-2026-09-27.md, reports/carte-hold-levier
 | Données mobula | AMBA 1m/15m : cassure d'unité (bougies ~1566 $ vs 0,0012 $) → 65 bougies jetées ; WETH 1h : 6 mèches non soutenues (high 13210 vs ~3100) réparées ; 7STOCK : 2 bougies seulement, print à 4,65e-12 $ | **NUL** (telles quelles) — nettoyer avant tout backtest 1m/15m mobula : filtre voisin-based dans scripts/fomo_lifecycle_v2.py |
 
 Rapport : reports/fomo-lifecycle-v2-2026-09-27.md (script : scripts/fomo_lifecycle_v2.py). v1 (corpus court) re-catégorisé : ses métriques 15m sous-estimaient les pumps <15 min (AMBA 1,14x → 92,9x) et bornaient le délai au pic (51,5h → 871,5h).
+
+## 27/09 — H1 absorption (buy_ratio) : FAIL strict, aucun sizing branché (h1_absorption_test.py)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **buy_ratio** (taker_buy_volume/volume, moyenne des 4 bougies 1h avant le signal cascade) — H1 pré-enregistrée dans flow-audit-2026-09-27 AVANT le backfill CVD | Corpus 230 events majors (collect_featured + add_rolling_scores, sélection sim, hold 24h ; le 165 historique a grossi avec la data), split 70/30 PAR LE TEMPS (161/69), coupures quartiles TRAIN 0.477/0.492/0.502 — dispersion minuscule : la moyenne 4 barres lave les spikes d'absorption. MAE moyen Q1→Q4 TRAIN **1.98/1.88/1.93/1.96** (plat, Spearman −0.05 : ne tient MÊME PAS en TRAIN) ; VAL **2.69/1.93/0.92/1.69** (Spearman −0.209, hint INVERSE non pré-enregistré, n=8–28/cellule). Liq @9.5 % : 0/161 TRAIN, 1/69 VAL. Espérance marge @10x maker TRAIN : Q4 +0.2 vs Q2 +9.0. Machine 4 flux NON branchée (sizing ×0.75/1.0/1.25 refusé — pas de gradient) | **NUL** — H1 close ; le hint inverse va au CONTEXTE de H2 (divergence delta), jamais en gate |
+
+Rapport : reports/h1-absorption-2026-09-27.md (script : scripts/h1_absorption_test.py — the_machine.py intact, klines.db lecture-seule).
+
+## 27/09 — H2 divergence delta + H3 sweep volumique : FAIL tous les deux, aucun sizing branché (h2_h3_cvd_test.py)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **pente_cvd** (régression linéaire du delta cumulé 2×taker_buy−vol sur les 6 bougies 1h avant l'entrée, normalisée par le vol moyen × flag nouveau-bas = close signal = min des 24 closes) — H2 pré-enregistrée dans flow-audit-2026-09-27 | Même corpus 230 events majors, split 70/30 par le temps (161/69), zone morte ≈0 = q33 des \|pentes\| TRAIN (0,0131). Ordre de danger déclaré : (0,nég)<(0,≈0)<(1,nég)<(1,≈0)<(0,pos)<(1,pos). MAE TRAIN le long de l'ordre **1.77/1.50/2.48/2.53/1.85/1.87** (NON monotone dès le 2e maillon), VAL **1.99/1.51/3.10/1.42/1.57/1.93** (NON). Cellule divergence (NL=1×pos) : n=3 TRAIN / 7 VAL — trop vide pour trancher ; Spearman pente×MAE −0.087 tr / −0.123 va (sens inverse du déclaré). Machine 4 flux NON branchée | **NUL** — H2 close ; hint post-hoc H2bis (nouveau-bas × pente CVD < −dz = capitulation → MAE haut : TRAIN 2.48 %/exp −0.9 n=30, VAL 3.10 %/1 liq/WR 33.3 %/exp −17.8 n=12) = **CONTEXTE**, à pré-enregistrer avant re-test |
+| **sweep_vol** (low d'une des 6 bougies avant l'entrée casse le plus-bas des 48h avec volume >2× sa moyenne 20) — H3 pré-enregistrée dans flow-audit-2026-09-27 | Même corpus ; outcome = max(high 4-12h post-entrée) − entrée. Buckets bounce no-sweep→2-3×→3-5×→≥5× : TRAIN **0.97/1.62/1.08/−0.39** (NON monotone, la queue ≥5× est NÉGATIVE), VAL **1.15/0.98/2.77/1.03** (NON). n buckets 3-5×/≥5× = 3-4/split — sous-puissant ET direction instable | **NUL** — H3 close ; hint post-hoc H3bis (sweep ≥2× → MAE 24h du short : TRAIN 2.66 vs 1.84 %, VAL 3.00 vs 1.84 %, espérance VAL sweep négative −27.3/−13.7/−6.6) = **CONTEXTE**, à pré-enregistrer avant re-test |
+
+Rapport : reports/h2-h3-cvd-2026-09-27.md (script : scripts/h2_h3_cvd_test.py — the_machine.py intact, klines.db 1h lecture-seule, backfill 15m non touché). Leçon confirmée : la dynamique (pente/divergence) bat la moyenne, mais la FORME prédite à l'avance reste la seule publiable — les 2 hints inversés attendent leur pré-enregistrement.

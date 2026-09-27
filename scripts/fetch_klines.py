@@ -41,7 +41,7 @@ from backend.services.backtest_v2.baselines import Bar  # noqa: E402
 ASTER_BASE = "https://fapi.asterdex.com"
 DB_PATH = ROOT / "data" / "warehouse" / "klines.db"
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MIN_SLEEP_S = 0.25
 DEFAULT_TIMEOUT = 15.0
 MAX_LIMIT = 1500
@@ -133,6 +133,8 @@ CREATE TABLE IF NOT EXISTS klines (
     low         REAL    NOT NULL CHECK (low   > 0),
     close       REAL    NOT NULL CHECK (close > 0),
     volume      REAL    NOT NULL CHECK (volume >= 0),
+    taker_buy_volume REAL NOT NULL DEFAULT 0 CHECK (taker_buy_volume >= 0),
+    quote_volume     REAL NOT NULL DEFAULT 0 CHECK (quote_volume     >= 0),
     close_time  INTEGER NOT NULL,
     snapshot_id TEXT    NOT NULL,
     source      TEXT    NOT NULL,
@@ -176,12 +178,25 @@ def init_db(path: Path | str = DB_PATH) -> sqlite3.Connection:
         p.parent.mkdir(parents=True, exist_ok=True)
         con = sqlite3.connect(str(p))
     con.row_factory = sqlite3.Row
+    con.execute("PRAGMA busy_timeout = 10000")
     # Les CHECK ne servent a rien si les contraintes ne sont pas appliquees.
     con.execute("PRAGMA foreign_keys = ON")
     con.executescript(CREATE_SQL + META_SQL + SNAPSHOT_SQL)
+    # Migration schema v1 -> v2 : taker_buy_volume / quote_volume (CVD).
+    # Les colonnes ajoutees a une base existante restent NULLABLE : NULL =
+    # bougie pas encore backfillée ; DEFAULT 0 sur les nouvelles bases.
+    cols = {r[1] for r in con.execute("PRAGMA table_info(klines)").fetchall()}
+    if "taker_buy_volume" not in cols:
+        con.execute("ALTER TABLE klines ADD COLUMN taker_buy_volume REAL")
+    if "quote_volume" not in cols:
+        con.execute("ALTER TABLE klines ADD COLUMN quote_volume REAL")
     con.execute(
         "INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)",
         (str(SCHEMA_VERSION),),
+    )
+    con.execute(
+        "UPDATE meta SET value = ? WHERE key = 'schema_version' AND value < ?",
+        (str(SCHEMA_VERSION), str(SCHEMA_VERSION)),
     )
     con.execute(
         "CREATE INDEX IF NOT EXISTS idx_klines_lookup "
@@ -195,9 +210,13 @@ def init_db(path: Path | str = DB_PATH) -> sqlite3.Connection:
 
 
 def parse_kline_row(row: Any, index: int = 0) -> tuple:
-    """Valide une ligne brute klines -> tuple normalise.
+    """Valide une ligne brute klines -> tuple normalise (9 champs).
 
-    Format attendu : [openTime, open, high, low, close, volume, closeTime, ...]
+    Format API Aster fapi v3 (12 champs, comme Binance) :
+      [openTime, open, high, low, close, volume, closeTime, quoteVolume,
+       trades, takerBuyBaseVolume, takerBuyQuoteVolume, ignore]
+    Les lignes plus courtes (tests, vieilles series) tombent a 0.0 pour
+    taker_buy_volume / quote_volume — jamais a une valeur inventee.
     Leve KlineParseError sur toute anomalie : mieux vaut une erreur bruyante
     qu'un backtest silencieusement faux.
     """
@@ -217,17 +236,37 @@ def parse_kline_row(row: Any, index: int = 0) -> tuple:
         except (TypeError, ValueError) as exc:
             raise KlineParseError(f"kline #{index}: closeTime invalide ({row[6]!r})") from exc
 
+    def _opt_float(idx: int, name: str) -> float:
+        if len(row) <= idx or row[idx] in (None, ""):
+            return 0.0
+        try:
+            return float(row[idx])
+        except (TypeError, ValueError) as exc:
+            raise KlineParseError(
+                f"kline #{index}: {name} invalide ({row[idx]!r})") from exc
+
+    quote_volume = _opt_float(7, "quoteVolume")
+    taker_buy = _opt_float(9, "takerBuyBaseVolume")
+
     for name, price in (("open", o), ("high", h), ("low", l), ("close", c)):
         if not price > 0:
             raise KlineParseError(f"kline #{index}: {name}={price} <= 0")
     if v < 0:
         raise KlineParseError(f"kline #{index}: volume negatif ({v})")
+    if taker_buy < 0 or quote_volume < 0:
+        raise KlineParseError(
+            f"kline #{index}: volume taker/quote negatif ({taker_buy}, {quote_volume})")
+    # Cohérence institutionnelle : le taker buy base ne peut pas dépasser le
+    # volume total (tolérance epsilon pour arrondis d'affichage de l'API).
+    if taker_buy > v + abs(v) * 1e-6 + 1e-12:
+        raise KlineParseError(
+            f"kline #{index}: taker_buy {taker_buy} > volume total {v}")
     if h < l:
         raise KlineParseError(f"kline #{index}: high {h} < low {l}")
     if open_time <= 0:
         raise KlineParseError(f"kline #{index}: open_time invalide ({open_time})")
 
-    return (open_time, o, h, l, c, v, close_time)
+    return (open_time, o, h, l, c, v, close_time, taker_buy, quote_volume)
 
 
 # --------------------------------------------------------------------- fetchers
@@ -431,13 +470,15 @@ def store_klines(
 
     inserted = 0
     skipped = 0
-    for open_time, o, h, l, c, v, close_time in parsed:
+    for open_time, o, h, l, c, v, close_time, taker_buy, quote_volume in parsed:
         cur = con.execute(
             "INSERT OR IGNORE INTO klines "
             "(symbol, interval, open_time, open, high, low, close, volume, "
-            " close_time, snapshot_id, source, fetched_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (sym, interval, open_time, o, h, l, c, v, close_time, snap, SOURCE, now),
+            " taker_buy_volume, quote_volume, close_time, snapshot_id, source, "
+            " fetched_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (sym, interval, open_time, o, h, l, c, v, taker_buy, quote_volume,
+             close_time, snap, SOURCE, now),
         )
         if cur.rowcount == 1:
             inserted += 1

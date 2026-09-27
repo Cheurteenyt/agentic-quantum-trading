@@ -68,19 +68,22 @@ def main() -> int:
     if not rows:
         print("[oi] aucun snapshot", file=sys.stderr)
         return 1
-    now = time.time()
+    now_ms = int(time.time() * 1000)
     con = sqlite3.connect(DB)
+    con.execute("PRAGMA busy_timeout = 10000")
+    # Schema v2 (voir scripts/oi_collector.py) : timestamps en MILLISECONDES.
     con.execute("""CREATE TABLE IF NOT EXISTS oi_history (
-        symbol TEXT NOT NULL, open_interest REAL, price REAL,
-        captured_at REAL NOT NULL, PRIMARY KEY (symbol, captured_at))""")
+        symbol TEXT NOT NULL, open_interest REAL NOT NULL, price REAL,
+        captured_at_ms INTEGER NOT NULL, PRIMARY KEY (symbol, captured_at_ms))""")
     movers: list[dict] = []
     for r in rows:
         prev = con.execute(
             "SELECT open_interest, price FROM oi_history WHERE symbol = ? "
-            "AND captured_at < ? ORDER BY captured_at DESC LIMIT 1",
-            (r["symbol"], now)).fetchone()
-        con.execute("INSERT OR IGNORE INTO oi_history VALUES (?,?,?,?)",
-                    (r["symbol"], r["oi"], r["price"], now))
+            "AND captured_at_ms < ? ORDER BY captured_at_ms DESC LIMIT 1",
+            (r["symbol"], now_ms)).fetchone()
+        con.execute("INSERT OR IGNORE INTO oi_history "
+                    "(symbol, open_interest, price, captured_at_ms) VALUES (?,?,?,?)",
+                    (r["symbol"], r["oi"], r["price"], now_ms))
         if prev and prev[0]:
             d_oi = (r["oi"] - prev[0]) / prev[0] * 100
             d_px = ((r["price"] - prev[1]) / prev[1] * 100
