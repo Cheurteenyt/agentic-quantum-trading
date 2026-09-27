@@ -147,3 +147,20 @@ Rapport : reports/h2-h3-cvd-2026-09-27.md (script : scripts/h2_h3_cvd_test.py �
 | wall-clock des cascades (l'heure d'entrée UTC, buckets 4h) | rho rangs TRAIN→VAL 0,60 mais incohérent entre années (rho -0,10 — le gradient TRAIN = un artefact du régime 2025) ; la fenêtre funding ±1h : signe qui bascule ; ±28 pts de WR détectables/bucket, aucun p<0,10 | **CONTEXTE** — le hint H2/H3 est enterré |
 
 Rapports : reports/qubo-sizing-2026-09-27.md, reports/wallclock-cascades-2026-09-27.md.
+
+## 27/09 nuit — garde drawdown du WALLET (désengagement prop-firm) : NUL, 0/12 cellules (wallet_dd_guard.py)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **garde wallet DD** (taille ×r quand DD wallet > S, retour sous S/2 hystérésis — 6 cellules S∈{10,15,20}/r∈{0.5,0.75}, 2 configs machine+QUBO, split 10/06/26) | Baselines reproduites bit-exact ($4 004,94 / $4 639,13). Coût de garde NÉGATIF sur 12/12 : les trades taillés sont des GAGNANTS (le rebond) — ex machine S=10/r=0.5 : 450 trades (33 %) taillés, +$521 réalisés vs +$1 042 pleine taille = -$521 manqués ; wallet FULL -19,6 % à -71,4 % vs contrôle. Pire mois DÉGRADÉ en TRAIN 11/12 (le garde coupe aussi les gagnants intra-mois du mois rouge : machine -10,1 → -10,6/-15,6) ; DD machine jamais amélioré (24,8 % partout — le DD est creusé par les entrées PRÉ-seuil) ; QUBO DD 23,4→21,2 mais ROI -31 à -61 %. 0 liq partout (invariant aux tailles, vérifié) | **NUL** — la mécanique est close au niveau WALLET (après sizing conditionnel cher et dd_cross nul) : le PnL de la machine est right-skewed, couper en drawdown coupe le rebond. Reste non testé : ré-engagement par PALIERS (r accru quand DD < S/2), garde sur DD inhérent au flux (pas au wallet) |
+
+Rapport : reports/wallet-dd-guard-2026-09-27.md (script : scripts/wallet_dd_guard.py — briques importées de the_machine/stacked_portfolio/qubo_sizing, aucun fichier officiel édité, klines.db lecture-seule).
+
+## 27/09 nuit — QUBO joint poids×levier (CANDIDAT, le meilleur point du projet) + garde wallet (NUL)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **QUBO JOINT poids×levier** — LA donnée : MAE max TRAIN par flux — majors 7,66 % → plafond **12,26x** (tournait à 10x) ; meme 223,68 % → 0,45x brut mais les 2 events ≥ 99,5 % ne passent jamais au sizer (busy-skip) → 1x tient fragile ; survivor intuable (LONG 1x) ; **vol_spike MAE 94,68 % (p99 49 %) → plafond 1,05x — l'hypothèse « entrée = extrême → MAE petit » est RÉFUTÉE** | cellule gagnante **w = [0.857, 0.857, 2.0, 0.857] × lev = [11x, 1x, 1x, 1x]** ; annealing = grille 16 384 états sur 14 λ ; TRAIN $2 175 @ 23,3 ; VAL +75,1 % @ 18,6, 0 liq ; **FULL $5 182 = +5 082 %/an @ DD 23,3 %, 0 liq, record +83,7 % (≥ cible 80 %), pire -13,4 %, 1 nég/12** vs poids seul $4 639 @ 23,4 vs main $4 005 @ 24,8 | **CANDIDAT — ⚠️ marge MAE majors VAL 7,84 % vs seuil 8,59 % (11x) = 9 % de tête seulement — en surveillance permanente** ; paper-forward avec les autres variantes |
+| garde drawdown wallet-level (prop-firm : taille ×r quand le wallet est à -S % du sommet, hystérésis S/2) | **NUL 12/12 cellules** — le coût de garde est négatif : les trades taillés sont les GAGNANTS du rebond (-$521 manqués sur une cellule, 33 % des trades taillés) ; le pire mois DÉGRADÉ 11/12 ; cohérent avec la loi d'exécution (le rebond après DD = là où l'edge vit) ; seul le QUBO gagnait 2,2 pts de DD au prix de -31 à -61 % de ROI | **NUL** — le ré-engagement par paliers reste non testé (à pré-enregistrer) |
+
+Rapports : reports/qubo-joint-lev-2026-09-27.md, reports/wallet-dd-guard-2026-09-27.md.
