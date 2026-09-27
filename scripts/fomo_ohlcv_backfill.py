@@ -181,6 +181,7 @@ def backfill_period(con: sqlite3.Connection, jwt: str, mint: str,
     `to` courant ; commit par page (une transaction fantôme = tout perdu)."""
     to = int(time.time() * 1000)
     total = 0
+    prev_min: int | None = None
     for _ in range(pages):
         rows = call(jwt, mint, period, 0, to)
         candles = rows_to_candles(rows)
@@ -191,10 +192,21 @@ def backfill_period(con: sqlite3.Connection, jwt: str, mint: str,
             [(mint, period, t, o, h, l, c, v, time.time())
              for t, o, h, l, c, v in candles])
         con.commit()
-        total += len(candles)
+        if prev_min is not None:
+            total += sum(1 for t, *_ in candles if t < prev_min)
+        else:
+            total += len(candles)
+        prev_min = min(t for t, *_ in candles)
         if len(candles) < CAP:
             break
-        to = min(t for t, *_ in candles) - 1
+        new_to = prev_min - 1
+        if new_to >= to:
+            # l'API ignore `to` (earliest ne descend pas) : les pages suivantes
+            # seraient les mêmes 2000 bougies re-upsertées et comptées en double
+            print(f"  pagination bloquée à to={new_to} (earliest ne descend plus)",
+                  flush=True)
+            break
+        to = new_to
         time.sleep(0.3)
     return total
 
@@ -226,8 +238,13 @@ def main() -> int:
     import subprocess
     stopped = False
     if not args.no_stop:
+        # fenêtre exclusive comme fomo_master_backfill : le timer top-up tire
+        # toutes les 15 min (passe ~93s) — sans ce stop, 2 écrivains lourds
+        # se croisent sur fomo.db pendant un backfill de 25+ min
         subprocess.run(["systemctl", "--user", "stop",
-                        "fomo-tick-collector.service"], capture_output=True)
+                        "fomo-tick-collector.service",
+                        "fomo-mobula-topup.timer",
+                        "fomo-mobula-topup.service"], capture_output=True)
         for _ in range(15):
             r = subprocess.run(["systemctl", "--user", "is-active",
                                 "fomo-tick-collector.service"],
@@ -269,7 +286,9 @@ def main() -> int:
         if not args.no_stop:
             subprocess.run(["systemctl", "--user", "start",
                             "fomo-tick-collector.service"], capture_output=True)
-            print("collector relancé", flush=True)
+            subprocess.run(["systemctl", "--user", "start",
+                            "fomo-mobula-topup.timer"], capture_output=True)
+            print("collector + top-up timer relancés", flush=True)
     return 0
 
 
