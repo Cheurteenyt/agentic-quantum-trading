@@ -35,6 +35,44 @@ from scripts.portfolio_sim import KDB, MAJORS, btc_regime_series  # noqa: E402
 
 REPORTS = ROOT / "reports"
 WIN_MS = 24 * 3600 * 1000       # la tempête = les 24h AVANT le signal (ms)
+WIN7_MS = 7 * 24 * 3600 * 1000  # les 7 jours glissants (fund7, vol7)
+
+
+def fund7_at(con: sqlite3.Connection, sym: str, t0_ms: float) -> float:
+    """fund7 : le funding MOYEN 7j du symbole à l'activation (en % / 8h).
+
+    Le séparateur n°1 de l'autopsie 27/09 (d=+0,98 sur les mois faibles) :
+    un funding élevé ex-ante = la foule paye pour rester long → carburant
+    de cascade. 0.0 si pas de données (jamais bloquer la sonde).
+    """
+    row = con.execute(
+        "SELECT AVG(rate) FROM funding_history "
+        "WHERE symbol = ? AND funding_time >= ? AND funding_time < ?",
+        (sym, t0_ms - WIN7_MS, t0_ms)).fetchone()
+    return float(row[0]) * 100 if row and row[0] is not None else 0.0
+
+
+def vol7_series(con: sqlite3.Connection) -> pd.Series:
+    """vol7 : l'ATR % roulant 7j MOYEN des majeures (série temporelle).
+
+    Le séparateur n°3 de l'autopsie : vol7 bas en janvier = les mois faibles.
+    ATR(1) % sur les bougies 1h, moyenne glissante 7j, puis moyenne
+    inter-majeures → une valeur ex-ante à chaque timestamp d'activation.
+    """
+    parts = []
+    for sym in MAJORS:
+        df = load_df(con, sym)
+        if df is None:
+            continue
+        tr = pd.concat([
+            df["high"] - df["low"],
+            (df["high"] - df["close"].shift()).abs(),
+            (df["low"] - df["close"].shift()).abs()], axis=1).max(axis=1)
+        atr_pct = (tr / df["close"] * 100).rolling("7D").mean()
+        parts.append(atr_pct.rename(sym))
+    if not parts:
+        return pd.Series(dtype=float)
+    return pd.concat(parts, axis=1).mean(axis=1).dropna()
 
 
 def main() -> int:
@@ -58,12 +96,17 @@ def main() -> int:
     sell_no = liq_sell["notional"].values.astype(float)
 
     rows = []
+    vol7 = vol7_series(con)
     for e in events:
         t0_ms = e["ts_ms"] / 10**6
         m = (sell_ts >= t0_ms - WIN_MS) & (sell_ts < t0_ms)
-        storm_no = float(sell_no[m].sum())
+        liq24h = float(sell_no[m].sum())          # notional SELL 24h glissantes
         storm_n = int(m.sum())
-        rows.append({**e, "storm_no": storm_no, "storm_n": storm_n})
+        rows.append({**e, "liq24h": liq24h, "storm_no": liq24h,
+                     "storm_n": storm_n,
+                     "fund7": fund7_at(con, e["sym"], t0_ms),
+                     "vol7": float(vol7.asof(pd.Timestamp(t0_ms, unit="ms")))
+                     if len(vol7) else 0.0})
 
     if len(rows) < 10:
         print(f"[probe] seulement {len(rows)} cascades dans la fenêtre liq — "
@@ -88,6 +131,17 @@ def main() -> int:
     # la corrélation brute storm ↔ continuation
     corr = float(np.corrcoef(np.log1p(storms), rets)[0, 1]) if len(rows) > 3 else 0.0
 
+    # les séparateurs de l'autopsie 27/09, corrélés à la continuation
+    fund7s = np.array([r["fund7"] for r in rows], dtype=float)
+    vol7s = np.array([r["vol7"] for r in rows], dtype=float)
+
+    def xcorr(arr: np.ndarray) -> float:
+        if len(rows) > 3 and float(np.std(arr)) > 0:
+            return float(np.corrcoef(arr, rets)[0, 1])
+        return 0.0
+
+    c_fund, c_vol = xcorr(fund7s), xcorr(vol7s)
+
     lines = [
         "# LA SONDE DE MÉCANISME — cascade × liquidations directes",
         f"{datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC — "
@@ -99,27 +153,33 @@ def main() -> int:
         f"| TEMPÊTE | {n_hot} | {r_hot:+.3f} % | {m_hot:.2f} % |",
         f"| CALME | {n_calm} | {r_calm:+.3f} % | {m_calm:.2f} % |",
         f"| Corrélation log(1+storm) ↔ continuation | {corr:+.3f} | | |", "",
+        "## Les séparateurs de l'autopsie (ex-ante, par activation)", "",
+        "| Champ | Médiane | Corrélation ↔ continuation 24h |", "|---|---|---|",
+        f"| fund7 (funding moyen 7j, % /8h) | {np.median(fund7s):+.4f} | {c_fund:+.3f} |",
+        f"| liq24h (notional SELL 24h, $) | ${np.median(storms):,.0f} | {corr:+.3f} |",
+        f"| vol7 (ATR %% 7j des majeures) | {np.median(vol7s):.3f} | {c_vol:+.3f} |", "",
         "**Lecture** : si TEMPÊTE > CALME en continuation (et MAE contenue),",
         "le mécanisme cascade-de-marges est RÉEL — les longs liquidés",
         "nourrissent la chute. Si CALME ≥ TEMPÊTE, nos cascades sont des",
         "patterns de prix sans ancrage d'acteurs. N de sonde : pas un",
         "verdict — le script se re-joue chaque nuit et N grossit.", "",
         "## Par cascade (détail)", "",
-        "| Symbole | Date | Notional longs liq 24h | Continuation 24h | MAE |",
-        "|---|---|---|---|---|",
+        "| Symbole | Date | liq24h ($) | fund7 %/8h | vol7 % | Continuation 24h | MAE |",
+        "|---|---|---|---|---|---|---|",
     ]
     for r in sorted(rows, key=lambda x: -x["storm_no"])[:14]:
         d = datetime.fromtimestamp(r["ts_ms"] / 10**9, tz=timezone.utc)
         lines.append(
-            f"| {r['sym']} | {d:%d/%m %H:%M} | ${r['storm_no']:,.0f} "
-            f"({r['storm_n']} évts) | {r['price_ret_short']:+.2f} % | "
-            f"{r['mae_adverse']:.2f} % |")
+            f"| {r['sym']} | {d:%d/%m %H:%M} | ${r['liq24h']:,.0f} "
+            f"({r['storm_n']} évts) | {r['fund7']:+.4f} | {r['vol7']:.3f} | "
+            f"{r['price_ret_short']:+.2f} % | {r['mae_adverse']:.2f} % |")
 
     out = REPORTS / f"mechanism-probe-{datetime.now(timezone.utc):%Y-%m-%d}.md"
     REPORTS.mkdir(exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[probe] {len(rows)} cascades | TEMPÊTE {r_hot:+.3f} % (n={n_hot}) "
-          f"vs CALME {r_calm:+.3f} % (n={n_calm}) | corr {corr:+.3f}")
+          f"vs CALME {r_calm:+.3f} % (n={n_calm}) | corr {corr:+.3f} | "
+          f"corr fund7 {c_fund:+.3f}, vol7 {c_vol:+.3f}")
     return 0
 
 

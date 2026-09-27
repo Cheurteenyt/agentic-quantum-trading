@@ -41,6 +41,8 @@ def main() -> int:
     ap.add_argument("--symbol", default="BTCUSDT")
     ap.add_argument("--minutes", type=int, default=5)
     ap.add_argument("--lev", type=int, default=LEV)
+    ap.add_argument("--force", action="store_true",
+                    help="tourner même si la fenêtre < 14 j (aperçu)")
     args = ap.parse_args()
 
     con = sqlite3.connect(DB)
@@ -51,6 +53,13 @@ def main() -> int:
               file=sys.stderr)
         return 1
     mids_d = {t: m for t, m in mids}
+    # le garde-fou fenêtre : le gisement est mûr à 14 jours glissants
+    # (docs/21 P4) — en dessous, l'aperçu est indicatif seulement
+    span_days = (mids[-1][0] - mids[0][0]) / 86400
+    if span_days < 14 and not args.force:
+        print(f"[depth] fenêtre {span_days:.1f} j / 14 — PAS MÛRE "
+              f"(mûr ~06-07/10). --force pour l'aperçu indicatif.")
+        return 0
     ts_list = [t for t, _ in mids]
     ts_pos_map = {t: i for i, t in enumerate(ts_list)}
     ts_set = set(ts_list)
