@@ -25,17 +25,20 @@ if log.exists():
     add("◆ RÉGIME cascade : " + log.read_text().strip().split("\n")[-1].split("| ")[-1])
 
 # 2. LE FORWARD ASTER (les 7 derniers jours clôturés + les totaux par flux)
-con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=30)
-cut = (now.timestamp() - 7 * 86400) * 1000
-add("◆ FORWARD Aster (7 j clôturés) :")
-for r in con.execute("""SELECT signal, COUNT(*), SUM(CASE WHEN ret_pct>0 THEN 1 ELSE 0 END),
-                        ROUND(SUM(ret_pct),1) FROM paper_trades
-                        WHERE status='closed' AND exit_ts > ? AND signal LIKE 'machine%'
-                        GROUP BY signal""", (cut,)).fetchall():
-    n, w, tot = r[1], r[2] or 0, r[3]
-    add(f"   {r[0]:<28} {n:3d} trades | WR {w/n*100:.0f} % | ret cum {tot:+.1f} %")
-n_open = con.execute("SELECT COUNT(*) FROM paper_trades WHERE status='open' AND signal LIKE 'machine%'").fetchone()[0]
-add(f"   ouverts : {n_open}")
+try:
+    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=30)
+    cut = (now.timestamp() - 7 * 86400) * 1000
+    add("◆ FORWARD Aster (7 j clôturés) :")
+    for r in con.execute("""SELECT signal, COUNT(*), SUM(CASE WHEN ret_pct>0 THEN 1 ELSE 0 END),
+                            ROUND(SUM(ret_pct),1) FROM paper_trades
+                            WHERE status='closed' AND exit_ts > ? AND signal LIKE 'machine%'
+                            GROUP BY signal""", (cut,)).fetchall():
+        n, w, tot = r[1], r[2] or 0, r[3]
+        add(f"   {r[0]:<28} {n:3d} trades | WR {w/n*100:.0f} % | ret cum {tot:+.1f} %")
+    n_open = con.execute("SELECT COUNT(*) FROM paper_trades WHERE status='open' AND signal LIKE 'machine%'").fetchone()[0]
+    add(f"   ouverts : {n_open}")
+except Exception as e:
+    add(f"◆ FORWARD Aster : indispo ({e})")
 
 # 3. LE FORWARD FOMO (les règles, le derek)
 fp = ROOT / "data" / "fomo" / "fomo_paper.db"
@@ -54,7 +57,7 @@ if fp.exists():
 fo = sqlite3.connect(str(ROOT / "data" / "fomo" / "fomo.db"), timeout=30)
 try:
     hot = fo.execute("""SELECT ticker, bonding_pct, age_minutes FROM fomo_new_coins
-                        WHERE tab='bonding' AND bonding_pct >= 88
+                        WHERE tab='bonding' AND CAST(bonding_pct AS REAL) >= 88
                         AND captured_at = (SELECT MAX(captured_at) FROM fomo_new_coins)
                         ORDER BY bonding_pct DESC LIMIT 5""").fetchall()
     if hot:
@@ -67,17 +70,20 @@ try:
 except Exception as e:
     add(f"◆ GRADUATIONS : indispo ({e})")
 
-# 5. LES BALEINES 7 J (les top achats)
+# 5. LES BALEINES 7 J (les top achats) — fomo_swaps vit dans fomo_swaps.db, ts en SECONDES
 try:
-    hot2 = fo.execute("""SELECT ticker, SUM(size_usd), COUNT(*) FROM fomo_swaps
+    fs = sqlite3.connect(str(ROOT / "data" / "fomo" / "fomo_swaps.db"), timeout=30)
+    hot2 = fs.execute("""SELECT ticker, SUM(size_usd), COUNT(*) FROM fomo_swaps
                          WHERE side='buy' AND ts > ?
                          GROUP BY ticker ORDER BY 2 DESC LIMIT 3""",
-                      ((now.timestamp() - 7 * 86400) * 1000,)).fetchall()
+                      (now.timestamp() - 7 * 86400,)).fetchall()
     if hot2:
         add("◆ BALEINES 7 j (top achats) : " +
             ", ".join(f"{t} ${v/1000:.0f}k ({n})" for t, v, n in hot2))
-except Exception:
-    pass
+    else:
+        add("◆ BALEINES 7 j : aucun achat")
+except Exception as e:
+    add(f"◆ BALEINES : indispo ({e})")
 
 # 6. LES ACTIONS DU JOUR
 add("◆ ACTIONS du jour :")

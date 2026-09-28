@@ -12,7 +12,8 @@ from scripts.anti_liq import add_rolling_scores, collect_featured
 from scripts.portfolio_sim import MAJORS, btc_regime_series
 from scripts.stacked_portfolio import funding_hourly_all
 
-SEUIL = 0.30          # % de marge — le seuil plat validé (p25 = FAIL)
+SEUIL = 0.30          # % de marge — l'alternative testée ; OFFICIEL pré-enregistré = p25 +0.722 (regime-adapter-2026-09-28.md §Pré-enregistrements)
+MIN_N = 10            # min_n du pré-enregistrement — sous 10 trades, pas de verdict
 RAPPORT = Path(__file__).resolve().parents[1] / "reports" / "edge-regime-monitor.log"
 
 
@@ -37,8 +38,12 @@ def main() -> int:
            if now_s - e["ts_ms"] / 1e9 <= 90 * 86400
            and e.get("price_ret_short") is not None]
     roll = sum(e["price_ret_short"] for e in win) / len(win) if win else float("nan")
-    etat = ("DÉRISKÉ ×0,75 (roulante < 0,30 %)" if roll < SEUIL
-            else "PLEIN RÉGIME (roulante ≥ 0,30 %)")
+    if len(win) < MIN_N or roll != roll:  # fenêtre vide/n<min_n = pas de verdict
+        etat = f"INDÉTERMINÉ (n={len(win)} < min_n {MIN_N}) — régime inchangé"
+    elif roll < SEUIL:
+        etat = "DÉRISKÉ ×0,75 (roulante < 0,30 %)"
+    else:
+        etat = "PLEIN RÉGIME (roulante ≥ 0,30 %)"
     line = (f"{datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')} | "
             f"roulante 90 j = {roll:+.2f} % sur {len(win)} trades | {etat}\n")
     print(line, end="")

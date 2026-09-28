@@ -20,9 +20,11 @@ def api(path: str):
         now = time.time()
         while WEIGHT_WINDOW and now - WEIGHT_WINDOW[0] > 60:
             WEIGHT_WINDOW.pop(0)
-        if len(WEIGHT_WINDOW) >= 66:
-            time.sleep(max(0.1, 60 / 66 - (now - WEIGHT_WINDOW[0])))
+        wait = max(0.1, 60 / 66 - (now - WEIGHT_WINDOW[0])) \
+            if len(WEIGHT_WINDOW) >= 66 else 0.0
         WEIGHT_WINDOW.append(time.time())
+    if wait:  # le sleep HORS lock — sinon 5 workers sur 6 attendent en chaîne
+        time.sleep(wait)
     req = urllib.request.Request(f"https://fapi.asterdex.com{path}", headers={"user-agent": UA})
     for attempt in range(3):
         try:

@@ -279,6 +279,17 @@ def main() -> int:
             print(f"[paper] vol_spike collect : {_e2}")
             _streams["machine_vol_spike_6h"] = []
         _specs["machine_vol_spike_6h"] = (6, None)   # None = dir par event
+        # flux 5 (PROMOTION 29/09 — la profonde-rapide, CANDIDAT n°1 du
+        # cascade) : 2 bougies r1<0 accélérées, depth >= 3 %, short, hold
+        # 24h, lev 7,5x. Générateur dédié deep_fast_signals.py (l'entrée =
+        # la close de la bougie du signal) ; idempotent via paper_trades.
+        try:
+            from scripts.deep_fast_signals import collect_deep_fast as _cdf
+            _streams["machine_deep_fast"] = _cdf(con)
+        except Exception as _e3:
+            print(f"[paper] deep_fast collect : {_e3}")
+            _streams["machine_deep_fast"] = []
+        _specs["machine_deep_fast"] = (24, -1)
         _fresh_n = 0
         for _sig, _evs in _streams.items():
             _hold, _dir = _specs[_sig]
@@ -358,9 +369,11 @@ def main() -> int:
                          f"cumulé {r[3]:+.2f} %")
     # ——— LE PORTEFEUILLE MACHINE en forward (les tailles réelles) ———
     _lev = {"machine_cascade_majors": 10, "machine_cascade_meme": 1,
-            "machine_survivor_long": 1, "machine_vol_spike_6h": 1}
+            "machine_survivor_long": 1, "machine_vol_spike_6h": 1,
+            "machine_deep_fast": 7.5}
     _base = {"machine_cascade_majors": 0.24, "machine_cascade_meme": 0.10,
-             "machine_survivor_long": 0.10, "machine_vol_spike_6h": 0.10}
+             "machine_survivor_long": 0.10, "machine_vol_spike_6h": 0.10,
+             "machine_deep_fast": 0.10}
     _mrows = con.execute(
         "SELECT signal, symbol, direction, entry_ts, exit_ts, exit_price, "
         "entry_price, ret_pct, status FROM paper_trades "

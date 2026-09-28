@@ -227,7 +227,7 @@ def detect_pass(now: float) -> dict:
         log = []
         for sid, mint, side, ts, usd in parsed:
             newest = max(newest, ts)
-            if ts <= since - 120 or sid in seen or side != "buy":
+            if ts <= since - REPL_ENTRY_WINDOW_S or sid in seen or side != "buy":
                 continue
             if usd < REPL_MIN_USD or not is_tradeable_mint(mint):
                 continue
