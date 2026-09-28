@@ -355,3 +355,5 @@ sont EXÉCUTABLES manuellement** — le verdict « liquidité insuffisante »
 s'applique au backtest machine (10 %/trade composé), PAS à l'exécution
 manuelle du user. Le livre macro manuel = possible dès maintenant,
 l'étude du signal tendance (EMA 48h) reste CONTEXTE (n à consolider).**
+
+**LA VALIDATION RUN_STACK DE LA VARIANTE (29/09 — le harnais complet, les ts ns convertis après le piège classique)** : la profonde-rapide 7,5x (10 %) = **$167,65 (+60 %/an environ) @ DD 8,6 %, WR 70 %, 0 liq, 4 mois négatifs/13** — un flux défensif RÉEL (la VAL-survie confirmée au wallet), PAS un record. À 5 % : DD 4,3 %. À 5x : DD 5,7 %. LA LECTURE : l'espérance par trade ×7 ne compense pas la fréquence ÷4,5 au wallet — la variante = un COMPLÉMENT de diversification (son entry timing diffère de la 3-bougies), pas un remplaçant. LE TEST MANQUANT : le COMBINÉ machine + variante (la corrélation des PnL dira si l'ajout améliore le profil complet). Le record reste +5 082/+6 419 (le joint QUBO), gelé régime T3.
