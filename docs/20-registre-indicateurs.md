@@ -373,3 +373,19 @@ l'étude du signal tendance (EMA 48h) reste CONTEXTE (n à consolider).**
 **LE MUR D'AUTH FOMO (29/09 — le mystère à résoudre en séance dédiée)** : le login frais de ce soir produit des tokens Privy **valides, non-expirés, du bon format** — et prod-api les rejette avec "Unexpected error in JWT authentication middleware" (401). Le même fetch marchait il y a 2 jours (les 22 captures auth + les swaps 200 OK). Les testés et éliminés : l'expiration (le token valide 49 min), le kid/format (le header décodé), les headers complets de la capture (le template intégré, même 401), les cookies (transférés), l'origine (fomo.family). **LA CONSÉQUENCE : derek_watch et swaps-fresh sont BLOQUÉS tant que le mur d'auth tient — l'app du user fonctionne (il navigue), mais les fetchs des collecteurs ne passent plus.** Les pistes restantes : le fingerprint du navigateur de l'ancien daemon (Cloudflare lie la session au device ?), la rotation des clés Privy côté API, le cookie de session spécifique. L'edge derek518 (+18,8 %/trade, la demi-vie 5×) : LE PRIZE qui justifie la séance d'auth dédiée.
 
 **LA VALIDATION MACHINE COMPLÈTE du combiné (le financement inclus — le +13,8 % CONFIRMÉ dans le cadre officiel)** : machine $265,60/DD 12,8 → COMBINÉ $302,32/DD 13,6 (+13,8 %, DD +0,8 pt), 0 liq, 3 mois nég — le même delta que dans le cadre simplifié = l'amélioration est ROBUSTE au financement. **LA PROMOTION : la profonde-rapide entre dans le paper tracking de la machine (le flux deep_fast 7,5x à côté du machine_11x) — le forward décide de la promotion v5.** L'état : le combiné = la meilleure config connue du projet dans ce cadre, l'adaptateur protège le régime mort, les couches d'octobre apportent le prochain edge.
+
+**L'INCIDENT BAN CLOUDFLARE FOMO (29/09 ~21h UTC) : NOTRE IP EST FLAGGÉE
+sur TOUT le domaine fomo (le site + prod-api + mobula = 403 depuis
+python ET les navigateurs) — la conséquence de la collecte agressive
+(~10k appels mobula/24h + le polling swaps horaire + les tests
+répétés). IMPACT : la collecte fomo EN PAUSE totale (les swaps, l'ohlcv,
+les positions), le navigateur du user bloqué aussi (le même IP).
+NON-IMPACTÉ : TOUTE la collecte Aster (fapi.asterdex.com = l'autre
+domaine — l'OI, le premium, les prints, les klines, le depth tournent).
+LE RECOVERY : le flag Cloudflare se lève seul (10 min à 24 h), LE
+SONDAGE S'ARRÊTE (chaque sonde risque de prolonger), le re-test = à la
+prochaine séance. LA RÈGLE DÉFINITIVE : les cadences soutenables dès le
+jour 1 sur toute nouvelle API — le topup sélectif, le pacing, le
+scorecard qualité — et JAMAIS de backfill massif sans la fenêtre de
+tolérance du fournisseur. Les gardes Aster : non-impactés, la
+semaine de tirs continue.**
