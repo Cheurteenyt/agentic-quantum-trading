@@ -283,3 +283,9 @@ Rapport : reports/breadth-cascade-2026-09-28.md (script : scripts/breadth_cascad
 | Exit CVD (le flux pendant la détention) | **FAIL** — le flag (le retour du taker buy à 2-12h) prédit le bounce sur TRAIN (-10,4 pts à 2h) mais **s'INVERSE en VAL** (+9,9) ; Spearman ≈ 0 ; les seuils sur-ajustés, le mécanisme ne tient pas hors-échantillon | **NUL** — le 24h fixe reste l'optimum de la famille exit (prix ET flux battus) |
 
 | Adaptateur fenêtre 30 j | **MORT** — 348/365 jours OFF (95 % du temps désengagé, y compris les bons trimestres à +0,75/+0,96 %) : la fenêtre courte contient 3-5 trades, l'espérance oscille sous le seuil en continu ; le lead de 5-7 semaines de la forensique ne survit pas au bruit | **NUL** — le 90 j reste LA fenêtre |
+
+## 28/09 nuit — le portefeuille des survivants (le régime T3 porté à DD 3,4 %)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **Portefeuille survivants** (fade vol_spike + réplication derek518, la fenêtre commune 26 j) | $100 → **$124,07 (+24,1 %/26 j) @ DD 3,4 %, 0 liq, 0 mois négatif**, 91 trades ; le fade = **multi-régime confirmé** (Q4'25 +19,2 / Q1'26 -4,2 / Q2'26 +2,9 / **Q3'26 +15,1 % — le régime mort est son MEILLEUR trimestre**) ; corr PnL fade×derek **-0,28** = diversification réelle ; l'apport derek +16,64 $ (vs +7,4 % pure-fade) | **CANDIDAT conditionnel** — derek sous-puissant mono-slot (7/72 captés, top-3 = 99 %) : le paper tranche, pas le backtest |
