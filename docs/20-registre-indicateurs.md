@@ -342,3 +342,16 @@ manquant (l'interpolation) ; (2) funding_history : 12 extrêmes LEGIT (MSTR -2,0
 %/8h en avril, MEME -1,98 % le 06/09) = les événements de foule extrême des
 synthétiques — un futur indicateur (le funding extrême = le marqueur de
 retournement de la foule sur les synthétiques).
+
+**LA CORRECTION D'UNITÉS DES SYNTHÉTIQUES (29/09) : le champ volume des
+klines synthétiques (XAU en onces, CL en barils, les équités en parts)
+N'EST PAS le volume USD — close×volume sur-surfait ×2 400 (XAU
+« 1 404 M$/h » vs le RÉEL ticker/24hr quoteVolume = **14,0 M$/24h**).
+LA MESURE FIABLE DE LIQUIDITÉ = ticker/24hr quoteVolume (le champ API).
+LES TIERS CORRIGÉS : T1 (≥ 1 M$/24h) = 45 symboles — l'or 14 M, le
+pétrole 9,7 M, l'argent 5,2 M en font partie. **LA NUANCE CAPITALE :
+à la taille du user ($100-1000/position), l'or et le pétrole sur Aster
+sont EXÉCUTABLES manuellement** — le verdict « liquidité insuffisante »
+s'applique au backtest machine (10 %/trade composé), PAS à l'exécution
+manuelle du user. Le livre macro manuel = possible dès maintenant,
+l'étude du signal tendance (EMA 48h) reste CONTEXTE (n à consolider).**
