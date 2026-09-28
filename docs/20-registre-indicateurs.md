@@ -321,3 +321,5 @@ certitude viendra de : le forward (derek/bonding), les tirs d'octobre,
 et le retour du régime cascade. La discipline vient de prouver qu'elle
 préfère la vérité au confort : elle a démonté notre propre « edge
 multi-régime confirmé ».
+
+**LA DEMI-VIE DE L'EDGE DEREK518 (28/09 nuit — la découverte qui redéfinit la priorité)** : le ret 24h de ses 85 achats ≥ $5k selon le délai d'entrée — **+1h : +21,2 %/+20,3 % → +24h : +7,8 %/+3,7 % = l'edge décroît 5× en 24 h** (même cohorte n=85 partout, décroissance monotone = mécanique : le marché copie derek en quelques heures). IMPLICATIONS : (1) l'étude v2 (+18,8 %/trade à l'entrée ~1h) mesurait la version CONSERVATRICE — l'edge temps réel est supérieur ; (2) la détection HOURLY (swaps-fresh) + la passe 15 min = une latence ~1h15 = on capture déjà le palier +1h ✓ mais le gain temps réel (détection en minutes via le flux Alerts du WS) = le palier supérieur non mesuré ; (3) la demi-vie COURT = l'edge est une COURSE : la détection temps réel de derek = l'infrastructure prioritaire du livre anti-régime.
