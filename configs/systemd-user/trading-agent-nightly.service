@@ -28,6 +28,7 @@ ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/paper_forward.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/qubo_forward_tracker.py --report
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/edge_regime_monitor.py
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_window_guard.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --run
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --review
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/score_x_calls.py --score
