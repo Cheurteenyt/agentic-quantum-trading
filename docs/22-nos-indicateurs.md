@@ -122,3 +122,24 @@ hold. Chacun a son chiffre dans docs/20.
 2 en attente conditionnelle (le QUBO joint et le corr-tilt ×1,10 — tous
 deux gelés par la décision régime : pas de promotion sur un backtest
 dominé par le régime mort). Aucun écart entre la doc et le code.**
+
+## LA FAMILLE COMPLÈTE — l'arsenal (les 5 signaux long-horizon, hérités et en forward)
+
+*En plus des 10 créations : l'arsenal (full_arsenal_2.py) = 5 signaux de
+position long-horizon, câblés au paper forward AVANT la refonte — ils
+accumulent leurs verdicts sur leurs horizons propres :*
+
+| Signal | Horizon | n forward | Le verdict |
+|---|---|---|---|
+| sweep_liquidite_short | **90 j** | 122 | dans ~3 mois |
+| funding_extreme_contre_courant | **7 j** | 117 | **CETTE SEMAINE** (J+6,5) |
+| vwap_extreme_reprise_short | 60 j | 78 | dans ~2 mois |
+| failed_ath_breakout_short | 60 j | 3 | dans ~2 mois |
+| funding_prix_divergence_short | 12 h | 63 | **NUL confirmé** (WR 19 %, forward) |
+
+**La règle de famille** : l'arsenal = des trades de POSITION (60-90 j),
+la machine = des trades 24-72 h — deux familles COMPLÉMENTAIRES, pas
+concurrentes. Le dépassement connu : la fdiv est NULLE au forward ; les
+4 autres restent à juger. **Les créations à venir** : conditionner les
+entrées de l'arsenal aux NOUVELLES couches (OI quadrants, prime
+extrême, murs) = l'upgrade naturel quand les fenêtres mûrissent jeudi.
