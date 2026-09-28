@@ -1,62 +1,30 @@
----
-title: Index documentation — trading-agent
-status: living
-owner: cheurteen
-updated: 2026-08-09
----
+# LA CARTE DE LECTURE DES DOCS
 
-# Documentation — trading-agent
+*Le projet = 2 livres (régime + anti-régime), une machine (the_machine.py),
+des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 
-**Tu débarques ? Lis `01-onboarding.md`. Rien d'autre.**
+## LE VIVANT (9 docs, à jour)
 
-Le pipeline est désormais **OPÉRATIONNEL** : la découverte (`nightly_campaign.py --run`) et la validation OOS (`reevaluate_oos.py`) sont câblées, et tournent chaque nuit en systemd timer sur 10 paires (BTC, ETH, SOL, XRP, BNB, DOGE, ADA, AVAX, LINK, LTC). Obtenir **0 survivant sur l'univers actuel** (6 stratégies / ~3000 bougies par paire) est un résultat **attendu, pas un bug** — voir `13-orchestration.md`.
+| Doc | Ce que c'est | Quand le lire |
+|---|---|---|
+| **00-CARTE** | la carte du projet entier | l'entrée, à chaque reprise |
+| **22-nos-indicateurs** | LES 10 CRÉATIONS : chaque indicateur, sa règle, sa preuve | pour savoir ce qu'on possède |
+| **20-registre-indicateurs** | la source de vérité des verdicts (25+ datés + les 25 réfutés) | avant de croire quoi que ce soit |
+| **21-goal-performances** | le plan P1-P5 + les dates de tir + le volet institutionnel | pour savoir où on va |
+| **06-data** | les 6 bases vivantes + qui écrit quoi | avant toute manipulation de data |
+| **13-orchestration** | les campagnes nocturnes + les timers | pour comprendre ce qui tourne |
+| **10-strategies** | les stratégies historiques (l'évolution) | le contexte des créations |
+| **03-methodology** | la discipline (harnais v5, train/val, pré-enregistrement) | avant tout nouveau test |
+| **04-runbook** | le runbook opérationnel | le dépannage quotidien |
 
-## Les docs vivants
+## L'ARCHIVE (docs/archive/ — 19 docs des ères passées)
 
-| Doc | Répond à la question |
-|---|---|
-| [`01-onboarding.md`](01-onboarding.md) | Je débarque sur le projet, je fais quoi ? |
-| [`02-architecture.md`](02-architecture.md) | Où vit quoi dans le code ? |
-| [`03-methodology.md`](03-methodology.md) | **Comment on évite de se mentir sur un backtest ?** ⚠️ critique |
-| [`04-runbook.md`](04-runbook.md) | Quelles commandes je tape ? |
-| [`05-data-sources.md`](05-data-sources.md) | Quelles sources de données marchent encore ? |
-| [`06-data.md`](06-data.md) | **Comment la data est rangée, et ce qu'elle révèle** ⚠️ critique |
-| [`07-backtest-engine.md`](07-backtest-engine.md) | Comment le moteur empêche le mensonge |
-| [`08-contributing.md`](08-contributing.md) | Conventions de code, tests, où mettre quoi |
-| [`09-pipeline.md`](09-pipeline.md) | **La chaîne automatisée : donnée → verdict** |
-| [`10-strategies.md`](10-strategies.md) | Stratégies + première campagne réelle sur BTC 1h |
-| [`11-campaign-real.md`](11-campaign-real.md) | Gardes ajoutées + résultat campagne 3001 bougies |
-| [`12-nondirectional.md`](12-nondirectional.md) | 3 stratégies non-directionnelles + bilan 2598 combos |
-| [`13-orchestration.md`](13-orchestration.md) | **La boucle découverte → validation OOS** (runbook) |
+L'ère pré-refonte (01-onboarding, 02-architecture, 05-data-sources,
+07-backtest-engine, 08-contributing, 09-pipeline) décrit un projet qui a
+changé — les règles vivantes sont dans 03 + AGENTS.md. Les docs d'époque
+(11-campaign, 12-nondirectional, 14-registre-x, 15-plan-revenus,
+16-inventaire-actifs, 17-mmt-m5, 18-roadmap-memecoin-x, 19-liquidations)
+restent pour l'historique — leurs chiffres ont été remplacés par docs/20.
 
-Plus `security/` — audits et accès réseau (Tailscale, ACL, threat models).
-
-## Les 4 règles anti-prolifération
-
-Ce dossier est passé de 36 fichiers à 5. Pour que ça reste vrai :
-
-1. **Un doc = une question que quelqu'un pose vraiment.** Pas de question, pas de doc.
-2. **Un snapshot daté n'est pas un doc.** Tout ce qui est une sortie de run
-   (statut, health dashboard, quality report, watchlist, comparaison de lanes)
-   va dans `reports/`, horodaté. Jamais ici.
-3. **Pas de nouveau fichier à la racine de `docs/`.** Connaissance durable et
-   rarement lue → `reference/`. Périmé mais à garder → `archive/`.
-4. **Plus jamais de doc HTML** (décision 2026-09-21) : les rapports visuels
-   sont produits en **PDF vectoriel** (via `scripts/html_to_pdf.py` ou rendu
-   HTML→PDF comme CE-001 v2) ; le markdown reste le format des docs vivants.
-
-## Les dossiers
-
-- `reference/` — connaissance durable, rarement lue, jamais périmée
-  (API Aster, streams WS, historique de recherche, accès client, RAG, roadmap stratégie).
-- `archive/` — gelé, lecture seule. Contexte historique. **Ne pas utiliser
-  comme source de décision.** Contient la suite Aster legacy (morte) et les
-  anciens rapports (PDF, convertis le 2026-09-21).
-- `security/` — audits sécurité, ACL Tailscale, onboarding accès privé.
-
-## État du projet en une ligne
-
-La suite Aster **legacy est morte** (0 promotion, PnL négatif, WR 41 %) — voir
-`03-methodology.md` pour ce qu'on en retient. Le **pipeline data Aster est
-vivant**. La prochaine étape est un moteur de backtest strict et automatisé :
-`reference/strategy-roadmap-2026-08.md`.
+**La règle** : un doc vivant est mis à jour quand le projet bouge ; un doc
+qui ne l'est plus part à l'archive avec son statut — jamais supprimé.

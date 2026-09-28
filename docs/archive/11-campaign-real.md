@@ -1,6 +1,6 @@
 ---
 title: Campagne réelle, gardes et leçon de données
-status: living
+status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-08-09
 ---

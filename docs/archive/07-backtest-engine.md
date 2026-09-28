@@ -1,6 +1,6 @@
 ---
 title: Moteur de backtest v2 — gates, coûts, walk-forward, moteur
-status: living
+status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-08-09
 ---

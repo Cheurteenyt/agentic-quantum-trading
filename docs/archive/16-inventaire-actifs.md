@@ -1,6 +1,6 @@
 ---
 title: Inventaire des actifs — ce qui existe, ce qui dort, ce qui vaut de l'or
-status: living
+status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-09-21
 ---

@@ -1,6 +1,6 @@
 ---
 title: Pipeline automatisé — de la donnée au verdict
-status: living
+status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-08-09
 ---

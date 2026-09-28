@@ -1,6 +1,6 @@
 ---
 title: Stratégies non-directionnelles et bilan complet
-status: living
+status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-08-09
 ---
