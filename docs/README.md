@@ -17,14 +17,24 @@ des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 | **03-methodology** | la discipline (harnais v5, train/val, pré-enregistrement) | avant tout nouveau test |
 | **04-runbook** | le runbook opérationnel | le dépannage quotidien |
 
-## L'ARCHIVE (docs/archive/ — 19 docs des ères passées)
+## L'ARCHIVE ANNOTÉE (docs/archive/ — 13 docs, jamais oubliés)
 
-L'ère pré-refonte (01-onboarding, 02-architecture, 05-data-sources,
-07-backtest-engine, 08-contributing, 09-pipeline) décrit un projet qui a
-changé — les règles vivantes sont dans 03 + AGENTS.md. Les docs d'époque
-(11-campaign, 12-nondirectional, 14-registre-x, 15-plan-revenus,
-16-inventaire-actifs, 17-mmt-m5, 18-roadmap-memecoin-x, 19-liquidations)
-restent pour l'historique — leurs chiffres ont été remplacés par docs/20.
+Chaque doc archivé porte son lien « LIRE AUSSI » vers la vérité à jour — l'archive est une bibliothèque annotée, pas un cimetière :
 
-**La règle** : un doc vivant est mis à jour quand le projet bouge ; un doc
-qui ne l'est plus part à l'archive avec son statut — jamais supprimé.
+| Doc archivé | Ce qu'il contient | La vérité à jour |
+|---|---|---|
+| 01-onboarding | l'onboarding de l'ère pré-refonte | docs/README + 00-CARTE |
+| 02-architecture | l'architecture d'avant le deux-livres | 00-CARTE + 06-data |
+| 05-data-sources | les sources de data d'avant le crack mobula | 06-data |
+| 07-backtest-engine | le moteur de backtest v1-v4 | 03-methodology + le harnais v5 |
+| 08-contributing | les règles de contribution d'antan | AGENTS.md + 03-methodology |
+| 09-pipeline | la pipeline d'avant les timers | 13-orchestration |
+| 11-campaign-real | les campagnes réelles de l'époque | 13-orchestration + reports/ |
+| 12-nondirectional | les stratégies non-directionnelles | 10-strategies + 20-registre |
+| 14-registre-x | le registre X de l'époque | 20-registre + x_posts.db |
+| 15-plan-revenus | le plan de revenus d'août | 21-goal-performances |
+| 16-inventaire-actifs | l'inventaire des actifs d'août | 06-data + 22-nos-indicateurs |
+| 18-roadmap-memecoin-x | la roadmap memecoin-x | 21-goal + 22-nos-indicateurs |
+| 19-liquidations-aster | la première cartographie des liquidations | 20-registre + le burst test |
+
+**17-mmt-m5 reste EN VIVANT** (le terminal externe MMT/M5 est une infra active).

@@ -4,6 +4,8 @@ status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-09-21
 ---
+> **LIRE AUSSI (la vérité à jour)** : docs/21-goal-performances.md (le plan P1-P5 vivant)
+
 
 # La question à laquelle ce doc répond
 

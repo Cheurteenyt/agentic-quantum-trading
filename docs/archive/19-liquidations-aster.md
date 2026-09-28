@@ -1,3 +1,5 @@
+
+> **LIRE AUSSI (la vérité à jour)** : docs/20-registre-indicateurs.md + scripts/liq_burst_reversal_test.py
 # Mécanique des LIQUIDATIONS sur Aster — étude du 24/09/2026
 
 > Sources : doc officielle V3 (api-docs, 7 000 lignes) + exchangeInfo public +

@@ -4,6 +4,8 @@ status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-09-21
 ---
+> **LIRE AUSSI (la vérité à jour)** : docs/06-data.md + docs/22-nos-indicateurs.md
+
 
 # La question à laquelle ce doc répond
 

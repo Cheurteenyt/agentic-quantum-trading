@@ -1,3 +1,5 @@
+
+> **LIRE AUSSI (la vérité à jour)** : docs/21-goal-performances.md + docs/22-nos-indicateurs.md
 # 18 — Roadmap Memecoin × X.com × Aster (la vraie vague)
 
 Date : 2026-09-23 (nuit 3). Remplace l'approche « BTC long/short de petits

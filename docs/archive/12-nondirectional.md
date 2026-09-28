@@ -4,6 +4,8 @@ status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-08-09
 ---
+> **LIRE AUSSI (la vérité à jour)** : docs/10-strategies.md + docs/20-registre-indicateurs.md
+
 
 # Stratégies non-directionnelles et bilan complet
 

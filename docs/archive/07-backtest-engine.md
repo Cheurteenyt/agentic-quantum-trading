@@ -4,6 +4,8 @@ status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-08-09
 ---
+> **LIRE AUSSI (la vérité à jour)** : docs/03-methodology.md + scripts/README.md (le harnais v5)
+
 
 # Moteur de backtest v2
 

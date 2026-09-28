@@ -4,6 +4,8 @@ status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-09-21
 ---
+> **LIRE AUSSI (la vérité à jour)** : docs/20-registre-indicateurs.md + data/warehouse/x_posts.db
+
 
 # Le registre X
 

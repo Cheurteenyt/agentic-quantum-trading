@@ -4,6 +4,8 @@ status: archived (28/09 — l'ère pré-refonte, voir docs/README.md)
 owner: cheurteen
 updated: 2026-08-09
 ---
+> **LIRE AUSSI (la vérité à jour)** : docs/13-orchestration.md (les campagnes + les timers)
+
 
 # Pipeline automatisé
 
