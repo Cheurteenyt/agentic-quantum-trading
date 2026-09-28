@@ -73,6 +73,16 @@ REPL_MIN_AGE_S = 7 * 86400       # token âgé ≥ 7j (1re bougie 1h du mint)
 REPL_ENTRY_WINDOW_S = 900        # entrée ≤ 15 min après son swap
 REPL_MAX_OPEN = 10               # ≤ 10 positions simultanées (exposition bornée)
 
+# ── LA RÈGLE bonding_watch (l'edge ×10,9 pré-pool médian, doctrine validée) ──
+# bonding_pct ≥ 90 % = les tokens les plus proches de la graduation ;
+# entrée à l'événement, sortie TEMPS-FIXE 72h + garde anti-rug (les
+# CONSTANTES du dessus). Idempotence par TICKER+RULE (pas par swap_id).
+BW_RULE = "bonding_watch"
+BW_MIN_PCT = 90.0                # bonding_pct ≥ 90 % = quasi gradué
+BW_HORIZON = "72h"               # la sortie temps-fixe de la doctrine bonding
+BW_MAX_OPEN = 8                  # ≤ 8 positions bonding_watch simultanées
+BW_MAX_STALE_S = 48 * 3600       # prix > 48h = courbe morte → pas d'entrée
+
 
 def open_live() -> sqlite3.Connection:
     con = sqlite3.connect(f"file:{LIVE_DB}?mode=ro", uri=True, timeout=45)
@@ -110,9 +120,15 @@ def open_paper() -> sqlite3.Connection:
 
 
 def last_price(con_live: sqlite3.Connection, mint: str):
-    """Le dernier close 1m de fomo_ohlcv, sinon le dernier tick. → (ts_s, px)"""
+    """Le dernier close 1m, sinon 1h (tokens backfillés nocturne : closes
+    1h/ticks = la convention bonding), sinon le dernier tick. → (ts_s, px)"""
     r = con_live.execute(
         "SELECT time, close FROM fomo_ohlcv WHERE asset=? AND period='1m' "
+        "ORDER BY time DESC LIMIT 1", (mint,)).fetchone()
+    if r and r[1]:
+        return r[0] / 1000.0, float(r[1])
+    r = con_live.execute(
+        "SELECT time, close FROM fomo_ohlcv WHERE asset=? AND period='1h' "
         "ORDER BY time DESC LIMIT 1", (mint,)).fetchone()
     if r and r[1]:
         return r[0] / 1000.0, float(r[1])
@@ -125,13 +141,20 @@ def last_price(con_live: sqlite3.Connection, mint: str):
 
 
 def max_since_entry(con_live: sqlite3.Connection, mint: str, entry_ts: float) -> float:
-    """Le max observé DEPUIS l'entrée (highs 1m + ticks) — le forward pur."""
+    """Le max observé DEPUIS l'entrée (highs 1m + ticks ; highs 1h si le
+    mint n'a pas de 1m — la convention bonding). Le forward pur."""
     best = 0.0
     r = con_live.execute(
         "SELECT MAX(high) FROM fomo_ohlcv WHERE asset=? AND period='1m' AND time>=?",
         (mint, int(entry_ts * 1000))).fetchone()
     if r and r[0]:
         best = float(r[0])
+    else:
+        r = con_live.execute(
+            "SELECT MAX(high) FROM fomo_ohlcv WHERE asset=? AND period='1h' AND time>=?",
+            (mint, int(entry_ts * 1000))).fetchone()
+        if r and r[0]:
+            best = float(r[0])
     r = con_live.execute(
         "SELECT MAX(priceUsd) FROM fomo_ticks WHERE mint=? AND ts_s>=?",
         (mint, int(entry_ts))).fetchone()
@@ -258,6 +281,93 @@ def replication_derek(con: sqlite3.Connection, con_live: sqlite3.Connection,
     return opened, skipped, capped
 
 
+def bonding_tickers_ge(con_live: sqlite3.Connection,
+                       min_pct: float = BW_MIN_PCT) -> list[tuple]:
+    """Le DERNIER snapshot par ticker de fomo_new_coins (tab='bonding',
+    bonding_pct ≥ min_pct) — la lecture impartiale (les snapshots sont la
+    source, pas l'UI). → [(ticker, bonding_pct, captured_at)]"""
+    rows = con_live.execute("""
+        SELECT n.ticker, n.bonding_pct, n.captured_at
+        FROM fomo_new_coins n
+        JOIN (SELECT ticker, MAX(captured_at) m FROM fomo_new_coins
+              WHERE tab='bonding' GROUP BY ticker) x
+          ON x.ticker=n.ticker AND x.m=n.captured_at
+        WHERE n.tab='bonding' AND n.bonding_pct>=?
+        ORDER BY n.bonding_pct DESC""", (min_pct,)).fetchall()
+    return [(t, float(b or 0), float(ca or 0)) for t, b, ca in rows]
+
+
+def entry_price_1h(con_live: sqlite3.Connection, mint: str):
+    """L'entrée bonding : le dernier close 1h (la vie sur la courbe est
+    backfillée en 1h), sinon le dernier tick. → (ts_s, px)"""
+    r = con_live.execute(
+        "SELECT time, close FROM fomo_ohlcv WHERE asset=? AND period='1h' "
+        "ORDER BY time DESC LIMIT 1", (mint,)).fetchone()
+    if r and r[1]:
+        return r[0] / 1000.0, float(r[1])
+    r = con_live.execute(
+        "SELECT ts_s, priceUsd FROM fomo_ticks WHERE mint=? "
+        "ORDER BY ts_s DESC LIMIT 1", (mint,)).fetchone()
+    if r and r[1]:
+        return float(r[0]), float(r[1])
+    return None, None
+
+
+def bonding_watch(con: sqlite3.Connection, con_live: sqlite3.Connection,
+                  now: float):
+    """La règle 'bonding_watch' : entrer sur les tokens ≥ 90 % de bonding.
+
+    À chaque passe : le DERNIER snapshot fomo_new_coins (tab='bonding') ;
+    pour chaque ticker PAS DÉJÀ en position bonding_watch (idempotence par
+    TICKER+RULE — pas par swap_id ici) : le mint est résolu VIA fomo_tokens
+    UNIQUEMENT (la résolution DexScreener est nocturne — jamais bloquée
+    dans une passe 15 min) : absent du mapping = SKIP silencieux. Entrée =
+    dernier close 1h sinon dernier tick, garde staleness 48h (une courbe
+    sans prix vivant = pas d'entrée fake-forward). OPEN horizon='72h' ;
+    la SORTIE = la boucle commune (hold 72h + garde anti-rug, VITAL ici :
+    l'âge du token rend le pic précoce probable). Cap ≤ 8 OPEN.
+    → (ouverts, skip_sans_mint, skip_stale, capped)
+    """
+    rows = con.execute("SELECT ticker, mint FROM fomo_paper_trades "
+                       "WHERE rule=?", (BW_RULE,)).fetchall()
+    seen_tk = {r[0] for r in rows}
+    seen_mint = {r[1] for r in rows}
+    n_open = con.execute("SELECT COUNT(*) FROM fomo_paper_trades "
+                         "WHERE rule=? AND status='OPEN'",
+                         (BW_RULE,)).fetchone()[0]
+    opened = skipped = stale = capped = 0
+    for tk, pct, _ca in bonding_tickers_ge(con_live):
+        if tk in seen_tk:
+            continue  # idempotence ticker+rule : jamais ré-ouvert
+        r = con_live.execute(
+            "SELECT mint FROM fomo_tokens WHERE ticker=? "
+            "ORDER BY resolved_at DESC LIMIT 1", (tk,)).fetchone()
+        mint = r[0] if r else None
+        if not mint or not _is_tradeable_mint(mint) or mint in seen_mint:
+            skipped += 1  # pas résolu (nocturne) / faux mint / déjà vu
+            continue
+        if n_open >= BW_MAX_OPEN:
+            capped += 1   # exposition bornée : skip, noté (pas de file)
+            continue
+        ts_px, px = entry_price_1h(con_live, mint)
+        if not px or px <= 0 or not ts_px or now - ts_px > BW_MAX_STALE_S:
+            stale += 1    # pas de prix vivant (≤ 48h) = courbe morte
+            continue
+        con.execute(
+            "INSERT INTO fomo_paper_trades (mint, ticker, rule, horizon, "
+            "entry_ts, entry_price, status, opened_at) "
+            "VALUES (?,?,?,?,?,?, 'OPEN', ?)",
+            (mint, tk, BW_RULE, BW_HORIZON, now, float(px), now))
+        con.commit()  # COMMIT explicite par ticker (pas de transaction fantôme)
+        seen_tk.add(tk)
+        seen_mint.add(mint)
+        n_open += 1
+        opened += 1
+        print(f"[bonding] OPEN {tk} ({mint[:12]}…) {pct:.0f}% @ {px:.8g} "
+              f"(hold 72h)", flush=True)
+    return opened, skipped, stale, capped
+
+
 def run_pass() -> None:
     now = time.time()
     con_live = open_live()
@@ -296,6 +406,9 @@ def run_pass() -> None:
     con_swaps = open_swaps()
     rep_open, rep_skip, rep_cap = replication_derek(con, con_live, con_swaps, now)
     con_swaps.close()
+
+    # ── LA RÈGLE bonding_watch : les ≥ 90 % de bonding (idempotent) ──
+    bw_open, bw_nomint, bw_stale, bw_cap = bonding_watch(con, con_live, now)
 
     # ── LA SORTIE : la gestion de chaque trade OPEN ──
     n_closed_rug, n_closed_horizon = 0, 0
@@ -351,7 +464,9 @@ def run_pass() -> None:
     print(f"[paper] passe : +{n_opened} mints ouverts, {n_skipped} sautés "
           f"(prix > 2h), {n_closed_rug} anti-rug, {n_closed_horizon} horizon, "
           f"repl +{rep_open} (derek518 : {rep_skip} hors-fenêtre/filtre, "
-          f"{rep_cap} cap) — ledger {n_tot} lignes ({n_open} OPEN)", flush=True)
+          f"{rep_cap} cap), bonding +{bw_open} ({bw_nomint} sans mint, "
+          f"{bw_stale} stale, {bw_cap} cap) — ledger {n_tot} lignes "
+          f"({n_open} OPEN)", flush=True)
     con.close()
     con_live.close()
 
@@ -387,6 +502,13 @@ def report() -> None:
         "WHERE rule='replication_derek'").fetchone()
     print(f"REPLICATION derek518 : {rep[1] or 0} OPEN / {REPL_MAX_OPEN} cap, "
           f"{rep[0]} trades au total (idempotent par swap_id, hold 24h+anti-rug)")
+    # la ligne dédiée bonding_watch : sépare la règle bonding des autres
+    bw = con.execute(
+        "SELECT COUNT(*), SUM(status='OPEN') FROM fomo_paper_trades "
+        "WHERE rule='bonding_watch'").fetchone()
+    print(f"BONDING_WATCH : {bw[1] or 0} OPEN / {BW_MAX_OPEN} cap, "
+          f"{bw[0]} trades au total (idempotent par ticker, bonding ≥ "
+          f"{BW_MIN_PCT:.0f} %, hold {BW_HORIZON}+anti-rug)")
     opens = con.execute(
         "SELECT ticker, rule, multiple, max_multiple FROM fomo_paper_trades "
         "WHERE status='OPEN' ORDER BY max_multiple DESC LIMIT 12").fetchall()
