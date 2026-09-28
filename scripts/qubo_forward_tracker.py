@@ -45,6 +45,11 @@ WEIGHTS: dict[str, dict[str, float]] = {
     "MAIN": {f: 1.0 for f in FLOWS},
     "QUBO": {"machine_cascade_majors": 0.857, "machine_cascade_meme": 0.857,
              "machine_survivor_long": 2.0, "machine_vol_spike_6h": 1.143},
+    # la variante SANS MEME (28/09) : le forward meme 0/10 gagnants (-49 %)
+    # + la VAL négative + aucun gate possible → le forward tranche entre
+    # la loterie décorrelante (QUBO) et la sortie franche (SANS_MEME)
+    "SANS_MEME": {"machine_cascade_majors": 0.857, "machine_cascade_meme": 0.0,
+                  "machine_survivor_long": 2.0, "machine_vol_spike_6h": 1.143},
 }
 
 
@@ -133,10 +138,11 @@ def main() -> int:
                 per_flow[t["flow"]]["played"] += 1
             else:
                 per_flow[t["flow"]]["blocked"] += 1
-    wallets = [run_wallet(n, played) for n in ("MAIN", "QUBO")]
-    (wm, wq) = wallets
+    wallets = {n: run_wallet(n, played) for n in WEIGHTS}
+    wm, wq, ws = wallets["MAIN"], wallets["QUBO"], wallets["SANS_MEME"]
     spread_abs = wq["bal"] - wm["bal"]
     spread_rel = (wq["bal"] / wm["bal"] - 1.0) * 100.0 if wm["bal"] > 0 else 0.0
+    spread_sm = ws["bal"] - wq["bal"]
 
     if not args.report:
         print("[qubo-tracker] rien à faire sans --report")
@@ -156,9 +162,9 @@ def main() -> int:
         base, lev = FLOWS[f]
         L.append(f"  - {f} (base {base} @ {lev:.0f}x) : joués {c['played']}, "
                  f"bloqués {c['blocked']}, ouverts {c['open']}")
-    for w in wallets:
-        tag = "MAIN" if w["name"] == "MAIN" else "QUBO"
-        wts = WEIGHTS[w["name"]]
+    for w in wallets.values():
+        tag = w["name"]
+        wts = WEIGHTS[tag]
         L.append(f"WALLET {tag:<4} [{wts['machine_cascade_majors']:.3f}/"
                  f"{wts['machine_cascade_meme']:.3f}/"
                  f"{wts['machine_survivor_long']:.3f}/"
