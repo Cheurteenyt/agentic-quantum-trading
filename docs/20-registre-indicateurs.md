@@ -298,3 +298,9 @@ Rapport : reports/breadth-cascade-2026-09-28.md (script : scripts/breadth_cascad
 | **Bursts de liquidations → rebond** (6 j, 81 bursts ≥3 SELL/1h ≥ $20k) | **L'INVERSE de l'hypothèse d'épuisement** : post-burst -0,18 %/+1h, -0,29 %/+4h (WR 39 %) — les ventes forcées CONTINUENT de nourrir la chute (cohérent corr-tilt : systémique = ça continue) ; hint : ≥8 SELL (n=17) → -0,016 % = les extrêmes commencent à épuiser | **CONTEXTE** — n=6 j, le reversal-long est réfuté sur cet échantillon ; re-test à 14 j |
 
 **PRÉ-LECTURE OI à 3 j (358 fenêtres complètes 90+90 min)** : H5 (OI↓+prix↓, n=42) → le drift suivant le MOINS négatif (-0,073 %/-0,171 % vs les chutes neutres -0,358 %) = la direction d'épuisement des flush se dessine tôt ; H4 (OI↑+prix↓, n=42) → -0,281 % (moins négatif que neutre — le sens OPPOSÉ au pré-enregistré « continuation », n trop mince pour conclure) ; tout mean-revert vers le bas dans ce régime (le contrôle hausses -0,374 %). **PRÉVIEW, PAS VERDICT** — le tir complet (5 j + train/val) reste jeudi.
+
+## 28/09 nuit — l'univers macro/synthétique d'Aster découvert et cartographié (CONTEXTE — veille)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **L'univers macro/synthétique** (587 perps listés sur Aster, 27 macro+equity fetchés : l'or XAU, l'argent XAG, le pétrole CL/BZ, SPX, NVDA, GOOGL, AAPL, TSLA, MSFT, MSTR, COIN...) | **DÉCORRÉLÉS comme promis** : CL vs BTC -0,19, les équités vs NEIRO ≤ +0,28 (hors MSTR +0,83 / COIN +0,74 / CRCL +0,69 = crypto déguisée, exclus) ; MAIS **la liquidité tue** : le meilleur (CL) = 0,47 M$/bougie 1h, les équités mortes < 0,03 M (AAPL/MSFT/SPX = zéro volume) ; le signal tendance naïf : 12/13 mois négatifs au composite | **CONTEXTE — VEILLE** : le collecteur premium étendu à CL/XAU/XAG/NVDA, aucun trade avant > 1 M$/bougie ; la liquidité d'Aster macro = le déclencheur à surveiller |
