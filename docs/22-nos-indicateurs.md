@@ -102,3 +102,23 @@ capitulation, le sweep, le funding structurel, le sizing conditionnel, le garde
 wallet, le wall-clock, le re-cascade, la fractalité d'espérance, l'exit CVD, le
 reversal-long des liqs, les interactions 2D, l'AL v2, le gate meme, l'hybride
 hold. Chacun a son chiffre dans docs/20.
+
+## LA TRAÇABILITÉ CODE (28/09 — l'audit Ariad + grep, les 10 créations vérifiées)
+
+| Création | Où elle vit | État du câblage |
+|---|---|---|
+| 1. La cascade | anti_liq.collect_featured (importé) | ✅ le corpus + les trades |
+| 2. L'AL Score | anti_liq.add_rolling_scores + le gating q66 | ✅ actif |
+| 3. Vol_spike_6h | collect_vol_spike (importé, derrière --vol-spike) | ✅ ON en paper forward |
+| 4. Le survivor long | le flux survivor natif | ✅ actif (0 trade encore — les signaux sont rares) |
+| 5. Le vol-inverse | le sizing ATR (13 occurrences) | ✅ actif |
+| 6. Le corr-tilt | CORR_TILT flag (ligne 165) + la logique corr | ✅ câblé, **OFF par défaut** — la variante ×1,10 attend son forward dédié |
+| 7. Le funding-rank ×1,5 | le weight rank (3 occurrences) | ✅ actif |
+| 8. La 0-liq | les constantes de levier par flux | ✅ constitutionnel |
+| 9. Le QUBO | qubo_forward_tracker (les poids) + qubo_joint_lev (les leviers) | ✅ suivi forward — **la cellule jointe ×11x attend la promotion** (gelé régime T3) |
+| 10. L'adaptateur | edge_regime_monitor.py (nocturne) | ✅ DÉRISKÉ ×0,75 actuellement |
+
+**Le constat de traçabilité : 10/10 créations tracées, 8 câblées actives,
+2 en attente conditionnelle (le QUBO joint et le corr-tilt ×1,10 — tous
+deux gelés par la décision régime : pas de promotion sur un backtest
+dominé par le régime mort). Aucun écart entre la doc et le code.**
