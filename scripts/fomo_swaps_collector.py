@@ -52,7 +52,13 @@ tok = fresh_jwt()
 
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
-    page = b.contexts[0].new_page()
+    # réutiliser une page fomo.family existante (zéro page créée = zéro flash)
+    page = next((p for p in b.contexts[0].pages
+                 if "fomo.family" in (p.url or "")), None)
+    created = False
+    if page is None:
+        page = b.contexts[0].new_page()
+        created = True
     page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(3000)
 
@@ -117,7 +123,8 @@ with sync_playwright() as p:
         db.execute("INSERT OR REPLACE INTO _swaps_meta VALUES (?,?,?,?,?)", (uid, h, time.time(), oldest, pages))
         db.commit()
         print(f"DONE {h}: pages={pages} nouveaux={total} oldest={oldest}")
-    page.close()
+    if created:
+        page.close()
 
 # 3. signaux
 now = int(time.time())

@@ -186,20 +186,19 @@ def main() -> int:
         page_refresh = time.time()
         while True:
             time.sleep(30)
-            # le rafraîchissement proactif : toutes les 4 min, nouvelle page
+            # le rafraîchissement proactif : toutes les 4 min, RELOAD de la
+            # même page — le reload recrée les sockets WS (le même effet que
+            # close+new) SANS créer de page : une création de page fait
+            # surgir la fenêtre du daemon à l'écran du user (le flash).
             if time.time() - page_refresh > 240:
                 try:
-                    page.close()
+                    page.reload(timeout=20000, wait_until="domcontentloaded")
                 except Exception:
-                    pass
-                page = ctx.new_page()
-                def on_ws_new(ws):
-                    ws.on("framereceived", on_frame)
-                try:
-                    page.on("websocket", on_ws_new)
-                except Exception:
-                    pass
-                page.goto(BASE, timeout=15000, wait_until="domcontentloaded")
+                    try:
+                        page.goto(BASE, timeout=15000,
+                                  wait_until="domcontentloaded")
+                    except Exception:
+                        pass
                 page_refresh = time.time()
                 print("[ticks] page recréée — les sockets sont neufs", flush=True)
             if time.time() - last_tick_ref[0] > 300:
