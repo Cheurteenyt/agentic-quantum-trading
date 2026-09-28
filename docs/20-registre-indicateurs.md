@@ -259,3 +259,25 @@ Rapport : reports/cascade-fractal-2026-09-28.md (script : scripts/cascade_fracta
 |---|---|---|
 | AL Score v2 (les 10 features pré-validées, rangs roulants) | **FAIL** — aucune feature ne bat le gate v1 en VAL (AUC v1 0,639 vs v2 0,503-0,648) ; LA LEÇON : les directions validées sur les GATED s'INVERSENT sur l'univers complet (fresh-peak) — un gate ne retient qu'une feature dont le gradient tient LÀ où il opère ; le re-gating d'essai ré-admettait l'event MAE 13,08 % → 1 LIQUIDATION | **NUL** — le gate v1 (6 features, p66) reste officiel ; re-tenter à n VAL ×2 |
 | Gate meme (9 features, 2 022 events) | **FAIL** — 0/9 feature monotone (U inversés, inversions VAL) ; les 3 mortels (MAE 224/109/106 %) isolables par AUCUNE feature ex-ante ; et le verdict de fond : **le flux meme est MORT quoi qu'il arrive** (espérance TRAIN +0,009 → VAL -0,018 $/trade, WR 52,9→47,0 % — l'edge évaporé depuis juin ne revient pas) | **NUL** — la décision meme = au user (réduction ×0 vs garder en loterie décorrelante à 0,857) |
+
+## 28/09 nuit — la breadth transversale aux entrées cascade : gradient OUI, sizing NON
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Breadth % des 6 majeures (ret 24h négatif, closes 1h ≤ entry, ex-ante) aux 165 events cascade gated | **Gradient COHÉRENT** : Δespérance hi-lo TRAIN +3.02 / VAL +5.39 %/marge, bucket bas = pire des deux splits (VAL 0-33 : -0.03 ≈ 0) ; ⟂ corr7 (r=-0.10), résiduel positif 5/6 cellules terciles corr7 ; journées breadth 100 % : n=34, WR 58.8 %, +6.81 (réels, pas miracles). MAIS le sizing ×0.75/×1.0/×1.25 sur machine 4 flux vol-spike : $3,757 vs baseline $4,004.94, DD 31.7 % (> 25 %) → FAIL ; variante mid ×1.25 : $3,967, DD 24.8 % → ROI < baseline, FAIL. Le ×0.75 ampute des trades à espérance positive, le ×1.25 gonfle le bucket au MAE max 7.66 % | **CONTEXTE** — marqueur descriptif de régime (diagnostic), JAMAIS un multiplicateur de sizing ; le corr-tilt 168h reste le seul module systémique du machine |
+| Breadth v2 : nb autres majeures en DD 24h ≥ 3 % | **INCOHÉRENT** — Δ hi-lo TRAIN -2.16 / VAL -1.31 (gradient inverse, faible, n VAL 3+ = 4) | **NUL** |
+
+Rapport : reports/breadth-cascade-2026-09-28.md (script : scripts/breadth_cascade_test.py — klines.db lecture-seule, réplique machine bit-exacte $4,004.94).
+
+## 28/09 — l'exit informé par le flux (CVD 1h pendant la détention) : le bounce ne s'annonce pas
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Flag CVD détention (delta buy_ratio = 2 dernières bougies 1h vs 2 pré-entrée, h ∈ {2,4,8,12}, seuil choisi sur TRAIN) sur les 165 cascade gated (hold 24h, TRAIN 115 / VAL 50) | **INVERSION TRAIN/VAL systématique** : Δespérance flag-non-flag TRAIN -10.37 / -5.80 / -3.95 / -1.09 pt mais VAL +9.88 / +1.24 / +3.89 / +3.39 pt (h=2/4/8/12) — le gradient TRAIN ne tient JAMAIS en VAL ; à h=2 les flaggés VAL sont même les MEILLEURS (WR 85.7 %, +11.97 %/marge, subs-MAE 1.05 % vs 1.48 %) ; spearman(delta, ret24) VAL ≈ 0 partout (-0.01 / +0.08 / +0.03 / -0.08). Phase B (machine 4 flux) non lancée — critère pré-enregistré « Δesp ≤ -1.0 pt TRAIN ET VAL » jamais rempli | **NUL** — le retour du taker buy ratio 1h ne précède PAS le bounce en hors-échantillon ; l'exit 24h fixe reste l'optimum de la famille exit ; seule piste résiduelle honnête : CVD 15m intra-bougie, coût data élevé, à ne rouvrir que si n ×2 |
+
+## 28/09 tard — forensique du régime (le caractère du T3) + exit CVD (NUL)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **Forensique du régime T3** | le caractère = une GRIND-UP ROTATION, pas de l'apathie : corr7 0,82→0,76 (-1,33σ), breadth 51→45 %, **funding ×2,4** ; vol/volume/DD inchangés (la vol était déjà basse en Q2 qui faisait +0,75 %) ; la bascule BRUTALE (la semaine 28/06→04/07, au sommet du régime herd-down) ; **AUCUN précurseur persistant** (« vol basse → dérisquer » réfutée par mai) ; le levier = raccourcir la fenêtre de l'adaptateur (les franchissements 30 j détectent le 07/07, 5-7 semaines avant le 90 j) | **CONTEXTE** — la signature funding↑+corr7↓+breadth↓ = pré-enregistrée, aucune récurrence en 4 ans |
+| Exit CVD (le flux pendant la détention) | **FAIL** — le flag (le retour du taker buy à 2-12h) prédit le bounce sur TRAIN (-10,4 pts à 2h) mais **s'INVERSE en VAL** (+9,9) ; Spearman ≈ 0 ; les seuils sur-ajustés, le mécanisme ne tient pas hors-échantillon | **NUL** — le 24h fixe reste l'optimum de la famille exit (prix ET flux battus) |
