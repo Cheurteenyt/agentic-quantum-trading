@@ -331,3 +331,14 @@ multi-régime confirmé ».
 | Verdict | Détail | Catégorie |
 |---|---|---|
 | **Le scan des paramètres du cascade** (18 combinaisons : n bougies {2,3,4} × accélération {stricte, lag} × profondeur {0, 1,5, 3 %}, non-recouvrant 24h, train/val 70/30) | LE GRADIENT DE PROFONDEUR EST MONOTONE ET TENU EN VAL : plus le flush est profond, meilleur le short — la pépite : **2 bougies accélérées avec -3 % cumulé (n=161 TR/+1,583 %, n=21 VAL/+1,054 %) = 7× l'espérance VALIDÉE de la config actuelle** (+0,148 %), pendant le régime mort ; le mode d'accélération : indifférent (strict = lag) ; n=4 : mort en VAL | **CANDIDAT n°1** — les réserves : n VAL=21, le MAE 24h non mesuré (le plafond 0-liq), l'interaction avec le gate AL non testée, le multiple-comparisons (18 combos — mais le gradient monotone des deux côtés = pas un pic isolé) |
+
+**LE SCORECARD QUALITÉ DES DONNÉES (28/09 — l'audit complet des 7 couches)** :
+VERT — klines 1h : 0 trou, 0 bougie aberrante sur 36 symboles ; CVD 15m : 100 % ;
+fomo_ohlcv : 1 354 mints/6,8 M bougies, 0 prix ≤ 0 ; paper : 0 incohérence ;
+swaps : 0 doublon ; depth/block_trades : à la minute.
+À CONNAÎTRE — (1) oi_history : 777 trous > 16 min sur 30 symboles (~14 % de
+manques intermittents, le max 188 min) → le tir H4/H5 doit TOLÉRER 1 snapshot
+manquant (l'interpolation) ; (2) funding_history : 12 extrêmes LEGIT (MSTR -2,00
+%/8h en avril, MEME -1,98 % le 06/09) = les événements de foule extrême des
+synthétiques — un futur indicateur (le funding extrême = le marqueur de
+retournement de la foule sur les synthétiques).
