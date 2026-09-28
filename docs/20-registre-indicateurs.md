@@ -304,3 +304,20 @@ Rapport : reports/breadth-cascade-2026-09-28.md (script : scripts/breadth_cascad
 | Verdict | Détail | Catégorie |
 |---|---|---|
 | **L'univers macro/synthétique** (587 perps listés sur Aster, 27 macro+equity fetchés : l'or XAU, l'argent XAG, le pétrole CL/BZ, SPX, NVDA, GOOGL, AAPL, TSLA, MSFT, MSTR, COIN...) | **DÉCORRÉLÉS comme promis** : CL vs BTC -0,19, les équités vs NEIRO ≤ +0,28 (hors MSTR +0,83 / COIN +0,74 / CRCL +0,69 = crypto déguisée, exclus) ; MAIS **la liquidité tue** : le meilleur (CL) = 0,47 M$/bougie 1h, les équités mortes < 0,03 M (AAPL/MSFT/SPX = zéro volume) ; le signal tendance naïf : 12/13 mois négatifs au composite | **CONTEXTE — VEILLE** : le collecteur premium étendu à CL/XAU/XAG/NVDA, aucun trade avant > 1 M$/bougie ; la liquidité d'Aster macro = le déclencheur à surveiller |
+
+## 29/09 — L'ANATOMIE PROFONDE DU FADE : le « multi-régime certain » n'existe pas (la vérité du harnais complet)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Anatomie des échecs fade (5 128 events, 6 features, train/val strict) | **zéro feature ne sépare les perdants** (tous \|ρ\| ≤ 0,06 — BTC, l'âge, le financement, le multiplicateur, le CVD d'absorption (réfuté au niveau fade aussi), le symbole) ; les pertes s'accumulent sur LAB/TRUMP/H (descriptif, pas filtrable) | CONTEXTE |
+| **LA DÉCOUVERTE CENTRALE** : la contingence du fade | les perdants ne « continuent » PAS après 2h — le drift 2h→6h des buckets perdants ≈ **zéro** : la continuation se joue DANS les 2 premières heures, ensuite le trade = de l'argent mort à queue grasse (le meilleur trade du corpus : +55,66 %) | CONTEXTE — la mécanique du fade est un événement instantané, pas une tendance |
+| Exit conditionnel côté perte (8 cellules) | **TOUTES FAIL** — couper tôt convertit les pertes flottantes en pertes réalisées ET rate la queue haute (-0,38 %/trade) ; la queue se réduit (-44,7→-37,5) mais le prix est excessif | **NUL** |
+| **LE FADE RÉEL** (le harnais complet, 847 trades) | WR 53,6 %, **ratio G/P 0,93** (le 0,47 du forward n=13 = du bruit d'échantillon !), +5,6 %/an @ DD 7,3 %, **5 mois négatifs/12, Q1'26 -0,18 %** = le critère multi-régime ÉCHOUE au bloc complet | **RE-CATÉGORISÉ : le fade = un petit edge positif, PAS l'edge multi-régime certain** |
+
+**LA CONSÉQUENCE STRATÉGIQUE** : le « record absolu et certain » n'existe
+pas encore dans notre inventaire — le fade est fin (+5,6 %/an), les
+cascades sont régime-mortes, derek a 26 jours, le bonding s'arme. La
+certitude viendra de : le forward (derek/bonding), les tirs d'octobre,
+et le retour du régime cascade. La discipline vient de prouver qu'elle
+préfère la vérité au confort : elle a démonté notre propre « edge
+multi-régime confirmé ».
