@@ -20,8 +20,6 @@ import re
 import sqlite3
 import sys
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -142,26 +140,15 @@ def fresh_jwt(retries: int = 3) -> str:
 
 def call(jwt: str, mint: str, period: str, frm: int, to: int,
          amount: int = CAP) -> list:
-    q = (f"?address={mint}&chainId=solana&period={period}&usd=true"
-         f"&from={frm}&to={to}&amount={amount}")
-    req = urllib.request.Request(BASE + q, headers={
-        "accept": "*/*", "origin": "https://fomo.family",
-        "referer": "https://fomo.family/", "user-agent": UA,
-        "authorization": f"Bearer {jwt}"})
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=25) as r:
-                return json.load(r).get("data") or []
-        except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < 2:
-                time.sleep(20.0 * (attempt + 1))
-                continue
-            raise
-        except Exception:
-            if attempt == 2:
-                raise
-            time.sleep(2.0)
-    return []
+    # 29/09 : le fetch passe par la couche scrapling fomo_access — urllib
+    # est banni (403 Cloudflare, le pattern qui a coûté le flag) et les
+    # retries/backoff (429 → 20/40 s) y sont centralisés.
+    from scripts.fomo_access import fetch_mobula, fetch_json
+    q = {"address": mint, "chainId": "solana", "period": period,
+         "usd": "true", "from": frm, "to": to, "amount": amount}
+    resp = fetch_mobula("/api/2/token/ohlcv-history", token=jwt, params=q)
+    data = fetch_json(resp)
+    return (data.get("data") or []) if isinstance(data, dict) else []
 
 
 def rows_to_candles(rows: list) -> list:

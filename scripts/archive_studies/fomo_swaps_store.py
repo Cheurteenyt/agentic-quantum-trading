@@ -1,3 +1,4 @@
+# ARCHIVÉ (29/09) : doublon couvert par fomo_swaps_collector.py + bug mint inversé (in_m sur buy) corrigé dans le collector — voir docs/20-registre-indicateurs.md
 import json, sys, sqlite3, time, datetime
 sys.path.insert(0, "scripts")
 from fomo_ohlcv_backfill import fresh_jwt

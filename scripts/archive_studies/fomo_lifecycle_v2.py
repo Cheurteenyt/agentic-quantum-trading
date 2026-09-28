@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ARCHIVÉ (29/09) : étude close, verdict NUL (métriques mobula à nettoyer avant usage) — le filtre voisin-based y est intégré — voir docs/20-registre-indicateurs.md
 """FOMO lifecycle study v2 — corpus profond (backfill mobula), lecture seule.
 
 Corpus : 386k bougies, 34 tokens. 1m remonte a fev 2025, 15m a nov 2024,

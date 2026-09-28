@@ -1,3 +1,4 @@
+# ARCHIVÉ (29/09) : sonde one-shot scroll profil — voir docs/20-registre-indicateurs.md
 """Probe pagination fomo.family profil : scroll la liste swaps + capture requetes API."""
 import json, sys
 sys.path.insert(0, "scripts")

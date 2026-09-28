@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ARCHIVÉ (29/09) : one-shot : la question « mobula inclut-il la bonding ? » a sa réponse (pool_created_at GT) — voir docs/20-registre-indicateurs.md
 """La question qui vaut les ×1000 : mobula inclut-il la phase BONDING ?
 
 Méthode : pour 6-8 tokens variés (2 très anciens, 2 moyens, 2 récents,

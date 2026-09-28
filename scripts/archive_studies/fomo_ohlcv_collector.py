@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# ARCHIVÉ (29/09) : remplacé par fomo_tick_collector (24/7, OHLCV 1m agrégée des ticks) — voir docs/20-registre-indicateurs.md
 """LE COLLECTEUR OHLCV fomo — les bougies 1m des tokens, en temps réel.
 
 Le protocole cracké le 26/09 : le WebSocket fomo.family streame des frames

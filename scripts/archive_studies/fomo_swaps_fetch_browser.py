@@ -1,3 +1,4 @@
+# ARCHIVÉ (29/09) : one-shot couvert par fomo_swaps_collector.py (mention historique en docstring de derek_watch.py) — voir docs/20-registre-indicateurs.md
 import json, sys
 sys.path.insert(0, "scripts")
 from fomo_ohlcv_backfill import fresh_jwt

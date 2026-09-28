@@ -1,3 +1,4 @@
+# ARCHIVÉ (29/09) : one-shot couvert par fomo_swaps_collector.py (résolution handle→userId en cache _swaps_meta) — voir docs/20-registre-indicateurs.md
 import json, time, re
 from playwright.sync_api import sync_playwright
 

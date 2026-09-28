@@ -50,6 +50,10 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `fetch_klines.py` / `fetch_deep_klines.py` | bougies 1h/15m (1 an+) |
 | `whale_radar.py` / `whale_flow.py` / `fomo_harvest.py` | la couche fomo |
 | `fomo_tick_collector.py` | ticks fomo 24/7 → 1m OHLCV (flock anti-orphan, filtre QUOTE_MINTS) |
+| `derek_watch.py` | la détection temps réel des achats de derek518 (swap API in-page CDP, 1 passe/min) — bloqué par le mur d'auth 29/09 |
+| `login_window_miner.py` | le mineur DOM résident de la fenêtre de login (:9223) — sans API, sans ban (1×/5 min) |
+| `fomo_window_guard.py` | le garde de la fenêtre fomo-whale sur special:fomo (-98) (restart daemon+collector si dérive) |
+| `fomo_bonding_monitor.py` | le moniteur de pré-graduation fomo → DEX |
 | `fomo_history_collector.py` / `fomo_master_backfill.py` | backfill GT via mapping `_TF` (minute 1/5/15, hour 1h/4h) + top-up sélectif |
 | `x_harvest.py` / `fetch_x_posts.py` / `score_x_calls.py` | la couche X |
 | `aster_oi_history.py` | open interest (maison) |
@@ -103,7 +107,7 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `volspike_meme_test.py` | vol_spike sur memecoins — CANDIDAT confirmé (flux memecoin natif, majors ~1 %) |
 | `carte_meme_hold.py` | carte hold × levier du flux meme — DÉGRADÉ (ne PAS lever) |
 | `autopsie_mois_negatifs.py` | séparateurs des mois négatifs (fund7, fresh-peak) — profil n=1 |
-| `fomo_lifecycle_study.py` / `fomo_lifecycle_v2.py` | lifecycle des lancements (v2 sur le corpus profond mobula) |
+| `fomo_lifecycle_study.py` / `fomo_lifecycle_v2.py` | lifecycle des lancements — **archivés 29/09** (v2 : verdict NUL, bougies mobula à nettoyer ; le filtre voisin-based vit dedans) |
 | `k_scan.py` | le multiplicateur de taille absolu K (le dernier paramètre libre) — K=0,95 = **+6 419 %/an @ DD 24,9 %**, CANDIDAT à arbitrer |
 | `meme_universe_audit.py` | audit de complétude de l'univers meme — 4 tier-1 câblés au nocturne (DRAM/PIEVERSE/VIRTUAL/MELANIA, +313 events/an), 2 tickers périmés corrigés |
 
@@ -113,11 +117,12 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 |---|---|
 | `fomo_ohlcv_backfill.py` | backfill OHLCV via l'endpoint mobula de l'app (le crack 27/09 : 347k → 2,89M bougies) |
 | `fomo_mobula_topup.py` | rattrapage de bougies sans navigateur — timer 15 min |
-| `fomo_bonding_phase_study.py` | la phase bonding (premier gisement : les ×10 pré-pool) |
+| `fomo_bonding_phase_study.py` | la phase bonding (premier gisement : les ×10 pré-pool) — **archivé 29/09** (étude close, verdict au registre) |
 | `fomo_bonding_resolve.py` | la boucle bonding : tickers → mints → OHLCV mobula (collecteur réparé, âge + overlap) |
-| `fomo_bonding_test.py` | mobula inclut-il la phase bonding ? (oui — le bonding est couvert) |
+| `fomo_bonding_test.py` | mobula inclut-il la phase bonding ? (oui — le bonding est couvert) — **archivé 29/09** (one-shot, réponse documentée) |
 | `bonding_signal_study.py` | signaux bonding × trades |
-| `fomo_swaps_collector.py` (+ `_resolve` / `_store`) | swaps des 13 baleines (pagination lastSwapId crackée, 12 562 swaps) |
+| `fomo_swaps_collector.py` | swaps des 13 baleines (pagination lastSwapId crackée, 12 562 swaps) — `_resolve`/`_store` **archivés 29/09** (doublons couverts + bug mint inversé dans _store) |
+| `fomo_access.py` | **LA couche d'accès unifiée fomo (29/09)** — scrapling Fetcher (impersonation TLS, passe le Cloudflare, testé 200) : `fetch_fomo` / `fetch_mobula` / `fetch_prod_api` + rate-limit et retries backoffés ; urllib direct banni |
 | `swaps_forward_study.py` | l'edge de réplication skill-weighted des swaps |
 | `swaps_forward_v2.py` | re-run post-backfill complet (2 233 events) — **PASS** (edge +8,4 %, TRAIN +6,7 → VAL +12,3 %) |
 | `derek_replication_test.py` | wallet séquentiel de réplication derek518 — CANDIDAT (+88 %/26 j @ DD 6,4 %, robuste sans le top-3) |
@@ -177,11 +182,18 @@ vivant ne l'importe.
 | `qubo_per_symbol.py` | QUBO par symbole (flux majors) — CONTEXTE |
 | `autopsie_mois_negatifs.py` | séparateurs des mois négatifs (fund7, fresh-peak) — profil n=1 (sonde P3 en octobre) |
 | `fomo_lifecycle_study.py` | lifecycle v1 — re-catégorisé (métriques 15m sous-estiment les pumps <15 min), remplacé par v2 |
+| `fomo_lifecycle_v2.py` | lifecycle v2 corpus profond — verdict NUL (bougies mobula à nettoyer avant tout backtest 1m/15m) — archivé 29/09 |
 | `fomo_launch_study.py` | première étude launches (5 tokens) — remplacée par lifecycle v2/v3 |
+| `fomo_ohlcv_collector.py` | collecteur OHLCV playwright — remplacé par `fomo_tick_collector.py` (24/7) — archivé 29/09 |
+| `fomo_bonding_phase_study.py` | étude de la phase bonding — close 27/09, verdict au registre — archivé 29/09 |
+| `fomo_bonding_test.py` | one-shot : mobula couvre la bonding (pool_created_at GT) — archivé 29/09 |
+| `fomo_chart_probe.py` | sonde one-shot de la source chart — archivé 29/09 |
+| `fomo_swaps_param_hunt.py` / `fomo_swaps_modal_probe.py` / `fomo_swaps_js_grep.py` / `fomo_swaps_module_grep.py` / `fomo_swaps_pagination_probe.py` | sondes one-shot pagination swaps — la réponse (lastSwapId) est câblée dans le collector — archivés 29/09 |
+| `fomo_swaps_resolve.py` / `fomo_swaps_fetch_browser.py` / `fomo_swaps_store.py` | one-shots/doublons couverts par `fomo_swaps_collector.py` (_store avait le bug mint inversé) — archivés 29/09 |
 
 **Exceptions gardées à la racine malgré un verdict non-VALIDÉ** :
 `k_scan.py` (CANDIDAT à arbitrer), `survivor_meme_test.py` + `volspike_meme_test.py`
-(vivant — l'un importe l'autre), `lifecycle_v3_scale.py` + `fomo_lifecycle_v2.py`
+(vivant — l'un importe l'autre), `lifecycle_v3_scale.py`
 (doctrine vivante), `depth_indicator_prototype.py` + `wall_detector.py`
 (re-tir 06-07/10), `tilt_frontier.py`, `qubo_sizing.py` / `qubo_joint_lev.py`
 (CANDIDATS en paper forward), `p5_frequency_test.py` (vol_spike câblé 4e flux).

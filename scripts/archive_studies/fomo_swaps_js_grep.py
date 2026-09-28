@@ -1,3 +1,4 @@
+# ARCHIVÉ (29/09) : sonde one-shot des bundles JS — voir docs/20-registre-indicateurs.md
 """Tentative 3 : grep des bundles JS fomo.family autour de /swaps + test POST/header."""
 import json, re, sys, time
 sys.path.insert(0, "scripts")

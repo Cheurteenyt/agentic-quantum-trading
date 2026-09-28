@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# ARCHIVÉ (29/09) : sonde one-shot de la source chart — voir docs/20-registre-indicateurs.md
 """LA SONDE DE CHART fomo — identifier la source de données du graphique.
 
 L'app fomo.family est une SPA : son chart de prix vient d'un endpoint API

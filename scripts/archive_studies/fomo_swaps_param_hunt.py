@@ -1,3 +1,4 @@
+# ARCHIVÉ (29/09) : sonde one-shot pagination — réponse (lastSwapId) câblée dans fomo_swaps_collector.py — voir docs/20-registre-indicateurs.md
 """Tentative 2 : hunt du parametre de pagination /swaps par elimination directe in-page."""
 import json, sys, time
 sys.path.insert(0, "scripts")

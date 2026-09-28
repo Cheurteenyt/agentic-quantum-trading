@@ -1,3 +1,4 @@
+# ARCHIVÉ (29/09) : sonde one-shot swaps-v2-*.js — voir docs/20-registre-indicateurs.md
 """Grep cible : swaps-v2-*.js -> construction exacte de l'URL /users/../swaps."""
 import json, re, sys
 sys.path.insert(0, "scripts")

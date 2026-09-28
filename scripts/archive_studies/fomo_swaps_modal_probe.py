@@ -1,3 +1,4 @@
+# ARCHIVÉ (29/09) : sonde one-shot modal positions — voir docs/20-registre-indicateurs.md
 """Tentative 3 : ouvrir le modal positions -> scroller la liste trades -> capturer page 2.
 Fallback: brute-force noms de params restants."""
 import json, re, sys, time

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ARCHIVÉ (29/09) : étude close 27/09, verdict rendu au registre — voir docs/20-registre-indicateurs.md
 """Étude de la PHASE BONDING (premier gisement) — 2026-09-27.
 
 Thèse user : les ×10-×100 se jouent AVANT la graduation (avant pool_created_at).
