@@ -27,6 +27,7 @@ ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_klines.py --fetch --symbols "ADAUSDT,ARBUSDT,ASTERUSDT,AVAXUSDT,BOMEUSDT,CATEUSDT,DOGSUSDT,FARTCOINUSDT,GOOGLUSDT,HUSDT,HYPEUSDT,LABUSDT,LINKUSDT,LTCUSDT,MEMEUSDT,MOODENGUSDT,NEIROUSDT,NOTUSDT,NVDAUSDT,PENGUUSDT,PNUTUSDT,PONSUSDT,PORTALUSDT,TRUMPUSDT,TURBOUSDT,WIFUSDT" --target-bars 3000
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/paper_forward.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/qubo_forward_tracker.py --report
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/edge_regime_monitor.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --run
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --review
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/score_x_calls.py --score
