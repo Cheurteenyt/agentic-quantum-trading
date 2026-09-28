@@ -289,3 +289,10 @@ Rapport : reports/breadth-cascade-2026-09-28.md (script : scripts/breadth_cascad
 | Verdict | Détail | Catégorie |
 |---|---|---|
 | **Portefeuille survivants** (fade vol_spike + réplication derek518, la fenêtre commune 26 j) | $100 → **$124,07 (+24,1 %/26 j) @ DD 3,4 %, 0 liq, 0 mois négatif**, 91 trades ; le fade = **multi-régime confirmé** (Q4'25 +19,2 / Q1'26 -4,2 / Q2'26 +2,9 / **Q3'26 +15,1 % — le régime mort est son MEILLEUR trimestre**) ; corr PnL fade×derek **-0,28** = diversification réelle ; l'apport derek +16,64 $ (vs +7,4 % pure-fade) | **CANDIDAT conditionnel** — derek sous-puissant mono-slot (7/72 captés, top-3 = 99 %) : le paper tranche, pas le backtest |
+
+## 28/09 très tard — les lectures précoces Aster (OI + liquidations)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **OI lecture structurelle** (2 j, 15 min) | la géographie surprend : l'OI Aster est dominé par les MEMECOINS (NEIRO 470 M, PEPE 187 M, DOGS 135 M — BTC/ETH hors top 10) ; la corrélation instantanée ΔOI×Δprix 15 min = **0,000 en moyenne** (le positionnement ne bouge pas avec le prix à cette échelle ; LAB -0,42 et DOGS -0,35 = les symboles à squeezes) | **CONTEXTE** — le tir H4/H5 (fenêtre 90 min, jeudi) reste le test décisif |
+| **Bursts de liquidations → rebond** (6 j, 81 bursts ≥3 SELL/1h ≥ $20k) | **L'INVERSE de l'hypothèse d'épuisement** : post-burst -0,18 %/+1h, -0,29 %/+4h (WR 39 %) — les ventes forcées CONTINUENT de nourrir la chute (cohérent corr-tilt : systémique = ça continue) ; hint : ≥8 SELL (n=17) → -0,016 % = les extrêmes commencent à épuiser | **CONTEXTE** — n=6 j, le reversal-long est réfuté sur cet échantillon ; re-test à 14 j |
