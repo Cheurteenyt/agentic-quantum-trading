@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Daemon WebSocket fomo — le collecteur temps réel SANS navigateur.
+"""Daemon WebSocket fomo v2 — le collecteur temps réel SANS navigateur.
 
-Protocole cracké (2026-09-29) :
-  wss://prod-api.fomo.family/ws + headers Origin/User-Agent navigateur
-  serveur → {"type":"challenge"}   client → {"type":"challengeResponse","jwt":<privy JWT>}
-  puis subscribe : {"type":"subscribe","topicType":..., "topicId":...}
-  topics : trading_activity/<uuid-user-logué> = le flux global des swaps
-           prices/<mint>:<chain> = les prix par token (chain 1399811149 Solana, 4663 EVM)
+Protocole (cracké 2026-09-29) :
+  wss://prod-api.fomo.family/ws + Origin/User-Agent navigateur (sinon fermeture muette)
+  serveur → {"type":"challenge"}  client → {"type":"challengeResponse","jwt":<privy JWT>}
+  subscribe/unsubscribe : {"type":..., "topicType":..., "topicId":...}
+  plafond : ~80 topics/session ; pacing 0.05 s sinon rate-limit
 
-Le JWT : cache fichier + refresh via CDP (le localStorage du login window :9223).
-L'UUID user : config data/fomo/ws_config.json (--discover-uuid = la résolution auto).
-Stockage : fomo_ticks (prix) + fomo_swaps.db ws_swaps (swaps temps réel).
+ARCHITECTURE v2 :
+  - trading_activity/<uuid-user-logué> = le FLUX GLOBAL des swaps de toute la
+    plateforme (payload : handle, userId, type buy/sell, ticker, tokenAddress,
+    usdAmount, marketCap, price, equity du trader)
+  - ws_swaps : les colonnes typées + le flag top_trader (les 8 meilleurs)
+  - ws_traders : le mapping handle→userId auto-appris depuis le flux
+  - PRICES : le hot set LRU — les tokens actifs vus dans le flux s'abonnent
+    automatiquement, les froids sont désabonnés (budget 78 topics)
 """
 import asyncio
 import base64
@@ -22,6 +26,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 import websockets
@@ -39,6 +44,12 @@ CONFIG = ROOT / "data" / "fomo" / "ws_config.json"
 LOCK = ROOT / "data" / "fomo" / ".ws_daemon.lock"
 CHAIN_SOL, CHAIN_EVM = "1399811149", "4663"
 
+# le budget des topics prices (le trading_activity = 1 de plus, la marge serveur)
+MAX_PRICE_TOPICS = 78
+SEED_MINTS = 40
+PACING = 0.05
+SUMMARY_EVERY = 600
+
 
 def log(m):
     print(f"[{time.strftime('%H:%M:%S')}] {m}", flush=True)
@@ -54,7 +65,6 @@ def jwt_exp(jwt):
 
 
 def read_jwt():
-    """Le JWT du cache, refresh CDP si périmé (< 10 min)."""
     if JWT_CACHE.exists():
         jwt = JWT_CACHE.read_text().strip().strip('"')
         if jwt_exp(jwt) > time.time() + 600:
@@ -77,7 +87,7 @@ def read_jwt():
     if len(jwt) < 100:
         raise RuntimeError(f"le JWT illisible via CDP : {r.stdout[:80]} {r.stderr[:120]}")
     JWT_CACHE.write_text(jwt)
-    log(f"le JWT rafraîchi ({len(jwt)} chars, exp dans {jwt_exp(jwt)-int(time.time())}s)")
+    log(f"le JWT rafraîchi (exp dans {jwt_exp(jwt)-int(time.time())}s)")
     return jwt
 
 
@@ -88,10 +98,8 @@ def load_config():
     con = sqlite3.connect(DB_TICKS)
     mints = [r[0] for r in con.execute(
         "SELECT DISTINCT mint FROM fomo_tokens WHERE mint IS NOT NULL "
-        "ORDER BY resolved_at DESC LIMIT 40")]
+        "ORDER BY resolved_at DESC LIMIT ?", (SEED_MINTS,))]
     con.close()
-    if "So11111111111111111111111111111111111111112" not in mints:
-        mints.append("So11111111111111111111111111111111111111112")
     return cfg["user_uuid"], mints
 
 
@@ -105,6 +113,7 @@ def ensure_dbs():
         mint TEXT, ts_s REAL, priceUsd REAL, captured_at INTEGER)""")
     con.execute("CREATE INDEX IF NOT EXISTS idx_ticks_mint_ts ON fomo_ticks(mint, ts_s)")
     con.commit(); con.close()
+
     con = sqlite3.connect(DB_SWAPS, timeout=30)
     try:
         con.execute("PRAGMA journal_mode=WAL")
@@ -113,16 +122,38 @@ def ensure_dbs():
     con.execute("""CREATE TABLE IF NOT EXISTS ws_swaps (
         swap_id TEXT PRIMARY KEY, trade_id TEXT, type TEXT, user_id TEXT,
         created_at TEXT, raw TEXT, captured_at INTEGER)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS ws_traders (
+        user_id TEXT PRIMARY KEY, handle TEXT, display_name TEXT,
+        equity_last REAL, first_seen INTEGER, last_seen INTEGER)""")
+    # la migration v2 : les colonnes typées de ws_swaps
+    cols = {r[1] for r in con.execute("PRAGMA table_info(ws_swaps)")}
+    for name, decl in [
+            ("handle", "TEXT"), ("ticker", "TEXT"), ("token_addr", "TEXT"),
+            ("network_id", "TEXT"), ("usd_amount", "REAL"), ("market_cap", "REAL"),
+            ("price", "REAL"), ("trader_equity", "REAL"), ("is_dev", "INTEGER"),
+            ("top_trader", "INTEGER DEFAULT 0")]:
+        if name not in cols:
+            con.execute(f"ALTER TABLE ws_swaps ADD COLUMN {name} {decl}")
+    # les index d'exploitation (les sorties des top traders = LA requête chaude)
+    for idx, on in [("idx_ws_type", "type, captured_at"),
+                    ("idx_ws_handle", "handle, captured_at"),
+                    ("idx_ws_token", "token_addr, captured_at"),
+                    ("idx_ws_top", "top_trader, type, captured_at")]:
+        con.execute(f"CREATE INDEX IF NOT EXISTS {idx} ON ws_swaps({on})")
     con.commit(); con.close()
 
 
+TOP_HANDLES = {"unipcs", "pointfarmcap", "DumbCrayonEater", "Salem1299534",
+               "The__Solstice", "theveeman", "AvgJoesCrypto", "frankdegods"}
+
+
 class Writer:
-    """Les batches d'écriture — connexions persistantes, OR REPLACE sur le PK ticks."""
+    """Les batchs d'écriture — les connexions persistantes WAL."""
 
     def __init__(self):
-        self.tick_q, self.swap_q = [], []
+        self.tick_q, self.swap_q, self.trader_q = [], [], {}
         self.last_flush = time.time()
-        self.n_ticks, self.n_swaps = 0, 0
+        self.n_ticks, self.n_swaps, self.n_top, self.n_sells_top = 0, 0, 0, 0
         self.con_ticks = sqlite3.connect(DB_TICKS, timeout=30)
         self.con_swaps = sqlite3.connect(DB_SWAPS, timeout=30)
 
@@ -137,9 +168,25 @@ class Writer:
         sid = payload.get("id")
         if not sid:
             return
-        self.swap_q.append((sid, payload.get("tradeId"), payload.get("type"),
-                            payload.get("userId"), payload.get("createdAt"),
-                            json.dumps(payload), int(time.time())))
+        handle = payload.get("userHandle") or ""
+        is_top = 1 if handle in TOP_HANDLES else 0
+        ptype = payload.get("type") or ""
+        self.swap_q.append((
+            sid, payload.get("tradeId"), ptype, payload.get("userId"),
+            payload.get("createdAt"), json.dumps(payload), int(time.time()),
+            handle, payload.get("ticker"), payload.get("tokenAddress"),
+            str(payload.get("networkId") or ""), payload.get("usdAmount"),
+            payload.get("marketCap"), payload.get("price"),
+            payload.get("equity"), 1 if payload.get("isDev") else 0, is_top))
+        if handle:
+            uid = payload.get("userId")
+            if uid:
+                self.trader_q[uid] = (uid, handle, payload.get("displayName"),
+                                      payload.get("equity"), int(time.time()))
+        if is_top:
+            self.n_top += 1
+            if ptype == "swap_sell":
+                self.n_sells_top += 1
 
     def flush(self):
         now = time.time()
@@ -152,18 +199,53 @@ class Writer:
             self.n_ticks += len(self.tick_q); self.tick_q = []
         if self.swap_q:
             self.con_swaps.executemany(
-                "INSERT OR IGNORE INTO ws_swaps VALUES (?,?,?,?,?,?,?)", self.swap_q)
+                "INSERT OR IGNORE INTO ws_swaps VALUES (?,?,?,?,?,?,?,"
+                "?,?,?,?,?,?,?,?,?,?)", self.swap_q)
             self.con_swaps.commit()
             self.n_swaps += len(self.swap_q); self.swap_q = []
+        if self.trader_q:
+            self.con_swaps.executemany(
+                "INSERT INTO ws_traders VALUES (?,?,?,?,?) "
+                "ON CONFLICT(user_id) DO UPDATE SET handle=excluded.handle, "
+                "display_name=excluded.display_name, equity_last=excluded.equity_last, "
+                "last_seen=excluded.last_seen",
+                list(self.trader_q.values()))
+            self.con_swaps.commit()
+            self.trader_q = {}
         self.last_flush = now
 
 
-async def run_session(user_uuid, mints, writer, run_until_ts=None):
+class HotSet:
+    """Le LRU des topics prices : subscribe le chaud, unsubscribe le froid."""
+
+    def __init__(self, seed_mints):
+        self.lru = OrderedDict()
+        self.chain = lambda m: CHAIN_EVM if m.startswith("0x") else CHAIN_SOL
+        for m in seed_mints:
+            self.lru[m] = None
+        self.pending = list(self.lru.keys())
+
+    def touch(self, mint):
+        if mint in self.lru:
+            self.lru.move_to_end(mint)
+            return None
+        evicted = None
+        if len(self.lru) >= MAX_PRICE_TOPICS:
+            evicted, _ = self.lru.popitem(last=False)
+        self.lru[mint] = None
+        self.pending.append(mint)
+        return evicted
+
+    def topic(self, mint):
+        return f"{mint}:{self.chain(mint)}"
+
+
+async def session(user_uuid, seed_mints, writer, run_until_ts=None):
     jwt = read_jwt()
+    hot = HotSet(seed_mints)
     log(f"connexion {WSS} …")
     async with websockets.connect(WSS, additional_headers=HEADERS,
                                   max_size=10*1024*1024, ping_interval=20) as ws:
-        # auth
         raw = await asyncio.wait_for(ws.recv(), timeout=15)
         if json.loads(raw).get("type") != "challenge":
             raise RuntimeError(f"pas de challenge : {raw[:100]}")
@@ -173,18 +255,16 @@ async def run_session(user_uuid, mints, writer, run_until_ts=None):
             raise RuntimeError(f"auth refusée : {raw[:150]}")
         log("auth acceptée")
 
-        # subscribe : le feed global des swaps + les prix (pacing anti-rate-limit)
         await ws.send(json.dumps({"type": "subscribe", "topicType": "trading_activity",
                                   "topicId": user_uuid}))
-        await asyncio.sleep(0.4)
-        for m in mints:
-            chain = CHAIN_EVM if m.startswith("0x") else CHAIN_SOL
+        await asyncio.sleep(PACING)
+        for m in list(hot.lru.keys()):
             await ws.send(json.dumps({"type": "subscribe", "topicType": "prices",
-                                      "topicId": f"{m}:{chain}"}))
-            await asyncio.sleep(0.25)
-        log(f"subscribe : trading_activity + {len(mints)} topics prices (pacing 0.25s)")
+                                      "topicId": hot.topic(m)}))
+            await asyncio.sleep(PACING)
+        log(f"subscribe : le feed swaps + {len(hot.lru)} topics prices")
 
-        n_recv, t0 = 0, time.time()
+        n_recv, t0, last_summary = 0, time.time(), time.time()
         async for raw in ws:
             try:
                 m = json.loads(raw)
@@ -196,37 +276,55 @@ async def run_session(user_uuid, mints, writer, run_until_ts=None):
                 if tt == "prices":
                     writer.add_price(m.get("topicId", ""), m.get("payload", {}))
                 elif tt == "trading_activity":
-                    writer.add_swap(m.get("payload", {}))
+                    p = m.get("payload", {})
+                    writer.add_swap(p)
+                    # la découverte : le token trade → le prix en direct
+                    addr = p.get("tokenAddress")
+                    if addr and addr not in hot.lru:
+                        ev = hot.touch(addr)
+                        if ev:
+                            await ws.send(json.dumps(
+                                {"type": "unsubscribe", "topicType": "prices",
+                                 "topicId": hot.topic(ev)}))
+                            await asyncio.sleep(PACING)
+                        while hot.pending:
+                            nm = hot.pending.pop(0)
+                            await ws.send(json.dumps(
+                                {"type": "subscribe", "topicType": "prices",
+                                 "topicId": hot.topic(nm)}))
+                            await asyncio.sleep(PACING)
             elif t in ("error", "challengeRejected"):
-                raise RuntimeError(f"le serveur : {raw[:150]}")
+                raise RuntimeError(f"le serveur : {raw[:160]}")
             n_recv += 1
             writer.flush()
+            if time.time() - last_summary > SUMMARY_EVERY:
+                writer.flush()
+                log(f"résumé 10 min : {n_recv} msgs | ticks={writer.n_ticks} "
+                    f"swaps={writer.n_swaps} (top={writer.n_top}, "
+                    f"sorties_top={writer.n_sells_top}) | topics prices={len(hot.lru)}")
+                last_summary = time.time()
             if run_until_ts and time.time() > run_until_ts:
                 writer.flush()
                 return n_recv, time.time() - t0
-            if n_recv % 5000 == 0:
-                writer.flush()
-                log(f"  {n_recv} messages reçus, {writer.n_ticks} ticks, {writer.n_swaps} swaps")
 
 
-async def daemon_loop(user_uuid, mints, writer, run_until_ts=None):
+async def daemon_loop(user_uuid, seed_mints, writer, run_until_ts=None):
     backoff = 5
     while True:
         try:
-            n, dur = await run_session(user_uuid, mints, writer, run_until_ts)
+            n, dur = await session(user_uuid, seed_mints, writer, run_until_ts)
             if run_until_ts:
                 return n, dur
         except Exception as e:
             log(f"session perdue : {str(e)[:120]} → reconnexion dans {backoff}s")
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 300)
-            # le JWT peut expirer pendant l'attente → read_jwt le raffraîchit
         else:
             backoff = 5
 
 
 async def discover_uuid():
-    """L'UUID du user logué = lu dans les SENT du navigateur au reload."""
+    """L'UUID du user logué = lu dans les SUBSCRIBE du navigateur au reload."""
     import urllib.request
     ver = json.loads(urllib.request.urlopen("http://127.0.0.1:9223/json/version").read())
     burl = ver["webSocketDebuggerUrl"]
@@ -298,15 +396,14 @@ async def main():
         return
     ensure_dbs()
     user_uuid, mints = load_config()
-    log(f"daemon : user={user_uuid[:8]}…, {len(mints)} mints, once={once is not None}")
+    log(f"daemon v2 : user={user_uuid[:8]}…, {len(mints)} mints seed, "
+        f"budget {MAX_PRICE_TOPICS} topics, once={once is not None}")
     writer = Writer()
-
-    # le SIGTERM = l'arrêt net (le flush perdu <2s = acceptable ; évite les orphelins)
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
     if once:
         n, dur = await daemon_loop(user_uuid, mints, writer, run_until_ts=once)
         log(f"TEST TERMINÉ : {n} messages en {dur:.0f}s → {writer.n_ticks} ticks, "
-            f"{writer.n_swaps} swaps")
+            f"{writer.n_swaps} swaps (top={writer.n_top}, sorties_top={writer.n_sells_top})")
     else:
         await daemon_loop(user_uuid, mints, writer)
 
