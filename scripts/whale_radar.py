@@ -18,6 +18,7 @@ import json
 import sqlite3
 import sys
 import time
+import traceback
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -90,7 +91,7 @@ def main() -> int:
     ap.add_argument("--top", type=int, default=35)
     args = ap.parse_args()
 
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=30)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS fomo_positions (
         handle     TEXT    NOT NULL, ticker TEXT NOT NULL, qty TEXT,
@@ -102,6 +103,7 @@ def main() -> int:
         PRIMARY KEY (handle, captured_at));
     """)
     handles = constants(con, top=args.top)
+    print(f"[radar] démarrage: {len(handles)} constants à miner via CDP :9222", flush=True)
     if not handles:
         print("[radar] aucun constant en base — miner le leaderboard d'abord", file=sys.stderr)
         return 1
@@ -207,5 +209,24 @@ def main() -> int:
     return 0
 
 
+def _main_guard() -> int:
+    """L'échec doit être VISIBLE : traceback dans reports/whale_radar_err.log
+    + stderr, exit non-zéro (le ExecStart=- du nocturne ignore le code mais
+    la trace reste)."""
+    try:
+        return main()
+    except BaseException:
+        err = REPORTS / "whale_radar_err.log"
+        try:
+            with err.open("a", encoding="utf-8") as f:
+                f.write(f"\n=== {datetime.now(tz=timezone.utc):%Y-%m-%d %H:%M:%S} UTC "
+                        f"— whale_radar crash ===\n")
+                traceback.print_exc(file=f)
+        except OSError:
+            pass
+        traceback.print_exc()
+        return 1
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_main_guard())
