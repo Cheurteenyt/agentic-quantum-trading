@@ -54,6 +54,10 @@ def ensure_tables():
         mint TEXT, handle TEXT, action TEXT, usd REAL, mc TEXT,
         time_rel TEXT, captured_at INTEGER,
         PRIMARY KEY (mint, handle, action, usd, mc, time_rel))""")
+    # l'archive BRUTE des frames du listener (le drain du parking) — le
+    # parking regonfle ~130 Mo/jour tant qu'il n'est pas drainé
+    con.execute("""CREATE TABLE IF NOT EXISTS ws_parking_frames (
+        line_hash TEXT PRIMARY KEY, raw TEXT)""")
     con.commit(); con.close()
 
 
@@ -154,6 +158,32 @@ def do_session(page):
                   timeout=30000)
         page.wait_for_timeout(6000)
     log(f"[session] {'OK' if alive else 're-authentifiée au reload'}")
+
+
+def flush_parking(con):
+    """Le drain du parking : les frames du listener → l'archive brute
+    ws_parking_frames (fomo_swaps.db, PK = sha1 de la ligne — idempotent).
+    Le truncate du fichier arrive SEULEMENT après le commit : un crash au
+    milieu = re-drain sans doublon, jamais de perte (la doctrine anti-txn-
+    fantôme du 29/09)."""
+    import hashlib
+    if not FRAMES_F.exists():
+        return
+    with open(FRAMES_F) as fh:
+        lines = [l for l in fh.read().splitlines() if l.strip()]
+    if not lines:
+        return
+    ch0 = con.total_changes
+    for i in range(0, len(lines), 2000):
+        buf = [(hashlib.sha1(l.encode()).hexdigest(), l[:4000])
+               for l in lines[i:i + 2000]]
+        con.executemany("INSERT OR IGNORE INTO ws_parking_frames "
+                        "(line_hash, raw) VALUES (?,?)", buf)
+        con.commit()
+    n_new = con.total_changes - ch0
+    open(FRAMES_F, "w").close()  # le truncate APRÈS le commit
+    log(f"[parking] drainé : {len(lines)} frames → archive "
+        f"({n_new} nouvelles)")
 
 
 # La TABLE DE ROUTES : (nom, cadence_min, fn, les args extra)
@@ -272,12 +302,19 @@ def main():
                         log(f"[{name}] ERR {str(e)[:80]}")
                     last_visit[name] = now
                     time.sleep(2)
+            if now - state.get("last_parking_flush", 0) > 600:
+                try:
+                    flush_parking(con_swaps)
+                except Exception as e:
+                    log(f"[parking] ERR {str(e)[:80]}")
+                state["last_parking_flush"] = now
             if now - state.get("last_summary", 0) > 600:
                 log(f"résumé : {listener.summary()}")
                 state["last_summary"] = now
                 STATE_F.write_text(json.dumps(
                     {"last_visit": last_visit,
-                     "last_summary": state["last_summary"]}))
+                     "last_summary": state["last_summary"],
+                     "last_parking_flush": state["last_parking_flush"]}))
             time.sleep(30)
     finally:
         try:
