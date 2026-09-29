@@ -1,5 +1,10 @@
 # scripts/ — LA CARTE
 
+**Les 3 nocturnes (30/09)** : le domaine ASTER = trading-agent-nightly (03:00,
+65 steps), le domaine X = x-nightly (03:21, 20 steps), le domaine FOMO =
+fomo-nightly (03:55, 9 steps) — un domaine = une unité, jamais éditer une
+unit pendant son run.
+
 **Comment on travaille** (la convention) : toute nouvelle idée d'indicateur
 naît en one-shot (`scripts/studies/`, ou racine si la brique est destinée
 au nocturne) → discipline complète (baseline, train/val

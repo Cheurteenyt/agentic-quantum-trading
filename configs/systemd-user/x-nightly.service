@@ -1,0 +1,30 @@
+[Unit]
+Description=x nightly — le domaine X seul (harvest, scores, rotation, pont aster, registre X)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/score_x_calls.py --score
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --profiles thatdevlr,lookonchain,bscnews,dumpdetected,lesssgooohhh,avw_5,ckarku33,tmtheog,crypto_shivam7,quarky32,rhdaily__,toshixchain,ct_marketpulse,altcoinscoob,unipcs,Salem1299534,AvgJoesCrypto,frogmanhaha,ogle,0xAvast,cosby,RugDalio,artthatfucks,0xSporadic,rainnen23,corleonefnf,FartmanSacks,smokey0x,byszzz,GiantLoyalFox,NoGiOlMoKiNi,4evertrader_,workethic
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest.json --query nightly
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --searches '$$BTC (long OR short),$$ETH (long OR short),$$ASTER (long OR short),$$SOL (long OR short)'
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest-searches.json --query nightly-searches
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_rotation.py
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_rotation.py --quotes 3
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_rotation.py --replies 3
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_rotation.py --meta 12
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --trends
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --list "https://x.com/i/lists/2102847500323336698" --scrolls 8
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest-list.json --query watchlist-live
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_aster_pulse.py
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --list "https://x.com/i/lists/1798011740065792264" --scrolls 6
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --list "https://x.com/i/lists/1837997582423077109" --scrolls 6
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest-list.json --query public-lists
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --parse-calls
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/score_x_calls.py --score
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/registre_board.py
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/html_to_pdf.py reports/registre-board.html
+TimeoutStartSec=3600
+

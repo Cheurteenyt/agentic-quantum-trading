@@ -11,6 +11,23 @@ updated: 2026-08-09
 > garde la preuve. Ce runbook explique comment lancer la boucle et ce qui se
 > passe à chaque étape.
 
+## Les 3 nocturnes (30/09) — la séparation des domaines
+
+Le nocturne unique de 102 steps mélangeait ASTER, FOMO et X : une édition du
+fichier unit pendant un run (« command vanished ») abandonnait la queue des
+steps EN SILENCE — 3 nuits de whale_radar perdues (27-29/09). Découpage :
+
+| Unité | Heure | Steps | Domaine |
+|---|---|---|---|
+| trading-agent-nightly | 03:00 | 65 | ASTER (caches, klines, machine, campagne, ménage) |
+| x-nightly | 03:21 | 20 | X (harvest, scores, rotation, pont aster, registre X) |
+| fomo-nightly | 03:55 | 9 | FOMO (garde-fenêtre, radar baleines, ondes, flows, harvest) |
+
+Le décalage préserve les dépendances : le X-nightly finit avant le
+fomo-nightly pour que wave_detector (la fusion baleines × X) lise le harvest
+frais. La règle : **ne jamais éditer un fichier unit pendant son run**, et un
+domaine = une unité (une édition n'emporte plus les autres domaines).
+
 ### But
 
 Transformer le pipeline manuel (un run ponctuel, lu, puis oublié) en un

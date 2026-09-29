@@ -1,0 +1,19 @@
+[Unit]
+Description=fomo nightly — le domaine fomo seul (garde-fenêtre, radar baleines, ondes, flows, harvest)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_window_guard.py
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/whale_radar.py
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/wave_detector.py
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/whale_flow.py
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_harvest.py --tokens graduated
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_harvest.py --tokens bonding
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_harvest.py --alerts
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_harvest.py --closed unipcs,ogle,pointfarmcap,frogmanhaha
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_harvest.py --clans 4
+TimeoutStartSec=3600
+
