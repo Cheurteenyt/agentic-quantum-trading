@@ -553,17 +553,14 @@ def do_profiles(page, state):
 
 
 # La TABLE DE ROUTES : (nom, cadence_min, fn, les args extra)
+# MIGRATION REST (29/09 soir) : 8 surfaces tuées — couvertes par
+# fomo_rest_collector.py (la carte : scripts/studies/fomo_rest_map.md,
+# 100 % des endpoints rejoués 200) : sidebar, most_held (le clic 6000 ms),
+# top100, holders, theses, clans, feed, profiles. Restent : walker
+# (fomo_new_coins, 5 lecteurs vivants) + session (le bootstrap JWT).
 SCHEDULE = [
-    ("sidebar", 5, do_sidebar, ()),
-    ("most_held", 30, do_most_held, ()),
     ("walker", 0, lambda page, lv=None, c=None: None, ()),  # les cadences internes
-    ("top100", 60, do_top100, ()),
     ("session", 30, do_session, ()),
-    ("holders", 30, do_holders, ()),
-    ("theses", 30, do_theses, ()),
-    ("clans", 30, do_clans, ()),
-    ("feed", 15, do_feed, ()),
-    ("profiles", 60, do_profiles, ()),
 ]
 
 

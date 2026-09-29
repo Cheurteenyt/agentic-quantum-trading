@@ -1,41 +1,63 @@
 #!/usr/bin/env python3
-"""LE COLLECTEUR REST FOMO (29/09) — « mieux que du DOM » : la sonde RE
-(scripts/studies/fomo_rest_probe.py) a prouvé que TOUTES les surfaces des
-onglets (holders, thèses, swaps élite, trades fermés, leaderboard, clans,
-trending) sont des endpoints REST de prod-api.fomo.family, et que le WAF
-(Cloudflare) ne bloque que le fingerprint TLS : curl_cffi impersonate
-chrome131 + Bearer JWT = 200 partout. Un appel REST remplace une route DOM
-(hodlers/top = 97 holders + totalHolders en 1 GET, contre un clic + scroll
-+ parse). Basse DÉDIÉE data/fomo/fomo_rest.db (un seul écrivain — la leçon
-du lock du 29/09), JWT partagé avec le daemon (ws_jwt_cache.txt, top-up
-15 min). Pacing 1,0 s : 37 appels ≈ 50 s/pass, timer 30 min.
-PAGINATION (29/09, preuves scripts/studies/fomo_rest_cursor_probe.py) :
-swaps = &lastSwapId=<dernier id page n> (p1→p2→p3 disjointes, zéro
-chevauchement) ; trades = &lastTradeId=<closedTrades[-1].trade.id> (param
-extrait du bundle fomo.family, trades-v2 : getNextPageParam = ne()).
-Backfill BORNÉ par passe (SWAPS_PAGES/TRADES_PAGES, env FOMO_*_PAGES) et
-INCRÉMENTAL : le curseur de reprise est persisté dans fomo_rest_snapshots
-(endpoint='cursor_swaps_<uid>' / 'cursor_trades_<uid>') ; passe suivante
-reprend au curseur ; flux épuisé → cycle neuf depuis le haut.
-Tables : fomo_rest_snapshots (le dernier état par entité, JSON brut intégral
-— l'extraction typée se fait quand une étude en a besoin) et fomo_rest_swaps
-(append idempotent par swap id, la rotation élite)."""
+"""LE COLLECTEUR REST FOMO (29/09, v2 « toute la carte ») — la sonde RE
+(scripts/studies/fomo_rest_probe.py puis fomo_rest_map.md) a prouvé que TOUTES
+les surfaces des onglets (holders, thèses, swaps élite, trades fermés,
+leaderboard 24h/all-time, clans, trending, verified, feed d'activité, profils,
+About/launchpad, pré-graduation) sont des endpoints REST de prod-api.fomo.family,
+et que le WAF (Cloudflare) ne bloque que le fingerprint TLS : curl_cffi
+impersonate chrome131 + Bearer JWT = 200 partout. Le collector devient LA
+collecte, le DOM (fomo_dom_worker) le fallback. Base DÉDIÉE data/fomo/fomo_rest.db
+(un seul écrivain — la leçon du lock du 29/09), JWT partagé (ws_jwt_cache.txt +
+jwt_cache.json, fallback CDP). Pacing 1,0 s : passe ~60 appels ≈ 1,5-2,5 min,
+timer 30 min.
+STRUCTURE DÉCLARATIVE : COLLECTES = liste (nom, cadence_en_passes, fonction)
+exécutée dans l'ordre (leaderboard→trending fournissent elite/mints au ctx).
+La fraîcheur est lue dans fomo_rest_snapshots (captured_at par endpoint+entité) :
+un snapshot plus récent que `cadence` passes (×30 min, marge 0,9) → skip.
+Cadence 1 = à chaque passe (comportement historique inchangé).
+PAGINATION (preuves fomo_rest_cursor_probe.py) : swaps = &lastSwapId, trades =
+&lastTradeId, curseurs persistés (endpoint='cursor_<kind>_<uid>'), backfill
+BORNÉ par passe (SWAPS_PAGES/TRADES_PAGES) et INCRÉMENTAL, flux épuisé → cycle
+neuf. INSERT OR IGNORE = idempotent par swap id.
+NOUVEAUTÉS v2 (formes validées par fomo_rest_collector_probe.py) :
+- /proxy/verifiedTokens → liste brute (tri par `holders` À LA LECTURE) ;
+- /v2/leaderboard?window=alltime&limit=100 → {leaderboard:[100×dict27]} ;
+- /feed/tradingActivity?limit=50&threshold=1000 → {items, hasNextPage}, items
+  portent tokenAddress/userId/tradeId/body — et `&tokenAddress=<mint>` FILTRE
+  (validé) → itération par token possible à l'itération suivante ;
+- profils élite : /v2/users/<uid> (+balances,/leaderboard) et
+  /v2/userTokens/aggregatedSnapshotById?userId=<uid>&snapshotId=1 — SANS
+  snapshotId = 400 ; réponse observée dégénérée {snapshotId,pnl,equity}, à creuser ;
+- /proxy/filterTokens avec body = TABLEAU ["mint:networkId",…] (BATCH 12 mints
+  en 1 appel) → token{address,totalSupply…,info}, createdAt, holders, activity,
+  launchpad{launchpadName,graduationPercent} (null si déjà gradué) ;
+- bonding : les 12 mints les plus récents de fomo.db fomo_pre_graduated
+  (lecture mode=ro, JAMAIS d'écriture) → filterTokens → snapshot par mint."""
 import json, os, time, sys, sqlite3
 from pathlib import Path
 from curl_cffi import requests as cffi
 
 ROOT = Path(__file__).resolve().parents[1]
 JWT_CACHE = ROOT / "data" / "fomo" / "ws_jwt_cache.txt"
-DB = ROOT / "data" / "fomo" / "fomo_rest.db"
+FOMO_DB = ROOT / "data" / "fomo" / "fomo.db"          # lecture seule (mode=ro)
+DB = ROOT / "data" / "fomo" / "fomo_rest.db"          # LA base du collector
 BASE = "https://prod-api.fomo.family"
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 NETWORK_ID = 1399811149  # solana
 PACING = 1.0
+PASS_SECONDS = 30 * 60   # cadence du timer systemd
 N_TOKENS = 12
 N_ELITE = 5
+N_PROFILES = 4           # uids profilés par passe (des 5 élite en rotation)
 SWAPS_PAGES = max(1, int(os.environ.get("FOMO_SWAPS_PAGES", "5")))
 TRADES_PAGES = max(1, int(os.environ.get("FOMO_TRADES_PAGES", "3")))
+PROFILE_KINDS = (  # (endpoint de snapshot, chemin GET) — {uid} formaté
+    ("user", "/v2/users/{uid}"),
+    ("balances", "/v2/users/{uid}/balances"),
+    ("leaderboard", "/v2/users/{uid}/leaderboard"),
+    ("aggregated", "/v2/userTokens/aggregatedSnapshotById?userId={uid}&snapshotId=1"),
+)
 
 
 def jwt_exp(jwt: str) -> float:
@@ -106,7 +128,7 @@ class Client:
             raise RuntimeError(f"{r.status_code} {path[:80]}")
         return r.json().get("responseObject")
 
-    def post(self, path: str, body: dict):
+    def post(self, path: str, body):
         r = cffi.post(BASE + path, headers=self.h, json=body,
                       impersonate="chrome131", timeout=15)
         self.n += 1
@@ -122,6 +144,20 @@ def snap(con, endpoint: str, entity_id: str, obj):
                    DO UPDATE SET captured_at=excluded.captured_at, data=excluded.data""",
                 (int(time.time()), endpoint, entity_id,
                  json.dumps(obj, ensure_ascii=False)))
+
+
+def fresh(con, endpoint: str, entity_id: str, cadence: int) -> bool:
+    """Snapshot (endpoint, entity_id) plus récent que `cadence` passes → skip.
+    Cadence 1 = jamais frais (collecte à chaque passe, comme avant)."""
+    if cadence <= 1:
+        return False
+    try:
+        row = con.execute("SELECT captured_at FROM fomo_rest_snapshots "
+                          "WHERE endpoint=? AND entity_id=?",
+                          (endpoint, entity_id)).fetchone()
+        return bool(row) and (time.time() - row[0]) < cadence * PASS_SECONDS * 0.9
+    except Exception:
+        return False
 
 
 def cursor_load(con, kind: str, uid: str) -> dict:
@@ -141,35 +177,36 @@ def cursor_save(con, kind: str, uid: str, cursor, pages: int, exhausted: bool) -
           "updated_at": int(time.time())})
 
 
-def main() -> int:
-    jwt = read_jwt()
-    if jwt is None:
-        jwt = refresh_jwt_via_cdp()
-    if jwt is None:
-        print("[rest] JWT absent/périmé et CDP sans page fomo — passe skippée")
-        return 1
-    cli = Client(jwt)
-    con = sqlite3.connect(str(DB), timeout=30)
-    con.execute("PRAGMA busy_timeout=30000")
-    con.execute("""CREATE TABLE IF NOT EXISTS fomo_rest_snapshots (
-                     captured_at INTEGER, endpoint TEXT, entity_id TEXT,
-                     data TEXT, PRIMARY KEY (endpoint, entity_id))""")
-    con.execute("""CREATE TABLE IF NOT EXISTS fomo_rest_swaps (
-                     swap_id TEXT PRIMARY KEY, user_id TEXT, captured_at INTEGER,
-                     data TEXT)""")
-    stats = []
+def _rows_of(d):
+    return (d.get("leaderboard") if isinstance(d, dict) else d) or []
 
+
+# ---------------------------------------------------------------- collectes
+
+def col_leaderboard(con, cli, cadence, ctx):
     lb = cli.get("/v2/leaderboard/24h") or {}
-    lb_rows = lb.get("leaderboard") if isinstance(lb, dict) else lb
-    snap(con, "leaderboard", "24h", lb_rows)
-    stats.append(f"leaderboard={len(lb_rows or [])}")
+    rows = _rows_of(lb)
+    snap(con, "leaderboard", "24h", rows)
     elite = []
-    for row in (lb_rows or [])[:N_ELITE]:
+    for row in (rows or [])[:N_ELITE]:
         uid = (row.get("user") or {}).get("id") if isinstance(row, dict) else None
         uid = uid or (row.get("id") if isinstance(row, dict) else None)
         if uid:
             elite.append(uid)
+    ctx["elite"] = elite
+    return f"leaderboard={len(rows or [])}"
 
+
+def col_leaderboard_alltime(con, cli, cadence, ctx):
+    if fresh(con, "leaderboard_alltime", "alltime", cadence):
+        return "alltime frais, skip"
+    d = cli.get("/v2/leaderboard?window=alltime&limit=100") or {}
+    rows = _rows_of(d)
+    snap(con, "leaderboard_alltime", "alltime", rows)
+    return f"leaderboard_alltime={len(rows or [])}"
+
+
+def col_trending(con, cli, cadence, ctx):
     trend = cli.post("/proxy/trendingTokens", {}) or []
     mints = []
     for t in trend:
@@ -180,30 +217,122 @@ def main() -> int:
                 mints.append(m)
         if len(mints) >= N_TOKENS:
             break
-    stats.append(f"trending={len(trend)} mints={len(mints)}")
+    ctx["mints"] = mints
     snap(con, "trending", "latest", trend)
+    return f"trending={len(trend)} mints={len(mints)}"
 
-    for mint in mints:
-        q = f"/hodlers/top?tokens=%5B%7B%22address%22%3A%22{mint}%22%2C%22networkId%22%3A{NETWORK_ID}%7D%5D"
+
+def col_verified(con, cli, cadence, ctx):
+    if fresh(con, "verified_tokens", "latest", cadence):
+        return "verified frais, skip"
+    vt = cli.get("/proxy/verifiedTokens") or []
+    snap(con, "verified_tokens", "latest", vt)
+    return f"verified={len(vt)}"
+
+
+def col_trading_activity(con, cli, cadence, ctx):
+    if fresh(con, "trading_activity_feed", "latest", cadence):
+        return "activity frais, skip"
+    d = cli.get("/feed/tradingActivity?limit=50&threshold=1000") or {}
+    items = d.get("items") if isinstance(d, dict) else d
+    snap(con, "trading_activity_feed", "latest", d)  # hasNextPage gardé
+    return f"activity={len(items or [])}"
+
+
+def _filter_batch(con, cli, endpoint, mints, cadence):
+    """POST /proxy/filterTokens batch (1 appel pour N mints) → 1 snapshot/mint."""
+    todo = [m for m in mints if not fresh(con, endpoint, m, cadence)]
+    if not todo:
+        return f"{endpoint} frais, skip"
+    items = cli.post("/proxy/filterTokens",
+                     [f"{m}:{NETWORK_ID}" for m in todo]) or []
+    n = 0
+    for it in items:
+        m = (it.get("token") or {}).get("address") if isinstance(it, dict) else None
+        if m:
+            snap(con, endpoint, m, it)
+            n += 1
+    return f"{endpoint}={n}/{len(todo)}"
+
+
+def col_token_about(con, cli, cadence, ctx):
+    mints = ctx.get("mints") or []
+    if not mints:
+        return "about: pas de mints"
+    return _filter_batch(con, cli, "token_about", mints, cadence)
+
+
+def pre_graduated_mints(limit: int) -> list:
+    """Les mints pré-graduation les plus récents de fomo.db (LECTURE mode=ro —
+    jamais d'écriture sur la base des autres services)."""
+    try:
+        src = sqlite3.connect(f"file:{FOMO_DB}?mode=ro", uri=True, timeout=10)
         try:
+            rows = src.execute("""SELECT mint FROM fomo_pre_graduated
+                                  WHERE mint NOT LIKE '0x%'
+                                  GROUP BY mint ORDER BY MAX(captured_at) DESC
+                                  LIMIT ?""", (limit,)).fetchall()
+        finally:
+            src.close()
+        return [r[0] for r in rows if r and r[0]]
+    except Exception:
+        return []
+
+
+def col_bonding(con, cli, cadence, ctx):
+    mints = pre_graduated_mints(N_TOKENS)
+    if not mints:
+        return "bonding: fomo_pre_graduated vide"
+    return _filter_batch(con, cli, "bonding_snapshot", mints, cadence)
+
+
+def col_hodlers_thesis(con, cli, cadence, ctx):
+    out = []
+    for mint in ctx.get("mints") or []:
+        if fresh(con, "hodlers_top", mint, cadence) and \
+           fresh(con, "thesis_sorted", mint, cadence):
+            continue
+        try:
+            q = f"/hodlers/top?tokens=%5B%7B%22address%22%3A%22{mint}%22%2C%22networkId%22%3A{NETWORK_ID}%7D%5D"
             wrap = cli.get(q) or []
             tok = (wrap[0] if isinstance(wrap, list) and wrap else {}) or {}
             holders = tok.get("topHolders") or []
             snap(con, "hodlers_top", mint, tok)
-            stats.append(f"holders {mint[:6]}={len(holders)}/{tok.get('totalHolders')}")
+            out.append(f"holders {mint[:6]}={len(holders)}/{tok.get('totalHolders')}")
         except Exception as e:
-            stats.append(f"holders {mint[:6]} ERR {str(e)[:40]}")
+            out.append(f"holders {mint[:6]} ERR {str(e)[:40]}")
         try:
             now_ms = int(time.time() * 1000)
             th = cli.get(f"/feed/token/sortedThesis?tokenAddress={mint}&networkId={NETWORK_ID}"
                          f"&afterTime={now_ms - 86_400_000}&beforeTime={now_ms}&limit=500&threshold=0") or {}
             items = th.get("items") if isinstance(th, dict) else th
             snap(con, "thesis_sorted", mint, items or th)
-            stats.append(f"thesis {mint[:6]}={len(items or [])}")
+            out.append(f"thesis {mint[:6]}={len(items or [])}")
         except Exception as e:
-            stats.append(f"thesis {mint[:6]} ERR {str(e)[:40]}")
+            out.append(f"thesis {mint[:6]} ERR {str(e)[:40]}")
+    return " ".join(out) or "hodlers/thesis frais, skip"
 
-    for uid in elite:
+
+def col_profiles(con, cli, cadence, ctx):
+    """Remplaçant de do_profiles : 4 endpoints REST par uid (swaps/trades déjà
+    couverts par col_swaps_trades — non dupliqués). Fraîcheur PAR KIND :
+    un échec isolé se re-collecte à la passe suivante."""
+    out = []
+    for uid in (ctx.get("elite") or [])[:N_PROFILES]:
+        for kind, path in PROFILE_KINDS:
+            if fresh(con, f"profile_{kind}", uid, cadence):
+                continue
+            try:
+                snap(con, f"profile_{kind}", uid, cli.get(path.format(uid=uid)))
+                out.append(f"{kind} {str(uid)[:8]}")
+            except Exception as e:
+                out.append(f"{kind} {str(uid)[:8]} ERR {str(e)[:40]}")
+    return " ".join(out) or "profiles frais, skip"
+
+
+def col_swaps_trades(con, cli, cadence, ctx):
+    out = []
+    for uid in ctx.get("elite") or []:
         # --- swaps élite : backfill BORNÉ (SWAPS_PAGES) et INCRÉMENTAL —
         # curseur lastSwapId=<dernier id page n>, preuve sonde du 29/09.
         # INSERT OR IGNORE = idempotent par swap id. ---
@@ -237,12 +366,11 @@ def main() -> int:
                 cursor_save(con, "swaps", uid, cur, done, exhausted)
                 if exhausted:
                     break
-            stats.append(f"swaps {str(uid)[:8]}=+{new} p={done}{' E' if exhausted else ''}")
+            out.append(f"swaps {str(uid)[:8]}=+{new} p={done}{' E' if exhausted else ''}")
         except Exception as e:
-            stats.append(f"swaps {str(uid)[:8]} ERR {str(e)[:40]}")
-        # --- trades fermés : page 1 snapshotée (comportement inchangé) puis
-        # backfill BORNÉ (TRADES_PAGES) par lastTradeId=closedTrades[-1].trade.id
-        # (bundle fomo.family). Page 1 réutilisée si départ à neuf. ---
+            out.append(f"swaps {str(uid)[:8]} ERR {str(e)[:40]}")
+        # --- trades fermés : page 1 snapshotée puis backfill BORNÉ
+        # (TRADES_PAGES) par lastTradeId=closedTrades[-1].trade.id. ---
         try:
             tr = cli.get(f"/trades?userId={uid}&orderBy=closedAt")
             snap(con, "trades_closed", uid, tr)
@@ -266,21 +394,65 @@ def main() -> int:
                 cursor_save(con, "trades", uid, cur, done, exhausted)
                 if exhausted:
                     break
-            stats.append(f"trades {str(uid)[:8]} p={done}{' E' if exhausted else ''}")
+            out.append(f"trades {str(uid)[:8]} p={done}{' E' if exhausted else ''}")
         except Exception as e:
-            stats.append(f"trades {str(uid)[:8]} ERR {str(e)[:40]}")
+            out.append(f"trades {str(uid)[:8]} ERR {str(e)[:40]}")
+    return " ".join(out)
 
-    try:
-        clans = cli.get("/v2/clans/leaderboard?window=24h&limit=50") or {}
-        rows = clans.get("leaderboard") if isinstance(clans, dict) else clans
-        snap(con, "clans", "24h", rows)
-        stats.append(f"clans={len(rows or [])}")
-    except Exception as e:
-        stats.append(f"clans ERR {str(e)[:40]}")
 
+def col_clans(con, cli, cadence, ctx):
+    if fresh(con, "clans", "24h", cadence):
+        return "clans frais, skip"
+    clans = cli.get("/v2/clans/leaderboard?window=24h&limit=50") or {}
+    rows = _rows_of(clans)
+    snap(con, "clans", "24h", rows)
+    return f"clans={len(rows or [])}"
+
+
+# La passe : (nom, cadence_en_passes, fonction). L'ordre compte :
+# leaderboard→elite et trending→mints alimentent le ctx des suivantes.
+COLLECTES = (
+    ("leaderboard_24h", 1, col_leaderboard),
+    ("leaderboard_alltime", 6, col_leaderboard_alltime),   # top100 : 1/6 passes
+    ("trending", 1, col_trending),
+    ("verified_tokens", 2, col_verified),                  # 1/2 passes
+    ("trading_activity", 1, col_trading_activity),
+    ("token_about", 1, col_token_about),                   # batch 12 mints
+    ("bonding", 1, col_bonding),                           # batch 12 pré-grad
+    ("hodlers_thesis", 1, col_hodlers_thesis),
+    ("profiles", 2, col_profiles),                         # 4 uids × 4 kinds
+    ("swaps_trades", 1, col_swaps_trades),
+    ("clans", 2, col_clans),                               # 1/2 passes
+)
+
+
+def main() -> int:
+    jwt = read_jwt()
+    if jwt is None:
+        jwt = refresh_jwt_via_cdp()
+    if jwt is None:
+        print("[rest] JWT absent/périmé et CDP sans page fomo — passe skippée")
+        return 1
+    cli = Client(jwt)
+    con = sqlite3.connect(str(DB), timeout=30)
+    con.execute("PRAGMA busy_timeout=30000")
+    con.execute("""CREATE TABLE IF NOT EXISTS fomo_rest_snapshots (
+                     captured_at INTEGER, endpoint TEXT, entity_id TEXT,
+                     data TEXT, PRIMARY KEY (endpoint, entity_id))""")
+    con.execute("""CREATE TABLE IF NOT EXISTS fomo_rest_swaps (
+                     swap_id TEXT PRIMARY KEY, user_id TEXT, captured_at INTEGER,
+                     data TEXT)""")
+    ctx, stats = {}, []
+    t0 = time.time()
+    for name, cadence, fn in COLLECTES:
+        try:
+            stats.append(fn(con, cli, cadence, ctx) or name)
+        except Exception as e:
+            stats.append(f"{name} ERR {str(e)[:50]}")
     con.commit()
     con.close()
-    print(f"[rest] passe OK : {cli.n} appels | " + " | ".join(stats))
+    print(f"[rest] passe OK : {cli.n} appels en {time.time() - t0:.0f}s | "
+          + " | ".join(stats))
     return 0
 
 
