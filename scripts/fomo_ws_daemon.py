@@ -48,6 +48,7 @@ CHAIN_SOL, CHAIN_EVM = "1399811149", "4663"
 MAX_PRICE_TOPICS = 78
 SEED_MINTS = 40
 EXIT_THRESHOLD = 2  # ≥ 2 top traders distincts vendent le même token = consensus
+STALE_TIMEOUT = 600  # le serveur muet > 10 min = session reconstruite
 
 
 class SignalEngine:
@@ -131,6 +132,12 @@ def load_config():
     return cfg["user_uuid"], mints
 
 
+def load_top_handles():
+    """Les top traders : la config ws_config.json override le défaut codé."""
+    cfg = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+    return set(cfg.get("top_handles", TOP_HANDLES)) or TOP_HANDLES
+
+
 def ensure_dbs():
     con = sqlite3.connect(DB_TICKS, timeout=30)
     try:
@@ -169,6 +176,9 @@ def ensure_dbs():
     con.execute("""CREATE TABLE IF NOT EXISTS ws_events (
         event_id TEXT, event_type TEXT, raw TEXT, captured_at INTEGER,
         PRIMARY KEY (event_id, event_type))""")
+    con.execute("""CREATE TABLE IF NOT EXISTS ws_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, started_at INTEGER,
+        ended_at INTEGER, n_msgs INTEGER)""")
     # la migration v2 : les colonnes typées de ws_swaps
     cols = {r[1] for r in con.execute("PRAGMA table_info(ws_swaps)")}
     for name, decl in [
@@ -197,6 +207,9 @@ class Writer:
     def __init__(self):
         self.tick_q, self.swap_q, self.thesis_q, self.event_q = [], [], [], []
         self.trader_q = {}
+        # la dédup : le dernier prix par topic (les frames identiques = ~40 %
+        # du flux, zéro information → zéro écriture)
+        self.last_px = {}
         # les buffers de bougie 1m : mint → [minute_ts_ms, open, high, low, close]
         # + le volume plateforme : (addr, minute_ts_ms) → la somme des usdAmount
         self.candles = {}
@@ -205,6 +218,7 @@ class Writer:
         self.last_flush = time.time()
         self.n_ticks, self.n_swaps, self.n_top, self.n_sells_top = 0, 0, 0, 0
         self.n_candles, self.n_theses, self.n_events = 0, 0, 0
+        self.n_dedup, self.n_errors = 0, 0
         self.unknown_types = set()
         self.con_ticks = sqlite3.connect(DB_TICKS, timeout=30)
         self.con_swaps = sqlite3.connect(DB_SWAPS, timeout=30)
@@ -228,16 +242,21 @@ class Writer:
         ts = payload.get("timestamp") or int(time.time())
         px = payload.get("priceUsd")
         if mint and px is not None:
-            self.tick_q.append((mint, float(ts), float(px), int(time.time())))
+            px = float(px)
+            if self.last_px.get(topic_id) == px:
+                self.n_dedup += 1
+                return
+            self.last_px[topic_id] = px
+            self.tick_q.append((mint, float(ts), px, int(time.time())))
             # la bougie 1m en cours
             minute = int(float(ts)) // 60 * 60 * 1000
             c = self.candles.get(mint)
             if c is None or c[0] != minute:
-                self.candles[mint] = [minute, float(px), float(px), float(px), float(px)]
+                self.candles[mint] = [minute, px, px, px, px]
             else:
-                c[2] = max(c[2], float(px))
-                c[3] = min(c[3], float(px))
-                c[4] = float(px)
+                c[2] = max(c[2], px)
+                c[3] = min(c[3], px)
+                c[4] = px
 
     def add_thesis(self, p):
         """Une thèse postée avec un achat : le texte, le MC à la publication,
@@ -333,10 +352,45 @@ class Writer:
         log(f"⚡⚡ SORTIE CONSENSUS {ticker} : {', '.join(handles)} "
             f"vendent dans la fenêtre 30 min")
 
+    def log_session_start(self):
+        """Le journal des sessions : la visibilité des gaps de collecte."""
+        try:
+            self.con_swaps.execute(
+                "INSERT INTO ws_sessions (started_at) VALUES (?)", (int(time.time()),))
+            self.con_swaps.commit()
+            self._session_row = self.con_swaps.execute(
+                "SELECT last_insert_rowid()").fetchone()[0]
+        except Exception:
+            self._session_row = None
+
+    def log_session_end(self, n_msgs):
+        if not getattr(self, "_session_row", None):
+            return
+        try:
+            self.con_swaps.execute(
+                "UPDATE ws_sessions SET ended_at=?, n_msgs=? WHERE id=?",
+                (int(time.time()), n_msgs, self._session_row))
+            self.con_swaps.commit()
+        except Exception:
+            pass
+        self._session_row = None
+
     def flush(self):
         now = time.time()
         if now - self.last_flush < 2:
             return
+        try:
+            self._flush_locked()
+        except sqlite3.OperationalError as e:
+            # la DB verrouillée/occupée : les queues restent en mémoire,
+            # le flush suivant re-tentera — la session ne meurt JAMAIS d'un flush
+            log(f"flush différé ({str(e)[:80]})")
+        except Exception as e:
+            self.n_errors += 1
+            log(f"flush err (#{self.n_errors}) : {str(e)[:100]}")
+        self.last_flush = now
+
+    def _flush_locked(self):
         self._roll_candles()
         if self.tick_q:
             self.con_ticks.executemany(
@@ -369,7 +423,6 @@ class Writer:
                 list(self.trader_q.values()))
             self.con_swaps.commit()
             self.trader_q = {}
-        self.last_flush = now
 
 
 class HotSet:
@@ -444,60 +497,76 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
 
         n_recv, t0, last_summary = 0, time.time(), time.time()
         signals = SignalEngine()
-        async for raw in ws:
+        writer.log_session_start()
+        # la boucle recv avec le watchdog : le serveur muet > STALE_TIMEOUT s
+        # = la session reconstruite (un feed mort ne déclenche pas ping)
+        while True:
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=STALE_TIMEOUT)
+            except asyncio.TimeoutError:
+                raise RuntimeError(f"silence du serveur > {STALE_TIMEOUT}s — session reconstruite")
             try:
                 m = json.loads(raw)
             except Exception:
                 continue
-            t = m.get("type")
-            if t == "data":
-                tt = m.get("topicType", "")
-                if tt == "prices":
-                    writer.add_price(m.get("topicId", ""), m.get("payload", {}))
-                elif tt == "trading_activity":
-                    p = m.get("payload", {})
-                    writer.add_event(p)
-                    addr = p.get("tokenAddress")
-                    # un top trader trade un token → ÉPINGLER sa série prix
-                    if addr and (p.get("userHandle") or "") in TOP_HANDLES:
-                        new = hot.pin(addr)
-                        if new:
-                            await ws.send(json.dumps(
-                                {"type": "subscribe", "topicType": "prices",
-                                 "topicId": hot.topic(new)}))
-                            await asyncio.sleep(PACING)
-                        # la sortie consensus, en DIRECT (< 2 s)
-                        if p.get("type") == "swap_sell":
-                            handles = signals.on_top_sell(addr, p.get("userHandle"),
-                                                          p.get("ticker"))
-                            if handles:
-                                writer.write_exit_signal(
-                                    addr, p.get("ticker"), sorted(handles))
-                    # la découverte : le token trade → le prix en direct
-                    elif addr and addr not in hot.lru and addr not in hot.pinned:
-                        new, ev = hot.touch(addr)
-                        if ev:
-                            await ws.send(json.dumps(
-                                {"type": "unsubscribe", "topicType": "prices",
-                                 "topicId": hot.topic(ev)}))
-                            await asyncio.sleep(PACING)
-                        while hot.pending:
-                            nm = hot.pending.pop(0)
-                            await ws.send(json.dumps(
-                                {"type": "subscribe", "topicType": "prices",
-                                 "topicId": hot.topic(nm)}))
-                            await asyncio.sleep(PACING)
-            elif t in ("error", "challengeRejected"):
-                raise RuntimeError(f"le serveur : {raw[:160]}")
-            n_recv += 1
+            try:
+                t = m.get("type")
+                if t == "data":
+                    tt = m.get("topicType", "")
+                    if tt == "prices":
+                        writer.add_price(m.get("topicId", ""), m.get("payload", {}))
+                    elif tt == "trading_activity":
+                        p = m.get("payload", {})
+                        writer.add_event(p)
+                        addr = p.get("tokenAddress")
+                        # un top trader trade un token → ÉPINGLER sa série prix
+                        if addr and (p.get("userHandle") or "") in TOP_HANDLES:
+                            new = hot.pin(addr)
+                            if new:
+                                await ws.send(json.dumps(
+                                    {"type": "subscribe", "topicType": "prices",
+                                     "topicId": hot.topic(new)}))
+                                await asyncio.sleep(PACING)
+                            # la sortie consensus, en DIRECT (< 2 s)
+                            if p.get("type") == "swap_sell":
+                                handles = signals.on_top_sell(addr, p.get("userHandle"),
+                                                              p.get("ticker"))
+                                if handles:
+                                    writer.write_exit_signal(
+                                        addr, p.get("ticker"), sorted(handles))
+                        # la découverte : le token trade → le prix en direct
+                        elif addr and addr not in hot.lru and addr not in hot.pinned:
+                            new, ev = hot.touch(addr)
+                            if ev:
+                                await ws.send(json.dumps(
+                                    {"type": "unsubscribe", "topicType": "prices",
+                                     "topicId": hot.topic(ev)}))
+                                await asyncio.sleep(PACING)
+                            while hot.pending:
+                                nm = hot.pending.pop(0)
+                                await ws.send(json.dumps(
+                                    {"type": "subscribe", "topicType": "prices",
+                                     "topicId": hot.topic(nm)}))
+                                await asyncio.sleep(PACING)
+                elif t in ("error", "challengeRejected"):
+                    raise RuntimeError(f"le serveur : {raw[:160]}")
+                n_recv += 1
+            except websockets.exceptions.ConnectionClosed:
+                raise
+            except Exception as e:
+                # une anomalie de payload ne tue JAMAIS la session
+                writer.n_errors += 1
+                log(f"msg handler err (#{writer.n_errors}) : {str(e)[:100]}")
             writer.flush()
             if time.time() - last_summary > SUMMARY_EVERY:
                 writer.flush()
                 log(f"résumé 10 min : {n_recv} msgs | ticks={writer.n_ticks} "
-                    f"bougies1m={writer.n_candles} swaps={writer.n_swaps} "
-                    f"(top={writer.n_top}, sorties_top={writer.n_sells_top}) "
+                    f"(dédup={writer.n_dedup}) bougies1m={writer.n_candles} "
+                    f"swaps={writer.n_swaps} (top={writer.n_top}, "
+                    f"sorties_top={writer.n_sells_top}) "
                     f"thèses={writer.n_theses} types_inconnus={writer.n_events} "
                     f"{sorted(writer.unknown_types) if writer.unknown_types else ''} "
+                    f"errs={writer.n_errors} "
                     f"| topics={len(hot.lru)}+{len(hot.pinned)}épinglés")
                 last_summary = time.time()
             if run_until_ts and time.time() > run_until_ts:
@@ -510,9 +579,11 @@ async def daemon_loop(user_uuid, seed_mints, writer, run_until_ts=None):
     while True:
         try:
             n, dur = await session(user_uuid, seed_mints, writer, run_until_ts)
+            writer.log_session_end(n)
             if run_until_ts:
                 return n, dur
         except Exception as e:
+            writer.log_session_end(-1)
             log(f"session perdue : {str(e)[:120]} → reconnexion dans {backoff}s")
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 300)
@@ -578,6 +649,7 @@ async def discover_uuid():
 
 
 async def main():
+    global TOP_HANDLES
     ap = sys.argv[1:] if len(sys.argv) > 1 else []
     if "--discover-uuid" in ap:
         return await discover_uuid()
@@ -593,8 +665,10 @@ async def main():
         return
     ensure_dbs()
     user_uuid, mints = load_config()
-    log(f"daemon v2 : user={user_uuid[:8]}…, {len(mints)} mints seed, "
-        f"budget {MAX_PRICE_TOPICS} topics, once={once is not None}")
+    TOP_HANDLES = load_top_handles()
+    log(f"daemon v3.1 : user={user_uuid[:8]}…, {len(mints)} mints seed, "
+        f"budget {MAX_PRICE_TOPICS} topics, {len(TOP_HANDLES)} top traders, "
+        f"once={once is not None}")
     writer = Writer()
     signal.signal(signal.SIGTERM, signal.SIG_DFL)
     if once:

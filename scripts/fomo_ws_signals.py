@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """La couche signaux fomo — lit ws_swaps/ws_theses (le flux WS) et détecte :
 
-  1. SORTIE CONSENSUS : ≥ N top traders vendent le MÊME token dans la fenêtre
-     → le signal de sortie des réplications (le smart money quitte).
-  2. THÈSE TOP TRADER : un des 8 meilleurs publie une thèse → le signal social
+  1. THÈSE TOP TRADER : un des 8 meilleurs publie une thèse → le signal social
      (le texte + la mise + le PnL live de l'auteur).
-  3. POMPE CONSENSUS : ≥ N top traders achètent le même token dans la fenêtre
+  2. POMPE CONSENSUS : ≥ N top traders achètent le même token dans la fenêtre
      → l'entrée de replication (l'extension du consensus AGI identifié).
 
-Les signaux vont dans ws_signals (fomo_swaps.db) + le journal. Idempotent :
-les signaux déjà émis (kind, token, fenêtre) ne se réémettent pas.
+⚠️ La SORTIE consensus (exit_consensus) = détectée EN TEMPS RÉEL dans le
+daemon (SignalEngine, latence < 2 s, commit 8981376) — PAS ici, ce serait
+un doublon avec une autre clé d'idempotence.
 Le rythme : 1×/5 min (le timer fomo-ws-signals.timer).
 """
 import json
@@ -64,21 +63,7 @@ def main():
     since = int(time.time()) - LOOKBACK_MIN * 60
     n_new = 0
 
-    # 1) les SORTIES consensus (les ventes des top traders par token)
-    rows = con.execute("""
-        SELECT token_addr, MAX(ticker), COUNT(DISTINCT handle), GROUP_CONCAT(DISTINCT handle),
-               ROUND(SUM(usd_amount), 0), MAX(captured_at)
-        FROM ws_swaps
-        WHERE top_trader=1 AND type='swap_sell' AND captured_at > ? AND token_addr IS NOT NULL
-        GROUP BY token_addr
-        HAVING COUNT(DISTINCT handle) >= ?
-        ORDER BY SUM(usd_amount) DESC""", (since, EXIT_THRESHOLD)).fetchall()
-    for addr, ticker, n, handles, usd, _ in rows:
-        if emit(con, state, "exit_consensus", addr, ticker, handles.split(","),
-                {"traders": n, "usd_sold_window": usd, "window_min": WINDOW_MIN}):
-            n_new += 1
-
-    # 2) les ENTRÉES consensus (les achats des top traders par token)
+    # 1) les ENTRÉES consensus (les achats des top traders par token)
     rows = con.execute("""
         SELECT token_addr, MAX(ticker), COUNT(DISTINCT handle), GROUP_CONCAT(DISTINCT handle),
                ROUND(SUM(usd_amount), 0), MAX(market_cap)
@@ -93,7 +78,7 @@ def main():
                  "window_min": WINDOW_MIN}):
             n_new += 1
 
-    # 3) les THÈSES des top traders (chaque thèse = un signal social)
+    # 2) les THÈSES des top traders (chaque thèse = un signal social)
     rows = con.execute("""
         SELECT thesis_id, handle, ticker, token_addr, comment, usd_value,
                pnl_pct_unrealized, mc_at_creation, captured_at
