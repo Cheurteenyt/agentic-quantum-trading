@@ -113,7 +113,7 @@ def store_tokens(con, route, tokens):
                                VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING""",
                             (t["ticker"], "bonding_walker", t.get("bonding_pct"), now_ts))
             else:
-                con.execute("""INSERT INTO fomo_price_history (ticker, captured_at, mc, price, change)
+                con.execute("""INSERT OR REPLACE INTO fomo_price_history (ticker, captured_at, mc, price, change)
                                VALUES (?,?,?,?,?)""",
                             (t["ticker"], now_ts, t.get("mc"), t.get("price"), t.get("change")))
         except Exception as e:
@@ -135,9 +135,18 @@ def store_alerts(con, alerts):
 
 
 def visit_route(page, route) -> tuple[str, list]:
-    """La navigation vers la route + l'extraction du texte."""
+    """La navigation vers la route + l'extraction du texte.
+    Les onglets (Trending/Bonding/…) = dans la VUE Tokens : l'activer
+    d'abord, sinon le clic atterrit sur le titre de la sidebar → 0 lignes."""
     try:
-        page.locator(f"text={route['button']}").first.click(timeout=5000)
+        # les guillemets = la correspondance EXACTE (text=Trending matchait le
+        # titre « Trending tokens » de la sidebar au lieu de l'onglet)
+        page.locator('text="Tokens"').first.click(timeout=5000)
+        time.sleep(2)
+    except Exception:
+        pass  # déjà sur la vue Tokens (ou le bouton = absent)
+    try:
+        page.locator(f'text="{route["button"]}"').first.click(timeout=5000)
     except Exception as e:
         return f"nav err {str(e)[:30]}", []
     time.sleep(5)
