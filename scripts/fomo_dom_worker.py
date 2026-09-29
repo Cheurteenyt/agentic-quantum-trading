@@ -169,7 +169,26 @@ def main():
                 except Exception:
                     pass
         log("les pages fomo purgées — le worker = seul propriétaire du navigateur")
-        page = ctx.new_page()  # la page DÉDIÉE du worker — détenue pour toujours
+        # la page DÉDIÉE : le retry (la limite d'onglets du Chrome for Testing
+        # = basse + la course au restart systemd) en libérant nos propres pages
+        page = None
+        for attempt in range(4):
+            try:
+                page = ctx.new_page()
+                break
+            except Exception:
+                log(f"new_page échoué ({attempt + 1}/4) — libération des pages fomo")
+                for p2 in list(ctx.pages):
+                    if "fomo.family" in (p2.url or ""):
+                        try:
+                            p2.close()
+                        except Exception:
+                            pass
+                time.sleep(5)
+        if page is None:
+            page = next((p for p in ctx.pages if "fomo.family" in (p.url or "")), None)
+        if page is None:
+            raise RuntimeError("aucune page fomo possible sur le navigateur dédié")
         # l'accueil = l'app rendue ; le clic « Tokens » active la vue à onglets
         # (Trending/Bonding/Graduated) — la route /tokens directe = morte (« Go home »)
         page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=30000)
@@ -278,6 +297,78 @@ def main():
                     log(f"[session] {'OK' if alive else 're-authentifiée au reload'}")
                 except Exception as e:
                     log(f"[session] ERR {str(e)[:80]}")
+                time.sleep(2)
+            # 1d) les HOLDERS des tokens chauds (l'élite + le trending) :
+            #     qui détient, son PnL, son MC d'entrée, sa thèse — le filtre
+            #     anti-rug (top-10 holding) et la carte des baleines par token
+            if now - last_visit.get("holders", 0) > 30 * 60:
+                try:
+                    from fomo_holders_parser import parse_holders, parse_token_header
+                    con_s = sqlite3.connect(str(DB_SWAPS), timeout=30)
+                    con_s.execute("PRAGMA busy_timeout=30000")
+                    mints = [r[0] for r in con_s.execute(
+                        """SELECT DISTINCT token_addr FROM ws_swaps
+                        WHERE top_trader=1 AND token_addr IS NOT NULL
+                        ORDER BY captured_at DESC LIMIT 8""")]
+                    con_s.close()
+                    con_t = sqlite3.connect(str(WDB), timeout=30)
+                    con_t.execute("PRAGMA busy_timeout=30000")
+                    for (m,) in con_t.execute(
+                            """SELECT DISTINCT t.mint FROM fomo_price_history ph
+                            JOIN fomo_tokens t ON t.ticker = ph.ticker
+                            WHERE t.mint IS NOT NULL ORDER BY ph.captured_at DESC LIMIT 4"""):
+                        if m not in mints:
+                            mints.append(m)
+                    con_t.close()
+                    captured = 0
+                    for mint in mints[:12]:
+                        chain = "ethereum" if mint.startswith("0x") else "solana"
+                        try:
+                            page.goto(f"https://fomo.family/tokens/{chain}/{mint}",
+                                      wait_until="domcontentloaded", timeout=25000)
+                            page.wait_for_timeout(5000)
+                            page.locator('text="Holders"').first.click(timeout=6000)
+                            page.wait_for_timeout(3000)
+                            txt = page.evaluate("() => document.body.innerText")
+                            rows = parse_holders(txt, "")
+                            hdr = parse_token_header(txt)
+                            now_i = int(time.time())
+                            con_h = sqlite3.connect(str(WDB), timeout=30)
+                            con_h.execute("PRAGMA busy_timeout=30000")
+                            con_h.execute("""CREATE TABLE IF NOT EXISTS fomo_token_holders (
+                                mint TEXT, handle TEXT, position_usd REAL, qty TEXT,
+                                ticker TEXT, pnl_usd REAL, pnl_pct REAL, entry_mc TEXT,
+                                entry_price REAL, avg_hold TEXT, thesis_likes INTEGER,
+                                thesis TEXT, captured_at INTEGER,
+                                PRIMARY KEY (mint, handle, captured_at))""")
+                            con_h.execute("""CREATE TABLE IF NOT EXISTS fomo_token_header (
+                                mint TEXT PRIMARY KEY, market_cap TEXT, holders TEXT,
+                                liquidity TEXT, top10_holding_pct REAL, buys INTEGER,
+                                sells INTEGER, buyers INTEGER, sellers INTEGER,
+                                captured_at INTEGER)""")
+                            for r in rows:
+                                con_h.execute(
+                                    """INSERT OR REPLACE INTO fomo_token_holders
+                                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                    (mint, r["handle"], r["position_usd"], r["qty"],
+                                     r["ticker"], r["pnl_usd"], r["pnl_pct"],
+                                     r["entry_mc"], r["entry_price"], r["avg_hold"],
+                                     r["thesis_likes"], r["thesis"], now_i))
+                            con_h.execute(
+                                """INSERT OR REPLACE INTO fomo_token_header
+                                VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                                (mint, hdr["market_cap"], hdr["holders"],
+                                 hdr["liquidity"], hdr["top10_holding_pct"],
+                                 hdr["buys"], hdr["sells"], hdr["buyers"],
+                                 hdr["sellers"], now_i))
+                            con_h.commit(); con_h.close()
+                            captured += 1
+                        except Exception as e:
+                            log(f"  holders {mint[:10]} ERR {str(e)[:60]}")
+                    last_visit["holders"] = now
+                    log(f"[holders] {captured}/{len(mints[:12])} tokens capturés")
+                except Exception as e:
+                    log(f"[holders] ERR {str(e)[:80]}")
                 time.sleep(2)
             # 2) les clans / le feed
             for name, fn in (("clans", visit_clans), ("feed", visit_feed)):
