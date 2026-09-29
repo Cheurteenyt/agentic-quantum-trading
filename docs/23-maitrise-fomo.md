@@ -68,10 +68,23 @@
 5. **Le panneau ?tradeId** — l'intel par trade
 6. **Les parseurs aux sélecteurs du census** — la robustesse aux changements d'UI
 
+## Le référentiel chart↔trader (29/09 nuit) — « reconstruire n'importe quelle chart fomo avec ses traders »
+
+| Brique | Où | Précision |
+|---|---|---|
+| La courbe prix | fomo_ohlcv 1m (5,14 M bougies / 1 414 assets, lag ~0) + fomo_ticks (hot set, 1-45 s) | bougie native |
+| **La MC native** | **fomo_mc_samples** (fomo.db) : les frames trending_tokens portaient marketCap/priceUSD/supply/holders — le daemon les JETAIT ; désormais échantillonnées (1/min/mint ou ΔMC ≥ 0,5 %, snapshot ET update ET pre_graduated) | native, supply variable suivie |
+| MC(t) calculée | MC = prix_tick(t) × supply_interp(t) (supply = market_cap/price_usd par échantillon, interpolé entre deux captured_at) | ±4-10 % si supply figée → NE PLUS figer |
+| Les trades | ws_swaps (live, hot set) + **fomo_rest_token_trades** (+~2 400/jour, walk du feed tradingActivity, curseur lastId — le filtre tokenAddress est IGNORÉ par l'API : mint toujours attribué par item.tokenAddress) + fomo_rest_swaps (élite) | **chaque trade porte marketCap/fdv/price/equity/usdAmount AU TRADE** |
+| Les traders | ws_traders (fomo_swaps.db), fomo_traders (373 handles), hodlers_top (averageEntryPrice/costBasis par holder), leaderboard | l'entrée moyenne sans date = la limite actuelle |
+| La reconstruction | **scripts/fomo_chart_trader.py --mint <mint>** → PDF (courbe fusionnée bougies+ticks, buys/sells, lignes d'entrée des holders, axe MC log) | la preuve : STONK, 3 784 pts, 1 828 trades, 660 entrées |
+
+Les pièges référentiels : le feed global est FAIBLE (20-75/h) — l'archive vient du walk incrémental, pas du live ; `token_details` ne porte QUE la pression (0 MC/supply) ; le filtre tokenAddress d'tradingActivity est un placebo ; toute donnée WS reçue et non persistée = un backtest amputé (le parking de 130 Mo/jour, refermé par le drain du worker).
+
 ## Les leçons d'architecture (gravées)
 - fomo.db = la base HOT du daemon (les ticks 2 s) → les tables DOM = sur fomo_swaps.db (le lock = la panne racine des routes holders)
 - La txn d'écriture = un commit PAR PASSE : la connexion walker survit au boot du worker, une txn jamais committée tient le verrou WAL en continu → TOUT le daemon gèle (la panne du 29/09 : 0 tick écrit pendant 1h30, 378 flush différés)
-- Le DDL des tables vit dans ensure_tables/ensure_dbs + l'INSERT = liste de colonnes explicite : un CREATE inline avalé par except ne crée JAMAIS la table (swap_history), un ALTER désynchronisé de l'INSERT déraille en silence (header 15 vs 14), et un parseur non importé perd ses lignes sans bruit (parse_token_swaps, NameError avalé)
+- Le DDL des tables vit dans ensure_tables/ensure_dbs + l'INSERT = liste de colonnes explicite : un CREATE inline avalé par except ne crée JAMAIS la table (swap_history), un ALTER désynchronisé de l'INSERT déraille en silence (header 15 vs 14, ws_traders 9 vs 6 — le flush des traders perdait des lignes toutes les 2 s), et un parseur non importé perd ses lignes sans bruit (parse_token_swaps, NameError avalé)
 - Le WAF (Cloudflare) bloque le fingerprint TLS, PAS l'API : curl_cffi impersonate chrome131 + Bearer JWT = 200 partout (la sonde REST du 29/09). « Pas d'API de données » était FAUX : les endpoints XHR (hodlers/top, feed/token/thesis, v2/users/<id>/swaps, trades, proxy/trendingTokens) n'apparaissent qu'en naviguant les onglets token — la sonde scripts/studies/fomo_rest_probe.py les capture et les rejoue
 - La collecte REST = une base DÉDIÉE (fomo_rest.db, 1 écrivain) : la leçon du lock du 29/09 appliquée d'office
 - Le collector REST = structure DÉCLARATIVE (COLLECTES + fraîcheur par captured_at) — une collecte sans skip de fraîcheur est un bug

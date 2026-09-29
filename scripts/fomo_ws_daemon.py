@@ -159,6 +159,16 @@ def ensure_dbs():
         mint TEXT, symbol TEXT, name TEXT, market_cap REAL, priceUSD REAL,
         token_created_at TEXT, change24 REAL, captured_at INTEGER,
         PRIMARY KEY (mint, captured_at))""")
+    # la MC NATIVE par tick échantillonné (le topic trending/pre_graduated
+    # porte marketCap + priceUSD + info.circulatingSupply + holders à
+    # l'instant t) : la chart calibrera prix × supply dessus — fin de la
+    # MC dérivée ±4-10 % (supply de bonding curve ≠ constante)
+    con.execute("""CREATE TABLE IF NOT EXISTS fomo_mc_samples (
+        mint TEXT, captured_at INTEGER, market_cap REAL, price_usd REAL,
+        supply REAL, holders INTEGER, symbol TEXT,
+        PRIMARY KEY (mint, captured_at))""")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_mcsample_mint "
+                "ON fomo_mc_samples(mint, captured_at DESC)")
     con.commit(); con.close()
 
     con = sqlite3.connect(DB_SWAPS, timeout=30)
@@ -230,6 +240,10 @@ class Writer:
         self.tdetail_q, self.ohlcv_q = [], []
         self.universe_q = []
         self.pregrad_q = []
+        # les échantillons MC NATIFS (la MC serveur + la supply à l'instant t)
+        # + l'état du rate-limiter : mint → (dernier ts, dernière MC)
+        self.mc_q = []
+        self.last_mc = {}
         self.trader_q = {}
         self.n_new_tokens = 0
         # la dédup : le dernier prix par topic (les frames identiques = ~40 %
@@ -243,7 +257,7 @@ class Writer:
         self.last_flush = time.time()
         self.n_ticks, self.n_swaps, self.n_top, self.n_sells_top = 0, 0, 0, 0
         self.n_candles, self.n_theses, self.n_events = 0, 0, 0
-        self.n_tdetail, self.n_ohlcv = 0, 0
+        self.n_tdetail, self.n_ohlcv, self.n_mc = 0, 0, 0
         self.n_dedup, self.n_errors = 0, 0
         self.unknown_types = set()
         self.con_ticks = sqlite3.connect(DB_TICKS, timeout=30)
@@ -304,25 +318,62 @@ class Writer:
             c.get("parentId"), c.get("createdAt") or p.get("createdAt"),
             json.dumps(p), int(time.time())))
 
+    @staticmethod
+    def _f(v):
+        """float ou None (les payloads sévissent en strings)."""
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def _mc_sample(self, mint, sym, tk, now):
+        """Un échantillon MC natif dans fomo_mc_samples : 1/min/mint ou
+        ΔMC ≥ 0,5 % (le firehose update intégral = ~2,5 M lignes/jour)."""
+        mc = self._f(tk.get("marketCap"))
+        if mc is None:
+            return
+        last_t, last_mc = self.last_mc.get(mint, (0, None))
+        if now - last_t >= 60 or (last_mc and abs(mc - last_mc)
+                                  / max(last_mc, 1e-9) >= 0.005):
+            self.last_mc[mint] = (now, mc)
+            info = (tk.get("token") or {}).get("info") or {}
+            self.mc_q.append((mint, now, mc, self._f(tk.get("priceUSD")),
+                              self._f(info.get("circulatingSupply")),
+                              tk.get("holders"), sym))
+
     def add_trending(self, payload):
         """Le snapshot trending_tokens : l'upsert de l'univers (le mint,
-        le symbole, la MC, le prix) + la découverte des nouveaux tokens."""
-        if payload.get("kind") != "snapshot":
+        le symbole, la MC, le prix) + la découverte des nouveaux tokens.
+        Les kind=update (1 token, ~33/s) alimentent aussi les ÉCHANTILLONS
+        MC NATIFS (marketCap/priceUSD/circulatingSupply/holders à l'instant
+        t) — la correction de la MC dérivée prix × supply constante."""
+        kind = payload.get("kind")
+        if kind == "snapshot":
+            toks = payload.get("tokens", [])
+        elif kind == "update":
+            u = payload.get("update") or {}
+            toks = [u] if u else []
+        else:
             return
-        for tk in payload.get("tokens", []):
+        now = int(time.time())
+        for tk in toks:
             tok = tk.get("token") or {}
             mint, sym = tok.get("address"), tok.get("symbol")
             if not mint or not sym:
                 continue
-            self.universe_q.append((mint, sym, tok.get("name"),
-                                    tk.get("marketCap"), tk.get("priceUSD"),
-                                    tk.get("change24"), int(time.time())))
+            if kind == "snapshot":
+                self.universe_q.append((mint, sym, tok.get("name"),
+                                        tk.get("marketCap"), tk.get("priceUSD"),
+                                        tk.get("change24"), now))
+            self._mc_sample(mint, sym, tk, now)
 
     def add_pre_graduated(self, payload):
         """Les tokens sur le point de graduer : le mint, l'âge, la MC, le
-        prix — l'ETA de graduation = le signal d'entrée le plus rentable."""
+        prix — l'ETA de graduation = le signal d'entrée le plus rentable
+        (+ les échantillons MC natifs : la supply de bonding curve bouge)."""
         if payload.get("kind") != "snapshot":
             return
+        now = int(time.time())
         for tk in payload.get("tokens", []):
             tok = tk.get("token") or {}
             mint = tok.get("address")
@@ -331,7 +382,8 @@ class Writer:
             self.pregrad_q.append((mint, tok.get("symbol"), tok.get("name"),
                                    tk.get("marketCap"), tk.get("priceUSD"),
                                    tk.get("createdAt"), tk.get("change24"),
-                                   int(time.time())))
+                                   now))
+            self._mc_sample(mint, tok.get("symbol"), tk, now)
 
     def add_token_details(self, topic_id, payload):
         """La pression par token : les changes %, les nb de buys/sells,
@@ -530,6 +582,13 @@ class Writer:
                 # l'échec n'est plus avalé : log + queue conservée pour le retry
                 log(f"pregrad : {len(self.pregrad_q)} frames différées "
                     f"({str(e)[:80]})")
+        if self.mc_q:
+            self.con_ticks.executemany(
+                "INSERT OR IGNORE INTO fomo_mc_samples (mint, captured_at, "
+                "market_cap, price_usd, supply, holders, symbol) "
+                "VALUES (?,?,?,?,?,?,?)", self.mc_q)
+            self.con_ticks.commit()
+            self.n_mc += len(self.mc_q); self.mc_q = []
         if self.tdetail_q:
             self.con_swaps.executemany(
                 "INSERT OR REPLACE INTO ws_token_details VALUES (?,?,?,?,?,?,?,?,?,?,"
@@ -555,7 +614,8 @@ class Writer:
             self.event_q = []
         if self.trader_q:
             self.con_swaps.executemany(
-                "INSERT INTO ws_traders VALUES (?,?,?,?,?,?) "
+                "INSERT INTO ws_traders (user_id, handle, display_name, "
+                "equity_last, first_seen, last_seen) VALUES (?,?,?,?,?,?) "
                 "ON CONFLICT(user_id) DO UPDATE SET handle=excluded.handle, "
                 "display_name=excluded.display_name, equity_last=excluded.equity_last, "
                 "last_seen=excluded.last_seen",
@@ -723,6 +783,7 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                     f"(dédup={writer.n_dedup}) bougies1m={writer.n_candles} "
                     f"swaps={writer.n_swaps} (top={writer.n_top}, "
                     f"sorties_top={writer.n_sells_top}) "
+                    f"mc_samples={writer.n_mc} "
                     f"thèses={writer.n_theses} types_inconnus={writer.n_events} "
                     f"{sorted(writer.unknown_types) if writer.unknown_types else ''} "
                     f"errs={writer.n_errors} "
