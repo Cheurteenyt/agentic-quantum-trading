@@ -153,6 +153,12 @@ def ensure_dbs():
     con.execute("""CREATE TABLE IF NOT EXISTS fomo_ticks (
         mint TEXT, ts_s REAL, priceUsd REAL, captured_at INTEGER)""")
     con.execute("CREATE INDEX IF NOT EXISTS idx_ticks_mint_ts ON fomo_ticks(mint, ts_s)")
+    # les tokens près de graduer (topic pre_graduated_tokens) : le DDL au
+    # démarrage — inline dans le flush, il n'a jamais pu s'exécuter
+    con.execute("""CREATE TABLE IF NOT EXISTS fomo_pre_graduated (
+        mint TEXT, symbol TEXT, name TEXT, market_cap REAL, priceUSD REAL,
+        token_created_at TEXT, change24 REAL, captured_at INTEGER,
+        PRIMARY KEY (mint, captured_at))""")
     con.commit(); con.close()
 
     con = sqlite3.connect(DB_SWAPS, timeout=30)
@@ -510,21 +516,20 @@ class Writer:
                             f"MC ${mc_f:,.0f})")
                     except Exception:
                         log(f"🆕 token découvert : {row[1]}")
-            con_u.commit(); con_u.close()
+            con_u.commit()  # JAMAIS close() : con_ticks est partagé (510f57f)
             self.n_new_tokens += new_m
             self.universe_q = []
         if self.pregrad_q:
-            con_p = self.con_ticks
-            con_p.execute("PRAGMA busy_timeout=30000")
-            con_p.execute("""CREATE TABLE IF NOT EXISTS fomo_pre_graduated (
-                mint TEXT, symbol TEXT, name TEXT, market_cap REAL, priceUSD REAL,
-                token_created_at INTEGER, change24 REAL, captured_at INTEGER,
-                PRIMARY KEY (mint, captured_at))""")
-            con_p.executemany(
-                "INSERT OR REPLACE INTO fomo_pre_graduated VALUES (?,?,?,?,?,?,?,?)",
-                self.pregrad_q)
-            con_p.commit(); con_p.close()
-            self.pregrad_q = []
+            try:
+                self.con_ticks.executemany(
+                    "INSERT OR REPLACE INTO fomo_pre_graduated VALUES (?,?,?,?,?,?,?,?)",
+                    self.pregrad_q)
+                self.con_ticks.commit()
+                self.pregrad_q = []
+            except sqlite3.Error as e:
+                # l'échec n'est plus avalé : log + queue conservée pour le retry
+                log(f"pregrad : {len(self.pregrad_q)} frames différées "
+                    f"({str(e)[:80]})")
         if self.tdetail_q:
             self.con_swaps.executemany(
                 "INSERT OR REPLACE INTO ws_token_details VALUES (?,?,?,?,?,?,?,?,?,?,"

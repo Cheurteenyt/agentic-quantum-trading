@@ -58,6 +58,12 @@ def ensure_tables():
     con.execute("""CREATE TABLE IF NOT EXISTS fomo_price_history (
         ticker TEXT, captured_at INTEGER, mc REAL, price REAL, change REAL,
         PRIMARY KEY (ticker, captured_at))""")
+    # l'historique des swaps par token (tab Swaps de do_holders) — la courbe
+    # de vie MC-par-trade ; le schéma = le dict de parse_token_swaps + mint
+    con.execute("""CREATE TABLE IF NOT EXISTS fomo_token_swap_history (
+        mint TEXT, handle TEXT, action TEXT, usd REAL, mc TEXT,
+        time_rel TEXT, captured_at INTEGER,
+        PRIMARY KEY (mint, handle, action, usd, mc, time_rel))""")
     con.commit(); con.close()
 
 
@@ -314,7 +320,8 @@ def do_holders(page):
     """Les HOLDERS des tokens chauds (l'élite + le trending) : qui détient,
     son PnL, son MC d'entrée, sa thèse — le scroll-capture complet (la liste
     virtualise). Le top-10 holding % = le filtre anti-rug."""
-    from fomo_holders_parser import parse_holders, parse_token_header
+    from fomo_holders_parser import (parse_holders, parse_token_header,
+                                     parse_token_swaps)
     con_s = sqlite3.connect(str(DB_SWAPS), timeout=30)
     con_s.execute("PRAGMA busy_timeout=30000")
     mints = [r[0] for r in con_s.execute(
@@ -397,13 +404,19 @@ def do_holders(page):
                      r["ticker"], r["pnl_usd"], r["pnl_pct"],
                      r["entry_mc"], r["entry_price"], r["avg_hold"],
                      r["thesis_likes"], r["thesis"], now_i))
-            con.execute("""INSERT OR REPLACE INTO fomo_token_header
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (mint, hdr["market_cap"], hdr["holders"], hdr["liquidity"],
-                 hdr["top10_holding_pct"], hdr["buys"], hdr["sells"],
-                 hdr["buyers"], hdr["sellers"], now_i,
-                 hdr.get("launchpad"), hdr.get("supply"), hdr.get("network"),
-                 hdr.get("created_rel"), hdr.get("contract")))
+            try:
+                con.execute("""INSERT OR REPLACE INTO fomo_token_header
+                    (mint, market_cap, holders, liquidity, top10_holding_pct,
+                     buys, sells, buyers, sellers, captured_at,
+                     launchpad, supply, network, created_rel, contract)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (mint, hdr["market_cap"], hdr["holders"], hdr["liquidity"],
+                     hdr["top10_holding_pct"], hdr["buys"], hdr["sells"],
+                     hdr["buyers"], hdr["sellers"], now_i,
+                     hdr.get("launchpad"), hdr.get("supply"), hdr.get("network"),
+                     hdr.get("created_rel"), hdr.get("contract")))
+            except Exception as e:
+                log(f"  header {mint[:10]} ERR {str(e)[:80]}")
             # les SWAPS HISTORIQUES du token : le tab Swaps + le scroll-collect
             # = la courbe de vie complète (le MC à chaque trade) = le backfill
             page.locator('text="Swaps"').first.click(timeout=6000)
@@ -434,10 +447,6 @@ def do_holders(page):
                         break
                 else:
                     stable_s = 0
-            con.execute("""CREATE TABLE IF NOT EXISTS fomo_token_swap_history (
-                mint TEXT, handle TEXT, action TEXT, usd REAL, mc TEXT,
-                time_rel TEXT, captured_at INTEGER,
-                PRIMARY KEY (mint, handle, action, usd, mc, time_rel))""")
             for r in sw_rows:
                 con.execute(
                     """INSERT OR REPLACE INTO fomo_token_swap_history

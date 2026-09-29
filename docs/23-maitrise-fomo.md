@@ -21,8 +21,8 @@
 | Header (MC, prix, holders, liquidité, top-10 %, buys/sells) | ✅ capturé | fomo_token_header | — |
 | Holders (position, PnL %, MC d'entrée, hold, thèse) | 🟡 partiel | fomo_token_holders | ~300/3 543 — la profondeur au-delà = le long tail |
 | Thesis (l'archive des thèses + likes) | 🟡 partiel | fomo_token_theses | le scroll-capture à câbler comme les holders |
-| Swaps historiques (l'archive AVANT notre capture) | ❌ manquant | — | le scroll-parse du tab Swaps = le backfill des backtests |
-| About + Created + socials + bonding curve state | ❌ manquant | — | présent dans la page, non parsé |
+| Swaps historiques (l'archive AVANT notre capture) | ✅ capturé | fomo_token_swap_history | l'accumulation (la profondeur du scroll) |
+| About (launchpad, supply, network, created, contract) | ✅ capturé | fomo_token_header (5 colonnes About) | les socials + l'état de la bonding curve |
 | Panneau position ?tradeId (l'entrée moyenne, les holders par trade) | ❌ manquant | fomo_token_intel (1 ligne morte) | la visite du panneau |
 | Chart overlays (my swaps, thesis, min size) | ❌ manquant | — | l'app aux overlays |
 
@@ -46,6 +46,7 @@
 | Pression (buys/sells, volumes achat/vente) | ✅ | ws_token_details | — |
 | Volume DEX (ohlcv 30s) | ✅ | fomo_ohlcv | — |
 | Découverte (trending_tokens snapshot) | ✅ | fomo_tokens | les tokens pré-trending (bonding) = le worker 15 min |
+| Pré-graduation (topic natif pre_graduated_tokens) | ✅ | fomo_pre_graduated | le branchement au prédicteur de graduation |
 | Sortie consensus (< 2 s) | ✅ | ws_signals | le branchement paper forward |
 
 ### Surfaces sociales / secondaires
@@ -59,8 +60,8 @@
 | Referrals / points | ❌ | hors edge |
 
 ## L'ordre d'attaque (l'alpha décroissant)
-1. **Swaps historiques par token** — le backfill = les backtests des nouveaux tokens dès leur naissance
-2. **About + bonding curve par token** — l'état de la courbe = le point d'entrée ×10
+1. ~~Swaps historiques par token~~ ✅ FAIT (29/09) — fomo_token_swap_history en capture continue
+2. **About** ✅ FAIT (29/09, dans fomo_token_header) — reste l'état de la bonding curve
 3. **L'onglet Thesis scroll** — l'archive complète (le même pattern que les holders)
 4. **Les 28 pages fermées** pour l'élite-20 — l'historique réalisé complet
 5. **Le panneau ?tradeId** — l'intel par trade
@@ -68,6 +69,8 @@
 
 ## Les leçons d'architecture (gravées)
 - fomo.db = la base HOT du daemon (les ticks 2 s) → les tables DOM = sur fomo_swaps.db (le lock = la panne racine des routes holders)
+- La txn d'écriture = un commit PAR PASSE : la connexion walker survit au boot du worker, une txn jamais committée tient le verrou WAL en continu → TOUT le daemon gèle (la panne du 29/09 : 0 tick écrit pendant 1h30, 378 flush différés)
+- Le DDL des tables vit dans ensure_tables/ensure_dbs + l'INSERT = liste de colonnes explicite : un CREATE inline avalé par except ne crée JAMAIS la table (swap_history), un ALTER désynchronisé de l'INSERT déraille en silence (header 15 vs 14), et un parseur non importé perd ses lignes sans bruit (parse_token_swaps, NameError avalé)
 - Les listes du site = virtualisées → scroll conteneur + dédupe, toujours
 - Les labels = SINGULIERS avec le compteur (« Thesis (3,846) ») — les matchs exacts
 - La nav = 100 % clics SPA, les URL directes = « Go home »

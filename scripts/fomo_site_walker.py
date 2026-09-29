@@ -118,6 +118,10 @@ def store_tokens(con, route, tokens):
                             (t["ticker"], now_ts, t.get("mc"), t.get("price"), t.get("change")))
         except Exception as e:
             print(f"    store err {t.get('ticker','?')} : {e}")
+    # le commit ICI rend le verrou d'écriture : la connexion survit au boot du
+    # worker, une txn jamais committée tiendrait le WAL en continu → « database
+    # is locked » pour le flush du daemon
+    con.commit()
 
 
 def store_alerts(con, alerts):
@@ -132,6 +136,7 @@ def store_alerts(con, alerts):
                         list(row.values()))
         except Exception as e:
             print(f"    alert store err : {str(e)[:60]}")
+    con.commit()  # idem : jamais une txn d'écriture ouverte au repos
 
 
 def visit_route(page, route) -> tuple[str, list]:
