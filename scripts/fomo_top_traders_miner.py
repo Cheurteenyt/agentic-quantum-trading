@@ -123,7 +123,7 @@ def harvest_trades(page, handle, con, now, log, max_pages=5):
     return total
 
 
-def mine_profile(page, handle, con, now, log):
+def mine_profile(page, handle, con, now, log, max_pages=5):
     page.goto("about:blank")
     time.sleep(0.4)
     page.goto(f"https://fomo.family/profile/{handle}?r={now}",
