@@ -6,6 +6,8 @@ prime = la PRÉVISION du prochain funding 8h à l'avance."""
 import sys, json, time, sqlite3, urllib.request
 from pathlib import Path
 
+import aster_rate  # le compteur X-MBX-USED-WEIGHT-1M (audit docs/24)
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.portfolio_sim import MAJORS
@@ -32,6 +34,7 @@ def main() -> int:
                 f"https://fapi.asterdex.com/fapi/v1/premiumIndex?symbol={sym}",
                 headers={"user-agent": UA})
             with urllib.request.urlopen(req, timeout=15) as r:
+                aster_rate.note_weight(getattr(r, "headers", None), "aster_premium")
                 d = json.load(r)
             mark, idx = float(d["markPrice"]), float(d["indexPrice"])
             prem = (mark / idx - 1) * 100 if idx else 0.0

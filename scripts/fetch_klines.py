@@ -29,6 +29,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+import aster_rate  # le compteur X-MBX-USED-WEIGHT-1M (audit docs/24)
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
@@ -102,6 +104,7 @@ def http_get_json(
     open_fn = opener or urllib.request.urlopen
     try:
         with open_fn(req, timeout=timeout) as resp:
+            aster_rate.note_weight(getattr(resp, "headers", None), "fetch_klines")
             raw = resp.read()
     except urllib.error.HTTPError as exc:
         raise AsterFetchError(f"HTTP {exc.code} sur {url}") from exc

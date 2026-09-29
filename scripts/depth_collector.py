@@ -23,6 +23,8 @@ import sys
 import threading
 import time
 import urllib.request
+
+import aster_rate  # le compteur X-MBX-USED-WEIGHT-1M (audit docs/24)
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,6 +93,7 @@ def snapshot_symbol(con: sqlite3.Connection, symbol: str) -> bool:
     req = urllib.request.Request(url, headers={"User-Agent": "trading-agent/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
+            aster_rate.note_weight(getattr(resp, "headers", None), "depth_collector")
             data = json.load(resp)
     except Exception as exc:  # noqa: BLE001 — le capteur ne doit jamais mourir sur un tick
         print(f"[warn] {symbol}: {exc}", file=sys.stderr, flush=True)

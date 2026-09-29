@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """LE WATCHDOG DE SANTÉ ASTER (30/09) — le symétrique de fomo_health.py pour
-le domaine Aster. 8 sondes toutes les 5 min, l'alerte SUR TRANSITION :
+le domaine Aster. 9 sondes toutes les 5 min, l'alerte SUR TRANSITION :
 1. klines 1h fraîches (< 25 h — le nocturne 03:00)
 2. oi_history fraîche (< 30 min — timer 15 min, la munition H4/H5 du 06-07)
 3. liq_events fraîche (< 30 min)
@@ -10,10 +10,14 @@ le domaine Aster. 8 sondes toutes les 5 min, l'alerte SUR TRANSITION :
 7. depth CONTINUITÉ : 0 trou > 15 min dans depth_meta sur 24 h (le tir
    depth/murs du 06-07 exige 14 j sans coupure — tolérance zéro)
 8. le cache funding (< 25 h — le nocturne)
+9. rate_weight : le budget X-MBX-USED-WEIGHT-1M vu par les collecteurs
+   (< 1800 = 75 % de 2 400/min — au-delà, risque 429 puis ban 418)
 État : data/warehouse/aster_health_state.json. Journal [aster-health].
 Exit 0 toujours (un timer ne doit pas spammer d'unités failed)."""
 import json, os, sqlite3, subprocess, sys, time
 from pathlib import Path
+
+import aster_rate  # le compteur de poids X-MBX-USED-WEIGHT-1M (docs/24)
 
 ROOT = Path(__file__).resolve().parents[1]
 KL = ROOT / "data" / "warehouse" / "klines.db"
@@ -109,6 +113,8 @@ CHECKS = [
      "trous > 15 min dans depth sur 24 h — la continuité 14 j du tir 06-07 est amputée"),
     ("funding_cache", lambda: (funding_cache_age() or 9e9) < 25 * 3600,
      "le cache funding > 25 h — le nocturne n'a pas rafraîchi"),
+    ("rate_weight", lambda: (aster_rate.worst_weight() or 0) < aster_rate.ALERT,
+     "budget weight >= 1800/2400/min (75 %) — réduire le pacing, risque 429/ban 418"),
 ]
 
 

@@ -39,6 +39,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+import aster_rate  # le compteur X-MBX-USED-WEIGHT-1M (audit docs/24)
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -99,6 +101,7 @@ def http_get_json(url: str, retries: int = 3) -> list | dict:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "trading-agent-blocktrades/1.0"})
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+                aster_rate.note_weight(getattr(resp, "headers", None), "aster_blocktrades")
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             if exc.code == 429:                       # cooldown prudent

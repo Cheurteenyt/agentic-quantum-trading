@@ -19,7 +19,12 @@ ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" script
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --run
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --review
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/reevaluate_oos.py
-ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_oi_history.py --top 8
+# P4 30/09/2026 : retiré — doublon OI. aster_oi_history.py ré-collecte l'univers complet dans
+# oi_history (klines.db), déjà couvert par oi-collector.timer (*:0/15, univers = klines 1h).
+# Consommateurs vérifiés (aster_health, aster_convergence, oi_quadrant_test, oi_early_read,
+# flow_audit) : aucun ne dépend de la cadence nocturne ; aster_health exige < 30 min via le
+# timer 15 min. --top 8 ne limitait que l'affichage du rapport. Le script reste (convention).
+# ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_oi_history.py --top 8
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_convergence.py
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/backtest_indicators.py
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/paper_forward.py

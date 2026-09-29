@@ -28,6 +28,8 @@ import time
 import urllib.request
 from pathlib import Path
 
+import aster_rate  # le compteur X-MBX-USED-WEIGHT-1M (audit docs/24)
+
 ROOT = Path(__file__).resolve().parents[1]
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 API = "https://fapi.asterdex.com/fapi/v3/fundingRate"
@@ -42,6 +44,7 @@ def fetch_page(symbol: str, start_ms: int) -> list[dict]:
     for attempt in (1, 2, 3):
         try:
             with urllib.request.urlopen(req, timeout=15) as r:
+                aster_rate.note_weight(getattr(r, "headers", None), "funding_history")
                 rows = json.load(r)
             return rows if isinstance(rows, list) else []
         except Exception:
