@@ -42,16 +42,18 @@ def max_age(db, sql):
 
 
 def depth_gaps_24h() -> int:
-    """Le nombre de trous > 15 min dans depth_meta sur les dernières 24 h."""
+    """Le nombre de trous > 15 min dans depth_meta sur les dernières 24 h.
+    ATTENTION aux unités : depth_meta.ts est en SECONDES (vérifié 30/09 —
+    un filtre en ms ne renvoyait AUCUNE ligne = vert mensonger)."""
     try:
         con = ro(DEPTH)
         rows = [r[0] for r in con.execute(
             "SELECT DISTINCT ts FROM depth_meta WHERE ts > ? ORDER BY ts",
-            (int((time.time() - 86400) * 1000),)).fetchall()]
+            (int(time.time() - 86400),)).fetchall()]
         con.close()
         if len(rows) < 2:
             return 0
-        gaps = sum(1 for a, b in zip(rows, rows[1:]) if b - a > 15 * 60_000)
+        gaps = sum(1 for a, b in zip(rows, rows[1:]) if b - a > 15 * 60)
         return gaps
     except Exception:
         return -1  # -1 = la sonde elle-même a échoué (alerte)
