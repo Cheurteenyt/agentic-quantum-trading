@@ -1,45 +1,35 @@
 #!/usr/bin/env python3
-"""Le worker DOM résident — l'exploitation COMPLÈTE du site fomo.
+"""Le worker DOM résident — la session JWT + le listener WS passif.
 
 Un service, UNE page dédiée permanente dans le navigateur dédié (:9222
-fallback :9223), la rotation de TOUTES les surfaces via une TABLE DE ROUTES
-(chaque surface = une fonction testable) + le LISTENER WS passif : chaque
-navigation déclenche les souscriptions naturelles de l'app, leurs frames
-sont capturées → l'inventaire automatique des topics qu'on ne connaît pas.
+fallback :9223). MIGRATION REST (29/09) : les 8 surfaces de collecte
+(sidebar, most_held, top100, holders, theses, clans, feed, profiles) et le
+walker sont couverts par fomo_rest_collector.py — il reste la santé de
+session (le bootstrap JWT, do_session) + le LISTENER WS passif : les frames
+des souscriptions naturelles de l'app sont capturées → l'inventaire des
+topics qu'on ne connaît pas.
 
 Les règles (gravées) : jamais d'itération des onglets du user ; le worker =
 seul propriétaire du navigateur dédié ; les écritures = sur fomo_swaps.db
-(fomo.db = la base chaude du daemon, verrouillée) ; les listes virtualisées
-= scroll conteneur + dédupe ; les labels = exacts (« Thesis » singulier).
+(fomo.db = la base chaude du daemon, verrouillée).
 """
 import json
 import sqlite3
 import sys
 import time
-from collections import OrderedDict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT))
 
-from fomo_site_walker import ROUTES, visit_route, store_tokens, store_alerts, DB as WDB
-from fomo_top_traders_miner import mine_profile, ensure_db as ensure_swaps_db
+from fomo_top_traders_miner import ensure_db as ensure_swaps_db
 from patchright.sync_api import sync_playwright
 
-CDP = "http://127.0.0.1:9223"
-DB_TICKS = ROOT / "data" / "fomo" / "fomo.db"
 DB_SWAPS = ROOT / "data" / "fomo" / "fomo_swaps.db"
 STATE_F = ROOT / "data" / "fomo" / "dom_worker_state.json"
 FRAMES_F = ROOT / "data" / "fomo" / "ws_frame_parking.jsonl"
 LOCK = ROOT / "data" / "fomo" / ".dom_worker.lock"
-
-TOP_HANDLES = ["unipcs", "pointfarmcap", "DumbCrayonEater", "Salem1299534",
-               "The__Solstice", "theveeman", "AvgJoesCrypto", "frankdegods"]
-
-# les cadences du walker (les routes importées) + les nôtres
-CADENCES = {r["name"]: r["cadence"] for r in ROUTES}
-CADENCES.update({"clans": 30, "feed": 15, "profiles": 60})
 
 
 def log(m):
@@ -58,8 +48,8 @@ def ensure_tables():
     con.execute("""CREATE TABLE IF NOT EXISTS fomo_price_history (
         ticker TEXT, captured_at INTEGER, mc REAL, price REAL, change REAL,
         PRIMARY KEY (ticker, captured_at))""")
-    # l'historique des swaps par token (tab Swaps de do_holders) — la courbe
-    # de vie MC-par-trade ; le schéma = le dict de parse_token_swaps + mint
+    # l'historique des swaps par token — la courbe de vie MC-par-trade ;
+    # le schéma = le dict de parse_token_swaps + mint
     con.execute("""CREATE TABLE IF NOT EXISTS fomo_token_swap_history (
         mint TEXT, handle TEXT, action TEXT, usd REAL, mc TEXT,
         time_rel TEXT, captured_at INTEGER,
@@ -96,21 +86,6 @@ def ensure_page(ctx, page):
             log("réutilisation de la page existante")
             return existing
         raise RuntimeError("page irécupérable")
-
-
-def visit_clans(page):
-    """La page clans : les groupes de baleines — le dump structuré brut
-    (le parse fin arrive quand le format réel est vu en production)."""
-    page.goto("https://fomo.family/clans", wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(4500)
-    return page.evaluate("() => document.body.innerText")
-
-
-def visit_feed(page):
-    """Le feed social : les trades et les thèses des comptes suivis/trending."""
-    page.goto("https://fomo.family/feed", wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(4500)
-    return page.evaluate("() => document.body.innerText")
 
 
 class FrameListener:
@@ -157,144 +132,9 @@ class FrameListener:
         return f"{self.n_frames} frames ({json.dumps(self.counts)})"
 
 
-def _mine_profile_light(page, handle, con, now):
-    """Le profil sans le mineur CLI : la même recette, la page du worker."""
-    from fomo_top_traders_miner import mouse_click_text, TRADES_RE, POS_RE, knum, STATS_RE
-    page.goto("about:blank")
-    time.sleep(0.4)
-    page.goto(f"https://fomo.family/profile/{handle}?r={now}",
-              wait_until="domcontentloaded", timeout=30000)
-    time.sleep(5)
-    text = page.evaluate("() => document.body.innerText")
-    rows = [(tk, knum(i), h.strip(), knum(p), float(pc.replace(",", "")))
-            for tk, i, h, p, pc in TRADES_RE.findall(text)]
-    mouse_click_text(page, "Open", pick="first")
-    text = page.evaluate("() => document.body.innerText")
-    for tk, inv, h, pnl, pc in TRADES_RE.findall(text):
-        try:
-            rows.append((tk, knum(inv), h.strip(), knum(pnl), float(pc.replace(",", ""))))
-        except Exception:
-            pass
-    for tk, inv, h, pnl, pc in rows:
-        con.execute("INSERT OR IGNORE INTO dom_profile_trades VALUES (?,?,?,?,?,?,?,?)",
-                    (handle, tk, inv, h, pnl, pc, 1, now))
-    page.goto("about:blank"); time.sleep(0.4)
-    page.goto(f"https://fomo.family/profile/{handle}?c={now}",
-              wait_until="domcontentloaded", timeout=30000)
-    time.sleep(4)
-    text2 = page.evaluate("() => document.body.innerText")
-    cur = POS_RE.findall(text2)
-    import re as _re
-    m_mut = _re.search(r"(\d+)\s*\nMutuals", text2) or _re.search(r"(\d+) Mutuals", text2)
-    m_fol = _re.search(r"(\d+)\s*\nFollowing", text2) or _re.search(r"([\d.,]+[KMB]?) Following", text2)
-    m_fers = _re.search(r"([\d.,]+[KMB]?)\s*\nFollowers", text2) or _re.search(r"([\d.,]+[KMB]?) Followers", text2)
-    try:
-        def _knum(s):
-            if not s: return None
-            s = s.replace(",", "")
-            mult = {"K": 1e3, "M": 1e6, "B": 1e9}.get(s[-1], 1) if s and s[-1].isalpha() else 1
-            return float(s.rstrip("KMB")) * mult
-        con.execute(
-            "UPDATE ws_traders SET mutuals=?, following=?, followers=? WHERE handle=?",
-            (int(m_mut.group(1)) if m_mut else None,
-             _knum(m_fol.group(1)) if m_fol else None,
-             _knum(m_fers.group(1)) if m_fers else None, handle))
-        con.commit()
-    except Exception:
-        pass
-    for tk, q, v, pc in cur:
-        con.execute("INSERT OR REPLACE INTO dom_profile_positions VALUES (?,?,?,?,?,?,?)",
-                    (handle, tk, q, knum(v), float(pc), "current", now))
-    return [], rows, cur
-
-
 # ============================ LES SURFACES ============================
 # La signature uniforme : fn(page) → None (le log = à l'intérieur).
 # Le scheduler appelle, horodate last_visit, ne connaît rien d'autre.
-
-
-def do_sidebar(page):
-    """La sidebar trending de l'ACCUEIL → fomo_price_history (le pattern
-    du miner : MC/prix/▲% — la route walker = les lignes de la page Tokens)."""
-    from login_window_miner import parse_trending
-    page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(4500)
-    text = page.evaluate("() => document.body.innerText")
-    parsed = parse_trending(text)
-    con = sqlite3.connect(str(DB_SWAPS), timeout=30)
-    con.execute("PRAGMA busy_timeout=30000")
-    n_ins = 0
-    for pk in parsed:
-        con.execute(
-            "INSERT OR REPLACE INTO fomo_price_history "
-            "(ticker, captured_at, mc, price, change) VALUES (?,?,?,?,?)",
-            (pk["ticker"], int(time.time()), pk["mc"], pk["price"], pk["change"]))
-        n_ins += 1
-    con.commit(); con.close()
-    log(f"[sidebar] {n_ins} tokens → fomo_price_history")
-
-
-def do_most_held(page):
-    """L'onglet Most held de la sidebar : ce que les baleines détiennent."""
-    from login_window_miner import parse_trending
-    page.locator('text="Most held"').first.click(timeout=6000)
-    page.wait_for_timeout(4000)
-    text = page.evaluate("() => document.body.innerText")
-    parsed = parse_trending(text)
-    con = sqlite3.connect(str(DB_SWAPS), timeout=30)
-    con.execute("PRAGMA busy_timeout=30000")
-    for pk in parsed:
-        con.execute(
-            "INSERT OR REPLACE INTO fomo_price_history "
-            "(ticker, captured_at, mc, price, change) VALUES (?,?,?,?,?)",
-            (pk["ticker"], int(time.time()), pk["mc"], pk["price"], pk["change"]))
-    con.commit(); con.close()
-    log(f"[most_held] {len(parsed)} tokens")
-
-
-def do_walker_routes(page, con_walker, last_visit):
-    """Les routes du walker (trending/bonding/graduated/alerts/leaderboard)
-    avec leurs cadences internes par route."""
-    now = time.time()
-    for route in ROUTES:
-        name = route["name"]
-        if now - last_visit.get(name, 0) > CADENCES[name] * 60:
-            try:
-                lines, parsed = visit_route(page, route)
-                if route["parser"] in ("tokens", "bonding"):
-                    store_tokens(con_walker, name, parsed)
-                elif route["parser"] == "alerts":
-                    store_alerts(con_walker, parsed)
-                last_visit[name] = now
-                log(f"[{name}] {len(parsed)} entrées")
-            except Exception as e:
-                log(f"[{name}] ERR {str(e)[:80]}")
-            time.sleep(2)
-
-
-def do_top100(page):
-    """Le leaderboard top-100 : le snapshot + la régénération de l'élite."""
-    from fomo_leaderboard_harvester import parse_leaderboard_text, CONFIG
-    page.goto("https://fomo.family/leaderboard",
-              wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(5000)
-    text = page.evaluate("() => document.body.innerText")
-    rows = parse_leaderboard_text(text)
-    now_i = int(time.time())
-    con = sqlite3.connect(str(DB_SWAPS), timeout=30)
-    con.execute("PRAGMA busy_timeout=30000")
-    con.execute("DELETE FROM dom_leaderboard")
-    for rank, name, handle, pnl, trades in rows:
-        con.execute("INSERT OR REPLACE INTO dom_leaderboard VALUES (?,?,?,?,?,?)",
-                    (rank, name, handle, pnl, trades, now_i))
-    con.commit(); con.close()
-    top = [h for _, _, h, _, _ in
-           sorted(rows, key=lambda r: r[3] or 0, reverse=True)[:20]]
-    cfg = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
-    cfg["top_handles"] = top
-    cfg["top_handles_updated_at"] = now_i
-    CONFIG.write_text(json.dumps(cfg, indent=1))
-    log(f"[top100] {len(rows)} traders, l'élite régénérée")
 
 
 def do_session(page):
@@ -316,250 +156,20 @@ def do_session(page):
     log(f"[session] {'OK' if alive else 're-authentifiée au reload'}")
 
 
-def do_holders(page):
-    """Les HOLDERS des tokens chauds (l'élite + le trending) : qui détient,
-    son PnL, son MC d'entrée, sa thèse — le scroll-capture complet (la liste
-    virtualise). Le top-10 holding % = le filtre anti-rug."""
-    from fomo_holders_parser import (parse_holders, parse_token_header,
-                                     parse_token_swaps)
-    con_s = sqlite3.connect(str(DB_SWAPS), timeout=30)
-    con_s.execute("PRAGMA busy_timeout=30000")
-    mints = [r[0] for r in con_s.execute(
-        """SELECT DISTINCT token_addr FROM ws_swaps
-        WHERE top_trader=1 AND token_addr IS NOT NULL
-        ORDER BY captured_at DESC LIMIT 8""")]
-    con_s.close()
-    con_t = sqlite3.connect(str(DB_SWAPS), timeout=30)
-    con_t.execute("PRAGMA busy_timeout=30000")
-    con_t.execute("ATTACH DATABASE ? AS fomo_db", (str(DB_TICKS),))
-    for (m,) in con_t.execute(
-            """SELECT DISTINCT t.mint FROM fomo_price_history ph
-            JOIN fomo_db.fomo_tokens t ON t.ticker = ph.ticker
-            WHERE t.mint IS NOT NULL ORDER BY ph.captured_at DESC LIMIT 4"""):
-        if m not in mints:
-            mints.append(m)
-    con_t.execute("DETACH DATABASE fomo_db")
-    con_t.close()
-    now_i = int(time.time())
-    con = sqlite3.connect(str(DB_SWAPS), timeout=30)
-    con.execute("PRAGMA busy_timeout=30000")
-    con.execute("""CREATE TABLE IF NOT EXISTS fomo_token_holders (
-        mint TEXT, handle TEXT, position_usd REAL, qty TEXT,
-        ticker TEXT, pnl_usd REAL, pnl_pct REAL, entry_mc TEXT,
-        entry_price REAL, avg_hold TEXT, thesis_likes INTEGER,
-        thesis TEXT, captured_at INTEGER,
-        PRIMARY KEY (mint, handle, captured_at))""")
-    con.execute("""CREATE TABLE IF NOT EXISTS fomo_token_header (
-        mint TEXT PRIMARY KEY, market_cap TEXT, holders TEXT,
-        liquidity TEXT, top10_holding_pct REAL, buys INTEGER,
-        sells INTEGER, buyers INTEGER, sellers INTEGER,
-        captured_at INTEGER)""")
-    for col in ("launchpad TEXT", "supply TEXT", "network TEXT",
-                "created_rel TEXT", "contract TEXT"):
-        try:
-            con.execute(f"ALTER TABLE fomo_token_header ADD COLUMN {col}")
-        except Exception:
-            pass
-    captured = 0
-    for mint in mints[:12]:
-        chain = "ethereum" if mint.startswith("0x") else "solana"
-        try:
-            page.goto(f"https://fomo.family/tokens/{chain}/{mint}",
-                      wait_until="domcontentloaded", timeout=25000)
-            page.wait_for_timeout(5000)
-            page.locator('text="Holders"').first.click(timeout=6000)
-            page.wait_for_timeout(3000)
-            seen, all_rows = set(), []
-            stable = 0
-            for it in range(45):
-                txt = page.evaluate("() => document.body.innerText")
-                for r in parse_holders(txt, ""):
-                    if r["handle"] not in seen:
-                        seen.add(r["handle"])
-                        all_rows.append(r)
-                page.evaluate("""() => {
-                    const cands = [...document.querySelectorAll('div')]
-                        .filter(d => d.scrollHeight > d.clientHeight + 100
-                            && (d.innerText || '').includes('avg. hold'));
-                    if (!cands.length) return 0;
-                    const el = cands[cands.length - 1];
-                    el.scrollTop += Math.max(2500, el.clientHeight * 2.5);
-                    return el.scrollTop;
-                }""")
-                page.wait_for_timeout(500)
-                if len(all_rows) == len(seen) and it > 3:
-                    stable += 1
-                    if stable >= 2:
-                        break
-                else:
-                    stable = 0
-            from fomo_holders_parser import parse_about
-            hdr = parse_token_header(page.evaluate("() => document.body.innerText"))
-            about = parse_about(page.evaluate("() => document.body.innerText"))
-            hdr.update(about)
-            for r in all_rows:
-                con.execute("""INSERT OR REPLACE INTO fomo_token_holders
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (mint, r["handle"], r["position_usd"], r["qty"],
-                     r["ticker"], r["pnl_usd"], r["pnl_pct"],
-                     r["entry_mc"], r["entry_price"], r["avg_hold"],
-                     r["thesis_likes"], r["thesis"], now_i))
-            try:
-                con.execute("""INSERT OR REPLACE INTO fomo_token_header
-                    (mint, market_cap, holders, liquidity, top10_holding_pct,
-                     buys, sells, buyers, sellers, captured_at,
-                     launchpad, supply, network, created_rel, contract)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (mint, hdr["market_cap"], hdr["holders"], hdr["liquidity"],
-                     hdr["top10_holding_pct"], hdr["buys"], hdr["sells"],
-                     hdr["buyers"], hdr["sellers"], now_i,
-                     hdr.get("launchpad"), hdr.get("supply"), hdr.get("network"),
-                     hdr.get("created_rel"), hdr.get("contract")))
-            except Exception as e:
-                log(f"  header {mint[:10]} ERR {str(e)[:80]}")
-            # les SWAPS HISTORIQUES du token : le tab Swaps + le scroll-collect
-            # = la courbe de vie complète (le MC à chaque trade) = le backfill
-            page.locator('text="Swaps"').first.click(timeout=6000)
-            page.wait_for_timeout(3000)
-            sw_seen, sw_rows = set(), []
-            stable_s = 0
-            for it in range(40):
-                txt2 = page.evaluate("() => document.body.innerText")
-                for r in parse_token_swaps(txt2):
-                    key = (r["handle"], r["action"], r["usd"], r["mc"], r["time_rel"])
-                    if key not in sw_seen:
-                        sw_seen.add(key)
-                        sw_rows.append(r)
-                page.evaluate(r"""() => {
-                    const cands = [...document.querySelectorAll('div')]
-                        .filter(d => d.scrollHeight > d.clientHeight + 100
-                            && /\$[\d.,]+[KMB]?\n/.test(d.innerText || '')
-                            && (d.innerText || '').includes('Buy'));
-                    if (!cands.length) return 0;
-                    const el = cands[cands.length - 1];
-                    el.scrollTop += Math.max(2500, el.clientHeight * 2.5);
-                    return el.scrollTop;
-                }""")
-                page.wait_for_timeout(450)
-                if len(sw_rows) == len(sw_seen) and it > 3:
-                    stable_s += 1
-                    if stable_s >= 2:
-                        break
-                else:
-                    stable_s = 0
-            for r in sw_rows:
-                con.execute(
-                    """INSERT OR REPLACE INTO fomo_token_swap_history
-                    VALUES (?,?,?,?,?,?,?)""",
-                    (mint, r["handle"], r["action"], r["usd"], r["mc"],
-                     r["time_rel"], now_i))
-            log(f"  swaps {mint[:10]} : {len(sw_rows)} trades historiques")
-            con.commit()
-            captured += 1
-            log(f"  holders {mint[:10]} : {len(all_rows)} capturés")
-        except Exception as e:
-            log(f"  holders {mint[:10]} ERR {str(e)[:60]}")
-    con.close()
-    log(f"[holders] {captured}/{len(mints[:12])} tokens capturés")
-
-
-def do_theses(page):
-    """L'ARCHIVE DES THÈSES par token : le tab « Thesis » = le filtre
-    holders-avec-thèse (le texte + les likes = le score social)."""
-    from fomo_holders_parser import parse_holders
-    con_s2 = sqlite3.connect(str(DB_SWAPS), timeout=30)
-    con_s2.execute("PRAGMA busy_timeout=30000")
-    mints = [r[0] for r in con_s2.execute(
-        """SELECT DISTINCT token_addr FROM ws_swaps
-        WHERE top_trader=1 AND token_addr IS NOT NULL
-        ORDER BY captured_at DESC LIMIT 8""")]
-    con_s2.close()
-    captured = 0
-    for mint in mints[:8]:
-        chain = "ethereum" if mint.startswith("0x") else "solana"
-        try:
-            page.goto(f"https://fomo.family/tokens/{chain}/{mint}",
-                      wait_until="domcontentloaded", timeout=25000)
-            page.wait_for_timeout(5000)
-            page.locator('text="Thesis"').first.click(timeout=6000)
-            page.wait_for_timeout(3000)
-            txt = page.evaluate("() => document.body.innerText")
-            rows = parse_holders(txt, "")
-            if not rows:
-                continue
-            now_i = int(time.time())
-            con = sqlite3.connect(str(DB_SWAPS), timeout=30)
-            con.execute("PRAGMA busy_timeout=30000")
-            con.execute("""CREATE TABLE IF NOT EXISTS fomo_token_theses (
-                mint TEXT, handle TEXT, position_usd REAL,
-                pnl_pct REAL, entry_mc TEXT, avg_hold TEXT,
-                thesis_likes INTEGER, thesis TEXT, captured_at INTEGER,
-                PRIMARY KEY (mint, handle, captured_at))""")
-            for r in rows:
-                if not r["thesis"] or r["thesis"] == "—":
-                    continue
-                con.execute("""INSERT OR REPLACE INTO fomo_token_theses
-                    VALUES (?,?,?,?,?,?,?,?,?)""",
-                    (mint, r["handle"], r["position_usd"], r["pnl_pct"],
-                     r["entry_mc"], r["avg_hold"], r["thesis_likes"],
-                     r["thesis"], now_i))
-            con.commit(); con.close()
-            captured += 1
-        except Exception as e:
-            log(f"  theses {mint[:10]} ERR {str(e)[:50]}")
-    log(f"[theses] {captured} tokens archivés")
-
-
-def do_clans(page):
-    n = len(visit_clans(page))
-    log(f"[clans] {n} chars capturés")
-
-
-def do_feed(page):
-    n = len(visit_feed(page))
-    log(f"[feed] {n} chars capturés")
-
-
-def do_profiles(page, state):
-    """Les profils : l'élite + les holders skilles DÉCOUVERTS (la boucle
-    auto-nourrie) — 1 par cycle, round-robin."""
-    candidates = list(TOP_HANDLES)
-    try:
-        con_d = sqlite3.connect(str(DB_SWAPS), timeout=30)
-        con_d.execute("PRAGMA busy_timeout=30000")
-        for (h,) in con_d.execute(
-                """SELECT handle FROM fomo_token_holders
-                WHERE pnl_pct > 100 AND position_usd > 3000
-                  AND handle NOT IN (SELECT handle FROM dom_leaderboard)
-                GROUP BY handle ORDER BY AVG(pnl_pct) DESC LIMIT 20"""):
-            if h not in candidates:
-                candidates.append(h)
-        con_d.close()
-    except Exception:
-        pass
-    profile_idx = state.get("profile_idx", 0)
-    handle = candidates[profile_idx % len(candidates)]
-    try:
-        con = ensure_swaps_db()
-        now_i = int(time.time())
-        base, open_rows, closed_rows = _mine_profile_light(page, handle, con, now_i)
-        con.close()
-        log(f"[profiles] {handle} : {len(open_rows)} courantes + "
-            f"{len(closed_rows)} top trades")
-        state["profile_idx"] = profile_idx + 1
-    except Exception as e:
-        log(f"[profiles] {handle} ERR {str(e)[:80]}")
-        state["profile_idx"] = profile_idx + 1
-
-
 # La TABLE DE ROUTES : (nom, cadence_min, fn, les args extra)
 # MIGRATION REST (29/09 soir) : 8 surfaces tuées — couvertes par
 # fomo_rest_collector.py (la carte : scripts/studies/fomo_rest_map.md,
 # 100 % des endpoints rejoués 200) : sidebar, most_held (le clic 6000 ms),
-# top100, holders, theses, clans, feed, profiles. Restent : walker
-# (fomo_new_coins, 5 lecteurs vivants) + session (le bootstrap JWT).
+# top100, holders, theses, clans, feed, profiles. Restent : session
+# (le bootstrap JWT).
+# MIGRATION REST (29/09, phase 2) : walker tué — DERNIÈRE navigation DOM
+# supprimée. fomo_new_coins (tab='bonding') est remplacé par le snapshot
+# REST bonding (fomo_rest.db, fomo_rest_snapshots endpoint='bonding_snapshot',
+# écrit par fomo_rest_collector.py) ; les 5 lecteurs migrés : daily_brief,
+# bonding_signal_study, fomo_bonding_monitor, fomo_history_collector,
+# fomo_bonding_resolve.
 SCHEDULE = [
-    ("walker", 0, lambda page, lv=None, c=None: None, ()),  # les cadences internes
+    # ("walker", 0, lambda page, lv=None, c=None: None, ()),  # TUÉE 29/09 (voir note ci-dessus)
     ("session", 30, do_session, ()),
 ]
 
@@ -588,8 +198,6 @@ def main():
     page = None
     listener = None
     con_swaps = ensure_swaps_db()
-    con_walker = sqlite3.connect(str(WDB), timeout=30)
-    con_walker.execute("PRAGMA busy_timeout=30000")
     try:
         browser, ctx = None, None
         for port in ("9223", "9222"):  # le login window du user, puis le nôtre
@@ -657,16 +265,9 @@ def main():
             now = time.time()
             page = ensure_page(ctx, page)
             for name, cadence, fn, extra in SCHEDULE:
-                if name == "walker":
-                    # les cadences internes par route du walker
-                    do_walker_routes(page, con_walker, last_visit)
-                    continue
                 if now - last_visit.get(name, 0) > cadence * 60:
                     try:
-                        if name == "profiles":
-                            do_profiles(page, state)
-                        else:
-                            fn(page)
+                        fn(page)
                     except Exception as e:
                         log(f"[{name}] ERR {str(e)[:80]}")
                     last_visit[name] = now
@@ -675,7 +276,7 @@ def main():
                 log(f"résumé : {listener.summary()}")
                 state["last_summary"] = now
                 STATE_F.write_text(json.dumps(
-                    {"last_visit": last_visit, "profile_idx": state.get("profile_idx", 0),
+                    {"last_visit": last_visit,
                      "last_summary": state["last_summary"]}))
             time.sleep(30)
     finally:
@@ -690,7 +291,6 @@ def main():
             except Exception:
                 pass
         con_swaps.close()
-        con_walker.close()
         pw.stop()
 
 
