@@ -27,6 +27,7 @@ DOCTRINE OBLIGATOIRE :
 - Cible user : 60-70 %/mois STABLES, gros WR, DD ≤ 25 %, 0 liq, record ≥ 80 %, ≤ 1 mois négatif/12.
 - JAMAIS découarter les anciennes stratégies — ré-catégoriser VALIDÉ/CANDIDAT/CONTEXTE/NUL dans docs/20-registre-indicateurs.md.
 - Leçon ts_ms : les timestamps contiennent des NANOSECONDES dans certains champs — vérifier l'unité avant tout join/overlap.
+- FOMO = FORWARD-ONLY : on ne backtestera jamais le passé de fomo — la donnée capturée en temps réel aujourd'hui EST le backtest de demain (elle commence le 29/09). Le référentiel : MC native = fomo_mc_samples (fomo.db), trades avec MC AU TRADE = fomo_rest_token_trades (fomo_rest.db), courbe = fomo_ohlcv 1m + fomo_ticks ; la reconstruction = scripts/fomo_chart_trader.py --mint. Les skills fomo-rest-api/fomo-pipeline-ops/quant-discipline (.zcode/skills) = les cartes.
 
 INTERDITS : toucher à data/fomo/, relancer un service systemd, git push, installer quoi que ce soit, `&` en shell.
 RÉPONSE : chiffrée, commence par le verdict, 12 lignes max, « prochaine action » finale.

@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "enabled": true,
+    "events": {
+      "PostToolUse": [
+        {
+          "matcher": "Edit|Write",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "\"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python\" \"${ZCODE_PROJECT_DIR}/.zcode/hooks/py_check.py\"",
+              "timeout": 40,
+              "statusMessage": "py_compile du fichier édité"
+            }
+          ]
+        }
+      ],
+      "SessionStart": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "\"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python\" \"${ZCODE_PROJECT_DIR}/.zcode/hooks/session_health.py\"",
+              "timeout": 150,
+              "statusMessage": "santé fomo au démarrage"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
