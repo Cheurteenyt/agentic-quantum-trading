@@ -4,9 +4,12 @@
 Pour UN token : reconstruire LA courbe que fomo affiche (MC si supply
 reconstruisible, sinon prix) et y placer chaque trader connu :
   - la courbe  : fomo.db/fomo_ohlcv (1m, time en MILLISECONDES) sinon fomo_ticks
-  - la MC      : supply = marketCap/priceUSD (trending, token_about, ws_swaps)
+  - la MC      : NATIVE via fomo.db/fomo_mc_samples (supply interpolée entre
+                 deux captured_at encadrant le tick, np.interp) ; fallback :
+                 supply = marketCap/priceUSD (trending, token_about, ws_swaps)
   - les trades : ws_swaps (WS direct), fomo_swaps (REST backfill),
-                 fomo_rest_swaps (REST JSON), hodlers (entry_price lignes)
+                 fomo_rest_swaps + fomo_rest_token_trades (REST JSON),
+                 hodlers (entry_price lignes)
 Read-only absolu (mode=ro) : aucune écriture dans les DB de prod.
 Sortie : reports/fomo_chart_trader_<mint>.pdf (note de recherche, fond blanc).
 """
@@ -22,6 +25,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 FOMO_DB = ROOT / "data" / "fomo" / "fomo.db"
@@ -108,6 +112,55 @@ def load_swaps_supply(mint):
     return rats[len(rats) // 2], f"ws_swaps×{len(rats)}"
 
 
+def load_handle_map():
+    """user_id -> handle (ws_traders, fomo_swaps.db) — nommer les uuids."""
+    con = ro(SWAPS_DB)
+    m = {r[0]: r[1] for r in con.execute(
+        "SELECT user_id, handle FROM ws_traders "
+        "WHERE handle IS NOT NULL AND handle!=''")}
+    con.close()
+    return m
+
+
+def load_mc_native(mint):
+    """MC native : échantillons fomo.db/fomo_mc_samples -> (ts_s, supply).
+    >= 2 échantillons requis pour interpoler ; sinon (None, None) -> fallback."""
+    con = ro(FOMO_DB)
+    rows = con.execute(
+        "SELECT captured_at, supply FROM fomo_mc_samples "
+        "WHERE mint=? AND captured_at>0 AND supply>0 "
+        "ORDER BY captured_at", (mint,)).fetchall()
+    con.close()
+    if len(rows) < 2:
+        return None, None
+    return [float(r[0]) for r in rows], [float(r[1]) for r in rows]
+
+
+def load_rest_token_trades(mint, uid2h):
+    """Trades « par token » de fomo_rest.db/fomo_rest_token_trades.
+    data JSON : type=swap_buy/swap_sell, usdAmount, marketCap, userHandle.
+    (thesis / user_trade_profit_milestone ne sont pas des trades -> skip.)"""
+    out = []
+    con = ro(REST_DB)
+    for user_id, data in con.execute(
+            "SELECT user_id, data FROM fomo_rest_token_trades WHERE mint=?",
+            (mint,)):
+        try:
+            j = json.loads(data)
+        except Exception:
+            continue
+        t = iso_to_s(j.get("createdAt"))
+        typ = j.get("type")
+        if not t or typ not in ("swap_buy", "swap_sell"):
+            continue
+        h = j.get("userHandle") or uid2h.get(user_id) or "?"
+        out.append((t, "buy" if typ == "swap_buy" else "sell",
+                    float(j.get("usdAmount") or 0.0),
+                    "fomo_rest_token_trades", h))
+    con.close()
+    return out
+
+
 def load_curve(mint):
     """fomo_ohlcv 1m (time en MILLISECONDES) + fomo_ticks (ts_s) fusionnés
     (les ticks comblent les trous du backfill 1m). -> (t_s, px, label)."""
@@ -128,7 +181,7 @@ def load_curve(mint):
             f"fomo_ohlcv 1m ×{n_oh} + fomo_ticks ×{len(ts) - n_oh}")
 
 
-def load_trades(mint):
+def load_trades(mint, uid2h):
     """Toutes les traces de trades connues pour CE token."""
     out = []  # (t_s, side, usd, source, handle)
     con = ro(SWAPS_DB)
@@ -146,8 +199,8 @@ def load_trades(mint):
             out.append((ts, side, usd or 0.0, "fomo_swaps", h or "?"))
     con.close()
     con = ro(REST_DB)
-    for (data,) in con.execute(
-            "SELECT data FROM fomo_rest_swaps WHERE data LIKE ?",
+    for user_id, data in con.execute(
+            "SELECT user_id, data FROM fomo_rest_swaps WHERE data LIKE ?",
             (f"%{mint[:24]}%",)):
         try:
             j = json.loads(data)
@@ -163,7 +216,8 @@ def load_trades(mint):
         if side:
             usd = j.get("humanUsdAmountOut" if side == "buy" else "humanUsdAmountIn") \
                 or j.get("humanUsdAmountIn") or 0.0
-            out.append((t, side, float(usd), "fomo_rest_swaps", "?"))
+            out.append((t, side, float(usd), "fomo_rest_swaps",
+                        uid2h.get(user_id) or "?"))
     con.close()
     return out
 
@@ -225,12 +279,18 @@ def main():
     con.close()
     ticker = t[0] if t else mint[:8]
 
+    uid2h = load_handle_map()
+    nat_ts, nat_sup = load_mc_native(mint)
+    native = nat_ts is not None
     supply, supply_src = load_trending_supply(mint)
     if supply is None:
         supply, supply_src = load_swaps_supply(mint)
     ts, px, curve_src = load_curve(mint)
-    trades = load_trades(mint)
+    trades = load_trades(mint, uid2h) + load_rest_token_trades(mint, uid2h)
     entries = load_holder_entries(mint)
+    mc_src = (f"native (fomo_mc_samples ×{len(nat_ts)})" if native
+              else "dérivée (supply figée, ±4-10 %)" if supply
+              else "indisponible")
 
     print(f"token  : {ticker} {mint}")
     print(f"courbe : {curve_src}  {len(ts)} pts", end="")
@@ -239,13 +299,22 @@ def main():
               f"{datetime.fromtimestamp(ts[-1], timezone.utc):%m-%d %H:%M}")
     else:
         print()
-    print(f"supply : {supply} ({supply_src})")
+    print(f"supply : {supply} ({supply_src})" if not native
+          else f"supply : interp fomo_mc_samples ×{len(nat_ts)}")
+    print(f"MC     : {mc_src}")
     print(f"trades : {len(trades)}  entries: {len(entries)}")
     if not ts:
         sys.exit("aucune courbe pour ce mint")
 
-    # ---- MC(t) = prix(t) × supply (supply supposée constante sur la fenêtre)
-    mc = [p * supply for p in px] if supply else None
+    # ---- MC(t) : native = prix(t) × supply_interp(t) (np.interp sur les
+    # échantillons fomo_mc_samples encadrant le tick, clamp aux bords) ;
+    # fallback = supply unique (trending/ws_swaps) supposée constante.
+    if native:
+        sup_t = np.interp(np.asarray(ts, dtype=float), nat_ts, nat_sup)
+        mc = [p * float(s) for p, s in zip(px, sup_t)]
+    else:
+        mc = [p * supply for p in px] if supply else None
+    sup_med = float(np.median(nat_sup)) if native else supply
 
     OUT_DIR.mkdir(exist_ok=True)
     out = Path(args.out) if args.out else OUT_DIR / f"fomo_chart_trader_{mint[:10]}.pdf"
@@ -255,7 +324,9 @@ def main():
         gridspec_kw={"height_ratios": [3, 1], "hspace": 0.08})
     fig.patch.set_facecolor("white")
 
-    label = f"MC(t) = prix × supply" if mc else "PRIX — MC indisponible (supply manquante)"
+    label = ("MC native (fomo_mc_samples)" if native
+             else "MC dérivée (supply figée, ±4-10 %)") if mc \
+        else "PRIX — MC indisponible (supply manquante)"
     ax.plot([datetime.fromtimestamp(t, timezone.utc) for t in ts],
             mc if mc else px, color=NAVY, lw=0.9, label=label)
     if not mc:
@@ -280,9 +351,15 @@ def main():
         ax.scatter(xs, ys, marker=mark, s=28, facecolor=col if side == "buy"
                    else "none", edgecolor=col, linewidths=0.9, zorder=5,
                    label=f"{side} ×{len(xs)}")
-    # les entrées des holders connus
+    # les entrées des holders connus (convertis via la supply médiane)
     for h, p, src in entries:
-        ax.axhline(p * (supply or 1.0), color=ENTRY, lw=0.5, ls=":", alpha=0.55)
+        ax.axhline(p * (sup_med or 1.0), color=ENTRY, lw=0.5, ls=":", alpha=0.55)
+    # handles des 10 plus gros trades annotés (ws_traders / badge userHandle)
+    for tr in sorted(trades, key=lambda x: -x[2])[:10]:
+        i = min(range(len(ts)), key=lambda k: abs(ts[k] - tr[0]))
+        y = (mc if mc else px)[i] * (1.11 if tr[1] == "buy" else 0.895)
+        ax.annotate(tr[4], (datetime.fromtimestamp(tr[0], timezone.utc), y),
+                    fontsize=5.5, color=INK, ha="center", zorder=6)
     ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor=INK)
     ax.grid(True, color="#E5E9F0", lw=0.5)
     for s in ax.spines.values():
@@ -290,7 +367,8 @@ def main():
 
     # panneau 2 : la taille USD des trades par source
     srcs = sorted({tr[3] for tr in trades})
-    cols = {"ws_swaps": BUY, "fomo_swaps": NAVY, "fomo_rest_swaps": GREY}
+    cols = {"ws_swaps": BUY, "fomo_swaps": NAVY, "fomo_rest_swaps": GREY,
+            "fomo_rest_token_trades": "#B07D2B"}
     for i, src in enumerate(srcs):
         xs = [d for d, tr in zip(dts, trades) if tr[3] == src]
         ys = [max(tr[2], 1.0) for tr in trades if tr[3] == src]
@@ -308,15 +386,17 @@ def main():
     fig.suptitle(
         f"{ticker} — chart fomo ↔ trader  |  {mint[:16]}…",
         color=NAVY, fontsize=13, fontweight="bold", y=0.97)
+    mc_head = (f"MC native (fomo_mc_samples ×{len(nat_ts)})" if native else
+               f"MC dérivée — supply: {fmt_usd(supply)} ({supply_src}), ±4-10 %")
     ax.set_title(
-        f"courbe: {curve_src} | supply: {fmt_usd(supply)} ({supply_src}) | "
-        f"trades: ws={n_ws} rest={n_rest} | entrées holders: {len(entries)} | "
-        f"MC = prix × supply (constante sur la fenêtre)",
+        f"courbe: {curve_src} | {mc_head} | "
+        f"trades: ws={n_ws} rest={n_rest} | entrées holders: {len(entries)}",
         color=INK, fontsize=8.5, loc="left", pad=6)
     fig.text(0.01, 0.005,
-             "Audit chart↔trader — sources: fomo.db(fomo_ohlcv/fomo_ticks), "
-             "fomo_swaps.db(ws_swaps/fomo_swaps/fomo_token_holders), "
-             "fomo_rest.db(fomo_rest_swaps/hodlers_top). Lecture read-only.",
+             "Audit chart↔trader — sources: fomo.db(fomo_ohlcv/fomo_ticks/"
+             "fomo_mc_samples), fomo_swaps.db(ws_swaps/fomo_swaps/"
+             "fomo_token_holders/ws_traders), fomo_rest.db(fomo_rest_swaps/"
+             "fomo_rest_token_trades/hodlers_top). Lecture read-only.",
              fontsize=6.5, color=GREY)
     fig.savefig(out, format="pdf", bbox_inches="tight", facecolor="white")
     plt.close(fig)
