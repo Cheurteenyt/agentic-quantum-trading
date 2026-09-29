@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""LE WATCHDOG DE SANTÉ ASTER (30/09) — le symétrique de fomo_health.py pour
+le domaine Aster. 8 sondes toutes les 5 min, l'alerte SUR TRANSITION :
+1. klines 1h fraîches (< 25 h — le nocturne 03:00)
+2. oi_history fraîche (< 30 min — timer 15 min, la munition H4/H5 du 06-07)
+3. liq_events fraîche (< 30 min)
+4. block_trades fraîche (< 30 min)
+5. premium_history fraîche (< 30 min)
+6. depth_meta fraîche (< 10 min — le collecteur 24/7, cadence ~1 min)
+7. depth CONTINUITÉ : 0 trou > 15 min dans depth_meta sur 24 h (le tir
+   depth/murs du 06-07 exige 14 j sans coupure — tolérance zéro)
+8. le cache funding (< 25 h — le nocturne)
+État : data/warehouse/aster_health_state.json. Journal [aster-health].
+Exit 0 toujours (un timer ne doit pas spammer d'unités failed)."""
+import json, os, sqlite3, subprocess, sys, time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+KL = ROOT / "data" / "warehouse" / "klines.db"
+DEPTH = ROOT / "data" / "warehouse" / "depth.db"
+STATE = ROOT / "data" / "warehouse" / "aster_health_state.json"
+CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / "aster_public_funding_history_cache.json"
+
+
+def ro(db):
+    return sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+
+
+def _norm_ms(v):
+    return v / 1000.0 if v and v > 1e12 else float(v or 0)
+
+
+def max_age(db, sql):
+    """L'âge en secondes du MAX(col) — sql renvoie une valeur ms OU s."""
+    try:
+        con = ro(db)
+        v = con.execute(sql).fetchone()[0]
+        con.close()
+        return round(time.time() - _norm_ms(v), 1) if v else None
+    except Exception:
+        return None
+
+
+def depth_gaps_24h() -> int:
+    """Le nombre de trous > 15 min dans depth_meta sur les dernières 24 h."""
+    try:
+        con = ro(DEPTH)
+        rows = [r[0] for r in con.execute(
+            "SELECT DISTINCT ts FROM depth_meta WHERE ts > ? ORDER BY ts",
+            (int((time.time() - 86400) * 1000),)).fetchall()]
+        con.close()
+        if len(rows) < 2:
+            return 0
+        gaps = sum(1 for a, b in zip(rows, rows[1:]) if b - a > 15 * 60_000)
+        return gaps
+    except Exception:
+        return -1  # -1 = la sonde elle-même a échoué (alerte)
+
+
+def funding_cache_age() -> float:
+    try:
+        return round(time.time() - os.path.getmtime(CACHE), 1)
+    except Exception:
+        return None
+
+
+def timer_age(unit: str) -> float:
+    """L'âge du dernier déclenchement d'un timer. La bonne sonde pour les
+    tables d'ÉVÉNEMENTS : un vieux MAX = un marché calme, un timer qui ne
+    tire plus = un collecteur mort. systemctl rend une date formatée même
+    avec --value (« Wed 2026-09-30 00:45:11 CEST ») → parser en forçant C."""
+    from datetime import datetime
+    try:
+        env = {**os.environ, "LC_ALL": "C"}
+        r = subprocess.run(["systemctl", "--user", "show", unit,
+                            "-p", "LastTriggerUSec", "--value"],
+                           capture_output=True, text=True, timeout=15, env=env)
+        v = r.stdout.strip()
+        if not v or v in ("0", "n/a"):
+            return None
+        dt = datetime.strptime(" ".join(v.split()[:3]),
+                               "%a %Y-%m-%d %H:%M:%S")
+        return round(time.time() - dt.timestamp(), 1)
+    except Exception:
+        return None
+
+
+def svc_active(unit: str) -> bool:
+    return subprocess.run(["systemctl", "--user", "is-active", "--quiet", unit],
+                          capture_output=True).returncode == 0
+
+
+CHECKS = [
+    ("klines_1h", lambda: (max_age(KL, "SELECT MAX(close_time) FROM klines WHERE interval='1h'") or 9e9) < 25 * 3600,
+     "klines 1h > 25 h — le nocturne 03:00 n'a pas tourné"),
+    ("oi_history", lambda: (max_age(KL, "SELECT MAX(captured_at_ms) FROM oi_history") or 9e9) < 1800,
+     "oi_history > 30 min — le timer 15 min est mort (la munition H4/H5 du 06-07)"),
+    ("liq_events", lambda: svc_active("aster-liq-collector.service"),
+     "le collecteur liq 24/7 est down"),
+    ("block_trades", lambda: (timer_age("aster-blocktrades.timer") or 9e9) < 1800,
+     "le timer block_trades ne tire plus (> 30 min)"),
+    ("premium_history", lambda: (max_age(KL, "SELECT MAX(captured_at_ms) FROM premium_history") or 9e9) < 1800,
+     "premium_history > 30 min"),
+    ("depth_meta", lambda: (max_age(DEPTH, "SELECT MAX(ts) FROM depth_meta") or 9e9) < 600,
+     "depth_meta > 10 min — le collecteur 24/7 stalle sans exit"),
+    ("depth_continuity", lambda: depth_gaps_24h() == 0,
+     "trous > 15 min dans depth sur 24 h — la continuité 14 j du tir 06-07 est amputée"),
+    ("funding_cache", lambda: (funding_cache_age() or 9e9) < 25 * 3600,
+     "le cache funding > 25 h — le nocturne n'a pas rafraîchi"),
+]
+
+
+def main() -> int:
+    prev = {}
+    if STATE.exists():
+        try:
+            prev = json.loads(STATE.read_text()).get("checks", {})
+        except Exception:
+            prev = {}
+    now = int(time.time())
+    alerts, checks = [], {}
+    for name, ok, msg in CHECKS:
+        good = bool(ok())
+        checks[name] = {"ok": good, "at": now}
+        was = prev.get(name, {}).get("ok", True)
+        if not good:
+            alerts.append(f"{name} : {msg}")
+            if was:
+                print(f"[aster-health] ALERTE {name} : {msg}")
+        elif not was and good:
+            print(f"[aster-health] rétabli : {name}")
+    STATE.write_text(json.dumps({"checks": checks, "updated_at": now}, indent=1))
+    if not alerts:
+        print("[aster-health] OK : " + ", ".join(c for c, _, _ in CHECKS))
+    else:
+        print(f"[aster-health] {len(alerts)} sonde(s) en alerte (voir ci-dessus)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
