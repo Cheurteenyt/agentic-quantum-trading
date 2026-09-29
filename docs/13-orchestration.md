@@ -104,3 +104,15 @@ backtest gagnant » en « j'ai une hypothèse survivante à confirmer ».
 - **Quotidienne** : `nightly_campaign.py --run` (idéalement en cron la nuit).
 - **+30j après chaque découverte** : `reevaluate_oos.py` sur les candidats
   mûrs (`pending(min_age_days=30)`).
+
+### Dette : le mobula top-up, 3e écrivain borné de fomo.db (29/09)
+
+- Les 16 « database is locked » de 19h47-19h51 venaient d'une **transaction
+  fantôme** : un commit en échec « locked » sans rollback laissait la txn
+  ouverte, tenant le write-lock pendant les appels réseau (3,5 s/token).
+  Fix : rollback systématique sur toute voie d'échec (`fomo_mobula_topup.py`).
+- `topup_dead` a migré vers `data/fomo/fomo_mobula.db` (lecteur unique,
+  copie one-time ATTACH mode=ro, COUNT vérifié 13=13).
+- `fomo_ohlcv` reste écrit dans fomo.db : 15+ lecteurs (dont derek_watch.py)
+  rendent une base dédiée cassante. Dette assumée : writer borné (commit par
+  token, rollback anti-fantôme, busy_timeout 30 s, budget de passe 480 s).

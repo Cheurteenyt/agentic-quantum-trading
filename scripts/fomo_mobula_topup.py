@@ -7,6 +7,16 @@ Ce top-up comble le récent sur 3 périodes (1 appel mobula chacune) :
 Contrairement à fomo_ohlcv_backfill.py il ne stoppe PAS le collector 24/7 :
 transactions courtes (commit par token) + busy_timeout=30000 (WAL) suffisent.
 
+ÉTAT 29/09 : les 16 « database is locked » de 19h47 venaient d'une TRANSACTION
+FANTÔME — un commit/INSERT en échec « locked » sans rollback laissait la txn
+ouverte, tenant le write-lock de fomo.db pendant les appels réseau (3,5 s/token)
+des tokens suivants. Correction : rollback systématique sur TOUTE voie d'échec.
+Dette documentée (docs/13) : fomo_ohlcv reste écrit dans fomo.db — 15+ lecteurs
+(dont derek_watch.py) rendent une base dédiée cassante — mais writer BORNÉ
+(commit par token, rollback anti-fantôme, busy_timeout 30 s, budget de passe).
+L'état mort/vivant topup_dead a MIGRÉ vers data/fomo/fomo_mobula.db
+(lecteur unique : ce script ; copie one-time ATTACH mode=ro, COUNT vérifié).
+
 Usage :
   .venv/bin/python scripts/fomo_mobula_topup.py --all
   .venv/bin/python scripts/fomo_mobula_topup.py --all --loop 15
@@ -25,6 +35,7 @@ from fomo_ohlcv_backfill import (QUOTE_MINTS, call, fresh_jwt,  # noqa: E402
                                  rows_to_candles, token_list)
 
 DB = ROOT / "data" / "fomo" / "fomo.db"
+MOBULA_DB = ROOT / "data" / "fomo" / "fomo_mobula.db"  # base dédiée top-up
 TOPUP = {"1m": 3 * 3600, "15m": 48 * 3600, "1h": 7 * 86400}  # s
 RETRY_DELAYS = (2.0, 5.0, 10.0)  # sur « database is locked »
 
@@ -59,27 +70,58 @@ def upsert_token_retry(con: sqlite3.Connection, jwt: str, mint: str):
         try:
             return upsert_token(con, jwt, mint), None
         except sqlite3.OperationalError as e:
+            con.rollback()  # ANTI-FANTÔME : une txn laissée ouverte tiendrait
+            # le write-lock de fomo.db pendant les 3,5 s réseau du token suivant
             last = e
             if "locked" not in str(e).lower():
                 return 0, e
         except Exception as e:  # réseau/API (call() a déjà retryé 3×)
+            con.rollback()
             return 0, e
+    con.rollback()
     return 0, last
 
 
 DEAD_SKIP_S = 12 * 3600
 
 
-def _dead_table(con: sqlite3.Connection) -> None:
-    con.execute("""CREATE TABLE IF NOT EXISTS topup_dead (
+def ensure_dead_db() -> sqlite3.Connection:
+    """fomo_mobula.db : base dédiée du top-up (zéro autre lecteur/écrivain).
+    DDL assuré ici (la règle) ; copie ONE-TIME de topup_dead depuis fomo.db
+    via ATTACH mode=ro (source en lecture seule) si la destination est vide,
+    COUNT source == COUNT destination vérifié avant de continuer."""
+    MOBULA_DB.parent.mkdir(parents=True, exist_ok=True)
+    dcon = sqlite3.connect(MOBULA_DB.as_uri(), uri=True, timeout=30)
+    dcon.execute("PRAGMA busy_timeout=30000")
+    dcon.execute("PRAGMA journal_mode=WAL")
+    dcon.execute("""CREATE TABLE IF NOT EXISTS topup_dead (
         mint TEXT PRIMARY KEY, last_zero REAL)""")
+    n_dst = dcon.execute("SELECT COUNT(*) FROM topup_dead").fetchone()[0]
+    if n_dst == 0 and DB.exists():
+        # ATTACH en mode=ro : la source fomo.db ne peut jamais être altérée
+        dcon.execute("ATTACH DATABASE ? AS src", (DB.as_uri() + "?mode=ro",))
+        try:
+            n_src = dcon.execute(
+                "SELECT COUNT(*) FROM src.topup_dead").fetchone()[0]
+            if n_src:
+                dcon.execute("INSERT OR REPLACE INTO topup_dead "
+                             "SELECT mint, last_zero FROM src.topup_dead")
+        except sqlite3.OperationalError:
+            n_src = 0  # pas encore de table source (première installation)
+        n_dst = dcon.execute("SELECT COUNT(*) FROM topup_dead").fetchone()[0]
+        assert n_dst == n_src, f"copie topup_dead : {n_src} != {n_dst}"
+        dcon.commit()  # commit AVANT le detach (sinon « database src is locked »)
+        dcon.execute("DETACH DATABASE src")
+        print(f"[topup] topup_dead migrée : {n_dst} ligne(s) fomo.db → "
+              f"fomo_mobula.db (COUNT vérifié)", flush=True)
+    dcon.commit()
+    return dcon
 
 
-def _dead_filter(con: sqlite3.Connection, mints: list[str]) -> list[str]:
+def _dead_filter(dcon: sqlite3.Connection, mints: list[str]) -> list[str]:
     """Les tokens morts (0 bougie récoltée au dernier essai) sortent
     12 h — sinon ils re-déclenchent à chaque passe pour toujours."""
-    _dead_table(con)
-    rows = dict(con.execute("SELECT mint, last_zero FROM topup_dead"))
+    rows = dict(dcon.execute("SELECT mint, last_zero FROM topup_dead"))
     now = time.time()
     keep, revive = [], []
     for m in mints:
@@ -90,19 +132,20 @@ def _dead_filter(con: sqlite3.Connection, mints: list[str]) -> list[str]:
         if lz:
             revive.append(m)
     if revive:
-        con.executemany("DELETE FROM topup_dead WHERE mint=?",
-                        [(m,) for m in revive])
-    con.commit()  # la table + les revivals survivent même à un kill du timer
+        dcon.executemany("DELETE FROM topup_dead WHERE mint=?",
+                         [(m,) for m in revive])
+    dcon.commit()  # les revivals survivent même à un kill du timer
     return keep
 
 
 PASS_BUDGET_S = 480.0  # < TimeoutStartSec=600 : la passe rend la main AVANT le kill
 
 
-def one_pass(con: sqlite3.Connection, jwt: str, mints: list[str],
-             budget_s: float = PASS_BUDGET_S) -> int:
+def one_pass(con: sqlite3.Connection, dcon: sqlite3.Connection, jwt: str,
+             mints: list[str], budget_s: float = PASS_BUDGET_S) -> int:
     t0, tot, fails = time.time(), 0, []
-    mints = _dead_filter(con, mints)
+    con.rollback()  # on n'entre JAMAIS en passe avec une txn héritée ouverte
+    mints = _dead_filter(dcon, mints)
     for i, mint in enumerate(mints):
         if i and time.time() - t0 > budget_s:
             print(f"[topup] budget {budget_s:.0f}s atteint — "
@@ -117,12 +160,16 @@ def one_pass(con: sqlite3.Connection, jwt: str, mints: list[str],
             continue
         # le marquage mort/vivant est commité PAR TOKEN : un kill du timer
         # (timeout systemd) ne repart pas de zéro à la passe suivante
-        if n == 0:
-            con.execute("INSERT OR REPLACE INTO topup_dead VALUES (?,?)",
-                        (mint, time.time()))
-        else:
-            con.execute("DELETE FROM topup_dead WHERE mint=?", (mint,))
-        con.commit()
+        try:
+            if n == 0:
+                dcon.execute("INSERT OR REPLACE INTO topup_dead VALUES (?,?)",
+                             (mint, time.time()))
+            else:
+                dcon.execute("DELETE FROM topup_dead WHERE mint=?", (mint,))
+            dcon.commit()
+        except sqlite3.OperationalError:
+            dcon.rollback()  # anti-fantôme (base dédiée, mais même règle)
+            raise
         tot += n
         print(f"  [{i+1}/{len(mints)}] {mint[:10]}… : +{n}", flush=True)
     print(f"[topup] passe : {tot} bougies upsertées en {time.time()-t0:.0f}s, "
@@ -144,6 +191,7 @@ def main() -> int:
 
     con = sqlite3.connect(DB, timeout=30)
     con.execute("PRAGMA busy_timeout=30000")
+    dcon = ensure_dead_db()
     mints = (token_list(con) if args.all
              else [m.strip() for m in args.mints.split(",") if m.strip()
                    and not m.startswith("0x") and m not in QUOTE_MINTS])
@@ -174,13 +222,14 @@ def main() -> int:
     if not jwt:
         print("ERREUR : aucun JWT frais dans le localStorage du daemon")
         return 1
-    one_pass(con, jwt, mints)
+    one_pass(con, dcon, jwt, mints)
     while args.loop > 0:
         print(f"[topup] sommeil {args.loop} min", flush=True)
         time.sleep(args.loop * 60)
         jwt = fresh_jwt() or jwt  # re-fraîchir (exp ~1h)
-        one_pass(con, jwt, mints)
+        one_pass(con, dcon, jwt, mints)
     con.close()
+    dcon.close()
     return 0
 
 
