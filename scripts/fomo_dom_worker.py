@@ -397,6 +397,20 @@ def main():
                             mints.append(m)
                     con_t.close()
                     captured = 0
+                    now_i = int(time.time())
+                    con_h = sqlite3.connect(str(DB_SWAPS), timeout=30)
+                    con_h.execute("PRAGMA busy_timeout=30000")
+                    con_h.execute("""CREATE TABLE IF NOT EXISTS fomo_token_holders (
+                        mint TEXT, handle TEXT, position_usd REAL, qty TEXT,
+                        ticker TEXT, pnl_usd REAL, pnl_pct REAL, entry_mc TEXT,
+                        entry_price REAL, avg_hold TEXT, thesis_likes INTEGER,
+                        thesis TEXT, captured_at INTEGER,
+                        PRIMARY KEY (mint, handle, captured_at))""")
+                    con_h.execute("""CREATE TABLE IF NOT EXISTS fomo_token_header (
+                        mint TEXT PRIMARY KEY, market_cap TEXT, holders TEXT,
+                        liquidity TEXT, top10_holding_pct REAL, buys INTEGER,
+                        sells INTEGER, buyers INTEGER, sellers INTEGER,
+                        captured_at INTEGER)""")
                     for mint in mints[:12]:
                         chain = "ethereum" if mint.startswith("0x") else "solana"
                         try:
@@ -405,24 +419,35 @@ def main():
                             page.wait_for_timeout(5000)
                             page.locator('text="Holders"').first.click(timeout=6000)
                             page.wait_for_timeout(3000)
-                            txt = page.evaluate("() => document.body.innerText")
-                            rows = parse_holders(txt, "")
-                            hdr = parse_token_header(txt)
-                            now_i = int(time.time())
-                            con_h = sqlite3.connect(str(WDB), timeout=30)
-                            con_h.execute("PRAGMA busy_timeout=30000")
-                            con_h.execute("""CREATE TABLE IF NOT EXISTS fomo_token_holders (
-                                mint TEXT, handle TEXT, position_usd REAL, qty TEXT,
-                                ticker TEXT, pnl_usd REAL, pnl_pct REAL, entry_mc TEXT,
-                                entry_price REAL, avg_hold TEXT, thesis_likes INTEGER,
-                                thesis TEXT, captured_at INTEGER,
-                                PRIMARY KEY (mint, handle, captured_at))""")
-                            con_h.execute("""CREATE TABLE IF NOT EXISTS fomo_token_header (
-                                mint TEXT PRIMARY KEY, market_cap TEXT, holders TEXT,
-                                liquidity TEXT, top10_holding_pct REAL, buys INTEGER,
-                                sells INTEGER, buyers INTEGER, sellers INTEGER,
-                                captured_at INTEGER)""")
-                            for r in rows:
+                            # le SCROLL-CAPTURE : la liste virtualise → scroller
+                            # le conteneur + dédupe = TOUS les holders
+                            seen, all_rows = set(), []
+                            stable = 0
+                            for it in range(45):
+                                txt = page.evaluate("() => document.body.innerText")
+                                for r in parse_holders(txt, ""):
+                                    if r["handle"] not in seen:
+                                        seen.add(r["handle"])
+                                        all_rows.append(r)
+                                page.evaluate("""() => {
+                                    const cands = [...document.querySelectorAll('div')]
+                                        .filter(d => d.scrollHeight > d.clientHeight + 100
+                                            && (d.innerText || '').includes('avg. hold'));
+                                    if (!cands.length) return 0;
+                                    const el = cands[cands.length - 1];
+                                    el.scrollTop += Math.max(2500, el.clientHeight * 2.5);
+                                    return el.scrollTop;
+                                }""")
+                                page.wait_for_timeout(500)
+                                if len(all_rows) == len(seen) and it > 3:
+                                    stable += 1
+                                    if stable >= 2:
+                                        break
+                                else:
+                                    stable = 0
+                            hdr = parse_token_header(
+                                page.evaluate("() => document.body.innerText"))
+                            for r in all_rows:
                                 con_h.execute(
                                     """INSERT OR REPLACE INTO fomo_token_holders
                                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -437,10 +462,12 @@ def main():
                                  hdr["liquidity"], hdr["top10_holding_pct"],
                                  hdr["buys"], hdr["sells"], hdr["buyers"],
                                  hdr["sellers"], now_i))
-                            con_h.commit(); con_h.close()
+                            con_h.commit()
                             captured += 1
+                            log(f"  holders {mint[:10]} : {len(all_rows)} capturés")
                         except Exception as e:
                             log(f"  holders {mint[:10]} ERR {str(e)[:60]}")
+                    con_h.close()
                     last_visit["holders"] = now
                     log(f"[holders] {captured}/{len(mints[:12])} tokens capturés")
                 except Exception as e:
@@ -472,7 +499,7 @@ def main():
                             if not rows:
                                 continue
                             now_i = int(time.time())
-                            con_th = sqlite3.connect(str(WDB), timeout=30)
+                            con_th = sqlite3.connect(str(DB_SWAPS), timeout=30)
                             con_th.execute("PRAGMA busy_timeout=30000")
                             con_th.execute("""CREATE TABLE IF NOT EXISTS fomo_token_theses (
                                 mint TEXT, handle TEXT, position_usd REAL,

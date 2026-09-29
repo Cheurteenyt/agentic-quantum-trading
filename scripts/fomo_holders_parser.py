@@ -54,7 +54,7 @@ def parse_holders(text, ticker):
             "pnl_usd": float(pnl.replace(",", "")) * (1 if sign == "+" else -1),
             "pnl_pct": float(pct.replace(",", "")) * (1 if sign == "+" else -1),
             "entry_mc": entry_mc,
-            "entry_price": float(entry_px),
+            "entry_price": float(entry_px.replace(",", "")),
             "thesis_likes": likes,
             "thesis": thesis,
         })
