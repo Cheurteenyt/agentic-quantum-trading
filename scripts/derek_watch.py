@@ -3,8 +3,10 @@
 
 La demi-vie mesurée (docs/20, 02baa1e) : l'edge derek décroît 5× en 24h
 (+21,2 % @+1h → +7,8 % @+24h). La chaîne actuelle (swaps-fresh HORAIRE +
-passe paper 15 min) = latence ~1h15. Ici : le swap API direct via fetch
-IN-PAGE CDP (le REST Python = 430 Cloudflare), 1 passe/minute.
+passe paper 15 min) = latence ~1h15. Ici : l'API REST prod-api.fomo.family
+en curl_cffi impersonate chrome131 (la voie CDP in-page est morte derrière
+le mur d'auth 29/09 ; sonde scripts/studies/derek_rest_probe.py : 100/100
+ids REST ∩ ledger, uuid = cache _swaps_meta), 1 passe/minute.
 
 Détection : buy ≥ $5k, token âgé ≥ 7j (1re bougie 1h de fomo.db), pas déjà
 répliqué (idempotence par swap_id, l'index unique de fomo_paper.db) →
@@ -14,6 +16,7 @@ validée de fomo_paper_forward.py ; INSERT OR IGNORE + busy_timeout — jamais
 bloquer la passe paper forward (elle écrit la même DB toutes les 15 min).
 """
 import argparse
+import base64
 import json
 import sqlite3
 import sys
@@ -21,16 +24,20 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-from fomo_ohlcv_backfill import fresh_jwt  # retry ×3 + cache disque
+from curl_cffi import requests as cffi
 
-from playwright.sync_api import sync_playwright
+ROOT = Path(__file__).resolve().parents[1]
 
 # ── les DB ──
 LIVE_DB = ROOT / "data" / "fomo" / "fomo.db"          # lecture (mode=ro)
 SWAPS_DB = ROOT / "data" / "fomo" / "fomo_swaps.db"   # lecture (mode=ro)
 PAPER_DB = ROOT / "data" / "fomo" / "fomo_paper.db"   # écriture (OR IGNORE)
+
+# ── la recette REST (sonde du 29/09, cf. fomo_rest_collector.py) ──
+REST_BASE = "https://prod-api.fomo.family"
+REST_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+           "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
+JWT_MARGIN_S = 600   # exp > now+600 sinon passe sautée (JAMAIS de re-auth)
 
 # ── les CONSTANTES de la règle replication_derek (fomo_paper_forward.py) ──
 REPL_RULE = "replication_derek"
@@ -50,14 +57,46 @@ QUOTE_MINTS = frozenset({
     "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",  # WBTC
 })
 
-JS_FETCH = """async ([tok, uid]) => {
-    const r = await fetch(
-        `https://prod-api.fomo.family/v2/users/${uid}/swaps?limit=100`,
-        {headers: {authorization: 'Bearer ' + tok,
-                   'content-type': 'application/json'}});
-    const t = await r.text();
-    return {status: r.status, body: t.slice(0, 900000)};
-}"""
+def read_jwt(margin: int = JWT_MARGIN_S):
+    """Le plus frais des 2 caches (daemon WS + top-up mobula — même token
+    privy), gate exp > now+margin. JAMAIS de re-auth forcée : périmé → None
+    (la passe suivante, 60 s plus tard, retente)."""
+    best, best_exp, src = None, 0, "?"
+    for p, name in ((ROOT / "data" / "fomo" / "ws_jwt_cache.txt", "ws"),
+                    (ROOT / "data" / "fomo" / "jwt_cache.json", "mobula")):
+        try:
+            raw = p.read_text().strip()
+            jwt = (json.loads(raw).get("jwt") or json.loads(raw).get("token")
+                   if raw.startswith("{") else raw.strip('"'))
+            seg = jwt.split(".")[1]
+            seg += "=" * (-len(seg) % 4)
+            e = json.loads(base64.urlsafe_b64decode(seg)).get("exp", 0)
+            if e > best_exp:
+                best, best_exp, src = jwt, e, name
+        except Exception:
+            continue
+    return (best if best_exp > time.time() + margin else None), best_exp, src
+
+
+def fetch_swaps_rest(uid: str):
+    """REST direct curl_cffi (le WAF ne bloque que le fingerprint TLS ;
+    sonde 29/09 : 100/100 ids ∩ ledger). 1 appel/passe, pacing 1 s.
+    Token périmé → None + log clair (PAS de refresh forcé)."""
+    jwt, exp, src = read_jwt()
+    if not jwt:
+        print(f"  JWT périmé ({src} : +{exp - time.time():.0f}s < marge "
+              f"{JWT_MARGIN_S}s) — passe sautée, pas de re-auth forcée",
+              flush=True)
+        return None
+    r = cffi.get(f"{REST_BASE}/v2/users/{uid}/swaps?limit=100", headers={
+        "user-agent": REST_UA, "authorization": f"Bearer {jwt}",
+        "origin": "https://fomo.family",
+        "referer": "https://fomo.family/"},
+        impersonate="chrome131", timeout=15)
+    time.sleep(1.0)  # pacing ≥ 1 s entre appels REST
+    if r.status_code != 200:
+        raise RuntimeError(f"REST HTTP {r.status_code}: {r.text[:80]}")
+    return unwrap_swaps(r.json())
 
 
 def is_tradeable_mint(mint) -> bool:
@@ -121,43 +160,6 @@ def unwrap_swaps(d):
     return []
 
 
-def fetch_swaps_cdp(jwt: str, uid: str, retries: int = 2):
-    """Le fetch sur le daemon CDP — zéro page créée (la leçon des flashs).
-    Voie 1 : fetch IN-PAGE sur la page fomo.family existante (le pattern
-    fomo_swaps_fetch_browser.py). Voie 2 (repli si l'API droppe CORS) :
-    ctx.request = la pile TLS du MÊME Chromium, insensible au CORS.
-    Retries courts : la passe suivante (60 s) retente de toute façon."""
-    last = None
-    for attempt in range(retries):
-        try:
-            with sync_playwright() as p:
-                b = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
-                ctx = b.contexts[0]
-                page = next((c for c in ctx.pages
-                             if "fomo.family" in (c.url or "")), None)
-                if page is not None:
-                    try:
-                        res = page.evaluate(JS_FETCH, [jwt, uid])
-                        if res.get("status") == 200:
-                            return unwrap_swaps(json.loads(res["body"]))
-                        last = RuntimeError(f"in-page HTTP {res.get('status')}")
-                    except Exception as e:  # CORS/edge → la voie 2
-                        last = e
-                url = (f"https://prod-api.fomo.family/v2/users/{uid}"
-                       f"/swaps?limit=100")
-                r = ctx.request.get(url, headers={
-                    "authorization": f"Bearer {jwt}",
-                    "content-type": "application/json",
-                    "referer": "https://fomo.family/"}, timeout=25000)
-                if r.status == 200:
-                    return unwrap_swaps(json.loads(r.text()))
-                raise RuntimeError(f"HTTP {r.status}: {r.text()[:80]}")
-        except Exception as e:  # noqa: BLE001 — retry puis la boucle 60 s
-            last = e
-            time.sleep(5.0 * (attempt + 1))
-    raise last
-
-
 def parse_swap(it: dict):
     """→ (swap_id, mint, side, ts_s, size_usd) | None. buy = quote en entrée."""
     sid = it.get("id")
@@ -211,7 +213,10 @@ def detect_pass(now: float) -> dict:
     con_swaps, con_live, con_paper = open_ro(SWAPS_DB), open_ro(LIVE_DB), open_paper_rw()
     try:
         uid = derek_uid(con_swaps)
-        items = fetch_swaps_cdp(fresh_jwt(), uid)
+        items = fetch_swaps_rest(uid)
+        if items is None:  # JWT périmé : rien touché, derek_last_ts intact
+            return {"items": 0, "opened": 0, "skipped": 0, "capped": 0,
+                    "log": []}
         parsed = sorted((x for x in (parse_swap(i) for i in items) if x),
                         key=lambda x: x[3])
         last = con_paper.execute("SELECT value FROM fomo_paper_state "

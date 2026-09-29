@@ -9,10 +9,18 @@ chrome131 + Bearer JWT = 200 partout. Un appel REST remplace une route DOM
 + parse). Basse DÉDIÉE data/fomo/fomo_rest.db (un seul écrivain — la leçon
 du lock du 29/09), JWT partagé avec le daemon (ws_jwt_cache.txt, top-up
 15 min). Pacing 1,0 s : 37 appels ≈ 50 s/pass, timer 30 min.
+PAGINATION (29/09, preuves scripts/studies/fomo_rest_cursor_probe.py) :
+swaps = &lastSwapId=<dernier id page n> (p1→p2→p3 disjointes, zéro
+chevauchement) ; trades = &lastTradeId=<closedTrades[-1].trade.id> (param
+extrait du bundle fomo.family, trades-v2 : getNextPageParam = ne()).
+Backfill BORNÉ par passe (SWAPS_PAGES/TRADES_PAGES, env FOMO_*_PAGES) et
+INCRÉMENTAL : le curseur de reprise est persisté dans fomo_rest_snapshots
+(endpoint='cursor_swaps_<uid>' / 'cursor_trades_<uid>') ; passe suivante
+reprend au curseur ; flux épuisé → cycle neuf depuis le haut.
 Tables : fomo_rest_snapshots (le dernier état par entité, JSON brut intégral
 — l'extraction typée se fait quand une étude en a besoin) et fomo_rest_swaps
 (append idempotent par swap id, la rotation élite)."""
-import json, time, sys, sqlite3
+import json, os, time, sys, sqlite3
 from pathlib import Path
 from curl_cffi import requests as cffi
 
@@ -26,6 +34,8 @@ NETWORK_ID = 1399811149  # solana
 PACING = 1.0
 N_TOKENS = 12
 N_ELITE = 5
+SWAPS_PAGES = max(1, int(os.environ.get("FOMO_SWAPS_PAGES", "5")))
+TRADES_PAGES = max(1, int(os.environ.get("FOMO_TRADES_PAGES", "3")))
 
 
 def jwt_exp(jwt: str) -> float:
@@ -53,6 +63,33 @@ def read_jwt() -> str | None:
         except Exception:
             continue
     return best if best_exp > time.time() + 600 else None
+
+
+def refresh_jwt_via_cdp() -> str | None:
+    """Le fallback de dernière main : la source de vérité = le localStorage
+    du navigateur (privy:token, re-minté par le site lui-même) — le même
+    mécanisme que le ws_daemon. On écrit le cache, ce qui sert aussi le
+    daemon. Jamais de re-auth forcée : si les navigateurs sont down, None."""
+    from patchright.sync_api import sync_playwright
+    pw = sync_playwright().start()
+    try:
+        for port in ("9223", "9222"):
+            try:
+                lg = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}", timeout=8000)
+            except Exception:
+                continue
+            cx = lg.contexts[0] if lg.contexts else lg
+            pg = next((p for p in cx.pages if "fomo.family" in (p.url or "")), None)
+            if pg is None:
+                continue
+            jwt = (pg.evaluate("() => localStorage.getItem('privy:token')")
+                   or "").strip().strip('"')
+            if len(jwt) > 100:
+                JWT_CACHE.write_text(jwt)
+                return jwt
+        return None
+    finally:
+        pw.stop()
 
 
 class Client:
@@ -87,10 +124,29 @@ def snap(con, endpoint: str, entity_id: str, obj):
                  json.dumps(obj, ensure_ascii=False)))
 
 
+def cursor_load(con, kind: str, uid: str) -> dict:
+    """High-water mark de reprise (fomo_rest_snapshots, endpoint='cursor_<kind>_<uid>')."""
+    try:
+        row = con.execute("SELECT data FROM fomo_rest_snapshots WHERE endpoint=? AND entity_id=?",
+                          (f"cursor_{kind}_{uid}", uid)).fetchone()
+        st = json.loads(row[0]) if row else {}
+        return st if isinstance(st, dict) else {}
+    except Exception:
+        return {}
+
+
+def cursor_save(con, kind: str, uid: str, cursor, pages: int, exhausted: bool) -> None:
+    snap(con, f"cursor_{kind}_{uid}", uid,
+         {"cursor": cursor, "pages": pages, "exhausted": bool(exhausted),
+          "updated_at": int(time.time())})
+
+
 def main() -> int:
     jwt = read_jwt()
     if jwt is None:
-        print("[rest] JWT absent/périmé (ws_jwt_cache.txt) — passe skippée")
+        jwt = refresh_jwt_via_cdp()
+    if jwt is None:
+        print("[rest] JWT absent/périmé et CDP sans page fomo — passe skippée")
         return 1
     cli = Client(jwt)
     con = sqlite3.connect(str(DB), timeout=30)
@@ -148,22 +204,69 @@ def main() -> int:
             stats.append(f"thesis {mint[:6]} ERR {str(e)[:40]}")
 
     for uid in elite:
+        # --- swaps élite : backfill BORNÉ (SWAPS_PAGES) et INCRÉMENTAL —
+        # curseur lastSwapId=<dernier id page n>, preuve sonde du 29/09.
+        # INSERT OR IGNORE = idempotent par swap id. ---
         try:
-            sw = cli.get(f"/v2/users/{uid}/swaps?limit=100") or {}
-            rows = sw.get("swaps") if isinstance(sw, dict) else (sw if isinstance(sw, list) else [])
-            for s in rows or []:
-                con.execute("""INSERT OR IGNORE INTO fomo_rest_swaps
-                               (swap_id, user_id, captured_at, data)
-                               VALUES (?,?,?,?)""",
-                            (s.get("id"), uid, int(time.time()),
-                             json.dumps(s, ensure_ascii=False)))
-            stats.append(f"swaps {str(uid)[:8]}={len(rows or [])}")
+            st = cursor_load(con, "swaps", uid)
+            cur = None if st.get("exhausted") else st.get("cursor")
+            new, done, exhausted = 0, 0, False
+            while done < SWAPS_PAGES:
+                q = f"/v2/users/{uid}/swaps?limit=100" + (f"&lastSwapId={cur}" if cur else "")
+                d = cli.get(q) or {}
+                rows = d.get("swaps") if isinstance(d, dict) else (d if isinstance(d, list) else [])
+                rows = rows or []
+                now = int(time.time())
+                for s in rows:
+                    sid = s.get("id") if isinstance(s, dict) else None
+                    if not sid:
+                        continue
+                    rc = con.execute("""INSERT OR IGNORE INTO fomo_rest_swaps
+                                        (swap_id, user_id, captured_at, data)
+                                        VALUES (?,?,?,?)""",
+                                     (sid, uid, now,
+                                      json.dumps(s, ensure_ascii=False))).rowcount
+                    new += 1 if rc and rc > 0 else 0
+                done += 1
+                nxt = rows[-1].get("id") if rows and isinstance(rows[-1], dict) else None
+                if not rows or d.get("hasNextPage") is False or not nxt or nxt == cur:
+                    cur = nxt or cur
+                    exhausted = True
+                else:
+                    cur = nxt
+                cursor_save(con, "swaps", uid, cur, done, exhausted)
+                if exhausted:
+                    break
+            stats.append(f"swaps {str(uid)[:8]}=+{new} p={done}{' E' if exhausted else ''}")
         except Exception as e:
             stats.append(f"swaps {str(uid)[:8]} ERR {str(e)[:40]}")
+        # --- trades fermés : page 1 snapshotée (comportement inchangé) puis
+        # backfill BORNÉ (TRADES_PAGES) par lastTradeId=closedTrades[-1].trade.id
+        # (bundle fomo.family). Page 1 réutilisée si départ à neuf. ---
         try:
             tr = cli.get(f"/trades?userId={uid}&orderBy=closedAt")
             snap(con, "trades_closed", uid, tr)
-            stats.append(f"trades {str(uid)[:8]}")
+            st = cursor_load(con, "trades", uid)
+            cur = None if st.get("exhausted") else st.get("cursor")
+            done, exhausted = 0, False
+            while done < TRADES_PAGES:
+                if cur is None:
+                    d, rows = tr, ((tr or {}).get("closedTrades") or [])
+                else:
+                    d = cli.get(f"/trades?userId={uid}&orderBy=closedAt&lastTradeId={cur}")
+                    rows = (d or {}).get("closedTrades") or []
+                done += 1
+                nxt = (rows[-1].get("trade") or {}).get("id") \
+                    if rows and isinstance(rows[-1], dict) else None
+                if not rows or (d or {}).get("hasNextPage") is False or not nxt or nxt == cur:
+                    cur = nxt or cur
+                    exhausted = True
+                else:
+                    cur = nxt
+                cursor_save(con, "trades", uid, cur, done, exhausted)
+                if exhausted:
+                    break
+            stats.append(f"trades {str(uid)[:8]} p={done}{' E' if exhausted else ''}")
         except Exception as e:
             stats.append(f"trades {str(uid)[:8]} ERR {str(e)[:40]}")
 
