@@ -321,6 +321,40 @@ class Writer:
                              p.get("open"), p.get("high"), p.get("low"), p.get("close"),
                              p.get("volume"), int(time.time())))
 
+    def _acc_volume(self, addr, created, usd):
+        """Le volume plateforme : la somme des usdAmount par (token, minute)."""
+        if not addr or usd is None:
+            return
+        try:
+            minute = int(time.mktime(time.strptime(
+                created[:19], "%Y-%m-%dT%H:%M:%S"))) // 60 * 60 * 1000
+            self.swap_vol[(addr, minute)] = \
+                self.swap_vol.get((addr, minute), 0.0) + float(usd)
+        except Exception:
+            pass
+
+    def _track_trader(self, payload, handle):
+        """Le mapping handle→userId auto-appris depuis le flux."""
+        uid = payload.get("userId")
+        if not handle or not uid:
+            return
+        now_s = int(time.time())
+        self.trader_q[uid] = (uid, handle, payload.get("displayName"),
+                              payload.get("equity"), now_s, now_s)
+
+    def _swap_row(self, payload):
+        """Le tuple typé pour ws_swaps (17 colonnes)."""
+        handle = payload.get("userHandle") or ""
+        return (
+            payload.get("id"), payload.get("tradeId"), payload.get("type") or "",
+            payload.get("userId"), payload.get("createdAt") or "",
+            json.dumps(payload), int(time.time()),
+            handle, payload.get("ticker"), payload.get("tokenAddress"),
+            str(payload.get("networkId") or ""), payload.get("usdAmount"),
+            payload.get("marketCap"), payload.get("price"),
+            payload.get("equity"), 1 if payload.get("isDev") else 0,
+            1 if handle in TOP_HANDLES else 0)
+
     def add_swap(self, payload):
         sid = payload.get("id")
         if not sid:
@@ -328,30 +362,11 @@ class Writer:
         handle = payload.get("userHandle") or ""
         is_top = 1 if handle in TOP_HANDLES else 0
         ptype = payload.get("type") or ""
-        usd = payload.get("usdAmount")
         addr = payload.get("tokenAddress")
         created = payload.get("createdAt") or ""
-        if addr and usd is not None:
-            try:
-                minute = int(time.mktime(time.strptime(
-                    created[:19], "%Y-%m-%dT%H:%M:%S"))) // 60 * 60 * 1000
-                self.swap_vol[(addr, minute)] = \
-                    self.swap_vol.get((addr, minute), 0.0) + float(usd)
-            except Exception:
-                pass
-        self.swap_q.append((
-            sid, payload.get("tradeId"), ptype, payload.get("userId"),
-            created, json.dumps(payload), int(time.time()),
-            handle, payload.get("ticker"), addr,
-            str(payload.get("networkId") or ""), usd,
-            payload.get("marketCap"), payload.get("price"),
-            payload.get("equity"), 1 if payload.get("isDev") else 0, is_top))
-        if handle:
-            uid = payload.get("userId")
-            if uid:
-                now_s = int(time.time())
-                self.trader_q[uid] = (uid, handle, payload.get("displayName"),
-                                      payload.get("equity"), now_s, now_s)
+        self._acc_volume(addr, created, payload.get("usdAmount"))
+        self.swap_q.append(self._swap_row(payload))
+        self._track_trader(payload, handle)
         if is_top:
             self.n_top += 1
             if ptype == "swap_sell":
