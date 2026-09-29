@@ -451,6 +451,13 @@ def main():
             if now - last_visit.get("theses", 0) > 30 * 60:
                 try:
                     from fomo_holders_parser import parse_holders
+                    con_s2 = sqlite3.connect(str(DB_SWAPS), timeout=30)
+                    con_s2.execute("PRAGMA busy_timeout=30000")
+                    mints = [r[0] for r in con_s2.execute(
+                        """SELECT DISTINCT token_addr FROM ws_swaps
+                        WHERE top_trader=1 AND token_addr IS NOT NULL
+                        ORDER BY captured_at DESC LIMIT 8""")]
+                    con_s2.close()
                     captured = 0
                     for mint in mints[:8]:
                         chain = "ethereum" if mint.startswith("0x") else "solana"

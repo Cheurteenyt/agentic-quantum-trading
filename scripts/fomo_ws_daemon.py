@@ -222,7 +222,9 @@ class Writer:
     def __init__(self):
         self.tick_q, self.swap_q, self.thesis_q, self.event_q = [], [], [], []
         self.tdetail_q, self.ohlcv_q = [], []
+        self.universe_q = []
         self.trader_q = {}
+        self.n_new_tokens = 0
         # la dédup : le dernier prix par topic (les frames identiques = ~40 %
         # du flux, zéro information → zéro écriture)
         self.last_px = {}
@@ -294,6 +296,20 @@ class Writer:
             p.get("numReplies"), (c.get("reactions", {}).get("counts") or {}).get("likeCount"),
             c.get("parentId"), c.get("createdAt") or p.get("createdAt"),
             json.dumps(p), int(time.time())))
+
+    def add_trending(self, payload):
+        """Le snapshot trending_tokens : l'upsert de l'univers (le mint,
+        le symbole, la MC, le prix) + la découverte des nouveaux tokens."""
+        if payload.get("kind") != "snapshot":
+            return
+        for tk in payload.get("tokens", []):
+            tok = tk.get("token") or {}
+            mint, sym = tok.get("address"), tok.get("symbol")
+            if not mint or not sym:
+                continue
+            self.universe_q.append((mint, sym, tok.get("name"),
+                                    tk.get("marketCap"), tk.get("priceUSD"),
+                                    tk.get("change24"), int(time.time())))
 
     def add_token_details(self, topic_id, payload):
         """La pression par token : les changes %, les nb de buys/sells,
@@ -460,6 +476,27 @@ class Writer:
                 "INSERT OR REPLACE INTO fomo_ohlcv VALUES (?,?,?,?,?,?,?,?,?)", self.ohlcv_q)
             self.con_ticks.commit()
             self.n_ohlcv += len(self.ohlcv_q); self.ohlcv_q = []
+        if self.universe_q:
+            con_u = sqlite3.connect(DB_TICKS, timeout=30)
+            con_u.execute("PRAGMA busy_timeout=30000")
+            new_m = 0
+            for row in self.universe_q:
+                exists = con_u.execute(
+                    "SELECT 1 FROM fomo_tokens WHERE mint=?", (row[0],)).fetchone()
+                con_u.execute(
+                    "INSERT OR REPLACE INTO fomo_tokens (ticker, mint, resolved_at) "
+                    "VALUES (?,?,?)", (row[1], row[0], row[6]))
+                if not exists:
+                    new_m += 1
+                    try:
+                        mc_f = float(row[3]) if row[3] else 0
+                        log(f"🆕 token découvert : {row[1]} ({row[0][:10]}…, "
+                            f"MC ${mc_f:,.0f})")
+                    except Exception:
+                        log(f"🆕 token découvert : {row[1]}")
+            con_u.commit(); con_u.close()
+            self.n_new_tokens += new_m
+            self.universe_q = []
         if self.tdetail_q:
             self.con_swaps.executemany(
                 "INSERT OR REPLACE INTO ws_token_details VALUES (?,?,?,?,?,?,?,?,?,?,"
@@ -558,6 +595,11 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
         await ws.send(json.dumps({"type": "subscribe", "topicType": "trading_activity",
                                   "topicId": user_uuid}))
         await asyncio.sleep(PACING)
+        # le snapshot global des tokens trending (toutes les chains) : la
+        # découverte automatique des nouveaux tokens + leurs métadonnées
+        await ws.send(json.dumps({"type": "subscribe", "topicType": "trending_tokens",
+                                  "topicId": "1,56,143,4663,5042,8453,1399811149"}))
+        await asyncio.sleep(PACING)
         for m in list(hot.lru.keys()):
             await ws.send(json.dumps({"type": "subscribe", "topicType": "prices",
                                       "topicId": hot.topic(m)}))
@@ -584,6 +626,8 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                     tt = m.get("topicType", "")
                     if tt == "prices":
                         writer.add_price(m.get("topicId", ""), m.get("payload", {}))
+                    elif tt == "trending_tokens":
+                        writer.add_trending(m.get("payload", {}))
                     elif tt == "token_details":
                         writer.add_token_details(m.get("topicId", ""), m.get("payload", {}))
                     elif tt == "ohlcv":
