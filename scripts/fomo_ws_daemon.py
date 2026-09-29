@@ -493,7 +493,7 @@ class Writer:
             self.con_ticks.commit()
             self.n_ohlcv += len(self.ohlcv_q); self.ohlcv_q = []
         if self.universe_q:
-            con_u = sqlite3.connect(DB_TICKS, timeout=30)
+            con_u = self.con_ticks
             con_u.execute("PRAGMA busy_timeout=30000")
             new_m = 0
             for row in self.universe_q:
@@ -514,7 +514,7 @@ class Writer:
             self.n_new_tokens += new_m
             self.universe_q = []
         if self.pregrad_q:
-            con_p = sqlite3.connect(DB_TICKS, timeout=30)
+            con_p = self.con_ticks
             con_p.execute("PRAGMA busy_timeout=30000")
             con_p.execute("""CREATE TABLE IF NOT EXISTS fomo_pre_graduated (
                 mint TEXT, symbol TEXT, name TEXT, market_cap REAL, priceUSD REAL,
