@@ -324,12 +324,14 @@ def do_holders(page):
     con_s.close()
     con_t = sqlite3.connect(str(DB_SWAPS), timeout=30)
     con_t.execute("PRAGMA busy_timeout=30000")
+    con_t.execute("ATTACH DATABASE ? AS fomo_db", (str(DB_TICKS),))
     for (m,) in con_t.execute(
             """SELECT DISTINCT t.mint FROM fomo_price_history ph
-            JOIN fomo_tokens t ON t.ticker = ph.ticker
+            JOIN fomo_db.fomo_tokens t ON t.ticker = ph.ticker
             WHERE t.mint IS NOT NULL ORDER BY ph.captured_at DESC LIMIT 4"""):
         if m not in mints:
             mints.append(m)
+    con_t.execute("DETACH DATABASE fomo_db")
     con_t.close()
     now_i = int(time.time())
     con = sqlite3.connect(str(DB_SWAPS), timeout=30)
@@ -345,6 +347,12 @@ def do_holders(page):
         liquidity TEXT, top10_holding_pct REAL, buys INTEGER,
         sells INTEGER, buyers INTEGER, sellers INTEGER,
         captured_at INTEGER)""")
+    for col in ("launchpad TEXT", "supply TEXT", "network TEXT",
+                "created_rel TEXT", "contract TEXT"):
+        try:
+            con.execute(f"ALTER TABLE fomo_token_header ADD COLUMN {col}")
+        except Exception:
+            pass
     captured = 0
     for mint in mints[:12]:
         chain = "ethereum" if mint.startswith("0x") else "solana"
@@ -378,7 +386,10 @@ def do_holders(page):
                         break
                 else:
                     stable = 0
+            from fomo_holders_parser import parse_about
             hdr = parse_token_header(page.evaluate("() => document.body.innerText"))
+            about = parse_about(page.evaluate("() => document.body.innerText"))
+            hdr.update(about)
             for r in all_rows:
                 con.execute("""INSERT OR REPLACE INTO fomo_token_holders
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -387,10 +398,53 @@ def do_holders(page):
                      r["entry_mc"], r["entry_price"], r["avg_hold"],
                      r["thesis_likes"], r["thesis"], now_i))
             con.execute("""INSERT OR REPLACE INTO fomo_token_header
-                VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (mint, hdr["market_cap"], hdr["holders"], hdr["liquidity"],
                  hdr["top10_holding_pct"], hdr["buys"], hdr["sells"],
-                 hdr["buyers"], hdr["sellers"], now_i))
+                 hdr["buyers"], hdr["sellers"], now_i,
+                 hdr.get("launchpad"), hdr.get("supply"), hdr.get("network"),
+                 hdr.get("created_rel"), hdr.get("contract")))
+            # les SWAPS HISTORIQUES du token : le tab Swaps + le scroll-collect
+            # = la courbe de vie complète (le MC à chaque trade) = le backfill
+            page.locator('text="Swaps"').first.click(timeout=6000)
+            page.wait_for_timeout(3000)
+            sw_seen, sw_rows = set(), []
+            stable_s = 0
+            for it in range(40):
+                txt2 = page.evaluate("() => document.body.innerText")
+                for r in parse_token_swaps(txt2):
+                    key = (r["handle"], r["action"], r["usd"], r["mc"], r["time_rel"])
+                    if key not in sw_seen:
+                        sw_seen.add(key)
+                        sw_rows.append(r)
+                page.evaluate(r"""() => {
+                    const cands = [...document.querySelectorAll('div')]
+                        .filter(d => d.scrollHeight > d.clientHeight + 100
+                            && /\$[\d.,]+[KMB]?\n/.test(d.innerText || '')
+                            && (d.innerText || '').includes('Buy'));
+                    if (!cands.length) return 0;
+                    const el = cands[cands.length - 1];
+                    el.scrollTop += Math.max(2500, el.clientHeight * 2.5);
+                    return el.scrollTop;
+                }""")
+                page.wait_for_timeout(450)
+                if len(sw_rows) == len(sw_seen) and it > 3:
+                    stable_s += 1
+                    if stable_s >= 2:
+                        break
+                else:
+                    stable_s = 0
+            con.execute("""CREATE TABLE IF NOT EXISTS fomo_token_swap_history (
+                mint TEXT, handle TEXT, action TEXT, usd REAL, mc TEXT,
+                time_rel TEXT, captured_at INTEGER,
+                PRIMARY KEY (mint, handle, action, usd, mc, time_rel))""")
+            for r in sw_rows:
+                con.execute(
+                    """INSERT OR REPLACE INTO fomo_token_swap_history
+                    VALUES (?,?,?,?,?,?,?)""",
+                    (mint, r["handle"], r["action"], r["usd"], r["mc"],
+                     r["time_rel"], now_i))
+            log(f"  swaps {mint[:10]} : {len(sw_rows)} trades historiques")
             con.commit()
             captured += 1
             log(f"  holders {mint[:10]} : {len(all_rows)} capturés")

@@ -223,6 +223,7 @@ class Writer:
         self.tick_q, self.swap_q, self.thesis_q, self.event_q = [], [], [], []
         self.tdetail_q, self.ohlcv_q = [], []
         self.universe_q = []
+        self.pregrad_q = []
         self.trader_q = {}
         self.n_new_tokens = 0
         # la dédup : le dernier prix par topic (les frames identiques = ~40 %
@@ -310,6 +311,21 @@ class Writer:
             self.universe_q.append((mint, sym, tok.get("name"),
                                     tk.get("marketCap"), tk.get("priceUSD"),
                                     tk.get("change24"), int(time.time())))
+
+    def add_pre_graduated(self, payload):
+        """Les tokens sur le point de graduer : le mint, l'âge, la MC, le
+        prix — l'ETA de graduation = le signal d'entrée le plus rentable."""
+        if payload.get("kind") != "snapshot":
+            return
+        for tk in payload.get("tokens", []):
+            tok = tk.get("token") or {}
+            mint = tok.get("address")
+            if not mint:
+                continue
+            self.pregrad_q.append((mint, tok.get("symbol"), tok.get("name"),
+                                   tk.get("marketCap"), tk.get("priceUSD"),
+                                   tk.get("createdAt"), tk.get("change24"),
+                                   int(time.time())))
 
     def add_token_details(self, topic_id, payload):
         """La pression par token : les changes %, les nb de buys/sells,
@@ -497,6 +513,18 @@ class Writer:
             con_u.commit(); con_u.close()
             self.n_new_tokens += new_m
             self.universe_q = []
+        if self.pregrad_q:
+            con_p = sqlite3.connect(DB_TICKS, timeout=30)
+            con_p.execute("PRAGMA busy_timeout=30000")
+            con_p.execute("""CREATE TABLE IF NOT EXISTS fomo_pre_graduated (
+                mint TEXT, symbol TEXT, name TEXT, market_cap REAL, priceUSD REAL,
+                token_created_at INTEGER, change24 REAL, captured_at INTEGER,
+                PRIMARY KEY (mint, captured_at))""")
+            con_p.executemany(
+                "INSERT OR REPLACE INTO fomo_pre_graduated VALUES (?,?,?,?,?,?,?,?)",
+                self.pregrad_q)
+            con_p.commit(); con_p.close()
+            self.pregrad_q = []
         if self.tdetail_q:
             self.con_swaps.executemany(
                 "INSERT OR REPLACE INTO ws_token_details VALUES (?,?,?,?,?,?,?,?,?,?,"
@@ -600,6 +628,11 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
         await ws.send(json.dumps({"type": "subscribe", "topicType": "trending_tokens",
                                   "topicId": "1,56,143,4663,5042,8453,1399811149"}))
         await asyncio.sleep(PACING)
+        # les tokens PRÈS DE GRADUER (la bonding quasi-complète) : le flux
+        # natif du prédicteur de graduation — le trade ×9 du projet
+        await ws.send(json.dumps({"type": "subscribe", "topicType": "pre_graduated_tokens",
+                                  "topicId": "1,56,143,4663,5042,8453,1399811149"}))
+        await asyncio.sleep(PACING)
         for m in list(hot.lru.keys()):
             await ws.send(json.dumps({"type": "subscribe", "topicType": "prices",
                                       "topicId": hot.topic(m)}))
@@ -628,6 +661,8 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                         writer.add_price(m.get("topicId", ""), m.get("payload", {}))
                     elif tt == "trending_tokens":
                         writer.add_trending(m.get("payload", {}))
+                    elif tt == "pre_graduated_tokens":
+                        writer.add_pre_graduated(m.get("payload", {}))
                     elif tt == "token_details":
                         writer.add_token_details(m.get("topicId", ""), m.get("payload", {}))
                     elif tt == "ohlcv":

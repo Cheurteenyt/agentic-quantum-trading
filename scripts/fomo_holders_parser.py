@@ -84,3 +84,36 @@ def parse_token_header(text):
         "buyers": int(buyers.group(1).replace(",", "")) if buyers else None,
         "sellers": int(buyers.group(2).replace(",", "")) if buyers else None,
     }
+
+
+# ============================ LES SWAPS D'UN TOKEN ============================
+# La structure du tab Swaps : Handle | Buy/Sell | $montant | $MC | temps
+SWAP_ROW = re.compile(
+    r"(?m)^([^\n$]+)\n(Buy|Sell)\n\$([\d,]+(?:\.\d+)?)\n\$([\d.,]+[KMB]?)\n(\d+[smhd])\n")
+
+
+def parse_token_swaps(text):
+    """L'historique des swaps du token : le trader, l'action, le montant USD,
+    la market cap AU MOMENT du trade, le temps relatif. Le scroll = la
+    profondeur ; ce sont les bougies de la courbe de vie du token."""
+    return [{"handle": m.group(1).strip(), "action": m.group(2),
+             "usd": float(m.group(3).replace(",", "")), "mc": m.group(4),
+             "time_rel": m.group(5)}
+            for m in SWAP_ROW.finditer(text)]
+
+
+def parse_about(text):
+    """Le panneau About : le launchpad, la supply, le réseau, l'âge de
+    création (la variable d'âge des études), l'adresse."""
+    out = {}
+    m = re.search(r"Launchpad\s*\n?\s*([^\n]+)", text)
+    out["launchpad"] = m.group(1).strip() if m else None
+    m = re.search(r"Supply\s*\n?\s*([\d.,]+[KMB]?)", text)
+    out["supply"] = m.group(1) if m else None
+    m = re.search(r"Network\s*\n?\s*([^\n]+)", text)
+    out["network"] = m.group(1).strip() if m else None
+    m = re.search(r"Created\s*\n?\s*(\d+[^\n]*ago)", text)
+    out["created_rel"] = m.group(1).strip() if m else None
+    m = re.search(r"Contract address\s*\n?\s*([^\n]+)", text)
+    out["contract"] = m.group(1).strip() if m else None
+    return out
