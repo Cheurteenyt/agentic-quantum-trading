@@ -125,6 +125,22 @@ def ensure_dbs():
     con.execute("""CREATE TABLE IF NOT EXISTS ws_traders (
         user_id TEXT PRIMARY KEY, handle TEXT, display_name TEXT,
         equity_last REAL, first_seen INTEGER, last_seen INTEGER)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS ws_theses (
+        thesis_id TEXT PRIMARY KEY, trade_id TEXT, user_id TEXT, handle TEXT,
+        display_name TEXT, ticker TEXT, token_addr TEXT, network_id TEXT,
+        comment TEXT, price_at_creation REAL, mc_at_creation REAL,
+        usd_value REAL, token_amount REAL, pnl_unrealized REAL,
+        pnl_pct_unrealized REAL, pnl_realized REAL, closed_at TEXT,
+        equity REAL, is_dev INTEGER, top_trader INTEGER DEFAULT 0,
+        num_replies INTEGER, num_likes INTEGER, parent_id TEXT,
+        created_at TEXT, raw TEXT, captured_at INTEGER)""")
+    for idx, on in [("idx_th_handle", "handle, captured_at"),
+                    ("idx_th_token", "token_addr, captured_at"),
+                    ("idx_th_top", "top_trader, captured_at")]:
+        con.execute(f"CREATE INDEX IF NOT EXISTS {idx} ON ws_theses({on})")
+    con.execute("""CREATE TABLE IF NOT EXISTS ws_events (
+        event_id TEXT, event_type TEXT, raw TEXT, captured_at INTEGER,
+        PRIMARY KEY (event_id, event_type))""")
     # la migration v2 : les colonnes typées de ws_swaps
     cols = {r[1] for r in con.execute("PRAGMA table_info(ws_swaps)")}
     for name, decl in [
@@ -151,7 +167,8 @@ class Writer:
     """Les batchs d'écriture — les connexions persistantes WAL + l'agrégation 1m."""
 
     def __init__(self):
-        self.tick_q, self.swap_q, self.trader_q = [], [], {}
+        self.tick_q, self.swap_q, self.thesis_q, self.event_q = [], [], [], []
+        self.trader_q = {}
         # les buffers de bougie 1m : mint → [minute_ts_ms, open, high, low, close]
         # + le volume plateforme : (addr, minute_ts_ms) → la somme des usdAmount
         self.candles = {}
@@ -159,9 +176,24 @@ class Writer:
         self.last_minute = int(time.time()) // 60
         self.last_flush = time.time()
         self.n_ticks, self.n_swaps, self.n_top, self.n_sells_top = 0, 0, 0, 0
-        self.n_candles = 0
+        self.n_candles, self.n_theses, self.n_events = 0, 0, 0
+        self.unknown_types = set()
         self.con_ticks = sqlite3.connect(DB_TICKS, timeout=30)
         self.con_swaps = sqlite3.connect(DB_SWAPS, timeout=30)
+
+    def add_event(self, p):
+        """Le dispatch par type : les swaps, les thèses, et le parking
+        des types inconnus (la découverte automatique du flux)."""
+        t = p.get("type", "")
+        if t in ("swap_buy", "swap_sell"):
+            self.add_swap(p)
+        elif t == "thesis":
+            self.add_thesis(p)
+        else:
+            eid = p.get("id") or json.dumps(p, sort_keys=True)[:64]
+            self.event_q.append((eid, t or "?", json.dumps(p), int(time.time())))
+            self.unknown_types.add(t or "?")
+            self.n_events += 1
 
     def add_price(self, topic_id, payload):
         mint = topic_id.rsplit(":", 1)[0]
@@ -178,6 +210,26 @@ class Writer:
                 c[2] = max(c[2], float(px))
                 c[3] = min(c[3], float(px))
                 c[4] = float(px)
+
+    def add_thesis(self, p):
+        """Une thèse postée avec un achat : le texte, le MC à la publication,
+        le PnL live de l'auteur, les likes/réponses."""
+        c = p.get("comment") or {}
+        at = p.get("authorTrade") or {}
+        handle = p.get("userHandle") or ""
+        self.thesis_q.append((
+            c.get("id") or p.get("id"), p.get("tradeId"), p.get("userId"), handle,
+            p.get("displayName"), p.get("ticker"), p.get("tokenAddress"),
+            str(p.get("networkId") or ""), c.get("comment"),
+            c.get("priceUsdAtCreation"), c.get("marketCapAtCreation"),
+            at.get("usdValue"), at.get("humanTokenAmount"),
+            at.get("unrealizedPnlUsd"), at.get("percentageUnrealizedPnl"),
+            at.get("realizedPnlUsd"), at.get("closedAt"),
+            p.get("equity"), 1 if p.get("isDev") else 0,
+            1 if handle in TOP_HANDLES else 0,
+            p.get("numReplies"), (c.get("reactions", {}).get("counts") or {}).get("likeCount"),
+            c.get("parentId"), c.get("createdAt") or p.get("createdAt"),
+            json.dumps(p), int(time.time())))
 
     def add_swap(self, payload):
         sid = payload.get("id")
@@ -252,6 +304,17 @@ class Writer:
                 "?,?,?,?,?,?,?,?,?,?)", self.swap_q)
             self.con_swaps.commit()
             self.n_swaps += len(self.swap_q); self.swap_q = []
+        if self.thesis_q:
+            self.con_swaps.executemany(
+                "INSERT OR IGNORE INTO ws_theses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,"
+                "?,?,?,?,?,?,?,?,?,?,?,?,?,?)", self.thesis_q)
+            self.con_swaps.commit()
+            self.n_theses += len(self.thesis_q); self.thesis_q = []
+        if self.event_q:
+            self.con_swaps.executemany(
+                "INSERT OR IGNORE INTO ws_events VALUES (?,?,?,?)", self.event_q)
+            self.con_swaps.commit()
+            self.event_q = []
         if self.trader_q:
             self.con_swaps.executemany(
                 "INSERT INTO ws_traders VALUES (?,?,?,?,?,?) "
@@ -326,7 +389,7 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                     writer.add_price(m.get("topicId", ""), m.get("payload", {}))
                 elif tt == "trading_activity":
                     p = m.get("payload", {})
-                    writer.add_swap(p)
+                    writer.add_event(p)
                     # la découverte : le token trade → le prix en direct
                     addr = p.get("tokenAddress")
                     if addr and addr not in hot.lru:
@@ -351,6 +414,8 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                 log(f"résumé 10 min : {n_recv} msgs | ticks={writer.n_ticks} "
                     f"bougies1m={writer.n_candles} swaps={writer.n_swaps} "
                     f"(top={writer.n_top}, sorties_top={writer.n_sells_top}) "
+                    f"thèses={writer.n_theses} types_inconnus={writer.n_events} "
+                    f"{sorted(writer.unknown_types) if writer.unknown_types else ''} "
                     f"| topics prices={len(hot.lru)}")
                 last_summary = time.time()
             if run_until_ts and time.time() > run_until_ts:
@@ -453,7 +518,9 @@ async def main():
     if once:
         n, dur = await daemon_loop(user_uuid, mints, writer, run_until_ts=once)
         log(f"TEST TERMINÉ : {n} messages en {dur:.0f}s → {writer.n_ticks} ticks, "
-            f"{writer.n_swaps} swaps (top={writer.n_top}, sorties_top={writer.n_sells_top})")
+            f"{writer.n_swaps} swaps (top={writer.n_top}, sorties_top={writer.n_sells_top}), "
+            f"{writer.n_theses} thèses, {writer.n_events} types inconnus "
+            f"{sorted(writer.unknown_types) if writer.unknown_types else ''}")
     else:
         await daemon_loop(user_uuid, mints, writer)
 
