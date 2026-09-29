@@ -147,8 +147,18 @@ def main():
     con_walker = sqlite3.connect(str(WDB), timeout=30)
     con_walker.execute("PRAGMA busy_timeout=30000")
     try:
-        browser = pw.chromium.connect_over_cdp(CDP, timeout=8000)
-        ctx = browser.contexts[0] if browser.contexts else browser
+        browser, ctx = None, None
+        for port in ("9223", "9222"):  # le login window du user, puis le nôtre
+            try:
+                browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}",
+                                                       timeout=8000)
+                ctx = browser.contexts[0] if browser.contexts else browser
+                log(f"CDP attaché sur :{port}")
+                break
+            except Exception:
+                continue
+        if ctx is None:
+            raise RuntimeError("aucun navigateur CDP disponible (:9223/:9222)")
         # la purge des onglets FANTÔMES du worker/miner (les marqueurs ?r=, ?c=,
         # ?fresh=, ?ws=, ?bot= = nos pages tuées avant le close) — JAMAIS les
         # onglets du user (sans marqueur)
