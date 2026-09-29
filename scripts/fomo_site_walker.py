@@ -178,10 +178,19 @@ def main() -> int:
     pw = sync_playwright().start()
     page = None
     try:
-        browser = pw.chromium.connect_over_cdp(CDP, timeout=8000)
+        browser = None
+        for port in ("9223", "9222"):  # la fenêtre loggée, puis le daemon (:9222 headed — headless rejeté par privy)
+            try:
+                browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}", timeout=5000)
+                break
+            except Exception:
+                continue
+        if browser is None:
+            raise RuntimeError("aucun navigateur CDP joignable (:9223/:9222)")
         ctx = browser.contexts[0] if browser.contexts else browser
-        # page DÉDIÉE — les routes se naviguent ICI, jamais dans un onglet du user
-        page = ctx.new_page()
+        # page DÉDIÉE et PERMANENTE — créée UNE fois (about:blank du run précédent
+        # réutilisé), jamais fermée : plus aucun flash à chaque run
+        page = next((q for q in ctx.pages if q.url == "about:blank"), None) or ctx.new_page()
         page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(3000)
 
@@ -209,9 +218,11 @@ def main() -> int:
         print(f"[walker] la rotation complète : {len(routes_due)} routes")
         return 0
     finally:
+        # la page reste ouverte (permanente) — on la repose sur about:blank
+        # pour la retrouver au prochain run, sans flash
         if page is not None:
             try:
-                page.close()
+                page.goto("about:blank", timeout=5000)
             except Exception:
                 pass
         pw.stop()
