@@ -446,6 +446,50 @@ def main():
                 except Exception as e:
                     log(f"[holders] ERR {str(e)[:80]}")
                 time.sleep(2)
+            # 1e) l'ARCHIVE DES THÈSES par token (le tab « Thesis » = le filtre
+            #     holders-avec-thèse : le texte + les likes = le score social)
+            if now - last_visit.get("theses", 0) > 30 * 60:
+                try:
+                    from fomo_holders_parser import parse_holders
+                    captured = 0
+                    for mint in mints[:8]:
+                        chain = "ethereum" if mint.startswith("0x") else "solana"
+                        try:
+                            page.goto(f"https://fomo.family/tokens/{chain}/{mint}",
+                                      wait_until="domcontentloaded", timeout=25000)
+                            page.wait_for_timeout(5000)
+                            page.locator('text="Thesis"').first.click(timeout=6000)
+                            page.wait_for_timeout(3000)
+                            txt = page.evaluate("() => document.body.innerText")
+                            rows = parse_holders(txt, "")
+                            if not rows:
+                                continue
+                            now_i = int(time.time())
+                            con_th = sqlite3.connect(str(WDB), timeout=30)
+                            con_th.execute("PRAGMA busy_timeout=30000")
+                            con_th.execute("""CREATE TABLE IF NOT EXISTS fomo_token_theses (
+                                mint TEXT, handle TEXT, position_usd REAL,
+                                pnl_pct REAL, entry_mc TEXT, avg_hold TEXT,
+                                thesis_likes INTEGER, thesis TEXT, captured_at INTEGER,
+                                PRIMARY KEY (mint, handle, captured_at))""")
+                            for r in rows:
+                                if not r["thesis"] or r["thesis"] == "—":
+                                    continue
+                                con_th.execute(
+                                    """INSERT OR REPLACE INTO fomo_token_theses
+                                    VALUES (?,?,?,?,?,?,?,?,?)""",
+                                    (mint, r["handle"], r["position_usd"],
+                                     r["pnl_pct"], r["entry_mc"], r["avg_hold"],
+                                     r["thesis_likes"], r["thesis"], now_i))
+                            con_th.commit(); con_th.close()
+                            captured += 1
+                        except Exception as e:
+                            log(f"  theses {mint[:10]} ERR {str(e)[:50]}")
+                    last_visit["theses"] = now
+                    log(f"[theses] {captured} tokens archivés")
+                except Exception as e:
+                    log(f"[theses] ERR {str(e)[:80]}")
+                time.sleep(2)
             # 2) les clans / le feed
             for name, fn in (("clans", visit_clans), ("feed", visit_feed)):
                 if now - last_visit.get(name, 0) > CADENCES[name] * 60:
