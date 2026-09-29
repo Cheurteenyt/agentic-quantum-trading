@@ -25,10 +25,10 @@
 | Depth 500 niveaux × 15 sym | REST 30 s (2 880 req/j, ~43 k poids) | `@depth20@100ms` (20 niveaux seulement !) ou diff-depth + resync | temps réel + poids économisés MAIS 20 niveaux ≠ notre schéma 500 niveaux (wall_detector) → **moteur de carnet diff+snapshot** (stateful) | **P1** (le gros morceau) |
 | Klines 1h/15m | nocturne 03:00 → **jusqu'à 24 h de retard** | `@kline_1h/15m` (250 ms, la bougie fermée est poussée) | la fraîcheur intra-journée pour le forward | **P2** |
 | Premium/funding | REST 15 min ×~12 | `!markPrice@arr` @1s (TOUS les symboles, 1 msg/s) | 15 min → 1 s, 1 stream au lieu de 12 polls | **P3** (facile) |
-| OI | REST 15 min ×2 collecteurs en doublon (même table !) | **aucun stream** (polling inévitable) | dédoublonner : garder oi_collector 15 min, tuer le nocturne dupliqué | **P4** (facile) |
+| OI | REST 15 min ×2 collecteurs en doublon (même table !) | **aucun stream** (polling inévitable) | ✅ P4 FAIT (30/09) : le nocturne retiré — il re-collectait l'univers entier en double | **P4** (facile) |
 | Liquidations | WS `!forceOrder@arr` ✅ déjà natif | — | déjà fait (le seul WS du parc) | — |
 | aggTrades/prints | REST 15 min paginé | `@aggTrade` 100 ms | tape_1m en temps réel MAIS gros débit (100 ms) — à réserver aux majors | P5 |
-| Le compteur de poids | aucun (429 subi) | header `X-MBX-USED-WEIGHT-1M` à lire partout | le budget réel devient visible, alerte avant le 429 | **P5** (transversal) |
+| Le compteur de poids | aucun (429 subi) | header `X-MBX-USED-WEIGHT-1M` à lire partout | ✅ P5 FAIT (30/09) : scripts/aster_rate.py câblé dans les 7 collecteurs + la 9e sonde aster_health < 1800 | **P5** (transversal) |
 | Funding ×3 chemins | refresh_cache + funding_history_collector + premium_history (3 univers, 2 versions) | consolidation | un seul besoin, une seule source | P6 |
 | v1 vs v3 mélangés | depth/OI/aggTrades/premium en v1 ; klines/funding en v3 | v3 = « recommandée » (identique en market-data) | cohérence, préparation à la fin des clés v1 (03/2026) | P6 |
 
