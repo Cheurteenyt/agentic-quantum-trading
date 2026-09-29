@@ -176,6 +176,15 @@ def ensure_dbs():
     con.execute("""CREATE TABLE IF NOT EXISTS ws_events (
         event_id TEXT, event_type TEXT, raw TEXT, captured_at INTEGER,
         PRIMARY KEY (event_id, event_type))""")
+    con.execute("""CREATE TABLE IF NOT EXISTS ws_token_details (
+        mint TEXT, captured_at INTEGER, change5m REAL, change1h REAL, change24h REAL,
+        buys5min INTEGER, buys1h INTEGER, buys24h INTEGER,
+        sells5min INTEGER, sells1h INTEGER, sells24h INTEGER,
+        volumeBuy5minUSD REAL, volumeBuy1hUSD REAL, volumeBuy24hUSD REAL,
+        volumeSell5minUSD REAL, volumeSell1hUSD REAL, volumeSell24hUSD REAL,
+        server_ts INTEGER, PRIMARY KEY (mint, captured_at))""")
+    con.execute("""CREATE INDEX IF NOT EXISTS idx_tdetail_mint
+                   ON ws_token_details(mint, captured_at DESC)""")
     con.execute("""CREATE TABLE IF NOT EXISTS ws_sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT, started_at INTEGER,
         ended_at INTEGER, n_msgs INTEGER)""")
@@ -206,6 +215,7 @@ class Writer:
 
     def __init__(self):
         self.tick_q, self.swap_q, self.thesis_q, self.event_q = [], [], [], []
+        self.tdetail_q, self.ohlcv_q = [], []
         self.trader_q = {}
         # la dédup : le dernier prix par topic (les frames identiques = ~40 %
         # du flux, zéro information → zéro écriture)
@@ -218,6 +228,7 @@ class Writer:
         self.last_flush = time.time()
         self.n_ticks, self.n_swaps, self.n_top, self.n_sells_top = 0, 0, 0, 0
         self.n_candles, self.n_theses, self.n_events = 0, 0, 0
+        self.n_tdetail, self.n_ohlcv = 0, 0
         self.n_dedup, self.n_errors = 0, 0
         self.unknown_types = set()
         self.con_ticks = sqlite3.connect(DB_TICKS, timeout=30)
@@ -277,6 +288,32 @@ class Writer:
             p.get("numReplies"), (c.get("reactions", {}).get("counts") or {}).get("likeCount"),
             c.get("parentId"), c.get("createdAt") or p.get("createdAt"),
             json.dumps(p), int(time.time())))
+
+    def add_token_details(self, topic_id, payload):
+        """La pression par token : les changes %, les nb de buys/sells,
+        les volumes achat/vente USD — le sentiment quantifié en direct."""
+        mint = topic_id.rsplit(":", 1)[0]
+        if not mint:
+            return
+        self.tdetail_q.append((mint, payload.get("change5m"), payload.get("change1h"),
+                               payload.get("change24h"),
+                               payload.get("buys5min"), payload.get("buys1h"), payload.get("buys24h"),
+                               payload.get("sells5min"), payload.get("sells1h"), payload.get("sells24h"),
+                               payload.get("volumeBuy5minUSD"), payload.get("volumeBuy1hUSD"),
+                               payload.get("volumeBuy24hUSD"),
+                               payload.get("volumeSell5minUSD"), payload.get("volumeSell1hUSD"),
+                               payload.get("volumeSell24hUSD"),
+                               payload.get("timestamp"), int(time.time())))
+
+    def add_ohlcv(self, p):
+        """Les bougies 30s de l'app AVEC le vrai volume DEX."""
+        asset = p.get("asset")
+        t = p.get("time")
+        if not asset or not t:
+            return
+        self.ohlcv_q.append((asset, p.get("period", "30s"), t,
+                             p.get("open"), p.get("high"), p.get("low"), p.get("close"),
+                             p.get("volume"), int(time.time())))
 
     def add_swap(self, payload):
         sid = payload.get("id")
@@ -397,6 +434,17 @@ class Writer:
                 "INSERT OR REPLACE INTO fomo_ticks VALUES (?,?,?,?)", self.tick_q)
             self.con_ticks.commit()
             self.n_ticks += len(self.tick_q); self.tick_q = []
+        if self.ohlcv_q:
+            self.con_ticks.executemany(
+                "INSERT OR REPLACE INTO fomo_ohlcv VALUES (?,?,?,?,?,?,?,?,?)", self.ohlcv_q)
+            self.con_ticks.commit()
+            self.n_ohlcv += len(self.ohlcv_q); self.ohlcv_q = []
+        if self.tdetail_q:
+            self.con_swaps.executemany(
+                "INSERT OR REPLACE INTO ws_token_details VALUES (?,?,?,?,?,?,?,?,?,?,"
+                "?,?,?,?,?,?,?)", self.tdetail_q)
+            self.con_swaps.commit()
+            self.n_tdetail += len(self.tdetail_q); self.tdetail_q = []
         if self.swap_q:
             self.con_swaps.executemany(
                 "INSERT OR IGNORE INTO ws_swaps VALUES (?,?,?,?,?,?,?,"
@@ -515,18 +563,24 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                     tt = m.get("topicType", "")
                     if tt == "prices":
                         writer.add_price(m.get("topicId", ""), m.get("payload", {}))
+                    elif tt == "token_details":
+                        writer.add_token_details(m.get("topicId", ""), m.get("payload", {}))
+                    elif tt == "ohlcv":
+                        writer.add_ohlcv(m.get("payload", {}))
                     elif tt == "trading_activity":
                         p = m.get("payload", {})
                         writer.add_event(p)
                         addr = p.get("tokenAddress")
                         # un top trader trade un token → ÉPINGLER sa série prix
+                        # + la PRESSION (token_details) + le VOLUME (ohlcv)
                         if addr and (p.get("userHandle") or "") in TOP_HANDLES:
                             new = hot.pin(addr)
                             if new:
-                                await ws.send(json.dumps(
-                                    {"type": "subscribe", "topicType": "prices",
-                                     "topicId": hot.topic(new)}))
-                                await asyncio.sleep(PACING)
+                                for ttype in ("prices", "token_details", "ohlcv"):
+                                    await ws.send(json.dumps(
+                                        {"type": "subscribe", "topicType": ttype,
+                                         "topicId": hot.topic(new)}))
+                                    await asyncio.sleep(PACING)
                             # la sortie consensus, en DIRECT (< 2 s)
                             if p.get("type") == "swap_sell":
                                 handles = signals.on_top_sell(addr, p.get("userHandle"),
