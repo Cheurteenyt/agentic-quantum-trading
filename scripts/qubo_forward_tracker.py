@@ -21,7 +21,8 @@ CONVENTIONS (reprises telles quelles des harnais) :
   2.0 est prêt, le spread bougera dès ses ouvertures.
 
 Idempotent : recalcul intégral depuis paper_trades en LECTURE SEULE.
-Sortie : --report (stdout ; le nocturne append vers reports/qubo-forward.log).
+Sortie : --report (stdout ET append vers reports/qubo-forward.log — le
+tracker s'appende lui-même, l'unité nocturne ne redirige pas).
 """
 from __future__ import annotations
 
@@ -53,21 +54,25 @@ WEIGHTS: dict[str, dict[str, float]] = {
 }
 
 
-def load_machine_trades(con: sqlite3.Connection) -> list[dict]:
-    """Trades machine_* (open + closed), ordre chronologique déterministe."""
+def load_machine_trades(con: sqlite3.Connection) -> tuple[list[dict], dict[str, int]]:
+    """Trades machine_* (open + closed), ordre chronologique déterministe.
+    Les tags hors FLOWS (ex. machine_deep_fast en quarantaine) sont COMPTÉS
+    et remontés au rapport — jamais silencieusement perdus."""
     rows = con.execute(
         "SELECT rowid, signal, symbol, entry_ts, exit_ts, ret_pct, status "
         "FROM paper_trades WHERE signal LIKE 'machine_%' "
         "ORDER BY entry_ts, rowid").fetchall()
     out = []
+    unknown: dict[str, int] = {}
     for rid, sig, sym, ets, xts, ret, status in rows:
         if sig not in FLOWS:
-            continue  # tag inconnu : signalé au rapport, jamais silencieusement perdu
+            unknown[sig] = unknown.get(sig, 0) + 1
+            continue
         out.append({"rowid": rid, "flow": sig, "symbol": sym,
                     "entry_ts": int(ets), "exit_ts": int(xts) if xts else None,
                     "ret": float(ret) if ret is not None else None,
                     "status": status})
-    return out
+    return out, unknown
 
 
 def slot_filter(trades: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -123,7 +128,7 @@ def main() -> int:
 
     uri = "file:" + urllib.parse.quote(str(KDB)) + "?mode=ro"
     con = sqlite3.connect(uri, uri=True)
-    trades = load_machine_trades(con)
+    trades, unknown = load_machine_trades(con)
     con.close()
 
     played, blocked = slot_filter(trades)
@@ -162,6 +167,10 @@ def main() -> int:
         base, lev = FLOWS[f]
         L.append(f"  - {f} (base {base} @ {lev:.0f}x) : joués {c['played']}, "
                  f"bloqués {c['blocked']}, ouverts {c['open']}")
+    if unknown:
+        L.append("  ⚠ TAGS HORS FLOWS ignorés (quarantaine/probe, hors "
+                 "scoreboard) : " + ", ".join(f"{k} ×{v}"
+                                              for k, v in sorted(unknown.items())))
     for w in wallets.values():
         tag = w["name"]
         wts = WEIGHTS[tag]
@@ -189,8 +198,18 @@ def main() -> int:
              f"({spread_rel:+.2f} % rel)")
     L.append("Idempotent : recalcul intégral depuis paper_trades (lecture "
              "seule). Verdict promotion : 2-4 semaines de spread.")
+    L.append("NB : le wallet QUBO = les POIDS SEULS (bases/leviers "
+             "paper_forward) — le point officiel JOINT (majors 11x) se "
+             "recalcule a posteriori sur les mêmes rets.")
 
-    print("\n".join(L))
+    report = "\n".join(L)
+    print(report)
+    log_f = ROOT / "reports" / "qubo-forward.log"
+    try:
+        with open(log_f, "a") as fh:
+            fh.write(report + "\n")
+    except OSError as e:
+        print(f"[qubo-tracker] append {log_f.name} impossible : {e}")
     return 0
 
 

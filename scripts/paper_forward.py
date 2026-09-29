@@ -45,6 +45,44 @@ CANDIDATES = [
 ]
 WINDOW_H = 48  # on détecte les événements des 48 dernières heures
 
+# ——— LA SONDE P3 : fund7/vol7/liq24h loggés à CHAQUE activation de signal
+# (les gradients mensuels de l'autopsie 27/09). Définitions EXACTES de
+# mechanism_probe.py — importées, jamais réinventées :
+#   fund7  = funding MOYEN 7j du symbole à l'activation, en % /8h
+#            (mechanism_probe.fund7_at, fenêtre 7j en ms sur funding_history)
+#   vol7   = ATR % roulant 7j MOYEN des 6 majeures
+#            (mechanism_probe.vol7_series, asof au timestamp d'activation)
+#   liq24h = notional SELL (longs liquidés) 24h glissantes, $ (probe L94-103)
+# 0.0 si données absentes — la sonde ne bloque jamais un flux.
+_PROBE_STATE: dict = {}
+
+
+def probe_fields(con: sqlite3.Connection, sym: str, t0_ms: float) -> tuple:
+    """(fund7, vol7, liq24h) au moment de l'activation t0_ms (ms)."""
+    try:
+        import numpy as np
+        from scripts.mechanism_probe import fund7_at, vol7_series
+        if "vol7" not in _PROBE_STATE:      # la série : une fois par run
+            _PROBE_STATE["vol7"] = vol7_series(con)
+        _v = _PROBE_STATE["vol7"]
+        vol7 = (float(_v.asof(pd.Timestamp(t0_ms, unit="ms")))
+                if len(_v) else 0.0)
+        if pd.isna(vol7):
+            vol7 = 0.0
+        if "liq" not in _PROBE_STATE:
+            liq = pd.read_sql_query(
+                "SELECT event_time, notional FROM liq_events WHERE side='SELL'",
+                con)
+            _PROBE_STATE["liq"] = (
+                liq["event_time"].values.astype(np.int64),
+                liq["notional"].values.astype(float))
+        _ts, _no = _PROBE_STATE["liq"]
+        m = (_ts >= t0_ms - 24 * 3600 * 1000) & (_ts < t0_ms)
+        return fund7_at(con, sym, t0_ms), vol7, float(_no[m].sum())
+    except Exception as _e:
+        print(f"[paper] sonde P3 ({sym}) : {_e}")
+        return 0.0, 0.0, 0.0
+
 
 def load_env_funding_stats(con: sqlite3.Connection) -> dict[str, float]:
     """taux de funding moyen PAR HEURE par symbole (comme le harnais)."""
@@ -98,6 +136,17 @@ def main() -> int:
         funding_pct REAL, status TEXT NOT NULL, created_at REAL NOT NULL,
         PRIMARY KEY (signal, symbol, signal_ts));
     """)
+    # ——— sonde P3 (fund7/vol7/liq24h, les gradients de l'autopsie 27/09) :
+    # 3 colonnes ajoutées en fin de table, idempotent. Ajout seul : le
+    # tracker qubo_forward_tracker lit en ro avec colonnes nommées. ———
+    for _ddl in ("ALTER TABLE paper_trades ADD COLUMN fund7 REAL",
+                 "ALTER TABLE paper_trades ADD COLUMN vol7 REAL",
+                 "ALTER TABLE paper_trades ADD COLUMN liq24h REAL"):
+        try:
+            con.execute(_ddl)
+        except sqlite3.OperationalError as _e:
+            if "duplicate column" not in str(_e).lower():
+                raise
     now = time.time()
     now_ms = int(now * 1000)
     since_ms = now_ms - WINDOW_H * 3600 * 1000
@@ -168,10 +217,15 @@ def main() -> int:
                     exit_price = exit_ts = ret = None
                     status = "open"
                     closed_n += 0
+                f7, v7, l24 = probe_fields(con, sym, sig_ts)   # sonde P3
                 con.execute(
-                    "INSERT OR IGNORE INTO paper_trades VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT OR IGNORE INTO paper_trades (signal, symbol, "
+                    "horizon_h, direction, signal_ts, entry_ts, entry_price, "
+                    "exit_ts, exit_price, ret_pct, funding_pct, status, "
+                    "created_at, fund7, vol7, liq24h) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, sym, horizon, direction, sig_ts, entry_ts, entry_price,
-                     exit_ts, exit_price, ret, None, status, now))
+                     exit_ts, exit_price, ret, None, status, now, f7, v7, l24))
                 opened += 1
 
     # ——— le CANDIDAT QUALITÉ : cascade ∩ funding-rank-bas (25/09) ———
@@ -231,11 +285,16 @@ def main() -> int:
                 ("cascade_funding_rank_low", e["sym"], sig_ts)).fetchone():
                 continue
             sig_ms = sig_ts // 10**6          # ts_ms = des NS (nom hérité)
+            f7, v7, l24 = probe_fields(con, e["sym"], sig_ms)   # sonde P3
             con.execute(
-                "INSERT OR IGNORE INTO paper_trades VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR IGNORE INTO paper_trades (signal, symbol, "
+                "horizon_h, direction, signal_ts, entry_ts, entry_price, "
+                "exit_ts, exit_price, ret_pct, funding_pct, status, "
+                "created_at, fund7, vol7, liq24h) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 ("cascade_funding_rank_low", e["sym"], 24, -1, sig_ms,
                  sig_ms, float(e["entry"]), None, None, None, None,
-                 "open", now))
+                 "open", now, f7, v7, l24))
             opened += 1
     except Exception as _e:
         print(f"[paper] candidat qualité : {_e}")
@@ -303,11 +362,16 @@ def main() -> int:
                     "SELECT 1 FROM paper_trades WHERE signal=? AND symbol=? "
                     "AND signal_ts=?", (_sig, e["sym"], sig_ms)).fetchone():
                     continue
+                _f7, _v7, _l24 = probe_fields(con, e["sym"], sig_ms)
                 con.execute(
-                    "INSERT OR IGNORE INTO paper_trades VALUES "
-                    "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT OR IGNORE INTO paper_trades (signal, symbol, "
+                    "horizon_h, direction, signal_ts, entry_ts, entry_price, "
+                    "exit_ts, exit_price, ret_pct, funding_pct, status, "
+                    "created_at, fund7, vol7, liq24h) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (_sig, e["sym"], _hold, _dir_e, sig_ms, sig_ms,
-                     float(e["entry"]), None, None, None, None, "open", now))
+                     float(e["entry"]), None, None, None, None, "open", now,
+                     _f7, _v7, _l24))
                 _fresh_n += 1
         if _fresh_n:
             print(f"[paper] machine streams : {_fresh_n} ouvertures fraîches")
