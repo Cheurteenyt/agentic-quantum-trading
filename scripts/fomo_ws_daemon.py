@@ -148,12 +148,18 @@ TOP_HANDLES = {"unipcs", "pointfarmcap", "DumbCrayonEater", "Salem1299534",
 
 
 class Writer:
-    """Les batchs d'écriture — les connexions persistantes WAL."""
+    """Les batchs d'écriture — les connexions persistantes WAL + l'agrégation 1m."""
 
     def __init__(self):
         self.tick_q, self.swap_q, self.trader_q = [], [], {}
+        # les buffers de bougie 1m : mint → [minute_ts_ms, open, high, low, close]
+        # + le volume plateforme : (addr, minute_ts_ms) → la somme des usdAmount
+        self.candles = {}
+        self.swap_vol = {}
+        self.last_minute = int(time.time()) // 60
         self.last_flush = time.time()
         self.n_ticks, self.n_swaps, self.n_top, self.n_sells_top = 0, 0, 0, 0
+        self.n_candles = 0
         self.con_ticks = sqlite3.connect(DB_TICKS, timeout=30)
         self.con_swaps = sqlite3.connect(DB_SWAPS, timeout=30)
 
@@ -163,6 +169,15 @@ class Writer:
         px = payload.get("priceUsd")
         if mint and px is not None:
             self.tick_q.append((mint, float(ts), float(px), int(time.time())))
+            # la bougie 1m en cours
+            minute = int(float(ts)) // 60 * 60 * 1000
+            c = self.candles.get(mint)
+            if c is None or c[0] != minute:
+                self.candles[mint] = [minute, float(px), float(px), float(px), float(px)]
+            else:
+                c[2] = max(c[2], float(px))
+                c[3] = min(c[3], float(px))
+                c[4] = float(px)
 
     def add_swap(self, payload):
         sid = payload.get("id")
@@ -171,27 +186,61 @@ class Writer:
         handle = payload.get("userHandle") or ""
         is_top = 1 if handle in TOP_HANDLES else 0
         ptype = payload.get("type") or ""
+        usd = payload.get("usdAmount")
+        addr = payload.get("tokenAddress")
+        created = payload.get("createdAt") or ""
+        if addr and usd is not None:
+            try:
+                minute = int(time.mktime(time.strptime(
+                    created[:19], "%Y-%m-%dT%H:%M:%S"))) // 60 * 60 * 1000
+                self.swap_vol[(addr, minute)] = \
+                    self.swap_vol.get((addr, minute), 0.0) + float(usd)
+            except Exception:
+                pass
         self.swap_q.append((
             sid, payload.get("tradeId"), ptype, payload.get("userId"),
-            payload.get("createdAt"), json.dumps(payload), int(time.time()),
-            handle, payload.get("ticker"), payload.get("tokenAddress"),
-            str(payload.get("networkId") or ""), payload.get("usdAmount"),
+            created, json.dumps(payload), int(time.time()),
+            handle, payload.get("ticker"), addr,
+            str(payload.get("networkId") or ""), usd,
             payload.get("marketCap"), payload.get("price"),
             payload.get("equity"), 1 if payload.get("isDev") else 0, is_top))
         if handle:
             uid = payload.get("userId")
             if uid:
+                now_s = int(time.time())
                 self.trader_q[uid] = (uid, handle, payload.get("displayName"),
-                                      payload.get("equity"), int(time.time()))
+                                      payload.get("equity"), now_s, now_s)
         if is_top:
             self.n_top += 1
             if ptype == "swap_sell":
                 self.n_sells_top += 1
 
+    def _roll_candles(self):
+        """Écrit les bougies 1m closes (et injecte le volume plateforme)."""
+        now_minute = int(time.time()) // 60
+        rows = []
+        for mint in list(self.candles):
+            c = self.candles[mint]
+            if c[0] // 60000 < now_minute:  # la minute est close
+                vol = self.swap_vol.get((mint, c[0]), 0.0)
+                rows.append((mint, "1m", c[0], c[1], c[2], c[3], c[4], vol,
+                             time.time()))
+                del self.candles[mint]
+        # purge des volumes anciens (> 10 min)
+        cutoff = (now_minute - 10) * 60 * 1000
+        for key in [k for k in self.swap_vol if k[1] < cutoff]:
+            del self.swap_vol[key]
+        if rows:
+            self.con_ticks.executemany(
+                "INSERT OR REPLACE INTO fomo_ohlcv VALUES (?,?,?,?,?,?,?,?,?)", rows)
+            self.con_ticks.commit()
+            self.n_candles += len(rows)
+
     def flush(self):
         now = time.time()
         if now - self.last_flush < 2:
             return
+        self._roll_candles()
         if self.tick_q:
             self.con_ticks.executemany(
                 "INSERT OR REPLACE INTO fomo_ticks VALUES (?,?,?,?)", self.tick_q)
@@ -205,7 +254,7 @@ class Writer:
             self.n_swaps += len(self.swap_q); self.swap_q = []
         if self.trader_q:
             self.con_swaps.executemany(
-                "INSERT INTO ws_traders VALUES (?,?,?,?,?) "
+                "INSERT INTO ws_traders VALUES (?,?,?,?,?,?) "
                 "ON CONFLICT(user_id) DO UPDATE SET handle=excluded.handle, "
                 "display_name=excluded.display_name, equity_last=excluded.equity_last, "
                 "last_seen=excluded.last_seen",
@@ -300,8 +349,9 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
             if time.time() - last_summary > SUMMARY_EVERY:
                 writer.flush()
                 log(f"résumé 10 min : {n_recv} msgs | ticks={writer.n_ticks} "
-                    f"swaps={writer.n_swaps} (top={writer.n_top}, "
-                    f"sorties_top={writer.n_sells_top}) | topics prices={len(hot.lru)}")
+                    f"bougies1m={writer.n_candles} swaps={writer.n_swaps} "
+                    f"(top={writer.n_top}, sorties_top={writer.n_sells_top}) "
+                    f"| topics prices={len(hot.lru)}")
                 last_summary = time.time()
             if run_until_ts and time.time() > run_until_ts:
                 writer.flush()

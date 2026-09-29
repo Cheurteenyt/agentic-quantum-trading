@@ -179,7 +179,8 @@ def main():
     try:
         login = pw.chromium.connect_over_cdp("http://127.0.0.1:9223", timeout=8000)
         lctx = login.contexts[0] if login.contexts else login
-        page = next((p for p in lctx.pages if "fomo.family" in (p.url or "")), None) or lctx.new_page()
+        # page DÉDIÉE — jamais un onglet du user
+        page = lctx.new_page()
         try:
             for h in [x.strip() for x in args.handles.split(",") if x.strip()]:
                 try:
@@ -189,8 +190,10 @@ def main():
                     log(f"  {h}: ERR {str(e)[:80]}")
             con.commit()
         finally:
-            if page.url == "about:blank":
+            try:
                 page.close()
+            except Exception:
+                pass
     finally:
         pw.stop()
         con.close()

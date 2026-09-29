@@ -162,13 +162,14 @@ def main() -> int:
     state = json.loads(state_f.read_text()) if state_f.exists() else {}
 
     pw = sync_playwright().start()
+    page = None
     try:
         browser = pw.chromium.connect_over_cdp(CDP, timeout=8000)
         ctx = browser.contexts[0] if browser.contexts else browser
-        page = next((p for p in ctx.pages if "fomo.family" in (p.url or "")), None)
-        if not page:
-            print("[walker] pas de page fomo — le daemon doit être loggé")
-            return 1
+        # page DÉDIÉE — les routes se naviguent ICI, jamais dans un onglet du user
+        page = ctx.new_page()
+        page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(3000)
 
         now = time.time()
         routes_due = [r for r in ROUTES
@@ -194,6 +195,11 @@ def main() -> int:
         print(f"[walker] la rotation complète : {len(routes_due)} routes")
         return 0
     finally:
+        if page is not None:
+            try:
+                page.close()
+            except Exception:
+                pass
         pw.stop()
 
 

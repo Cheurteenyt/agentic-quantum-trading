@@ -45,13 +45,14 @@ def parse_trending(text: str) -> list[dict]:
 
 def main() -> int:
     pw = sync_playwright().start()
+    page = None
     try:
         browser = pw.chromium.connect_over_cdp(CDP, timeout=8000)
         ctx = browser.contexts[0] if browser.contexts else browser
-        page = next((p for p in ctx.pages if "fomo.family" in (p.url or "")), None)
-        if not page:
-            print("[miner] pas de page fomo.family dans la fenêtre de login")
-            return 1
+        # page DÉDIÉE créée pour la passe — interdiction d'adopter un onglet du user
+        page = ctx.new_page()
+        page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(4000)  # le boot WS + le render de la sidebar
         # le texte de la sidebar trending (le contenu visible)
         text = page.evaluate("""() => {
             const els = document.querySelectorAll('[class*="trending" i], [class*="Trending"] i');
@@ -82,6 +83,11 @@ def main() -> int:
         con.close()
         return 0
     finally:
+        if page is not None:
+            try:
+                page.close()
+            except Exception:
+                pass
         pw.stop()
 
 
