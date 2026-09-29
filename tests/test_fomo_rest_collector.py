@@ -5,8 +5,11 @@ hors réseau et hors DB de prod.
 Couvre : jwt_exp (payload valide/expiré/malformé), read_jwt sur des caches
 temporaires (le plus frais des deux gagne, marge exp > now+600), la fenêtre de
 fraîcheur fresh() (cadence × 30 min × 0,9), snap/cursor_load/cursor_save sur
-sqlite :memory:, le filtre EVM de pre_graduated_mints (mints 0x exclus) et le
-décapsulage _rows_of (responseObject liste vs dict).
+sqlite :memory:, le filtre EVM de pre_graduated_mints (mints 0x exclus), le
+décapsulage _rows_of (responseObject liste vs dict) et col_token_trades sur
+un client factice (walk du feed global — le filtre &tokenAddress= est ignoré
+par l'API —, mint = item.tokenAddress, idempotence par item.id, curseur
+lastId, cycle neuf, skip de fraîcheur).
 
     .venv/bin/python -m unittest tests.test_fomo_rest_collector -v
 """
@@ -36,12 +39,40 @@ def make_jwt(exp: int) -> str:
 
 
 def memory_db() -> sqlite3.Connection:
-    """La table snapshots, même DDL que le collector (main)."""
+    """Les tables snapshots + token_trades, même DDL que le collector (main)."""
     con = sqlite3.connect(":memory:")
     con.execute("""CREATE TABLE fomo_rest_snapshots (
                      captured_at INTEGER, endpoint TEXT, entity_id TEXT,
                      data TEXT, PRIMARY KEY (endpoint, entity_id))""")
+    con.execute("""CREATE TABLE fomo_rest_token_trades (
+                     trade_id TEXT PRIMARY KEY, mint TEXT, user_id TEXT,
+                     captured_at INTEGER, data TEXT)""")
     return con
+
+
+class FakeCli:
+    """Client sans réseau ni pacing : pages en file, URLs enregistrées."""
+
+    def __init__(self, pages):
+        self.pages = list(pages)
+        self.urls = []
+        self.n = 0
+
+    def get(self, path):
+        self.urls.append(path)
+        self.n += 1
+        return self.pages.pop(0) if self.pages \
+            else {"items": [], "hasNextPage": False}
+
+
+def feed_item(i: int, mint: str = "MintAAA", **over) -> dict:
+    """Un item /feed/tradingActivity réduit aux champs porteurs."""
+    it = {"id": f"id-{i}", "tradeId": f"trade-{i}", "tokenAddress": mint,
+          "userId": f"user-{i}", "type": "swap_buy",
+          "usdAmount": 1000.0 + i, "marketCap": 164623.0,
+          "price": 0.000168349, "createdAt": "2026-09-29T20:00:00.000Z"}
+    it.update(over)
+    return it
 
 
 class JwtExpTests(unittest.TestCase):
@@ -297,6 +328,83 @@ class RowsOfTests(unittest.TestCase):
 
     def test_dict_sans_leaderboard(self):
         self.assertEqual(col._rows_of({"autre": []}), [])
+
+
+class TokenTradesTests(unittest.TestCase):
+    """col_token_trades : &tokenAddress= est IGNORÉ par l'API (sonde du
+    29/09) → walk du feed GLOBAL, mint = item.tokenAddress (jamais celui
+    demandé), INSERT OR IGNORE par item.id, curseur lastId persisté."""
+
+    def setUp(self):
+        self.con = memory_db()
+        self.addCleanup(self.con.close)
+
+    def run_col(self, cli, cadence=1):
+        return col.col_token_trades(self.con, cli, cadence, {})
+
+    def test_attribution_mint_par_item(self):
+        """Le mint vient de l'ITEM : deux tokens dans une même page."""
+        page = {"items": [feed_item(1, "MintAAA"), feed_item(2, "MintBBB")],
+                "hasNextPage": False}
+        self.run_col(FakeCli([page]))
+        mints = [r[0] for r in self.con.execute(
+            "SELECT mint FROM fomo_rest_token_trades ORDER BY trade_id")]
+        self.assertEqual(mints, ["MintAAA", "MintBBB"])
+        users = dict(self.con.execute(
+            "SELECT trade_id, user_id FROM fomo_rest_token_trades"))
+        self.assertEqual(users, {"id-1": "user-1", "id-2": "user-2"})
+
+    def test_data_json_integral(self):
+        """data = l'item intégral (MC, fdv, price, equity… au trade)."""
+        it = feed_item(7, marketCap=50000.0, price=1e-6, equity=999.0)
+        self.run_col(FakeCli([{"items": [it], "hasNextPage": False}]))
+        data = self.con.execute(
+            "SELECT data FROM fomo_rest_token_trades "
+            "WHERE trade_id='id-7'").fetchone()[0]
+        self.assertEqual(json.loads(data), it)
+
+    def test_idempotent_append_only(self):
+        page = {"items": [feed_item(1), feed_item(2)], "hasNextPage": False}
+        self.run_col(FakeCli([page]))
+        self.run_col(FakeCli([page]))             # les mêmes items re-servis
+        self.assertEqual(self.con.execute(
+            "SELECT COUNT(*) FROM fomo_rest_token_trades").fetchone()[0], 2)
+
+    def test_pagination_lastid(self):
+        """Page 2 = &lastId=<id du dernier item page 1> ; +n = nouveaux."""
+        p1 = {"items": [feed_item(i) for i in range(4)], "hasNextPage": True}
+        p2 = {"items": [feed_item(10 + i) for i in range(4)],
+              "hasNextPage": False}
+        cli = FakeCli([p1, p2])
+        out = self.run_col(cli)
+        self.assertEqual(len(cli.urls), 2)
+        self.assertNotIn("lastId", cli.urls[0])
+        self.assertIn("lastId=id-3", cli.urls[1])
+        self.assertIn("+8", out)
+
+    def test_cycle_neuf_apres_epuisement(self):
+        """Flux épuisé → le curseur repart de None à la passe suivante."""
+        page = {"items": [feed_item(1)], "hasNextPage": False}
+        self.run_col(FakeCli([page]))
+        cli2 = FakeCli([page])
+        self.run_col(cli2)
+        self.assertNotIn("lastId", cli2.urls[0])
+
+    def test_item_sans_id_saute(self):
+        page = {"items": [{"tradeId": "t-sans-id"}, feed_item(2)],
+                "hasNextPage": False}
+        out = self.run_col(FakeCli([page]))
+        self.assertEqual(self.con.execute(
+            "SELECT COUNT(*) FROM fomo_rest_token_trades"
+        ).fetchone()[0], 1)
+        self.assertIn("+1", out)
+
+    def test_fraicheur_skip(self):
+        """Cadence > 1 et snapshot frais → 0 appel (le garde-fou existe)."""
+        col.snap(self.con, "token_trades", "latest", {})
+        cli = FakeCli([])
+        self.assertIn("skip", self.run_col(cli, cadence=6))
+        self.assertEqual(cli.n, 0)
 
 
 class CollectesTests(unittest.TestCase):

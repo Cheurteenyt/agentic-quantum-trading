@@ -23,8 +23,13 @@ NOUVEAUTÉS v2 (formes validées par fomo_rest_collector_probe.py) :
 - /proxy/verifiedTokens → liste brute (tri par `holders` À LA LECTURE) ;
 - /v2/leaderboard?window=alltime&limit=100 → {leaderboard:[100×dict27]} ;
 - /feed/tradingActivity?limit=50&threshold=1000 → {items, hasNextPage}, items
-  portent tokenAddress/userId/tradeId/body — et `&tokenAddress=<mint>` FILTRE
-  (validé) → itération par token possible à l'itération suivante ;
+  portent tokenAddress/userId/tradeId/body — ATTENTION : `&tokenAddress=` est
+  IGNORÉ par l'API (sonde du 29/09 : 0/25 items du mint demandé ; l'ancienne
+  preuve 3/3 = coïncidence, le token chaud dominait le feed global). La
+  calibration du filtre était donc fausse : l'archive PAR TOKEN passe par le
+  walk du feed global (col_token_trades, curseur lastId=<item.id> découvert
+  par sondage) — les mints du hot set dominent le feed et s'y accumulent ;
+  le mint attribué est TOUJOURS item.tokenAddress (jamais celui demandé) ;
 - profils élite : /v2/users/<uid> (+balances,/leaderboard) et
   /v2/userTokens/aggregatedSnapshotById?userId=<uid>&snapshotId=1 — SANS
   snapshotId = 400 ; réponse observée dégénérée {snapshotId,pnl,equity}, à creuser ;
@@ -52,6 +57,7 @@ N_ELITE = 5
 N_PROFILES = 4           # uids profilés par passe (des 5 élite en rotation)
 SWAPS_PAGES = max(1, int(os.environ.get("FOMO_SWAPS_PAGES", "5")))
 TRADES_PAGES = max(1, int(os.environ.get("FOMO_TRADES_PAGES", "3")))
+TOKEN_TRADES_PAGES = max(1, int(os.environ.get("FOMO_TOKEN_TRADES_PAGES", "2")))
 PROFILE_KINDS = (  # (endpoint de snapshot, chemin GET) — {uid} formaté
     ("user", "/v2/users/{uid}"),
     ("balances", "/v2/users/{uid}/balances"),
@@ -400,6 +406,56 @@ def col_swaps_trades(con, cli, cadence, ctx):
     return " ".join(out)
 
 
+def col_token_trades(con, cli, cadence, ctx):
+    """L'archive des trades PAR TOKEN en continu (table append-only
+    fomo_rest_token_trades, INSERT OR IGNORE par item.id — la clé de
+    pagination du feed, donc idempotent).
+
+    Le paramètre &tokenAddress= du feed est IGNORÉ par l'API (sonde du
+    29/09 : 0/25 items du mint demandé) : impossible d'interroger mint par
+    mint. Le walk du feed GLOBAL y supplée — les mints du hot set le
+    dominent (22/25 items pour le token chaud observé) et chaque passe
+    avance de TOKEN_TRADES_PAGES pages (25 items/page, cap serveur sur
+    limit=50) via lastId=<item.id> (découvert par sondage, persisté comme
+    les curseurs élite ; flux épuisé → cycle neuf). Le mint attribué est
+    TOUJOURS item.tokenAddress — la doctrine « seul le MINT capturé live
+    fait foi ». Un item porte : type swap_buy/swap_sell, usdAmount,
+    marketCap, fdv, price, equity (MC/price AU TRADE = reconstruction de
+    chart), createdAt, userId, ticker, badge…"""
+    if fresh(con, "token_trades", "latest", cadence):
+        return "token_trades frais, skip"
+    st = cursor_load(con, "token_trades", "latest")
+    cur = None if st.get("exhausted") else st.get("cursor")
+    now = int(time.time())
+    new, done, exhausted = 0, 0, False
+    while done < TOKEN_TRADES_PAGES:
+        d = cli.get("/feed/tradingActivity?limit=50&threshold=1000"
+                    + (f"&lastId={cur}" if cur else "")) or {}
+        rows = d.get("items") if isinstance(d, dict) else d
+        rows = rows or []
+        for it in rows:
+            tid = it.get("id") if isinstance(it, dict) else None
+            if not tid:
+                continue
+            rc = con.execute("""INSERT OR IGNORE INTO fomo_rest_token_trades
+                                (trade_id, mint, user_id, captured_at, data)
+                                VALUES (?,?,?,?,?)""",
+                             (tid, it.get("tokenAddress"), it.get("userId"),
+                              now, json.dumps(it, ensure_ascii=False))).rowcount
+            new += 1 if rc and rc > 0 else 0
+        done += 1
+        nxt = rows[-1].get("id") if rows and isinstance(rows[-1], dict) else None
+        if not rows or d.get("hasNextPage") is False or not nxt or nxt == cur:
+            cur = nxt or cur
+            exhausted = True
+        else:
+            cur = nxt
+        cursor_save(con, "token_trades", "latest", cur, done, exhausted)
+        if exhausted:
+            break
+    return f"token_trades=+{new} p={done}{' E' if exhausted else ''}"
+
+
 def col_clans(con, cli, cadence, ctx):
     if fresh(con, "clans", "24h", cadence):
         return "clans frais, skip"
@@ -417,6 +473,7 @@ COLLECTES = (
     ("trending", 1, col_trending),
     ("verified_tokens", 2, col_verified),                  # 1/2 passes
     ("trading_activity", 1, col_trading_activity),
+    ("token_trades", 1, col_token_trades),                 # walk feed, 2 pages
     ("token_about", 1, col_token_about),                   # batch 12 mints
     ("bonding", 1, col_bonding),                           # batch 12 pré-grad
     ("hodlers_thesis", 1, col_hodlers_thesis),
@@ -442,6 +499,9 @@ def main() -> int:
     con.execute("""CREATE TABLE IF NOT EXISTS fomo_rest_swaps (
                      swap_id TEXT PRIMARY KEY, user_id TEXT, captured_at INTEGER,
                      data TEXT)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS fomo_rest_token_trades (
+                     trade_id TEXT PRIMARY KEY, mint TEXT, user_id TEXT,
+                     captured_at INTEGER, data TEXT)""")
     ctx, stats = {}, []
     t0 = time.time()
     for name, cadence, fn in COLLECTES:
