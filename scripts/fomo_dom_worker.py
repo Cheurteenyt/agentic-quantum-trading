@@ -54,6 +54,38 @@ def ensure_tables():
     con.close()
 
 
+def ensure_page(ctx, page):
+    """La santé de la page : si morte (fermée/crash), ré-acquérir — le worker
+    ne doit JAMAIS tourner en zombie sur une page fermée."""
+    try:
+        page.evaluate("() => 1")
+        return page
+    except Exception:
+        log("page morte → ré-acquisition")
+        for attempt in range(4):
+            try:
+                np = ctx.new_page()
+                np.goto("https://fomo.family/", wait_until="domcontentloaded",
+                        timeout=30000)
+                np.wait_for_timeout(4000)
+                log("page ré-acquise ✓")
+                return np
+            except Exception:
+                # libérer puis réutiliser une page existante
+                for p2 in list(ctx.pages):
+                    if "fomo.family" in (p2.url or ""):
+                        try:
+                            p2.close()
+                        except Exception:
+                            pass
+                time.sleep(5)
+        existing = next((p2 for p2 in ctx.pages if "fomo.family" in (p2.url or "")), None)
+        if existing:
+            log("réutilisation de la page existante")
+            return existing
+        raise RuntimeError("page irécupérable")
+
+
 def visit_clans(page):
     """La page clans : les groupes de baleines — le dump structuré brut
     (le parse fin arrive quand le format réel est vu en production)."""
@@ -136,6 +168,13 @@ def main():
         return 0
 
     ensure_tables()
+    con_mig = ensure_swaps_db()
+    for col in ("mutuals INTEGER", "following REAL", "followers REAL"):
+        try:
+            con_mig.execute(f"ALTER TABLE ws_traders ADD COLUMN {col}")
+        except Exception:
+            pass  # déjà présentes
+    con_mig.commit(); con_mig.close()
     state = json.loads(STATE_F.read_text()) if STATE_F.exists() else {}
     last_visit = state.get("last_visit", {})
     profile_idx = state.get("profile_idx", 0)
@@ -169,8 +208,8 @@ def main():
                 except Exception:
                     pass
         log("les pages fomo purgées — le worker = seul propriétaire du navigateur")
-        # la page DÉDIÉE : le retry (la limite d'onglets du Chrome for Testing
-        # = basse + la course au restart systemd) en libérant nos propres pages
+        # la page DÉDIÉE : le retry avec l'ESCALADE — au 2e échec, le
+        # navigateur dédié = HS → restart du service fomo-browser + re-connexion
         page = None
         for attempt in range(4):
             try:
@@ -184,6 +223,21 @@ def main():
                             p2.close()
                         except Exception:
                             pass
+                if attempt >= 1:
+                    log("le navigateur dédié = HS → restart fomo-browser.service")
+                    import subprocess
+                    subprocess.run(["systemctl", "--user", "restart",
+                                    "fomo-browser.service"], timeout=90)
+                    time.sleep(12)
+                    for port2 in ("9222", "9223"):
+                        try:
+                            browser = pw.chromium.connect_over_cdp(
+                                f"http://127.0.0.1:{port2}", timeout=8000)
+                            ctx = browser.contexts[0] if browser.contexts else browser
+                            log(f"CDP re-attaché sur :{port2}")
+                            break
+                        except Exception:
+                            continue
                 time.sleep(5)
         if page is None:
             page = next((p for p in ctx.pages if "fomo.family" in (p.url or "")), None)
@@ -205,6 +259,7 @@ def main():
 
         while True:
             now = time.time()
+            page = ensure_page(ctx, page)
             # 0) la sidebar trending de l'ACCUEIL → fomo_price_history
             #    (le pattern du miner : MC/prix/▲% — la route du walker = les
             #    lignes de la page Tokens, une autre structure)
@@ -231,6 +286,27 @@ def main():
                     log(f"[sidebar] {n_ins} tokens → fomo_price_history")
                 except Exception as e:
                     log(f"[sidebar] ERR {str(e)[:80]}")
+                time.sleep(2)
+            # 0b) l'onglet Most held de la sidebar (ce que les baleines détiennent)
+            if now - last_visit.get("most_held", 0) > 30 * 60:
+                try:
+                    from login_window_miner import parse_trending
+                    page.locator('text="Most held"').first.click(timeout=6000)
+                    page.wait_for_timeout(4000)
+                    text = page.evaluate("() => document.body.innerText")
+                    parsed = parse_trending(text)
+                    con_h = sqlite3.connect(str(WDB), timeout=30)
+                    con_h.execute("PRAGMA busy_timeout=30000")
+                    for pk in parsed:
+                        con_h.execute(
+                            "INSERT OR REPLACE INTO fomo_price_history "
+                            "(ticker, captured_at, mc, price, change) VALUES (?,?,?,?,?)",
+                            (pk["ticker"], int(time.time()), pk["mc"], pk["price"], pk["change"]))
+                    con_h.commit(); con_h.close()
+                    last_visit["most_held"] = now
+                    log(f"[most_held] {len(parsed)} tokens")
+                except Exception as e:
+                    log(f"[most_held] ERR {str(e)[:70]}")
                 time.sleep(2)
             # 1) les routes du walker dues
             for route in ROUTES:
@@ -380,9 +456,25 @@ def main():
                     except Exception as e:
                         log(f"[{name}] ERR {str(e)[:80]}")
                     time.sleep(2)
-            # 3) les profils top traders (1 par cycle = le round-robin, la vue investie)
+            # 3) les profils : l'élite + les holders skilles DÉCOUVERTS
+            #    (la boucle auto-nourrie : un holder avec un bon PnL = un
+            #    candidat élite qui entre automatiquement dans la rotation)
             if now - last_visit.get("profiles", 0) > CADENCES["profiles"] * 60:
-                handle = TOP_HANDLES[profile_idx % len(TOP_HANDLES)]
+                candidates = list(TOP_HANDLES)
+                try:
+                    con_d = sqlite3.connect(str(WDB), timeout=30)
+                    con_d.execute("PRAGMA busy_timeout=30000")
+                    for (h,) in con_d.execute(
+                            """SELECT handle FROM fomo_token_holders
+                            WHERE pnl_pct > 100 AND position_usd > 3000
+                              AND handle NOT IN (SELECT handle FROM dom_leaderboard)
+                            GROUP BY handle ORDER BY AVG(pnl_pct) DESC LIMIT 20"""):
+                        if h not in candidates:
+                            candidates.append(h)
+                    con_d.close()
+                except Exception:
+                    pass
+                handle = candidates[profile_idx % len(candidates)]
                 try:
                     con_swaps2 = ensure_swaps_db()
                     now_i = int(time.time())
@@ -450,6 +542,25 @@ def _mine_profile_light(page, handle, con, now):
     time.sleep(4)
     text2 = page.evaluate("() => document.body.innerText")
     cur = POS_RE.findall(text2)
+    # le graphe social : mutuals / following / followers → ws_traders
+    import re as _re
+    m_mut = _re.search(r"(\d+)\s*\nMutuals", text2) or _re.search(r"(\d+) Mutuals", text2)
+    m_fol = _re.search(r"(\d+)\s*\nFollowing", text2) or _re.search(r"([\d.,]+[KMB]?) Following", text2)
+    m_fers = _re.search(r"([\d.,]+[KMB]?)\s*\nFollowers", text2) or _re.search(r"([\d.,]+[KMB]?) Followers", text2)
+    try:
+        def _knum(s):
+            if not s: return None
+            s = s.replace(",", "")
+            mult = {"K": 1e3, "M": 1e6, "B": 1e9}.get(s[-1], 1) if s and s[-1].isalpha() else 1
+            return float(s.rstrip("KMB")) * mult
+        con.execute(
+            "UPDATE ws_traders SET mutuals=?, following=?, followers=? WHERE handle=?",
+            (int(m_mut.group(1)) if m_mut else None,
+             _knum(m_fol.group(1)) if m_fol else None,
+             _knum(m_fers.group(1)) if m_fers else None, handle))
+        con.commit()
+    except Exception:
+        pass
     for tk, q, v, pc in cur:
         con.execute("INSERT OR REPLACE INTO dom_profile_positions VALUES (?,?,?,?,?,?,?)",
                     (handle, tk, q, knum(v), float(pc), "current", now))
