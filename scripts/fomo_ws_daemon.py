@@ -47,6 +47,34 @@ CHAIN_SOL, CHAIN_EVM = "1399811149", "4663"
 # le budget des topics prices (le trading_activity = 1 de plus, la marge serveur)
 MAX_PRICE_TOPICS = 78
 SEED_MINTS = 40
+EXIT_THRESHOLD = 2  # ≥ 2 top traders distincts vendent le même token = consensus
+
+
+class SignalEngine:
+    """La détection temps réel DANS le daemon (latence < 2 s) :
+    la sortie consensus = ≥ N top traders distincts vendent le même token
+    dans la fenêtre glissante de 30 min. Idempotent par (token, bucket)."""
+
+    def __init__(self):
+        self.sells = []  # [(ts, addr, handle)]
+        self.emitted = set()
+
+    def on_top_sell(self, addr, handle, ticker):
+        """Retourne le set des handles si un consensus vient de se former."""
+        now = time.time()
+        self.sells.append((now, addr, handle))
+        cutoff = now - 30 * 60
+        self.sells = [s for s in self.sells if s[0] > cutoff and s[1] == addr]
+        handles = {h for _, _, h in self.sells}
+        if len(handles) >= EXIT_THRESHOLD:
+            bucket = int(now // (30 * 60))
+            key = (addr, bucket)
+            if key not in self.emitted:
+                self.emitted.add(key)
+                if len(self.emitted) > 300:
+                    self.emitted = set(list(self.emitted)[-200:])
+                return handles
+        return None
 PACING = 0.05
 SUMMARY_EVERY = 600
 
@@ -288,6 +316,23 @@ class Writer:
             self.con_ticks.commit()
             self.n_candles += len(rows)
 
+    def write_exit_signal(self, addr, ticker, handles):
+        """Le signal exit_consensus écrit immédiatement (+ le journal)."""
+        bucket = int(time.time() // (30 * 60))
+        key = f"exit_consensus_rt|{addr}|{bucket}"
+        try:
+            self.con_swaps.execute(
+                "INSERT OR IGNORE INTO ws_signals VALUES (?,?,?,?,?,?,?)",
+                (key, "exit_consensus_rt", addr, ticker,
+                 json.dumps({"handles": handles, "window_min": 30, "latency": "realtime"}),
+                 int(time.time()), int(time.time())))
+            self.con_swaps.commit()
+        except Exception as e:
+            log(f"signal write err : {str(e)[:80]}")
+            return
+        log(f"⚡⚡ SORTIE CONSENSUS {ticker} : {', '.join(handles)} "
+            f"vendent dans la fenêtre 30 min")
+
     def flush(self):
         now = time.time()
         if now - self.last_flush < 2:
@@ -328,9 +373,11 @@ class Writer:
 
 
 class HotSet:
-    """Le LRU des topics prices : subscribe le chaud, unsubscribe le froid."""
+    """Les topics prices : les ÉPINGLÉS (les tokens des top traders — jamais
+    évincés, la série prix de leurs positions = critique) + le LRU du reste."""
 
     def __init__(self, seed_mints):
+        self.pinned = set()
         self.lru = OrderedDict()
         self.chain = lambda m: CHAIN_EVM if m.startswith("0x") else CHAIN_SOL
         for m in seed_mints:
@@ -338,15 +385,34 @@ class HotSet:
         self.pending = list(self.lru.keys())
 
     def touch(self, mint):
-        if mint in self.lru:
-            self.lru.move_to_end(mint)
-            return None
+        """Le flux trade un token : le replacer en LRU (ou l'ajouter si la place).
+        Retourne (nouveau_topic | None, évincé | None)."""
+        if mint in self.pinned or mint in self.lru:
+            if mint in self.lru:
+                self.lru.move_to_end(mint)
+            return None, None
         evicted = None
-        if len(self.lru) >= MAX_PRICE_TOPICS:
-            evicted, _ = self.lru.popitem(last=False)
+        if len(self.lru) + len(self.pinned) >= MAX_PRICE_TOPICS:
+            if self.lru:
+                evicted, _ = self.lru.popitem(last=False)
+            else:
+                return None, None  # tout est épinglé — le budget est saturé
         self.lru[mint] = None
         self.pending.append(mint)
-        return evicted
+        return mint, evicted
+
+    def pin(self, mint):
+        """Épingler un token top-trader : le sortir du LRU, jamais évincé."""
+        if mint in self.pinned:
+            return None
+        new = None
+        if mint in self.lru:
+            del self.lru[mint]
+        elif len(self.lru) + len(self.pinned) < MAX_PRICE_TOPICS:
+            new = mint
+        self.pinned.add(mint)
+        self.pending.append(mint)
+        return new
 
     def topic(self, mint):
         return f"{mint}:{self.chain(mint)}"
@@ -377,6 +443,7 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
         log(f"subscribe : le feed swaps + {len(hot.lru)} topics prices")
 
         n_recv, t0, last_summary = 0, time.time(), time.time()
+        signals = SignalEngine()
         async for raw in ws:
             try:
                 m = json.loads(raw)
@@ -390,10 +457,25 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                 elif tt == "trading_activity":
                     p = m.get("payload", {})
                     writer.add_event(p)
-                    # la découverte : le token trade → le prix en direct
                     addr = p.get("tokenAddress")
-                    if addr and addr not in hot.lru:
-                        ev = hot.touch(addr)
+                    # un top trader trade un token → ÉPINGLER sa série prix
+                    if addr and (p.get("userHandle") or "") in TOP_HANDLES:
+                        new = hot.pin(addr)
+                        if new:
+                            await ws.send(json.dumps(
+                                {"type": "subscribe", "topicType": "prices",
+                                 "topicId": hot.topic(new)}))
+                            await asyncio.sleep(PACING)
+                        # la sortie consensus, en DIRECT (< 2 s)
+                        if p.get("type") == "swap_sell":
+                            handles = signals.on_top_sell(addr, p.get("userHandle"),
+                                                          p.get("ticker"))
+                            if handles:
+                                writer.write_exit_signal(
+                                    addr, p.get("ticker"), sorted(handles))
+                    # la découverte : le token trade → le prix en direct
+                    elif addr and addr not in hot.lru and addr not in hot.pinned:
+                        new, ev = hot.touch(addr)
                         if ev:
                             await ws.send(json.dumps(
                                 {"type": "unsubscribe", "topicType": "prices",
@@ -416,7 +498,7 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                     f"(top={writer.n_top}, sorties_top={writer.n_sells_top}) "
                     f"thèses={writer.n_theses} types_inconnus={writer.n_events} "
                     f"{sorted(writer.unknown_types) if writer.unknown_types else ''} "
-                    f"| topics prices={len(hot.lru)}")
+                    f"| topics={len(hot.lru)}+{len(hot.pinned)}épinglés")
                 last_summary = time.time()
             if run_until_ts and time.time() > run_until_ts:
                 writer.flush()
