@@ -1,0 +1,8 @@
+[Unit]
+Description=fomo swaps fresh — page 1 des 13 baleines (le flux de réplication impartial)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_swaps_collector.py --fresh
+TimeoutStartSec=600

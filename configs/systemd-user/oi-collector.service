@@ -1,0 +1,8 @@
+[Unit]
+Description=Aster OI collector — le footprint positionnel (open interest) toutes les 15 min
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/oi_collector.py
+TimeoutStartSec=300

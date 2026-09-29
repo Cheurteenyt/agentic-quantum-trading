@@ -1,0 +1,8 @@
+[Unit]
+Description=aster health — les 8 sondes (klines/OI/liq/blocks/premium/depth/continuité/funding), alerte sur transition
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_health.py
+TimeoutStartSec=180

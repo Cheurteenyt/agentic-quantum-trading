@@ -28,15 +28,22 @@ holds 24h/72h/6h = des optimums mesurés (design evidence-locked,
 `funding_hold_surv_map.py`) ; les 3 configs avancent côte à côte sur les
 MÊMES trades paper (`qubo_forward_tracker.py`).
 
-## Le volet institutionnel (état au 28/09) — 5 couches, toutes datées de tir
+## Le volet institutionnel (état au 30/09) — 5 couches, toutes datées de tir
 
 La couche institutionnelle fine est en place : **5 couches** (murs, prints,
 OI H4/H5, sonde liq, whale_flow), chacune avec sa date de tir — plus la
-boucle réplication derek518 câblée au forward.
+boucle réplication derek518 câblée au forward. **Munitions vérifiées au
+30/09** : OI 9,2-9,9 j au 06/10 (besoin 5-7) ; CVD 15m backfill FINI ;
+depth 7,08 j collectés avec **veille inhibée + watchdog anti-stall**
+(continuité 14 j) ; whale_radar réarmé (le run de preuve : +1 308 positions,
+whale_flow +168 lignes — les 3 nuits perdues = l'unit éditée pendant le run) ;
+**la sonde P3 (fund7/vol7/liq24h) câblée au forward** (les définitions de
+mechanism_probe, match exact vérifié) — chaque activation du nocturne 03:00
+logge les 3 gradients.
 
 | Couche | Outil | Tir |
 |---|---|---|
-| les murs du carnet | `wall_detector.py` (PROTOTYPE 4,3 j non-mature) | **re-tir 06-07/10** |
+| les murs du carnet | `wall_detector.py` (PROTOTYPE, depth 14 j avec veille inhibée) | **re-tir 06-07/10** |
 | les gros prints | `aster_blocktrades.py` (timer 15 min câblé) — le fade = **détecteur d'absorption**, pas de continuation | le cross prints × OI squeeze dans **2 semaines** |
 | OI × prix (H4/H5) | `oi_quadrant_test.py` | **06-07/10** |
 | sonde liq | `liq_storm.py` | ~**10/10** |

@@ -1,0 +1,8 @@
+[Unit]
+Description=fomo session monitor — le jeton Privy ne meurt plus en silence
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_session_monitor.py
+StandardOutput=journal

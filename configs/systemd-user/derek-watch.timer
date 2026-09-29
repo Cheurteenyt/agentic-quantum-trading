@@ -1,0 +1,9 @@
+[Unit]
+Description=derek_watch chaque minute (la course contre les copieurs)
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

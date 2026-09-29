@@ -1,0 +1,15 @@
+[Unit]
+Description=fomo dom worker — la session JWT (bootstrap Privy) + le listener WS passif
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" -u scripts/fomo_dom_worker.py
+Restart=always
+RestartSec=60
+StandardOutput=journal
+
+[Install]
+WantedBy=default.target

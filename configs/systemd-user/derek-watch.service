@@ -1,0 +1,8 @@
+[Unit]
+Description=derek_watch — la détection temps réel des achats de derek518 (1 min)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/derek_watch.py
+TimeoutStartSec=110

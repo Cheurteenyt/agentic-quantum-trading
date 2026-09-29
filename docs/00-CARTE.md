@@ -1,6 +1,6 @@
 # 🗺️ CARTE DU PROJET — un seul endroit pour tout trouver
 
-> Mise à jour : 28/09/2026. Si un fichier bouge, cette carte bouge.
+> Mise à jour : 30/09/2026. Si un fichier bouge, cette carte bouge.
 > Doc d'architecture complète : `docs/02-architecture.md`.
 
 ## 🏆 LA MACHINE & LE REGISTRE (l'état de la stratégie)
@@ -27,17 +27,23 @@
 
 | Service | Rythme | Rôle |
 |---|---|---|
-| `aster-depth-collector` | 24/7 WS/REST | Carnets d'ordres → `depth.db` (15 symboles) |
+| `aster-depth-collector` | 24/7 WS/REST | Carnets d'ordres → `depth.db` (15 symboles) — **veille inhibée** (continuité 14 j du tir 06-07), watchdog anti-stall interne |
 | `aster-liq-collector` | 24/7 WS | Liquidations → `klines.db:liq_events` |
+| `fomo-ws-daemon` | 24/7 | Socket natif prod-api : prix, swaps, thèses, `pre_graduated_tokens`, **MC samples** (`fomo_mc_samples`) |
 | `fomo-tick-collector` | 24/7 | Ticks fomo → 1m OHLCV (flock anti-orphan, filtre QUOTE_MINTS) |
-| `fomo-mobula-topup` | 15 min | Rattrapage bougies mobula sans navigateur (`fomo_mobula_topup.py`) |
+| `fomo-browser` | permanent | Chromium caché (special:fomo, no_focus) + CDP :9222 — la session JWT |
+| `fomo-rest-collector` | 30 min | TOUTE l'historique/snapshots REST → `fomo_rest.db` (structure déclarative) |
 | `fomo-paper-forward` | 15 min | Ledger forward des lancements (`fomo_paper_forward.py`) |
+| `fomo-mobula-topup` | 15 min | Rattrapage bougies mobula sans navigateur (`fomo_mobula_topup.py`) |
 | `oi-collector` | 15 min | OI Aster → `klines.db:oi_history` (`oi_collector.py`) |
+| `aster-blocktrades` / `aster-premium` | 15 min | Gros prints institutionnels + premium/funding |
+| `derek-watch` | 1 min | Les swaps de derek518 via REST (l'edge répliqué) |
 | `fomo-swaps-fresh` | 1 h | Page 1 des 13 baleines (`fomo_swaps_collector.py`) |
-| `fomo-browser` | permanent | Chromium caché (special:fomo) + CDP :9222 |
-| `trading-agent-nightly` | 03h00 (~70 étapes) | TOUTE la chaîne nocturne (voir unité) — les indicateurs câblés |
+| `aster-health` / `fomo-health` | 5 min | **Les 2 watchdogs** (sondes + alertes sur transition) |
+| `trading-agent-nightly` | 03h00 (65 steps) | **Le nocturne ASTER** (caches, klines, machine, campagne, ménage) |
+| `x-nightly` | 03h21 (20 steps) | **Le nocturne X** (harvest, scores, rotation, registre X) |
+| `fomo-nightly` | 03h55 (9 steps) | **Le nocturne FOMO** (garde-fenêtre, radar, ondes, flows, harvest) |
 | `trading-agent-registre-noon` | 14h00 | Récolte X + liste privée + OI + scoring |
-| `depth-heatmap` / `liquidation-watcher` | périodique | Rapports visuels |
 
 ## 🤖 LES AGENTS (.zcode/agents/)
 
@@ -82,13 +88,19 @@
 - `aster_account.py` — sonde signée EIP-712 (solde/positions) — prête, attend clé privée API wallet
 
 ## 🗄️ ENTREPÔTS (`data/`)
-- `klines.db` — klines 1h **1 an** + `oi_history` + `liq_events` + `funding_history` (4,5 mois)
-- `fomo.db` — 10 tables : positions, traders, tier_list, token_intel, new_coins,
-  events, closed, clans, clan_holdings, clan_members
-- `x_posts.db` — registre (560+ posts, calls, scores) + `x_pressure` + `x_signal_history`
-  + `x_profiles` + `x_trends` + `x_lists_found`
-- `depth.db` — carnets d'ordres (4,4M bins) + slippage mesuré
-- `legacy_lanes.db` — les 17 092 lanes de juin 2026 (auditées)
+- `warehouse/klines.db` — **le domaine ASTER** : klines 1h **1 an** + `oi_history` +
+  `liq_events` + `funding_history` + `block_trades` + `premium_history` +
+  `paper_trades` (le ledger machine, colonnes sonde P3) + `signal_events`
+- `warehouse/depth.db` — carnets d'ordres (54 M bins, 15 symboles, cadence 30 s)
+- `warehouse/x_posts.db` — registre X (posts, calls, scores) + `x_pressure`
+- `fomo/fomo.db` — **la base HOT du daemon fomo** : fomo_ticks (2 s), `fomo_mc_samples`
+  (la MC native échantillonnée), fomo_tokens, fomo_ohlcv, fomo_pre_graduated (16 k)
+- `fomo/fomo_swaps.db` — le worker DOM : holders/theses/header + ws_traders + ws_swaps
+- `fomo/fomo_rest.db` — **le collector REST** : fomo_rest_snapshots (toute la carte) +
+  fomo_rest_swaps + fomo_rest_token_trades (les trades avec MC AU TRADE)
+- `fomo/fomo_mobula.db` — le top-up (topup_dead) · `fomo/fomo_paper.db` — le ledger
+  forward fomo (réplication derek, anti-rug)
+- `x_browser_profile` — cache navigateur X (nettoyable)
 
 ## 📊 RAPPORTS (`reports/`) — rétention automatique (housekeeping)
 `whale-radar` (7j) · `x-aster-pulse` (7j) · `aster-convergence` (7j) · `memecoin-pulse` (3)

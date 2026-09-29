@@ -1,0 +1,9 @@
+[Unit]
+Description=fomo paper forward toutes les 15 min (le pas fin capte les vrais pics de max_multiple)
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

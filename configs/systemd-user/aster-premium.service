@@ -1,0 +1,8 @@
+[Unit]
+Description=Aster premiumIndex — la prime mark/index et la prévision du funding (15 min)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_premium_collector.py
+TimeoutStartSec=300

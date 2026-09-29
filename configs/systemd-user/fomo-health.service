@@ -1,0 +1,8 @@
+[Unit]
+Description=fomo health — les 4 sondes (ticks/collector REST/JWT/locks), alerte sur transition
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_health.py
+TimeoutStartSec=120

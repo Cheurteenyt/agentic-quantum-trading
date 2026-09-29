@@ -1,0 +1,8 @@
+[Unit]
+Description=Aster block trades — les gros prints institutionnels du tape (15 min)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_blocktrades.py
+TimeoutStartSec=600

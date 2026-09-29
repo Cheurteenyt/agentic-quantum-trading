@@ -1,0 +1,8 @@
+[Unit]
+Description=fomo rest collector — les endpoints REST de prod-api (holders/thèses/swaps élite/trades/leaderboard/clans/trending, sans navigateur)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_rest_collector.py
+TimeoutStartSec=300

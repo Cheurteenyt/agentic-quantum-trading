@@ -227,9 +227,12 @@ test à écrire, avant toute stratégie.
 |---|---|---|
 | `data/warehouse/klines.db` | klines 1h+15m (CVD taker 100 %), funding_history, liq_events, oi_history (15 min), block_trades+tape_1m (15 min), signal_events, paper_trades (le forward Aster), flow_events, lifecycle_map | fetch_klines (nocturne), oi-collector, aster-blocktrades, paper_forward (nocturne) |
 | `data/warehouse/depth.db` | depth_bins 500 niveaux × 15 symboles (24/7, ~30 M lignes) — maturité 14 j le 06-07/10 | aster-depth-collector |
-| `data/fomo/fomo.db` | fomo_ohlcv (1 353+ mints, 6,79 M bougies — mobula), fomo_tokens, fomo_ticks, fomo_new_coins (age_minutes), fomo_positions/closed/events, whale_flow, fomo_price_history | tick collector 24/7, mobula-topup 15 min (sélectif + topup_dead), harvest nocturne |
-| `data/fomo/fomo_swaps.db` | 12 562+ swaps baleines (13 traders, pagination lastSwapId) | fomo-swaps-fresh (horaire) |
+| `data/fomo/fomo.db` | fomo_ohlcv (1 353+ mints, 6,8 M bougies — mobula), fomo_tokens, fomo_ticks (2 s), **fomo_mc_samples (la MC native échantillonnée — trending_tokens 1/min/mint ou ΔMC 0,5 %)**, fomo_new_coins, fomo_pre_graduated (16 k), fomo_price_history, fomo_token_details (backfill parking) | daemon WS 24/7 (le SEUL écrivain), mobula-topup 15 min, harvest nocturne |
+| `data/fomo/fomo_swaps.db` | le worker DOM : fomo_token_holders/theses/header/swap_history, ws_traders, ws_swaps + **ws_parking_frames (le drain du listener)** | worker DOM (session + drain), fomo-swaps-fresh (horaire) |
+| `data/fomo/fomo_rest.db` | **le collector REST** : fomo_rest_snapshots (toute la carte, fraîcheur par captured_at), fomo_rest_swaps (élite, curseurs lastSwapId), fomo_rest_token_trades (les trades avec MC AU TRADE, +2 400/jour) | fomo-rest-collector (30 min, structure déclarative) |
+| `data/fomo/fomo_mobula.db` | topup_dead (la mémoire des morts du top-up) | mobula-topup 15 min |
 | `data/fomo/fomo_paper.db` | le ledger forward fomo (102+ trades : 3 horizons + anti-rug + replication_derek) | fomo-paper-forward 15 min |
+| `data/warehouse/aster_health_state.json` · `data/fomo/health_state.json` | les états des 2 watchdogs (sondes + transitions) | aster-health / fomo-health (5 min) |
 | `data/warehouse/x_posts.db` | le registre X (les récoltes midi/nuit) | X harvest |
 | **archivées** | backtest.db (legacy juin), klines_audit_*.db (side-DB d'audits), x.db/onchain.db (0 octet) | — |
 

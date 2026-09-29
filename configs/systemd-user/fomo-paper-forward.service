@@ -1,0 +1,8 @@
+[Unit]
+Description=fomo paper forward — le ledger forward des lancements (entrée à la naissance, sortie temps-fixe + anti-rug)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" "/run/media/cheurteen/Jeux SSD/trading-agent/scripts/fomo_paper_forward.py" --run
+TimeoutStartSec=300
