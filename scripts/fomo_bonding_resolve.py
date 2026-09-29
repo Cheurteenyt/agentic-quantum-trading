@@ -30,14 +30,23 @@ UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
 
 
 def bonding_tickers(con: sqlite3.Connection) -> list[dict]:
-    rows = con.execute(
-        """SELECT n.ticker, n.bonding_pct, n.mc, n.captured_at
-           FROM fomo_new_coins n
-           JOIN (SELECT ticker, MAX(captured_at) m FROM fomo_new_coins
-                 WHERE tab='bonding' GROUP BY ticker) x
-             ON x.ticker=n.ticker AND x.m=n.captured_at
-           WHERE n.tab='bonding' ORDER BY n.bonding_pct DESC""").fetchall()
-    return [{"ticker": t, "bonding_pct": b, "mc": mc} for t, b, mc, _ in rows]
+    # MIGRATION REST (29/09) : fomo_new_coins mort → snapshot REST bonding
+    # (fomo_rest.db, endpoint='bonding_snapshot') ; con (fomo.db) inutilisé.
+    rest = sqlite3.connect(
+        f"file:{ROOT / 'data' / 'fomo' / 'fomo_rest.db'}?mode=ro", uri=True)
+    out = []
+    for mint, raw in rest.execute(
+            "SELECT entity_id, data FROM fomo_rest_snapshots "
+            "WHERE endpoint='bonding_snapshot'").fetchall():
+        d = json.loads(raw)
+        tok = d.get("token") or {}
+        pct = (tok.get("launchpad") or {}).get("graduationPercent")
+        if pct is None:
+            continue
+        out.append({"ticker": tok.get("symbol") or mint[:8],
+                    "bonding_pct": float(pct), "mc": d.get("marketCap")})
+    rest.close()
+    return sorted(out, key=lambda r: -r["bonding_pct"])
 
 
 def dexscreener_pairs(ticker: str) -> list[dict]:

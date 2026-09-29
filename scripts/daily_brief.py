@@ -2,7 +2,7 @@
 """LE BRIEFING QUOTIDIEN (28/09) — un seul document, chaque matin :
 l'état du régime, le forward Aster, le forward fomo, les watchlists,
 et les actions du jour. La lecture = 1 minute, l'action = claire."""
-import sys, sqlite3, time
+import sys, sqlite3, time, json
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -54,12 +54,22 @@ if fp.exists():
     add(f"   → derek518 : verdict à ≥ 5 CLOSED (actuellement {derek_clo} closed, {derek_open} open)")
 
 # 4. LES GRADUATIONS IMMINENTES (bonding_pct ≥ 88 %, les plus fraîches)
-fo = sqlite3.connect(str(ROOT / "data" / "fomo" / "fomo.db"), timeout=30)
+# MIGRATION REST (29/09) : fomo_new_coins mort → snapshot REST bonding
+# (fomo_rest.db fomo_rest_snapshots endpoint='bonding_snapshot', même forme).
+fo = sqlite3.connect(str(ROOT / "data" / "fomo" / "fomo_rest.db"), timeout=30)
 try:
-    hot = fo.execute("""SELECT ticker, bonding_pct, age_minutes FROM fomo_new_coins
-                        WHERE tab='bonding' AND CAST(bonding_pct AS REAL) >= 88
-                        AND captured_at = (SELECT MAX(captured_at) FROM fomo_new_coins)
-                        ORDER BY bonding_pct DESC LIMIT 5""").fetchall()
+    rows = []
+    for mint, raw, cap in fo.execute(
+            "SELECT entity_id, data, captured_at FROM fomo_rest_snapshots "
+            "WHERE endpoint='bonding_snapshot'").fetchall():
+        d = json.loads(raw)
+        tok = d.get("token") or {}
+        pct = (tok.get("launchpad") or {}).get("graduationPercent")
+        if pct is None:
+            continue
+        age = max(0, int((cap - (tok.get("createdAt") or cap)) / 60))
+        rows.append((tok.get("symbol") or mint[:8], round(float(pct), 2), age))
+    hot = sorted((r for r in rows if r[1] >= 88), key=lambda r: -r[1])[:5]
     if hot:
         add("◆ GRADUATIONS imminentes (bonding ≥ 88 %) :")
         for t in hot:

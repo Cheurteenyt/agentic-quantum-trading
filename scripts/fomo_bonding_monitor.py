@@ -16,6 +16,7 @@ déclenche le pump — la loi 0-7j/près-ATH de la carte de cycle de vie).
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 import time
@@ -30,13 +31,23 @@ REPORTS = ROOT / "reports"
 
 
 def main() -> int:
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=10)
+    # MIGRATION REST (29/09) : fomo_new_coins mort → snapshot REST bonding
+    # (fomo_rest.db, endpoint='bonding_snapshot') ; upsert = 1 point/mint.
+    con = sqlite3.connect(
+        f"file:{ROOT / 'data' / 'fomo' / 'fomo_rest.db'}?mode=ro",
+        uri=True, timeout=10)
     # les snapshots bonding_pct par ticker : (ticker, captured_at, bonding_pct, mc)
-    rows = con.execute("""
-        SELECT ticker, captured_at, CAST(bonding_pct AS REAL), mc
-        FROM fomo_new_coins
-        WHERE bonding_pct IS NOT NULL AND bonding_pct != ''
-        ORDER BY ticker, captured_at""").fetchall()
+    rows = []
+    for mint, raw, cap in con.execute(
+            "SELECT entity_id, data, captured_at FROM fomo_rest_snapshots "
+            "WHERE endpoint='bonding_snapshot'").fetchall():
+        d = json.loads(raw)
+        tok = d.get("token") or {}
+        pct = (tok.get("launchpad") or {}).get("graduationPercent")
+        if pct is None:
+            continue
+        rows.append((tok.get("symbol") or mint[:8], cap, float(pct),
+                     d.get("marketCap")))
     con.close()
 
     by_ticker: dict[str, list] = {}

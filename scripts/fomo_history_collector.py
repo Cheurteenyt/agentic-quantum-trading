@@ -224,9 +224,25 @@ def main() -> int:
         tickers = [t.strip().upper() for t in tf.read_text().splitlines()
                    if t.strip() and len(t.strip()) >= 2]
     else:
+        # MIGRATION REST (29/09) : fomo_new_coins mort → snapshot REST
+        # (fomo_rest.db, endpoints bonding_snapshot + trending, token.symbol).
+        # NB : trending.data = LISTE de tokens, bonding_snapshot.data = dict.
+        rcon = sqlite3.connect(
+            f"file:{ROOT / 'data' / 'fomo' / 'fomo_rest.db'}?mode=ro", uri=True)
+        rest_tk = []
+        for (raw,) in rcon.execute(
+                "SELECT data FROM fomo_rest_snapshots "
+                "WHERE endpoint IN ('bonding_snapshot','trending')").fetchall():
+            d = json.loads(raw)
+            for e in (d if isinstance(d, list) else [d]):
+                if not isinstance(e, dict):
+                    continue
+                sym = (e.get("token") or {}).get("symbol")
+                if sym:
+                    rest_tk.append(sym)
+        rcon.close()
         tickers = sorted(
-            {r[0].upper() for r in con.execute(
-                "SELECT DISTINCT ticker FROM fomo_new_coins")}
+            {t.upper() for t in rest_tk}
             | {r[0].upper() for r in con.execute(
                 "SELECT DISTINCT ticker FROM fomo_positions")})
         tickers = [t for t in tickers if t and len(t) >= 2]

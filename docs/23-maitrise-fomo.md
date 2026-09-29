@@ -10,8 +10,8 @@
 | Moteur | Transport | Ce qu'il porte |
 |---|---|---|
 | **daemon WS** (`fomo_ws_daemon.py`) | wss natif, sans navigateur | prix (dédup), swaps globaux, thèses live, pression token_details, ohlcv 30s (volume DEX), trending_tokens (la découverte), bougies 1m, signaux de sortie temps réel |
-| **worker DOM** (`fomo_dom_worker.py`) | 1 page permanente, navigateur dédié :9222 | sidebar (trending/most held), bonding, graduated, alerts, top-100+élite, clans/feed (bruts), profils top traders (courant + top trades), holders scroll-capture, theses archive, header token |
-| **collector REST** (`fomo_rest_collector.py`, 29/09) | HTTPS prod-api, curl_cffi chrome131 + JWT, SANS navigateur | holders (97/appel + totalHolders + costBasis), thèses 24 h (500/token), swaps élite (100/appel), trades fermés, leaderboard, clans, trending — le DOM devient le fallback |
+| **worker DOM** (`fomo_dom_worker.py`) | 1 page permanente, navigateur dédié :9222 | désormais **2 surfaces** : le walker bonding (sidebar) + la session JWT (le re-mint CDP) — tout le reste de l'onglet token est passé au REST |
+| **collector REST** (`fomo_rest_collector.py`, 29/09 v2 « toute la carte ») | HTTPS prod-api, curl_cffi chrome131 + JWT, SANS navigateur | holders (97/appel + totalHolders + costBasis), thèses 24 h (500/token), swaps élite (curseur lastSwapId), trades fermés, top-100 all-time, clans, trending, feed d'activité, profils élite (4 endpoints), About batch (filterTokens), bonding (pre-graduation) — structure DÉCLARATIVE COLLECTES + skip par fraîcheur (captured_at), base dédiée fomo_rest.db |
 | **timers** | signaux 5 min, paper forward 15 min | consensus sortie/entrée, thèses élite, réplications |
 
 ## La matrice des surfaces
@@ -30,12 +30,12 @@
 ### Niveau trader
 | Surface | État | Table | Manque |
 |---|---|---|---|
-| Top-100 all-time + l'élite dynamique | ✅ capturé | dom_leaderboard | — |
-| Trades fermés | ✅ capturé (REST) | fomo_rest_snapshots=trades_closed | la pagination hasNextPage (curseur) à suivre |
-| Positions courantes | ✅ capturé | dom_profile_positions | — |
+| Top-100 all-time + l'élite dynamique | ✅ capturé (REST, remplace dom_leaderboard) | fomo_rest_snapshots=leaderboard_alltime (+ /v2/leaderboard/24h pour l'élite) | — |
+| Trades fermés | ✅ capturé (REST) | fomo_rest_snapshots=trades_closed | le backfill incrémental lastTradeId |
+| Positions courantes | ✅ capturé (REST, remplace dom_profile_positions) | fomo_rest_snapshots=profile_user/balances | — |
 | Graphe social (mutuals/following/followers) | ✅ capturé | ws_traders | le graphe entre traders (qui suit qui) |
 | Courbe d'équité (le graphique du profil) | ❌ manquant | — | le data derrière le chart |
-| Swap history paginé (lastSwapId = cracké, API 401) | 🟡 partiel | fomo_swaps | la reprise quand l'auth revient |
+| Swap history paginé (lastSwapId = cracké) | ✅ capturé (REST) | fomo_rest_swaps | — |
 | Découverte : holders skilles → la rotation | ✅ la boucle | ws_traders + la rotation | l'accumulation |
 
 ### Niveau flux temps réel
@@ -47,16 +47,16 @@
 | Pression (buys/sells, volumes achat/vente) | ✅ | ws_token_details | — |
 | Volume DEX (ohlcv 30s) | ✅ | fomo_ohlcv | — |
 | Découverte (trending_tokens snapshot) | ✅ | fomo_tokens | les tokens pré-trending (bonding) = le worker 15 min |
-| Pré-graduation (topic natif pre_graduated_tokens) | ✅ | fomo_pre_graduated | le branchement au prédicteur de graduation |
+| Pré-graduation (topic natif pre_graduated_tokens) | ✅ | fomo_pre_graduated (WS live) + fomo_rest_snapshots=bonding_snapshot (REST 30 min) — bonding/graduated = WS live + REST snapshot | le branchement au prédicteur de graduation |
 | Sortie consensus (< 2 s) | ✅ | ws_signals | le branchement paper forward |
 
 ### Surfaces sociales / secondaires
 | Surface | État | Manque |
 |---|---|---|
-| Clans (liste + holdings) | 🟡 brut | le parse fin + la page clans (la nav a bougé) |
-| Feed (les posts) | 🟡 brut (51 chars = vide) | le follow-based = notre compte ne suit personne |
-| Search | ❌ | jamais explorée |
-| Most held | 🟡 le clic = à régler | l'onglet sidebar scrollable |
+| Clans (liste + holdings) | ✅ capturé (REST, remplace le DOM brut) | fomo_rest_snapshots=clans | le parse fin à la lecture |
+| Feed (les posts/trades) | ✅ capturé (REST, remplace le DOM 51 chars) | fomo_rest_snapshots=trading_activity_feed | le follow-based = notre compte ne suit personne |
+| Search | ❌ | — | jamais explorée |
+| Most held | ✅ remplacé REST | fomo_rest_snapshots=verified_tokens (tri `holders` à la lecture) | les onglets hero n'émettent AUCUN XHR — le clic DOM était mort |
 | Messages / Send / notes | ❌ | hors edge |
 | Referrals / points | ❌ | hors edge |
 
@@ -74,6 +74,7 @@
 - Le DDL des tables vit dans ensure_tables/ensure_dbs + l'INSERT = liste de colonnes explicite : un CREATE inline avalé par except ne crée JAMAIS la table (swap_history), un ALTER désynchronisé de l'INSERT déraille en silence (header 15 vs 14), et un parseur non importé perd ses lignes sans bruit (parse_token_swaps, NameError avalé)
 - Le WAF (Cloudflare) bloque le fingerprint TLS, PAS l'API : curl_cffi impersonate chrome131 + Bearer JWT = 200 partout (la sonde REST du 29/09). « Pas d'API de données » était FAUX : les endpoints XHR (hodlers/top, feed/token/thesis, v2/users/<id>/swaps, trades, proxy/trendingTokens) n'apparaissent qu'en naviguant les onglets token — la sonde scripts/studies/fomo_rest_probe.py les capture et les rejoue
 - La collecte REST = une base DÉDIÉE (fomo_rest.db, 1 écrivain) : la leçon du lock du 29/09 appliquée d'office
+- Le collector REST = structure DÉCLARATIVE (COLLECTES + fraîcheur par captured_at) — une collecte sans skip de fraîcheur est un bug
 - Les listes du site = virtualisées → scroll conteneur + dédupe, toujours
 - Les labels = SINGULIERS avec le compteur (« Thesis (3,846) ») — les matchs exacts
 - La nav = 100 % clics SPA, les URL directes = « Go home »

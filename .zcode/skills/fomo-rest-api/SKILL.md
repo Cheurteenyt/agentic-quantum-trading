@@ -54,6 +54,12 @@ r = cffi.get(url, headers=H, impersonate="chrome131", timeout=15)
 | `GET /trades` | `?userId=&orderBy=closedAt` | `{activeTrades, closedTrades, closedCount, hasNextPage}` — les trades fermés SANS les 28 pages DOM |
 | `GET /v2/clans/leaderboard` | `?window=24h&limit=50` | `{leaderboard:[50]}` |
 | `GET /v2/users/<uuid>` · `/v2/users/userHandle/<handle>` · `/v2/users/<uuid>/spotlight` · `/watchlist` · `/config` | — | profils, spotlight, watchlist |
+| `POST /proxy/filterTokens` | body = **TABLEAU** `["mint:1399811149",…]` (BATCH, 12 mints en 1 appel) | `[N]` : `token{address, totalSupply=null, socialLinks, info}`, `launchpad{launchpadName, graduationPercent}` (null si déjà gradué), `createdAt`, `holders`, `activity` — porte le **About complet** (tokenDetails ne le porte PAS) |
+| `GET /v2/leaderboard` | `?window=alltime&limit=100` | `{leaderboard:[100]}` = **le top-100 all-time** (le 24h ne donne que 150 lignes court terme) |
+| `GET /feed/tradingActivity` | `?limit=50&threshold=1000` (+ `&tokenAddress=<mint>` filtre par token, **validé**) | `{items, hasNextPage}` — items : `tokenAddress, userId, tradeId, body` |
+| `GET /v2/userTokens/aggregatedSnapshotById` | `?userId=<uid>&snapshotId=1` — **SANS `snapshotId` = 400** | `{snapshotId, pnl, equity}` (réponse observée dégénérée, à creuser) |
+
+Pièges découverts le 29/09 : les **onglets hero** (Trending/Bonding/Graduated/Most held) n'émettent **AUCUN XHR** (tout par WS ou tri client — most held = `verifiedTokens` tri `holders` à la lecture) ; et les mints de `fomo_pre_graduated` contiennent des **0x EVM** (faux mints de cotation) → filtrer `mint NOT LIKE '0x%'` avant les batches solana.
 
 `networkId=1399811149` = solana. Pagination : `hasNextPage:true` — le nom du
 curseur se découvre par sondage (`before/after=<dernier id>`, `cursor=`,
@@ -64,7 +70,12 @@ curseur se découvre par sondage (`before/after=<dernier id>`, `cursor=`,
 `scripts/fomo_rest_collector.py` — timer systemd `fomo-rest-collector.timer`
 (30 min), base **dédiée** `data/fomo/fomo_rest.db` (tables
 `fomo_rest_snapshots` PK(endpoint,entity_id) + `fomo_rest_swaps` idempotent
-par swap id), pacing 1 s, ~37 appels ≈ 60 s/passe. L'étendre, jamais le
+par swap id), pacing 1 s, ~60 appels ≈ 1,5-2,5 min/passe. Structure
+**DÉCLARATIVE** : COLLECTES = liste (nom, cadence_en_passes, fonction) et
+fraîcheur lue dans `captured_at` (snapshot plus récent que cadence × 30 min ×
+0,9 → skip ; cadence 1 = à chaque passe) — une collecte sans skip de fraîcheur
+est un bug. Curseurs de pagination persistés (`cursor_<kind>_<uid>`), backfill
+BORNÉ par passe. L'étendre, jamais le
 dupliquer. Les one-shots RE : `scripts/studies/fomo_rest_probe.py` (capture
 XHR + rejoue) et `fomo_ws_frame_capture.py` (frames WS via
 `page.on("websocket")` — insensible aux mondes isolés de patchright).

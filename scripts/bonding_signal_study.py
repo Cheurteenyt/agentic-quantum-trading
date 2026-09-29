@@ -30,10 +30,20 @@ cur = con.cursor()
 res = json.load(open(RES))["resolved"]
 
 snaps = {}
-for t, pct, mc, cap in cur.execute(
-        "SELECT ticker, bonding_pct, mc, captured_at FROM fomo_new_coins "
-        "WHERE tab='bonding' AND bonding_pct IS NOT NULL ORDER BY captured_at"):
-    snaps.setdefault(t, []).append((ts_sec(cap), float(pct), mc))
+# MIGRATION REST (29/09) : fomo_new_coins mort → snapshot REST bonding
+# (fomo_rest.db, endpoint='bonding_snapshot') ; upsert = 1 point/mint.
+rcur = sqlite3.connect(f"file:{ROOT}/data/fomo/fomo_rest.db?mode=ro", uri=True).cursor()
+for mint, raw, cap in rcur.execute(
+        "SELECT entity_id, data, captured_at FROM fomo_rest_snapshots "
+        "WHERE endpoint='bonding_snapshot'"):
+    d = json.loads(raw)
+    tok = d.get("token") or {}
+    pct = (tok.get("launchpad") or {}).get("graduationPercent")
+    if pct is None:
+        continue
+    snaps.setdefault(tok.get("symbol") or mint[:8], []).append(
+        (ts_sec(cap), float(pct), d.get("marketCap")))
+rcur.close()
 n1 = sorted(t for t, sl in snaps.items() if sl[0][0] < 1790300000)
 n2 = sorted(t for t, sl in snaps.items() if sl[0][0] >= 1790300000)
 n_obs = sum(len(v) for v in snaps.values())
