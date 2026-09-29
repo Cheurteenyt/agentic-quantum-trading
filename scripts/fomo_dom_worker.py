@@ -179,15 +179,49 @@ def main():
                 except Exception:
                     pass
         page = ctx.new_page()  # la page DÉDIÉE du worker — détenue pour toujours
-        # la page Tokens = le domicile des routes (les boutons Trending/Bonding/…)
-        page.goto("https://fomo.family/tokens", wait_until="domcontentloaded", timeout=30000)
+        # l'accueil = l'app rendue ; le clic « Tokens » active la vue à onglets
+        # (Trending/Bonding/Graduated) — la route /tokens directe = morte (« Go home »)
+        page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(6000)
+        try:
+            page.locator("text=Tokens").first.click(timeout=8000)
+            page.wait_for_timeout(4000)
+            log("vue Tokens activée")
+        except Exception as e:
+            log(f"clic Tokens ERR {str(e)[:60]} — les routes en cliquent quand même")
         listener = FrameListener(page)
         log(f"worker DOM résident démarré — la page dédiée, "
             f"{len(CADENCES)} surfaces, le listener WS passif actif")
 
         while True:
             now = time.time()
+            # 0) la sidebar trending de l'ACCUEIL → fomo_price_history
+            #    (le pattern du miner : MC/prix/▲% — la route du walker = les
+            #    lignes de la page Tokens, une autre structure)
+            if now - last_visit.get("home_trending", 0) > 5 * 60:
+                try:
+                    from fomo_top_traders_miner import SWAPS_RE
+                    from login_window_miner import parse_trending
+                    page.goto("https://fomo.family/", wait_until="domcontentloaded",
+                              timeout=30000)
+                    page.wait_for_timeout(4500)
+                    text = page.evaluate("() => document.body.innerText")
+                    parsed = parse_trending(text)
+                    con_h = sqlite3.connect(str(WDB), timeout=30)
+                    con_h.execute("PRAGMA busy_timeout=30000")
+                    n_ins = 0
+                    for pk in parsed:
+                        con_h.execute(
+                            "INSERT OR REPLACE INTO fomo_price_history "
+                            "(ticker, captured_at, mc, price, change) VALUES (?,?,?,?,?)",
+                            (pk["ticker"], int(time.time()), pk["mc"], pk["price"], pk["change"]))
+                        n_ins += 1
+                    con_h.commit(); con_h.close()
+                    last_visit["home_trending"] = now
+                    log(f"[sidebar] {n_ins} tokens → fomo_price_history")
+                except Exception as e:
+                    log(f"[sidebar] ERR {str(e)[:80]}")
+                time.sleep(2)
             # 1) les routes du walker dues
             for route in ROUTES:
                 name = route["name"]
