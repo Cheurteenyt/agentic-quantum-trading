@@ -1,0 +1,15 @@
+[Unit]
+Description=fomo ws daemon — le socket natif temps réel (swaps + prices, sans navigateur)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" -u scripts/fomo_ws_daemon.py
+Restart=always
+RestartSec=60
+StandardOutput=journal
+
+[Install]
+WantedBy=default.target

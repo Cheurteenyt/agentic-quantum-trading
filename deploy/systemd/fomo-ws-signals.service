@@ -1,0 +1,9 @@
+[Unit]
+Description=fomo ws signals — les consensus de sortie/entrée et les thèses des top traders
+After=fomo-ws-daemon.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fomo_ws_signals.py
+StandardOutput=journal
