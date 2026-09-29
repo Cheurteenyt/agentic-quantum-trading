@@ -44,11 +44,15 @@ def log(m):
 
 
 def ensure_tables():
-    con = sqlite3.connect(str(WDB), timeout=30)
+    con = sqlite3.connect(str(DB_SWAPS), timeout=30)
+    con.execute("PRAGMA busy_timeout=30000")
     con.execute("""CREATE TABLE IF NOT EXISTS clans_raw (
         snapshot_ts INTEGER PRIMARY KEY, text TEXT, parsed INTEGER DEFAULT 0)""")
     con.execute("""CREATE TABLE IF NOT EXISTS feed_raw (
         snapshot_ts INTEGER PRIMARY KEY, text TEXT, parsed INTEGER DEFAULT 0)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS fomo_price_history (
+        ticker TEXT, captured_at INTEGER, mc REAL, price REAL, change REAL,
+        PRIMARY KEY (ticker, captured_at))""")
     con.commit(); con.close()
     con = ensure_swaps_db()
     con.close()
@@ -92,7 +96,7 @@ def visit_clans(page):
     page.goto("https://fomo.family/clans", wait_until="domcontentloaded", timeout=30000)
     page.wait_for_timeout(4500)
     text = page.evaluate("() => document.body.innerText")
-    con = sqlite3.connect(str(WDB), timeout=30)
+    con = sqlite3.connect(str(DB_SWAPS), timeout=30)
     con.execute("PRAGMA busy_timeout=30000")
     con.execute("INSERT OR REPLACE INTO clans_raw VALUES (?,?,0)",
                 (int(time.time()), text))
@@ -105,7 +109,7 @@ def visit_feed(page):
     page.goto("https://fomo.family/feed", wait_until="domcontentloaded", timeout=30000)
     page.wait_for_timeout(4500)
     text = page.evaluate("() => document.body.innerText")
-    con = sqlite3.connect(str(WDB), timeout=30)
+    con = sqlite3.connect(str(DB_SWAPS), timeout=30)
     con.execute("PRAGMA busy_timeout=30000")
     con.execute("INSERT OR REPLACE INTO feed_raw VALUES (?,?,0)",
                 (int(time.time()), text))
@@ -272,7 +276,7 @@ def main():
                     page.wait_for_timeout(4500)
                     text = page.evaluate("() => document.body.innerText")
                     parsed = parse_trending(text)
-                    con_h = sqlite3.connect(str(WDB), timeout=30)
+                    con_h = sqlite3.connect(str(DB_SWAPS), timeout=30)
                     con_h.execute("PRAGMA busy_timeout=30000")
                     n_ins = 0
                     for pk in parsed:
@@ -295,7 +299,7 @@ def main():
                     page.wait_for_timeout(4000)
                     text = page.evaluate("() => document.body.innerText")
                     parsed = parse_trending(text)
-                    con_h = sqlite3.connect(str(WDB), timeout=30)
+                    con_h = sqlite3.connect(str(DB_SWAPS), timeout=30)
                     con_h.execute("PRAGMA busy_timeout=30000")
                     for pk in parsed:
                         con_h.execute(
@@ -387,7 +391,7 @@ def main():
                         WHERE top_trader=1 AND token_addr IS NOT NULL
                         ORDER BY captured_at DESC LIMIT 8""")]
                     con_s.close()
-                    con_t = sqlite3.connect(str(WDB), timeout=30)
+                    con_t = sqlite3.connect(str(DB_SWAPS), timeout=30)
                     con_t.execute("PRAGMA busy_timeout=30000")
                     for (m,) in con_t.execute(
                             """SELECT DISTINCT t.mint FROM fomo_price_history ph
@@ -540,7 +544,7 @@ def main():
             if now - last_visit.get("profiles", 0) > CADENCES["profiles"] * 60:
                 candidates = list(TOP_HANDLES)
                 try:
-                    con_d = sqlite3.connect(str(WDB), timeout=30)
+                    con_d = sqlite3.connect(str(DB_SWAPS), timeout=30)
                     con_d.execute("PRAGMA busy_timeout=30000")
                     for (h,) in con_d.execute(
                             """SELECT handle FROM fomo_token_holders
