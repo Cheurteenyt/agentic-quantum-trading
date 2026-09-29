@@ -159,25 +159,16 @@ def main():
                 continue
         if ctx is None:
             raise RuntimeError("aucun navigateur CDP disponible (:9223/:9222)")
-        # la purge des onglets FANTÔMES du worker/miner (les marqueurs ?r=, ?c=,
-        # ?fresh=, ?ws=, ?bot= = nos pages tuées avant le close) — JAMAIS les
-        # onglets du user (sans marqueur)
+        # :9222 = NOTRE navigateur dédié (le user = sur son chromium à lui) :
+        # la propriété totale — toutes les pages fomo = purgées au boot,
+        # le worker = le SEUL créateur de pages (zéro flash, zéro fuite)
         for p2 in list(ctx.pages):
-            u = p2.url or ""
-            marked = "fomo.family" in u and any(f"?{m}=" in u for m in ("r", "c", "fresh", "ws", "bot"))
-            dead_shell = False
-            if "fomo.family" in u and not marked:
-                try:
-                    if len(p2.evaluate("() => document.body.innerText")) < 100:
-                        dead_shell = True  # une coquille morte (feed vide au crash, etc.)
-                except Exception:
-                    dead_shell = True
-            if marked or dead_shell:
+            if "fomo.family" in (p2.url or ""):
                 try:
                     p2.close()
-                    log(f"onglet purgé ({'marqué' if marked else 'coquille morte'}) : {u[:60]}")
                 except Exception:
                     pass
+        log("les pages fomo purgées — le worker = seul propriétaire du navigateur")
         page = ctx.new_page()  # la page DÉDIÉE du worker — détenue pour toujours
         # l'accueil = l'app rendue ; le clic « Tokens » active la vue à onglets
         # (Trending/Bonding/Graduated) — la route /tokens directe = morte (« Go home »)
@@ -237,6 +228,57 @@ def main():
                     except Exception as e:
                         log(f"[{name}] ERR {str(e)[:80]}")
                     time.sleep(2)
+            # 1b) le leaderboard top-100 (le parse du harvester, intégré)
+            if now - last_visit.get("top100", 0) > 60 * 60:
+                try:
+                    from fomo_leaderboard_harvester import parse_leaderboard_text, CONFIG, knum as _k
+                    page.goto("https://fomo.family/leaderboard",
+                              wait_until="domcontentloaded", timeout=30000)
+                    page.wait_for_timeout(5000)
+                    text = page.evaluate("() => document.body.innerText")
+                    rows = parse_leaderboard_text(text)
+                    now_i = int(time.time())
+                    con_lb = sqlite3.connect(str(ROOT / "data" / "fomo" / "fomo_swaps.db"), timeout=30)
+                    con_lb.execute("PRAGMA busy_timeout=30000")
+                    con_lb.execute("DELETE FROM dom_leaderboard")
+                    for rank, name, handle, pnl, trades in rows:
+                        con_lb.execute(
+                            "INSERT OR REPLACE INTO dom_leaderboard VALUES (?,?,?,?,?,?)",
+                            (rank, name, handle, pnl, trades, now_i))
+                    con_lb.commit()
+                    top = [h for _, _, h, _, _ in
+                           sorted(rows, key=lambda r: r[3] or 0, reverse=True)[:20]]
+                    cfg = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+                    cfg["top_handles"] = top
+                    cfg["top_handles_updated_at"] = now_i
+                    CONFIG.write_text(json.dumps(cfg, indent=1))
+                    con_lb.close()
+                    last_visit["top100"] = now
+                    log(f"[top100] {len(rows)} traders, l'élite régénérée")
+                except Exception as e:
+                    log(f"[top100] ERR {str(e)[:80]}")
+                time.sleep(2)
+            # 1c) la santé de session (le moniteur intégré)
+            if now - last_visit.get("session", 0) > 30 * 60:
+                try:
+                    import base64 as _b64
+                    tok = (page.evaluate("() => localStorage.getItem('privy:token')")
+                           or "").strip().strip('"')
+                    alive = False
+                    if len(tok) > 100:
+                        pl = tok.split(".")[1]; pl += "=" * (-len(pl) % 4)
+                        exp = json.loads(_b64.urlsafe_b64decode(pl)).get("exp", 0)
+                        alive = exp - time.time() > 900
+                    if not alive:
+                        log("session faible → reload de sauvetage")
+                        page.goto("https://fomo.family/", wait_until="domcontentloaded",
+                                  timeout=30000)
+                        page.wait_for_timeout(6000)
+                    last_visit["session"] = now
+                    log(f"[session] {'OK' if alive else 're-authentifiée au reload'}")
+                except Exception as e:
+                    log(f"[session] ERR {str(e)[:80]}")
+                time.sleep(2)
             # 2) les clans / le feed
             for name, fn in (("clans", visit_clans), ("feed", visit_feed)):
                 if now - last_visit.get(name, 0) > CADENCES[name] * 60:
