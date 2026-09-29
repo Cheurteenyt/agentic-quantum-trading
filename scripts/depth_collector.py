@@ -16,9 +16,11 @@ Stdlib uniquement — même discipline que liq_collector.
 from __future__ import annotations
 
 import json
+import os
 import signal
 import sqlite3
 import sys
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -33,6 +35,13 @@ DEPTH_URL = "https://fapi.asterdex.com/fapi/v1/depth"
 POLL_SEC = 30
 BIN_FRAC = 0.0001         # largeur de bac = 0.01 % du mid
 RETENTION_DAYS = 30
+STALL_LIMIT_SEC = 300     # 5 min sans write = stall (cadence normale ~30s ; pire
+                          # cas réseau = 15 symboles x timeout 15s = 225s < 300)
+
+_running = True
+_last_progress = time.time()   # dernier write réussi OU prune finie (wall clock,
+                               # volontairement : avance au réveil de suspend)
+_in_prune = False
 
 DEPTH_DDL = """
 CREATE TABLE IF NOT EXISTS depth_bins (
@@ -102,14 +111,54 @@ def snapshot_symbol(con: sqlite3.Connection, symbol: str) -> bool:
     )
     con.execute("INSERT OR REPLACE INTO depth_meta (symbol, ts, mid) VALUES (?, ?, ?)", (symbol, ts, mid))
     con.commit()
+    global _last_progress
+    _last_progress = time.time()
     return True
 
 
+def _stalled(now: float | None = None) -> bool:
+    """True si aucune écriture réussie depuis STALL_LIMIT_SEC (hors prune)."""
+    if _in_prune:
+        return False
+    now = time.time() if now is None else now
+    return (now - _last_progress) > STALL_LIMIT_SEC
+
+
+def _watchdog() -> None:
+    """Chien de garde dans un thread : le process qui n'écrit plus doit EXIT.
+
+    Couvre les modes d'échec silencieux que Restart=always ne voit jamais :
+    - getaddrinfo pendant (la résolution DNS n'est PAS couverte par le
+      timeout=15 d'urlopen, seul le socket l'est) ;
+    - socket morte / réveil de suspend (S3) avec état stale ;
+    - toute boucle vivante mais muette.
+    os._exit(1) car sys.exit ne tuerait que ce thread ; Restart=always refait
+    un process propre.
+    """
+    while _running:
+        time.sleep(20)
+        if _stalled():
+            age = time.time() - _last_progress
+            print(
+                f"[watchdog] aucun write réussi depuis >{STALL_LIMIT_SEC}s "
+                f"(dernier progrès il y a {age:.0f}s) -> exit(1), systemd relance",
+                file=sys.stderr,
+                flush=True,
+            )
+            os._exit(1)
+
+
 def prune_old(con: sqlite3.Connection) -> int:
-    cutoff = int(time.time()) - RETENTION_DAYS * 86400
-    cur = con.execute("DELETE FROM depth_bins WHERE ts < ?", (cutoff,))
-    con.execute("DELETE FROM depth_meta WHERE ts < ?", (cutoff,))
-    con.commit()
+    global _in_prune, _last_progress
+    _in_prune = True  # le DELETE scanne 54M lignes sans index ts : pas de kill
+    try:
+        cutoff = int(time.time()) - RETENTION_DAYS * 86400
+        cur = con.execute("DELETE FROM depth_bins WHERE ts < ?", (cutoff,))
+        con.execute("DELETE FROM depth_meta WHERE ts < ?", (cutoff,))
+        con.commit()
+    finally:
+        _in_prune = False
+        _last_progress = time.time()
     return cur.rowcount
 
 
@@ -118,6 +167,9 @@ def main() -> int:
     signal.signal(signal.SIGINT, _stop)
     con = connect()
     print(f"[depth-collector] démarré : {SYMBOLS} toutes les {POLL_SEC}s -> {DB_PATH}", flush=True)
+    global _last_progress
+    _last_progress = time.time()
+    threading.Thread(target=_watchdog, name="watchdog", daemon=True).start()
     last_prune_day = -1
     while _running:
         started = time.time()

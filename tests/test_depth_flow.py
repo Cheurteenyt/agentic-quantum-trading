@@ -60,6 +60,26 @@ class PruneTest(unittest.TestCase):
         con.close()
 
 
+class WatchdogTest(unittest.TestCase):
+    """Le process qui n'écrit plus doit se déclarer stallé (exit -> systemd)."""
+
+    def test_stalled_after_limit_without_write(self):
+        import scripts.depth_collector as dc
+        dc._in_prune = False
+        dc._last_progress = 1_000_000.0
+        self.assertFalse(dc._stalled(now=1_000_000.0 + dc.STALL_LIMIT_SEC - 1))
+        self.assertTrue(dc._stalled(now=1_000_000.0 + dc.STALL_LIMIT_SEC + 1))
+
+    def test_prune_does_not_count_as_stall(self):
+        import scripts.depth_collector as dc
+        dc._last_progress = 1_000_000.0
+        dc._in_prune = True
+        try:
+            self.assertFalse(dc._stalled(now=1_000_000.0 + 10_000))
+        finally:
+            dc._in_prune = False
+
+
 class FlowSnapshotRecordTest(unittest.TestCase):
     def test_record_idempotent(self):
         db = Path(tempfile.mkdtemp()) / "f.db"
