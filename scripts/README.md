@@ -51,6 +51,7 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `whale_radar.py` / `whale_flow.py` / `fomo_harvest.py` | la couche fomo |
 | `fomo_tick_collector.py` | ticks fomo 24/7 → 1m OHLCV (flock anti-orphan, filtre QUOTE_MINTS) |
 | `fomo_ws_daemon.py` | **daemon WS natif 24/7 (d9e23b4→v2)** : le socket prod-api/ws sans navigateur — le feed GLOBAL des swaps (ws_swaps typées, flag top_trader, ws_traders auto-appris) + les prix LRU 78 topics ; protocole : challenge JWT + subscribe, plafond ~80 topics, pacing 0.05 s |
+| `fomo_rest_collector.py` | **collector REST (29/09, timer 30 min)** : les endpoints prod-api en Python pur (curl_cffi chrome131 + JWT partagé) — hodlers/top (97/appel + totalHolders), sortedThesis 24 h (500/token), swaps élite 100/appel, trades fermés, leaderboard/clans/trending → `fomo_rest.db` dédiée (1 écrivain) ; le DOM = le fallback |
 | `derek_watch.py` | la détection temps réel des achats de derek518 (swap API in-page CDP, 1 passe/min) — bloqué par le mur d'auth 29/09 |
 | `login_window_miner.py` | le mineur DOM résident de la fenêtre de login (:9223) — sans API, sans ban (1×/5 min) |
 | `fomo_window_guard.py` | le garde de la fenêtre fomo-whale sur special:fomo (-98) (restart daemon+collector si dérive) |
