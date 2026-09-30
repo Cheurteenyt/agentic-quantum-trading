@@ -3,11 +3,14 @@
 *Le projet = 2 livres (régime + anti-régime), une machine (the_machine.py),
 des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 
-## LE VIVANT (9 docs, à jour)
+## LE VIVANT (11 docs, à jour)
 
 | Doc | Ce que c'est | Quand le lire |
 |---|---|---|
 | **00-CARTE** | la carte du projet entier | l'entrée, à chaque reprise |
+| **25-openmarket-x501** | la mission x501 : chiffres officiels, falsifications, exécution maker, roadmap | le domaine OpenMarket (pivot 30/09) |
+| **26-openmarket-donnees** | l'entrepôt om_v27 : l'audit vert, le manifest, les bandes de coûts | avant toute manipulation de data openmarket |
+| **27-pouvoirs-kscript** | le registre d'exploitation : 28/53 capacités, 25 dormants, plan d'activation 3 vagues | avant d'écrire tout nouveau kScript |
 | **22-nos-indicateurs** | LES 10 CRÉATIONS : chaque indicateur, sa règle, sa preuve | pour savoir ce qu'on possède |
 | **20-registre-indicateurs** | la source de vérité des verdicts (25+ datés + les 25 réfutés) | avant de croire quoi que ce soit |
 | **21-goal-performances** | le plan P1-P5 + les dates de tir + le volet institutionnel | pour savoir où on va |

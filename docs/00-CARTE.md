@@ -23,6 +23,27 @@
   murs (`wall_detector.py`), prints (`aster_blocktrades.py`, timer 15 min),
   réplication derek518 (`replication_derek` dans `fomo_paper_forward.py`).
 
+## 🌐 LE DOMAINE OPENMARKET x501 (intégré le 30/09)
+
+Le programme **100 $ → 50 100 $ en 12 mois** (×501, DD ≤ 25 % strict,
+zéro intervention) — `docs/25-openmarket-x501.md` (mission, chiffres
+officiels, doctrine, roadmap) · `docs/26-openmarket-donnees.md`
+(l'entrepôt om_v27 audité vert : 226 800 doublons purgés, index UNIQUE) ·
+`docs/27-pouvoirs-kscript.md` (l'audit d'exploitation : **28/53 capacités
+= 52,8 %**, 7 flux institutionnels gratuits dormants — ETF, CME, Deribit,
+options/skew, LSR — plan d'activation en 3 vagues).
+**MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
+**468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
+**+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
+règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 9 kScripts + 5 QA **PASS** dans
+`scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
+référence, fill 97,9 % à δ=2 ; l'audit d'exploitation kScript
+`x501_exploit_audit.py`). Les livrables : `docs/reference/openmarket-x501/`
+(9 PDF + 2 protocoles). La baseline du 01/10 : voir le commit de la branche (le fichier reports/ n'est pas versionné — à committer par le domaine OpenMarket)
+(v20, l'édition 30/09 est conservée pour la trace).
+**Pivot 30/09 : la recherche Aster/FOMO est gelée au profit d'OpenMarket**
+(les collecteurs continuent, plus aucun effort de recherche).
+
 ## 🔁 LES COLLECTEURS QUI TOURNENT 24/7 (systemd user)
 
 | Service | Rythme | Rôle |
