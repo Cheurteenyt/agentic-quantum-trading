@@ -22,7 +22,7 @@
 
 | Donnée | Aujourd'hui | Stream natif | Gain | Priorité |
 |---|---|---|---|---|
-| Depth 500 niveaux × 15 sym | REST 30 s (2 880 req/j, ~43 k poids) | `@depth20@100ms` (20 niveaux seulement !) ou diff-depth + resync | temps réel + poids économisés MAIS 20 niveaux ≠ notre schéma 500 niveaux (wall_detector) → **moteur de carnet diff+snapshot** (stateful) | **P1** (le gros morceau) |
+| Depth 500 niveaux × 15 sym | ~~REST 30 s (2 880 req/j, ~43 k poids)~~ | `@depth@500ms` diff + resync snapshot | ✅ **P1 FAIT — CUTOVER (30/09)** : aster_depth_engine.py 24/7 (3 connexions × 5 sym, l'état maintenu, resync au trou de séquence, l'ancre Binance inapplicable à Aster corrigée au runtime) ; ACCEPTATION T+10 = 15/15, T+20 = 14/15 (le moteur fait MIEUX que 2 snapshots REST consécutifs : 12/20-17/20 de churn) ; l'ancien collector désactivé (fallback conservé) | **P1** ✅ |
 | Klines 1h/15m | nocturne 03:00 → **jusqu'à 24 h de retard** | `@kline_1h/15m` (250 ms, la bougie fermée est poussée) | la fraîcheur intra-journée pour le forward | **P2** |
 | Premium/funding | REST 15 min ×~12 | `!markPrice@arr` @1s (TOUS les symboles, 1 msg/s) | ✅ P3 FAIT (30/09) : aster_markprice_ws.py 24/7 (échantillonnage 1/min/symbole, ~26 000 lignes/jour, reconnect 23 h programmée) — l'ancien timer REST désactivé | **P3** (facile) |
 | OI | REST 15 min ×2 collecteurs en doublon (même table !) | **aucun stream** (polling inévitable) | ✅ P4 FAIT (30/09) : le nocturne retiré — il re-collectait l'univers entier en double | **P4** (facile) |
