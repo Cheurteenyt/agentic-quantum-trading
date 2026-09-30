@@ -54,3 +54,26 @@
 4. **P1 le moteur de carnet** (diff-depth + snapshot resync, stateful,
    reconstruction 500 niveaux) — le gros morceau, à faire APRÈS que P2-P4
    tournent, avec les tests de continuité de l'audit depth.
+
+## Au-delà de l'API documentée : l'API INTERNE de l'UI (la sonde du 30/09)
+
+La sonde `scripts/studies/aster_ui_probe.py` + `aster_ui_replay.py` (les
+techniques fomo : capture CDP des frames WS + XHR en naviguant l'UI, puis
+rejoue curl_cffi chrome131) a découvert une famille d'endpoints NON
+documentés que l'UI asterdex.com consomme — **29/33 rejouables sans
+navigateur, pas d'auth, pas de Cloudflare** :
+
+| Flux | Contenu | Opportunité |
+|---|---|---|
+| `bapi/…/aster/ticker/pair` | **642 symboles en 1 appel** : lastPrice + volume + **openInterest** | remplace N appels openInterest non-documentés, couvre les exotiques et les perps actions |
+| `bapi/…/real-time-funding-rate` | bulk 764 syms : fundingIntervalHours, cap/floor ±0,02, estimatedSettlePrice | plus riche que premiumIndex |
+| WS `!miniTicker@arr` (sstream.asterdex.com) | 606+ symboles, temps réel | l'univers complet en 1 stream |
+| WS `!assetIndex@arr` | 42 assets : indices + taux d'emprunt bid/ask | la donnée d'emprunt n'existe pas dans fapi |
+| WS `!sfpriceIndex@arr` + `!tradingMode@arr` | les indices ACTIONS (COIN/AMD/GBP) + les fenêtres de session | les perps pre-market |
+
+Pièges gravés : curl_cffi 0.16 = impasse sur le WS aster (handshake OK puis
+recv bloquant — utiliser `websockets.sync`) ; patchright `req.all_headers()`
+dans le handler `request` pompe la boucle d'événements = les statuts perdus
+à vie (utiliser `req.headers` local — nos sondes fomo portaient le même
+pattern) ; la 2e socket du site = `sstream.asterdex.com`, le principal =
+`fstream5.asterdex.com/plain/stream`.
