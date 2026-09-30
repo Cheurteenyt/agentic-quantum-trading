@@ -255,6 +255,8 @@ class Writer:
         self.swap_vol = {}
         self.last_minute = int(time.time()) // 60
         self.last_flush = time.time()
+        # la rétention (audit 30/09) : le dernier jour (epoch//86400) prune
+        self.last_prune_day = -1   # -1 = prune dès le 1er flush post-démarrage
         self.n_ticks, self.n_swaps, self.n_top, self.n_sells_top = 0, 0, 0, 0
         self.n_candles, self.n_theses, self.n_events = 0, 0, 0
         self.n_tdetail, self.n_ohlcv, self.n_mc = 0, 0, 0
@@ -536,7 +538,49 @@ class Writer:
         except Exception as e:
             self.n_errors += 1
             log(f"flush err (#{self.n_errors}) : {str(e)[:100]}")
+        try:
+            self._maybe_prune_daily()
+        except Exception as e:
+            log(f"prune err : {str(e)[:80]}")
         self.last_flush = now
+
+    # --- RÉTENTION fomo.db (audit 30/09) : le daemon = LE writer de cette
+    # base, il prune SA table au changement de jour. Unités VÉRIFIÉES au
+    # PRAGMA + sonde (30/09) : captured_at en SECONDES pour les 3 tables
+    # (fomo_ticks REAL 1790728643.0, fomo_pre_graduated INTEGER,
+    # fomo_token_details REAL). fomo_token_details = la table de
+    # parking_backfill (dédupliquée par mint) — prune par captured_at.
+    RET_TICKS_J = 14
+    RET_PREGRAD_J = 30
+    RET_TDETAIL_J = 60
+
+    def _maybe_prune_daily(self):
+        """1×/j (le check date au flush 2 s = trivial) : DELETE paramétré par
+        captured_at, COMMIT explicite (anti-txn-fantôme), compte loggué."""
+        day = int(time.time() // 86400)
+        if day == self.last_prune_day:
+            return
+        self.last_prune_day = day
+        now_s = int(time.time())
+        try:
+            n1 = self.con_ticks.execute(
+                "DELETE FROM fomo_ticks WHERE captured_at < ?",
+                (now_s - self.RET_TICKS_J * 86400,)).rowcount
+            n2 = self.con_ticks.execute(
+                "DELETE FROM fomo_pre_graduated WHERE captured_at < ?",
+                (now_s - self.RET_PREGRAD_J * 86400,)).rowcount
+            n3 = self.con_ticks.execute(
+                "DELETE FROM fomo_token_details WHERE captured_at < ?",
+                (now_s - self.RET_TDETAIL_J * 86400,)).rowcount
+            self.con_ticks.commit()
+        except sqlite3.Error as e:
+            self.last_prune_day = -1  # DB occupée : re-tente au flush suivant
+            log(f"prune fomo.db err : {str(e)[:80]}")
+            return
+        if n1 or n2 or n3:
+            log(f"prune fomo.db : ticks={n1} (> {self.RET_TICKS_J}j), "
+                f"pre_graduated={n2} (> {self.RET_PREGRAD_J}j), "
+                f"token_details={n3} (> {self.RET_TDETAIL_J}j)")
 
     def _flush_locked(self):
         self._roll_candles()

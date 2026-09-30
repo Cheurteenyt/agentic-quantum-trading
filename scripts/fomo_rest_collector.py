@@ -183,6 +183,37 @@ def cursor_save(con, kind: str, uid: str, cursor, pages: int, exhausted: bool) -
           "updated_at": int(time.time())})
 
 
+# La rétention fomo_rest.db (audit 30/09) : fomo_rest_snapshots > 7 j (LES
+# snapshots obèses 129 Ko/ligne — le plus urgent), fomo_rest_swaps > 90 j.
+# fomo_rest_token_trades = INFINI (le référentiel chart↔trader, MC/price AU
+# TRADE — JAMAIS prune). Unité VÉRIFIÉE au PRAGMA + sonde (30/09) :
+# captured_at INTEGER en SECONDES. Collector oneshot (timer 30 min) :
+# le jour de prune en mémoire = au plus 1 prune par passe.
+SNAP_RETENTION_DAYS = 7
+SWAP_RETENTION_DAYS = 90
+_last_prune_day = -1
+
+
+def prune_daily(con) -> None:
+    """Le prune 1×/passe (DELETE paramétré par captured_at, COMMIT explicite,
+    compte loggué). Les curseurs (endpoint cursor_*) sont rafraîchis à chaque
+    passe : jamais touchés par le cutoff 7 j."""
+    global _last_prune_day
+    day = int(time.time() // 86400)
+    if day == _last_prune_day:
+        return
+    _last_prune_day = day
+    now_s = int(time.time())
+    n1 = con.execute("DELETE FROM fomo_rest_snapshots WHERE captured_at < ?",
+                     (now_s - SNAP_RETENTION_DAYS * 86400,)).rowcount
+    n2 = con.execute("DELETE FROM fomo_rest_swaps WHERE captured_at < ?",
+                     (now_s - SWAP_RETENTION_DAYS * 86400,)).rowcount
+    con.commit()
+    if n1 or n2:
+        print(f"[rest] prune : snapshots={n1} (> {SNAP_RETENTION_DAYS}j), "
+              f"swaps={n2} (> {SWAP_RETENTION_DAYS}j)", flush=True)
+
+
 def _rows_of(d):
     return (d.get("leaderboard") if isinstance(d, dict) else d) or []
 
@@ -509,6 +540,10 @@ def main() -> int:
             stats.append(fn(con, cli, cadence, ctx) or name)
         except Exception as e:
             stats.append(f"{name} ERR {str(e)[:50]}")
+    try:
+        prune_daily(con)
+    except Exception as e:
+        stats.append(f"prune ERR {str(e)[:50]}")
     con.commit()
     con.close()
     print(f"[rest] passe OK : {cli.n} appels en {time.time() - t0:.0f}s | "

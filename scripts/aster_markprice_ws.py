@@ -46,6 +46,38 @@ INSERT = """INSERT OR REPLACE INTO premium_history
     (symbol, mark_price, index_price, premium_pct, last_funding_rate,
      next_funding_time_ms, captured_at_ms) VALUES (?,?,?,?,?,?,?)"""
 
+# La rétention (audit 30/09) : premium_history > 30 j. Unité VÉRIFIÉE au
+# PRAGMA + sonde (30/09) : captured_at_ms en MILLISECONDES (last=1790728677164).
+PREMIUM_RETENTION_DAYS = 30
+_last_prune_day = -1
+
+
+def prune_daily() -> int:
+    """Le prune 1×/j de premium_history (appelé au flush, la date en mémoire).
+    -1 = déjà prune aujourd'hui ou DB occupée (re-tente au flush suivant).
+    Cutoff en MS (×1000) — le piège d'unité du projet."""
+    global _last_prune_day
+    day = int(time.time() // 86400)
+    if day == _last_prune_day:
+        return -1
+    _last_prune_day = day
+    cutoff_ms = int((time.time() - PREMIUM_RETENTION_DAYS * 86400) * 1000)
+    try:
+        con = sqlite3.connect(str(DB_PATH), timeout=30)
+        try:
+            con.execute("PRAGMA busy_timeout=30000")
+            cur = con.execute(
+                "DELETE FROM premium_history WHERE captured_at_ms < ?",
+                (cutoff_ms,))
+            con.commit()
+            return cur.rowcount
+        finally:
+            con.close()
+    except Exception as exc:
+        _last_prune_day = -1
+        print(f"[markprice-ws] prune err : {exc}", flush=True)
+        return -1
+
 
 def load_symbols() -> frozenset[str]:
     """LA liste du parc (source de vérité : aster_premium_collector)."""
@@ -140,6 +172,11 @@ async def listen(duration_s: float | None = None) -> None:
                         n_stored += store(buffer)
                         buffer = []
                         last_flush = now
+                    removed = prune_daily()  # 1×/j (check date interne)
+                    if removed >= 0:
+                        print(f"[markprice-ws] prune : {removed} lignes "
+                              f"premium_history > {PREMIUM_RETENTION_DAYS}j",
+                              flush=True)
                     if now - last_log >= LOG_INTERVAL_S:
                         print(f"[markprice-ws] {n_frames / (now - last_log):.1f}"
                               f" frame/s | {len(last_write)} symboles | "

@@ -97,6 +97,43 @@ def log(msg: str) -> None:
     print(f"[{datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S}Z] {msg}", flush=True)
 
 
+# La rétention (audit 30/09) : tape_1m > 60 j, block_trades + block_meta
+# > 365 j. Unités VÉRIFIÉES au PRAGMA + sonde (30/09) : TOUT en MILLISECONDES
+# (tape_1m.minute_ts=1790728200000, block_trades.ts_ms=…8162950,
+# block_meta.updated_at=…8220242) → cutoff ×1000 (le piège d'unité du projet).
+TAPE_RETENTION_DAYS = 60
+BLOCK_RETENTION_DAYS = 365
+_last_prune_day = -1
+
+
+def prune_daily(con: sqlite3.Connection) -> None:
+    """Le prune 1×/j (le dernier jour de prune en mémoire ; le process oneshot
+    timer = au plus 1 prune par tir). COMMIT explicite, compte loggué."""
+    global _last_prune_day
+    day = int(time.time() // 86400)
+    if day == _last_prune_day:
+        return
+    _last_prune_day = day
+    now_ms = int(time.time() * 1000)
+    c_tape = now_ms - TAPE_RETENTION_DAYS * 86400 * 1000
+    c_blk = now_ms - BLOCK_RETENTION_DAYS * 86400 * 1000
+    try:
+        n1 = con.execute("DELETE FROM tape_1m WHERE minute_ts < ?",
+                         (c_tape,)).rowcount
+        n2 = con.execute("DELETE FROM block_trades WHERE ts_ms < ?",
+                         (c_blk,)).rowcount
+        n3 = con.execute("DELETE FROM block_meta WHERE updated_at < ?",
+                         (c_blk,)).rowcount
+        con.commit()
+    except sqlite3.Error as exc:
+        _last_prune_day = -1  # DB occupée : re-tente au prochain tir
+        log(f"prune ERR {exc}")
+        return
+    if n1 or n2 or n3:
+        log(f"prune : tape_1m={n1} (> {TAPE_RETENTION_DAYS}j), "
+            f"block_trades={n2}, block_meta={n3} (> {BLOCK_RETENTION_DAYS}j)")
+
+
 def http_get_json(url: str, retries: int = 3) -> tuple[list | dict, int | None]:
     """Retourne (payload, poids lu X-MBX-USED-WEIGHT-1M) — le poids sert au
     garde-fou budget de fetch_window (None si header absent)."""
@@ -269,6 +306,7 @@ def last_ts(con: sqlite3.Connection, symbol: str) -> int:
 
 def run(args: argparse.Namespace) -> None:
     con = connect_db()
+    prune_daily(con)  # la rétention 1×/j (audit 30/09)
     symbols = ([s.strip().upper() for s in args.symbols.split(",") if s.strip()]
                if args.symbols else active_symbols(con, args.max_symbols, args.min_qv))
     now = int(time.time() * 1000)

@@ -1,0 +1,14 @@
+[Unit]
+Description=Aster — collecteur klines WS @kline_1h/@kline_15m 24/7 (bougies fermées temps réel; le nocturne fetch_klines reste le backfill)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_klines_ws.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

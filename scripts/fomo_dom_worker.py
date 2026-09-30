@@ -58,6 +58,26 @@ def ensure_tables():
     # parking regonfle ~130 Mo/jour tant qu'il n'est pas drainé
     con.execute("""CREATE TABLE IF NOT EXISTS ws_parking_frames (
         line_hash TEXT PRIMARY KEY, raw TEXT)""")
+    # la rétention (audit 30/09) : la table n'avait AUCUNE colonne temporelle
+    # → captured_at INTEGER (SECONDES = l'unité du champ ts du frame JSON,
+    # sonde 30/09 : {"ts": 1790727982, ...}) — DDL dans ensure_*
+    try:
+        con.execute("ALTER TABLE ws_parking_frames ADD COLUMN captured_at INTEGER")
+    except sqlite3.OperationalError:
+        pass  # colonne déjà présente
+    rows = con.execute("SELECT rowid, raw FROM ws_parking_frames "
+                       "WHERE captured_at IS NULL LIMIT 50000").fetchall()
+    if rows:  # le backfill one-shot : le ts = le 1er champ du JSON brut
+        buf = []
+        for rid, raw in rows:
+            try:
+                ts = int(json.loads(raw).get("ts") or 0) or None
+            except Exception:
+                ts = None
+            buf.append((ts, rid))
+        con.executemany("UPDATE ws_parking_frames SET captured_at=? "
+                        "WHERE rowid=?", buf)
+        log(f"[parking] backfill captured_at : {len(buf)} frames horodatées")
     con.commit(); con.close()
 
 
@@ -175,15 +195,49 @@ def flush_parking(con):
         return
     ch0 = con.total_changes
     for i in range(0, len(lines), 2000):
-        buf = [(hashlib.sha1(l.encode()).hexdigest(), l[:4000])
-               for l in lines[i:i + 2000]]
+        buf = []
+        for l in lines[i:i + 2000]:
+            try:  # le ts (secondes) = le 1er champ du frame JSON
+                ts = int(json.loads(l).get("ts") or 0) or None
+            except Exception:
+                ts = None
+            buf.append((hashlib.sha1(l.encode()).hexdigest(), l[:4000], ts))
         con.executemany("INSERT OR IGNORE INTO ws_parking_frames "
-                        "(line_hash, raw) VALUES (?,?)", buf)
+                        "(line_hash, raw, captured_at) VALUES (?,?,?)", buf)
         con.commit()
     n_new = con.total_changes - ch0
     open(FRAMES_F, "w").close()  # le truncate APRÈS le commit
     log(f"[parking] drainé : {len(lines)} frames → archive "
         f"({n_new} nouvelles)")
+
+
+# La rétention de l'archive du parking (audit 30/09) : ws_parking_frames
+# > 7 j, purgée au drain. Unité VÉRIFIÉE : captured_at = les SECONDES du
+# champ ts du frame JSON (colonne ajoutée + backfillée dans ensure_tables).
+PARKING_RETENTION_DAYS = 7
+_last_prune_day = -1
+
+
+def prune_parking(con):
+    """Le purge 1×/j (le dernier jour de prune en mémoire) : DELETE
+    paramétré par captured_at, COMMIT explicite, compte loggué."""
+    global _last_prune_day
+    day = int(time.time() // 86400)
+    if day == _last_prune_day:
+        return
+    _last_prune_day = day
+    try:
+        cutoff = int(time.time()) - PARKING_RETENTION_DAYS * 86400
+        cur = con.execute("DELETE FROM ws_parking_frames "
+                          "WHERE captured_at < ?", (cutoff,))
+        con.commit()
+    except sqlite3.Error as e:
+        _last_prune_day = -1  # DB occupée : re-tente au prochain drain
+        log(f"[prune] parking err : {str(e)[:80]}")
+        return
+    if cur.rowcount:
+        log(f"[prune] parking : {cur.rowcount} frames > "
+            f"{PARKING_RETENTION_DAYS}j supprimées de l'archive")
 
 
 # La TABLE DE ROUTES : (nom, cadence_min, fn, les args extra)
@@ -308,6 +362,7 @@ def main():
                 except Exception as e:
                     log(f"[parking] ERR {str(e)[:80]}")
                 state["last_parking_flush"] = now
+            prune_parking(con_swaps)  # la purge 1×/j de l'archive (check date interne)
             if now - state.get("last_summary", 0) > 600:
                 log(f"résumé : {listener.summary()}")
                 state["last_summary"] = now
