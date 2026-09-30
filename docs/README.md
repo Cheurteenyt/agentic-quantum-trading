@@ -3,7 +3,7 @@
 *Le projet = 2 livres (régime + anti-régime), une machine (the_machine.py),
 des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 
-## LE VIVANT (11 docs, à jour)
+## LE VIVANT (12 docs, à jour)
 
 | Doc | Ce que c'est | Quand le lire |
 |---|---|---|
@@ -13,6 +13,7 @@ des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 | **27-pouvoirs-kscript** | le registre d'exploitation : 40/53 capacités (75,5 %), vagues 1-2-3 ACTIVÉES (régime institutionnel + absorption + hygiène broker) | avant d'écrire tout nouveau kScript |
 | **28-protocole-ab-x501** | le protocole A/B PRÉ-ENREGISTRÉ : 8 runs, critères figés 01/10/2026, moteur déterministe | avant et après tout run A/B des vagues 1-2 et MK6 |
 | **29-fill-maker-mesure** | la chaîne de preuve maker : surface de fill δ×TTL, sélection adverse sur le pool P1, candidat v21, la boucle des compteurs `_MK` | avant de croire au fill 97,9 % ou de toucher au TTL |
+| **30-flux-funding-banc-local** | le banc de test des flux dormants : flux taker natif + funding au banc, 12/12 cellules KILL, plomberie prouvée vivante | avant de proposer un filtre de flux ou de funding |
 | **22-nos-indicateurs** | LES 10 CRÉATIONS : chaque indicateur, sa règle, sa preuve | pour savoir ce qu'on possède |
 | **20-registre-indicateurs** | la source de vérité des verdicts (25+ datés + les 25 réfutés) | avant de croire quoi que ce soit |
 | **21-goal-performances** | le plan P1-P5 + les dates de tir + le volet institutionnel | pour savoir où on va |

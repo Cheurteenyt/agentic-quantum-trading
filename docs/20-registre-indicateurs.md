@@ -407,3 +407,18 @@ semaine de tirs continue.**
 | ABS-BTC/ETH (BTCUSDT, ETHUSDT) | Signature H1 | Absorption H1 (mur ≥ 3× moy 200, attaque ≥ 2×, tenue ≤ 0,8 %, reprise ≥ 1,2) | idem avec N_MIN = 12 (profondeur orderbook limitée en backtest — falsification initiale, tout PROMOTION reste CANDIDAT au papier forward) | **PRÉ-ENREGISTRÉ 01/10/2026 — verdict à l'export des CSV** |
 
 **Les verdicts intermédiaires impossible à manquer** (pré-enregistrés) : `n_B ≥ 97 % de n_A` = DATA_ABSENTE (le filtre n'a rien filtré, fail-open — problème de data, pas verdict de signal) ; `P ≤ 0,40` avec n_B ≥ 10 = KILL (anti-signal, entrée NUL avec les chiffres) ; sinon INCONCLU — **et le cas attendu est INCONCLU** : les CSV de référence portent 16 trades (BTC) / 15 (ETH), donc n_B < 20 presque à coup sûr avec le RI actif. La règle est écrite AVANT : fenêtre élargie et re-run, JAMAIS de promotion sous N_MIN — pas même quand le bootstrap sourit (la démo du moteur sur les CSV existants l'illustre : P = 0,9358 mais n_B = 15 → INCONCLU imposé). La vague 3 (hygiène broker : trail natif, ocaName, cancelAll, rapport natif) est active dans les `_MK` avec useNativeTrail=false par défaut — la référence MC v20 reste bit-à-bit.
+
+## 01/10 — openmarket x501 : le banc de test local KILLE les filtres continus de flux taker et de funding (vague 5, docs/30, x501_flux_local.py)
+
+**Le pré-enregistrement AVANT la mesure** : grille figée dans l'en-tête du script AVANT tout chiffre — 12 cellules de panel (flux taker : D = 2·tbqv/qv − 1, EMA L ∈ {6, 24, 72} barres ; funding : moyenne K ∈ {9, 21, 90} paiements 8h ; horizons H ∈ {24, 72} barres open→open), hypothèses gravées (flux = CONTINUATION attendue, funding = CONTRARIAN attendu), verdict mécanique au critère AUC du domaine (IC 95 % bootstrap 1 000 par journées seed 501 contient 0,5 et |AUC−0,5| < 0,02 = KILL ; exclut 0,5 avec |AUC−0,5| ≥ 0,05 et sens confirmé = CANDIDAT au re-test 60 j frais).
+
+| cellule (panel 80 symboles × 1 092 j = 2 053 975 barres, 0 gap) | AUC | IC 95 % | delta médian | verdict |
+|---|---|---|---|---|
+| flux L6/L24/L72 × H24/H72 (6 cellules) | 0,5008 – 0,5038 | tous contiennent 0,5 | +9,3 à +31,9 bps | **KILL ×6** |
+| funding K9/K21/K90 × H24/H72 (6 cellules) | 0,4956 – 0,5103 | tous contiennent 0,5 | −21,7 à +46,7 bps | **KILL ×6** |
+| pool P1 : flux L24 (469 entrées, CONTEXTE in-sample) | — | — | delta méd +0,089 R, P = 0,686 | **INCONCLU** (< 0,70 et < +0,10 R) |
+| pool P1 : funding K21 (CONTEXTE) | — | — | delta méd −0,096 R, P = 0,359 | **INCONCLU** |
+
+**La plomberie est prouvée vivante** (le point qui fait la valeur du KILL) : le test d'altération de la QA — décaler le score d'une barre vers l'avant (look-ahead) fait DÉCOLLER l'AUC (BTC 0,5306 vs 0,5079 strict ; sur le rendement intrabar de la même barre : **BTC 0,6103 / ETH 0,6065**) — le flux taker contient de l'information, le harnais la voit, et le verdict strict ~0,5 est donc réel. AUC par symbole sur 8 liquides ≈ 0,5 (0,4978/0,5022/0,5009) : le pooling ne dilue rien. Re-exécution bit à bit.
+
+**Statut : KILL des filtres continus** (le niveau EMA du flux, la moyenne du funding — 5e falsification fermée du domaine après fz, flush OI, ML). **NON réfuté** : le pattern absorption ÉVÉNEMENTIEL de la vague 2 (mur/attaque/tenue/reprise à 4 conditions ordonnées — le champ orderbook n'a pas d'équivalent klines) — son juge reste le protocole A/B docs/28. Re-test interdit sans pré-enregistrement explicite d'une hypothèse nouvelle.

@@ -21,6 +21,12 @@ depuis les sources publiques listées ci-dessous.
 | Funding (Bybit) | 8 h | 66 jours | — |
 | Long/Short Ratio | 4 h | 8 jours | — |
 
+Mise à jour du manifest CSV (re-collecte v16/v17 du 01/10) : le répertoire
+`data_x501/` couvre désormais **80 symboles**, klines 1h sur **1 092 jours**
+(01/10/2023 → 27/10/2026, 26 208 barres par symbole, **0 gap** sur le panel
+complet) et funding 8h assorti — c'est la fenêtre qu'a consommée le banc de
+test des flux dormants (`docs/30`).
+
 ## L'AUDIT VERT (ce qui a été purgé et verrouillé)
 
 L'audit v27 a rendu l'entrepôt **vert** en trois corrections définitives.
@@ -68,3 +74,16 @@ proposition de signal qui repose sur ces séries courtes est invalide par
 construction jusqu'à extension de la collecte — c'est exactement le même
 statut que les données fomo pré-crack dans `docs/06-data.md` : on collecte,
 on ne conclut pas.
+
+## CE QUI EST BANC-TESTÉ (requalification du 01/10, `docs/30`)
+
+Deux familles de séries qui dormaient ont passé le banc de test local et en
+sortent **fermées comme filtres continus** : le **flux taker natif des
+klines** (`taker_buy_quote_volume` — 6/6 cellules KILL) et le **funding
+Binance multi-années** (6/6 KILL) — grille pré-déclarée, plomberie prouvée
+vivante par le test d'altération de la QA, re-exécution bit à bit. Le statut
+de ces séries change : elles ne sont plus « dormantes » mais **mesurées et
+fermées** — tout re-test exige un pré-enregistrement explicite d'une
+hypothèse nouvelle au registre (`docs/20`), pas un re-run de curiosité.
+La collecte continue : les fenêtres se rallongent, l'entrepôt reste la
+matière première des prochains bancs (OI 1h en tête).

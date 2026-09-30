@@ -106,6 +106,14 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    reconnaissait des symboles, pas du temps. Tri global par timestamp (la
    vérité) : **AUC 0,4994**, et 4 plis roulants 0,483 / 0,533 / 0,488 /
    0,471 (signes alternés = bruit pur). Promotion J+30 **annulée**.
+4. **Banc local des flux dormants (vague 5, 01/10, `docs/30`)** : le flux
+   taker natif des klines (EMA 6/24/72 h) et le funding (moyennes 3/7/30 j)
+   testés en filtres continus sur 80 symboles × 1 092 j = 2 053 975 barres,
+   grille pré-déclarée, verdict mécanique au critère AUC — **12/12 cellules
+   KILL** (AUC 0,4956–0,5103, tous les IC 95 % contiennent 0,5) ; le test
+   d'altération de la QA prouve la plomberie vivante (look-ahead :
+   AUC 0,5306/0,6103 BTC). Le pattern absorption ÉVÉNEMENTIEL (vague 2)
+   n'est pas réfuté par ce banc — son juge reste le protocole A/B.
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -172,6 +180,13 @@ est re-éditée.
    Deribit, options/skew, LSR) ; vague 2 : absorption orderbook native ;
    vague 3 : hygiène broker (trail natif, OCA, stats). Même discipline de
    promotion, zéro raccourci.
+5. **Banc de test local des flux dormants — FAIT (01/10, `docs/30`)** —
+   le flux taker natif et le funding multi-années passés au banc AVANT
+   tout run kScript : 12/12 cellules KILL au critère AUC (2 053 975
+   barres, plomberie prouvée vivante par le test d'altération). Le
+   diagnostic « tu n'exploites aucun pouvoir » reçoit sa réponse
+   définitive : les pouvoirs data sont désormais TOUS banc-testés —
+   fz, flush OI, ML, flux taker, funding.
 
 ## LES RÈGLES NON NÉGOCIABLES
 
