@@ -32,6 +32,17 @@ officiels, doctrine, roadmap) · `docs/26-openmarket-donnees.md`
 `docs/27-pouvoirs-kscript.md` (l'audit d'exploitation : **40/53 capacités
 = 75,5 %** — sources premium 7/8, orderbook 2/3, broker 15/16 ; vagues 1-2
 activées, **vague 3 hygiène broker activée**, `docs/28-protocole-ab-x501.md`
+= les A/B PRÉ-ENREGISTRÉS des vagues 1-2 (8 runs, dont MK6 TTL=2 vs 6),
+3 tests au registre docs/20).
+**MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
+**468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
+**+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
+règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane.
+**⚠ Révision exécution EN ATTENTE DE REVIEW (docs/29)** : la mesure
+reproductible du fill maker (surface δ×TTL 2 053 015 tentatives + sélection
+sur le pool P1) **réfute l'hypothèse d'entrée v20** (delta réel +0,375 bps,
+fallback à −88,6 bps, biais concentré sur A4) → candidat v21 : médiane
+**306,2 $** (TTL=2) / **364,0 $** (TTL=6, +33,6 % vs taker). Le code : 12 kScripts + 6 QA **PASS** dans
 = les A/B PRÉ-ENREGISTRÉS des vagues 1-2, 3 tests au registre docs/20).
 `docs/27-pouvoirs-kscript.md` (l'audit d'exploitation : **36/53 capacités
 = 67,9 %** — sources premium 7/8, orderbook 2/3 ; vagues 1-2 activées).
@@ -40,6 +51,7 @@ origin/main
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
 règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 12 kScripts + 6 QA **PASS** dans
+origin/main
 `scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
 référence, fill 97,9 % à δ=2 ; l'audit d'exploitation kScript
 `x501_exploit_audit.py` ; **vagues 1-2 du plan d'exploitation ACTIVÉES le
