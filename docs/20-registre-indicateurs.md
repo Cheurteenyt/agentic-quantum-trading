@@ -431,3 +431,14 @@ Rapports : reports/aster_deep_regimes_p2.md (script : scripts/mechanism_probe.py
 Rapports : reports/aster_volspike_gate.md (script : scripts/studies/aster_volspike_gate.py — pattern verbatim T9/T10/T11, klines.db lecture-seule).
 origin/main
 origin/main
+
+## 01/10 — T16 : LA GRANULARITÉ 15m PROFONDE (178 k barres × 3 majors, 2021-2026) — le verdict intraday
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Les 6 familles à 15m profond | momentum 875t·17 %·−27 %·DD63·17m− (connu) ; mean_reversion WR 47 %·−40 % ; breakout −21 % ; funding_carry −33 % — 0 lane PASS aux gates honnêtes, sharpe OOS ≤ 0,04 hors artefacts | **NUL intraday** — aucun edge régime-indépendant à 15m dans les 6 familles |
+| La comparaison 1h→15m | l'edge momentum 1h (+55/+56/+61 % recov/bull24/chop) S'EFFONDRE à 15m (+7/−42/−14) : trades ×3-4 = ~4,5 pts de frais sur 5 ans + le whipsaw | **CONTEXTE** — l'edge momentum était un edge d'HORIZON (1h), pas du marché |
+| Les invariances inter-horizons | mean_reversion : WR invariant 43-59 % à 15m comme 38-52 % à 1h (structurel) mais PnL tué par RR+frais aux deux ; funding_carry bear +39→+23 % (le même accident du short passif) | **CONTEXTE** — confirmé multi-horizons |
+| L'orientation intraday | le forward intraday (les signaux 15m du tape) n'a AUCUNE base dans les 6 familles OHLCV — sa base est ailleurs : le carnet réel 1m (le depth engine), l'ordre-flow/CVD, le pont fomo | **DOCTRINE** — la quête intraday bascule du OHLCV vers l'ordre-flow |
+
+Rapports : reports/aster_15m_regimes.md (script : scripts/studies/aster_15m_regimes.py — configs REF T7, le harnais corrigé b825da9, DB ro).
