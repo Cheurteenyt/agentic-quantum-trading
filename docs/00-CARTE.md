@@ -35,11 +35,13 @@ options/skew, LSR — plan d'activation en 3 vagues).
 **MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
-règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 9 kScripts + 5 QA **PASS** dans
+règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 12 kScripts + 6 QA **PASS** dans
 `scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
 référence, fill 97,9 % à δ=2 ; l'audit d'exploitation kScript
-`x501_exploit_audit.py`). Les livrables : `docs/reference/openmarket-x501/`
-(9 PDF + 2 protocoles). La baseline du 01/10 : voir le commit de la branche (le fichier reports/ n'est pas versionné — à committer par le domaine OpenMarket)
+`x501_exploit_audit.py` ; **vagues 1-2 du plan d'exploitation ACTIVÉES le
+01/10 : filtre régime institutionnel sur 5 flux premium + absorption
+orderbook native, `docs/27`**). Les livrables : `docs/reference/openmarket-x501/`
+(9 PDF + 2 protocoles). Baseline : `reports/openmarket-x501-baseline-2026-10-01.md`
 (v20, l'édition 30/09 est conservée pour la trace).
 **Pivot 30/09 : la recherche Aster/FOMO est gelée au profit d'OpenMarket**
 (les collecteurs continuent, plus aucun effort de recherche).

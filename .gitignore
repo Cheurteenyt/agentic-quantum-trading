@@ -127,6 +127,8 @@ rag/
 backend/services/onchain/aster/archive/research_artifacts/legacy_discovery_batches/
 reports/*
 !reports/README.md
+# les baselines du domaine OpenMarket = documents de référence datés (demande review PR #1)
+!reports/openmarket-x501-baseline-*.md
 *.bak-*
 backend/services/onchain/aster/archive/research_artifacts/
 scripts/.gt_pool_cache.json

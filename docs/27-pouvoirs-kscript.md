@@ -100,3 +100,48 @@ backtest pré-enregistré (méthode `docs/03-methodology.md`), le registre
 (`docs/20-registre-indicateurs.md`) reçoit le verdict chiffré, et le papier
 forward reste le juge. Exploiter les pouvoirs ne veut PAS dire croire plus
 vite — ça veut dire tester plus de portes, avec la même clé.
+
+## EXÉCUTION — LES VAGUES 1-2 SONT ACTIVÉES (le 01/10/2026)
+
+Les trois scripts ci-dessous sont écrits, pré-enregistrés et passent la QA
+statique (`qa_vagues_x501.py` — 122 contrôles, 0 échec ; les 4 QA existantes
+restent PASS). Ils EXPLOITENT les familles dormantes : sources premium
+1/8 → 8 flux branchés, orderbook 1/3 → les 4 fonctions natives utilisées.
+
+| Fichier | Vague | Ce qu'il fait |
+|---|---|---|
+| `Operation_x501_Signature_H1_RI.ks` | 1 | la Signature H1 + le filtre de régime institutionnel : score RI = moyenne des 5 composantes écrêtées (ETF flow 3 j en sigma, CME OI 3 j × signe prix, DVOL vs MM 30, dérive skew 1W sur 5 j, LSR top traders contrarian), seuil ±0,10, poids égaux figés dans le code |
+| `x501_observe_regime.ks` | 1 | l'observe des 8 flux premium (9 souscriptions) : table de disponibilité par flux, composantes brutes, alerte de bascule de quadrant — la vérification « le flux répond » AVANT le filtre |
+| `Operation_x501_Absorption_H1.ks` | 2 | le pattern Aster en natif : mur = `maxBidAmount`/`maxAskAmount` ≥ 3× sa moyenne 200, attaque = vague taker ≥ 2× sa moyenne, tenue = écrasement intrabar ≤ 0,8 %, reprise = EMA flux net 6 + déséquilibre de carnet ≥ 1,2 (`sumBids`/`sumAsks`) |
+
+**La discipline no-repaint des flux lents (le piège qui tuait le backtest).**
+`etf_flow`/`cme_oi`/`skew` sont DAILY : sur un chart 1h, l'engine
+forward-fille la valeur du jour en cours dès 00h alors que la donnée réelle
+n'est publiée qu'en fin de journée. Les trois scripts ne lisent donc JAMAIS
+le bucket courant des séries lentes : ils projettent via `htf(..., "1D")`
+et lisent `[1]` et avant (les buckets complétés). `long_short_ratio` n'a
+pas de membre `.time` (lecture snapshot directe), le DVOL est continu
+(lecture `[0]` sûre), le skew s'épelle `onemonth`.
+
+**Le fail-open (pré-enregistré).** Si moins de 3 des 5 composantes RI
+répondent sur un symbole (data premium absente), le filtre devient
+TRANSPARENT : le backtest mesure « aucun effet » et non « tout bloqué ».
+L'observe donne la table de disponibilité par symbole pour le vérifier
+visuellement avant tout backtest.
+
+**Les limites assumées.** (1) L'agrégation `htf()` d'une série `.value`
+(dernière valeur vs somme du bucket) doit être confirmée au premier run :
+si les valeurs ETF ressortent ~24× celles de la plateforme, la composante
+se saturera et la falsification le montrera immédiatement — c'est écrit
+ici AVANT le run. (2) La profondeur d'historique orderbook en backtest est
+limitée (la doc donne ~1 semaine à 1m, des mois à 1h) : le backtest du
+pattern absorption est une falsification initiale sur la fenêtre
+DISPONIBLE, pas une preuve 733 j — la vraie validation = papier forward
+(protocole v11), les alertes « mur géant » des deux scripts stratégies
+servent au comptage en direct.
+
+**Prochain jalon (vague 3 — hygiène, aucun edge espéré)** : `trailPoints`
+dans les `_MK`, `ocaName` pour les brackets, `strategy.maxDrawdown()` dans
+les rapports de preuve live. Puis les backtests A/B pré-enregistrés des
+vagues 1-2 (RI on/off sur BTC et ETH ; absorption vs signature) et le
+verdict au registre `docs/20`.
