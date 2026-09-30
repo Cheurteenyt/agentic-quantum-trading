@@ -23,6 +23,21 @@
   murs (`wall_detector.py`), prints (`aster_blocktrades.py`, timer 15 min),
   réplication derek518 (`replication_derek` dans `fomo_paper_forward.py`).
 
+## 🌐 LE DOMAINE OPENMARKET x501 (intégré le 30/09)
+
+Le programme **100 $ → 50 100 $ en 12 mois** (×501, DD ≤ 25 % strict,
+zéro intervention) — `docs/25-openmarket-x501.md` (mission, chiffres
+officiels, doctrine, roadmap) · `docs/26-openmarket-donnees.md`
+(l'entrepôt om_v27 audité vert : 226 800 doublons purgés, index UNIQUE).
+**MC v18, config honnête** : V1 taker 216 $ / **V1 maker δ=2 475 $
+(P(250) 80 %)** / V3 2 353 $ — la règle : −2 bps de coût/côté ≈ +25 % de
+médiane. Le code : 9 kScripts + 4 QA **PASS** dans
+`scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
+référence, fill 97,9 % à δ=2). Les livrables : `docs/reference/openmarket-x501/`
+(9 PDF + 2 protocoles). Baseline : `reports/openmarket-x501-baseline-2026-09-30.md`.
+**Pivot 30/09 : la recherche Aster/FOMO est gelée au profit d'OpenMarket**
+(les collecteurs continuent, plus aucun effort de recherche).
+
 ## 🔁 LES COLLECTEURS QUI TOURNENT 24/7 (systemd user)
 
 | Service | Rythme | Rôle |

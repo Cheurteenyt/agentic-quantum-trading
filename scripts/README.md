@@ -207,6 +207,21 @@ vivant ne l'importe.
 (re-tir 06-07/10), `tilt_frontier.py`, `qubo_sizing.py` / `qubo_joint_lev.py`
 (CANDIDATS en paper forward), `p5_frequency_test.py` (vol_spike câblé 4e flux).
 
+## 8. LE DOMAINE OPENMARKET x501 (`scripts/studies/x501_openmarket/`) — le 30/09
+
+> L'intégration du programme OpenMarket (100 $ → 50 100 $, DD ≤ 25 %) :
+> `docs/25-openmarket-x501.md`. Un dossier = le domaine entier : 9 kScripts,
+> le scanner d'installation, 4 QA statiques (4× PASS 0 échec à l'intégration).
+> La carte interne : `scripts/studies/x501_openmarket/README.md`.
+
+| Contenu | Une ligne |
+|---|---|
+| `Operation_x501_Signature_H1/H4.ks` + 3 alphas `_H4` | les 5 stratégies (signature, cascade financement, éruption vol, confluence MTF) |
+| `Operation_x501_Signature_*_MK.ks` | les versions **maker** δ=2–5 (TTL, fallback taker, verrous pend*) — fill 97,9 % à δ=2 |
+| `x501_observe_*.ks` | 2 collecteurs d'observation (zéro ordre, C4) |
+| `x501_setup_kscript.js` | l'installation codifiée (49 contrôles QA) |
+| `qa_*_x501.py` (4) | QA générale + scanner + maker (M1–M15) + observation — stdlib pure, une commande |
+
 ---
 
 **Le nocturne** (`trading-agent-nightly.service`, 03h01) exécute ~70 étapes :
