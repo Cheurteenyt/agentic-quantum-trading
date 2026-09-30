@@ -153,8 +153,14 @@ def _watchdog() -> None:
 
 def prune_old(con: sqlite3.Connection) -> int:
     global _in_prune, _last_progress
-    _in_prune = True  # le DELETE scanne 54M lignes sans index ts : pas de kill
+    _in_prune = True  # le DELETE + l'index scannent des millions de lignes : pas de kill
     try:
+        # l'index ts : sans lui le DELETE quotidien = un scan complet qui
+        # triplerait en semaines (54 M → 192 M lignes) — créé une fois (17 s),
+        # no-op ensuite ; la page libérée par le DELETE est réutilisée : le
+        # fichier plafonne sans VACUUM
+        con.execute("CREATE INDEX IF NOT EXISTS idx_depth_bins_ts ON depth_bins(ts)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_depth_meta_ts ON depth_meta(ts)")
         cutoff = int(time.time()) - RETENTION_DAYS * 86400
         cur = con.execute("DELETE FROM depth_bins WHERE ts < ?", (cutoff,))
         con.execute("DELETE FROM depth_meta WHERE ts < ?", (cutoff,))

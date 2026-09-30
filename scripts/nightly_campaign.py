@@ -56,8 +56,12 @@ CANDIDATES_DB = ROOT / "data" / "warehouse" / "candidates.db"
 STORE_DB = ROOT / "data" / "warehouse" / "backtest.db"
 REPORTS_DIR = ROOT / "reports"
 
-MIN_BARS = 300
-"""En dessous, le walk-forward ne peut pas produire un OOS defendable."""
+MIN_BARS = 3000
+"""En dessous, le walk-forward ne peut pas produire un OOS defendable.
+(30/09 : 300 → 3000, aligné sur ce docstring — les 16 séries du lab à
+599-1 636 barres produisaient des walk-forwards bruités et coûtaient
+~20 % du temps de campagne ; le ciblage --target-bars 3000 des fetches
+est la même doctrine.)"""
 
 MATURITY_DAYS = 30
 """Delai minimal avant reevaluation d'un candidat. Evaluer plus tot revient a
