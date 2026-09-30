@@ -10,7 +10,10 @@ des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 | **00-CARTE** | la carte du projet entier | l'entrée, à chaque reprise |
 | **25-openmarket-x501** | la mission x501 : chiffres officiels, falsifications, exécution maker, roadmap | le domaine OpenMarket (pivot 30/09) |
 | **26-openmarket-donnees** | l'entrepôt om_v27 : l'audit vert, le manifest, les bandes de coûts | avant toute manipulation de data openmarket |
+| **27-pouvoirs-kscript** | le registre d'exploitation : 40/53 capacités (75,5 %), vagues 1-2-3 ACTIVÉES (régime institutionnel + absorption + hygiène broker) | avant d'écrire tout nouveau kScript |
+| **28-protocole-ab-x501** | le protocole A/B PRÉ-ENREGISTRÉ : 6 runs, critères figés 01/10/2026, moteur déterministe | avant et après tout run A/B des vagues 1-2 |
 | **27-pouvoirs-kscript** | le registre d'exploitation : 36/53 capacités (67,9 %), vagues 1-2 ACTIVÉES (régime institutionnel + absorption), backtests A/B à venir | avant d'écrire tout nouveau kScript |
+origin/main
 | **22-nos-indicateurs** | LES 10 CRÉATIONS : chaque indicateur, sa règle, sa preuve | pour savoir ce qu'on possède |
 | **20-registre-indicateurs** | la source de vérité des verdicts (25+ datés + les 25 réfutés) | avant de croire quoi que ce soit |
 | **21-goal-performances** | le plan P1-P5 + les dates de tir + le volet institutionnel | pour savoir où on va |

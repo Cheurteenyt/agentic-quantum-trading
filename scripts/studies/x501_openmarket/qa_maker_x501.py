@@ -13,10 +13,13 @@ générale (qa_kscript_x501.py) qui reste applicable au squelette commun :
   M7  invalidation : clôture au-delà du stop prévu (2 côtés), sans fallback
   M8  fallback : conditionné, pendFb=1, et boucle d'expiration fermée au fallback
   M9  transfert pend->plan complet au fill (side/qty/stop/entry/fillDone)
-  M10 pas d'alert() dans les stratégies (non documenté kScript)
+  M10 alert() = uniquement le rapport fin de run sur isLastBar (vague 3)
   M11 flash de fill reseté en fin de script
   M12 équilibre accolades/parenthèses du code
   M13 non-régression : chaque ligne de l'original est une sous-séquence du MK
+      (exceptions doctrinales : les 3 lignes remplacées P5A/B/C, le commentaire
+      bracket remplacé vague 3, et les lignes "upgradées" vague 3 — celles que
+      le MK PROLONGE avec ocaName/trail natif : même tête de ligne, + kwargs)
   M14 identifiants non déclarés : aucun (réutilise la whitelist de la QA générale)
   M15 marqueurs chart fill maker/fallback présents
 """
@@ -82,9 +85,9 @@ def check_pair(orig: Path, mk: Path):
           bool(re.search(r'strategy\.entry\("L",\s*"long",\s*qty=qtyL,\s*limit=limL', src)))
     qadir(msgs, "M5 limite short : limit=limS présent",
           bool(re.search(r'strategy\.entry\("S",\s*"short",\s*qty=qtyS,\s*limit=limS', src)))
-    qadir(msgs, "M5 branches taker inchangées (2 entries marché)",
-          'strategy.entry("L", "long", qty=qtyL, comment="x501 long")' in src and
-          'strategy.entry("S", "short", qty=qtyS, comment="x501 short")' in src)
+    qadir(msgs, "M5 branches taker inchangées (2 entries marché, ocaName vague 3 en fin)",
+          'strategy.entry("L", "long", qty=qtyL, comment="x501 long", ocaName="x501L")' in src and
+          'strategy.entry("S", "short", qty=qtyS, comment="x501 short", ocaName="x501S")' in src)
     qadir(msgs, "M5 delta bps : long sous le prix, short au-dessus",
           "trade.close * (1 - makerDeltaBps / 10000)" in code and
           "trade.close * (1 + makerDeltaBps / 10000)" in code)
@@ -114,8 +117,10 @@ def check_pair(orig: Path, mk: Path):
     qadir(msgs, "M9 compteurs fills maker/fallback", "mkFills = mkFills + 1" in code and
           "mkFb = mkFb + 1" in code)
 
-    # M10 pas d'alert()
-    qadir(msgs, "M10 aucun alert() dans la stratégie", "alert(" not in code)
+    # M10 alert() : uniquement le rapport fin de run sur isLastBar (vague 3,
+    # docs/27-28) — AUCUNE alerte de signal dans les stratégies _MK
+    qadir(msgs, "M10 alert() uniquement le rapport fin de run (isLastBar, 1 appel)",
+          code.count("alert(") == 1 and "alert(" in code.split("if (isLastBar)")[-1])
 
     # M11 flash reset
     qadir(msgs, "M11 fillFlash = 0 en fin de script", "fillFlash = 0;" in code)
@@ -124,17 +129,34 @@ def check_pair(orig: Path, mk: Path):
     qadir(msgs, "M12 accolades équilibrées", code.count("{") == code.count("}"))
     qadir(msgs, "M12 parenthèses équilibrées", code.count("(") == code.count(")"))
 
-    # M13 non-régression (exception : les 3 lignes signal REMPLACÉES par P5A/B/C)
+    # M13 non-régression (exceptions : les 3 lignes signal REMPLACÉES par
+    # P5A/B/C + le commentaire bracket remplacé par la vague 3)
     replaced = {
         "var longSignal = flat && regimeLong && zoneTouchLong && confluenceOk &&",
         "var shortSignal = flat && regimeShort && zoneTouchShort && confluenceOk &&",
         "cvdUp && bullBar && fundingOkLong && breakersOk;",
+        "// Bracket : TP1 (moitié) + TP2 (quart) + runner — le stop est commun",
     }
     orig_lines = [l.strip() for l in src_o.splitlines() if l.strip()
                   and l.strip() not in replaced]
     mk_lines = [l.strip() for l in src.splitlines() if l.strip()]
+
+    def ligne_upgradee_vague3(base_line, mk_set):
+        """Une ligne d'origine est "upgradée" (et non perdue) si une ligne du
+        MK la PROLONGE : même tête exacte, plus longue (les kwargs vague 3
+        ocaName=/trailPoints= sont ajoutés en fin d'appel, jamais insérés au
+        milieu — les entries taker, elles, sont vérifiées mot pour mot en M5)."""
+        core = base_line
+        if core.endswith(");"):
+            core = core[:-2]
+        elif core.endswith(";"):
+            core = core[:-1]
+        return any(m.startswith(core) and len(m) > len(core) for m in mk_set)
+
+    mk_set = set(mk_lines)
+    orig_effectives = [l for l in orig_lines if not ligne_upgradee_vague3(l, mk_set)]
     qadir(msgs, "M13 original = sous-séquence du MK (aucune ligne perdue, indent. ignorée)",
-          is_subsequence(orig_lines, mk_lines))
+          is_subsequence(orig_effectives, mk_lines))
 
     # M14 identifiants inconnus (réutilise la logique QA générale, simplifiée)
     assigned = set(pers)

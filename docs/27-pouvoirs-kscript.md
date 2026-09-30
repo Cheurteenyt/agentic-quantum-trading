@@ -156,3 +156,36 @@ dans les `_MK`, `ocaName` pour les brackets, `strategy.maxDrawdown()` dans
 les rapports de preuve live. Puis les backtests A/B pré-enregistrés des
 vagues 1-2 (RI on/off sur BTC et ETH ; absorption vs signature) et le
 verdict au registre `docs/20`.
+
+## EXÉCUTION — LA VAGUE 3 EST ACTIVÉE + LE PROTOCOLE A/B EST PRÉ-ENREGISTRÉ (le 01/10/2026)
+
+**La vague 3 (hygiène broker, aucun edge espéré — la fidélité d'exécution,
+pas un signal)** est câblée dans les DEUX `_MK` (H1 et H4), pré-enregistrée
+dans leurs en-têtes :
+
+| ajout | capacité kScript | ce que ça change |
+|---|---|---|
+| trail natif du runner (input `useNativeTrail`, **défaut false** = la référence MC v20 reste bit-à-bit) + `trailNativePct` (1,5 %) | `trailPoints`/`trailOffset` | le RUN porte un trail qui ratatine INTRABAR (la piste manuelle ne ratatine qu'à la clôture) ; la piste manuelle reste en stop plancher sur la même jambe ; `trailPoints = tp2R × riskPx` = activation immédiate à l'armement (l'excursion favorable TP2 est déjà atteinte) |
+| groupes OCA nommés PAR TRANCHE (`x501L-TP1`, `x501L-TP2`, `x501L-RUN`, idem côté S) + `ocaName="x501L"/"x501S"` sur les 6 entrées | `ocaName` | les noms remontent au log du testeur (preuve live) ; PRÉ-ENREGISTRÉ : ocaName = « quand l'un remplit, les autres s'annulent » — l'échelle TP1/TP2/RUN ne partage JAMAIS un même groupe (un TP1 rempli ne doit pas tuer le runner) |
+| `strategy.cancelAll()` au coupe-circuit -25 % quand flat | `strategy.cancelAll()` | **bug réel corrigé** : un ordre limite maker encore en file pouvait remplir APRÈS l'arrêt du plan (-25 %) et rouvrir une position ; la file entière est purgée, idempotent |
+| rapport fin de run (plotTable + alert sur `isLastBar`) | `closedTradeCount`, `winTradeCount`, `lossTradeCount`, `maxDrawdown` | les getters NATIFS croisent nos compteurs internes (nTr/WR/maxDD en USD vs ddPct interne, mkFills/mkFb/mkTOut/mkInv) — toute divergence = bug d'état à corriger AVANT la preuve live (protocole v11) |
+
+**Le refus pré-enregistré** : `strategy.exit profit=/loss=` (distances en
+ticks de l'API) reste DORMANT par design — dépendant de la taille de tick du
+symbole, notre échelle calcule des prix absolus depuis la distance de stop
+réelle. Famille broker : **15/16**, la case refusée est documentée, pas
+oubliée. Le taux d'exploitation monte de **36/53 (67,9 %) à 40/53
+(75,5 %)** — `x501_exploit_audit.py` re-run bit-à-bit (13 scripts : 12 .ks +
+le setup js).
+
+**Le protocole A/B des vagues 1-2 est PRÉ-ENREGISTRÉ** dans
+`docs/28-protocole-ab-x501.md` (6 runs, critères figés le 01/10/2026, 4
+verdicts dans l'ordre : DATA_ABSENTE / PROMOTION / KILL / INCONCLU) avec le
+moteur déterministe `x501_verdict_ab.py` (bootstrap 10 000, seed 501, stdlib
+pure). Les 3 tests (RI-BTC, RI-ETH, ABS-BTC/ETH) sont entrés au registre
+`docs/20` au statut PRÉ-ENREGISTRÉ. Le cas attendu au premier run est
+INCONCLU (n_B < 20) : la règle « fenêtre élargie, JAMAIS de promotion sous
+N_MIN — pas même quand le bootstrap sourit » est écrite AVANT les runs, et
+la démo du moteur sur les CSV de référence l'illustre (P = 0,9358, n_B = 15
+→ INCONCLU imposé).
+origin/main
