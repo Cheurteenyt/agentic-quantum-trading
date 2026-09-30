@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """LE WATCHDOG DE SANTÉ ASTER (30/09) — le symétrique de fomo_health.py pour
-le domaine Aster. 9 sondes toutes les 5 min, l'alerte SUR TRANSITION :
+le domaine Aster. 11 sondes toutes les 5 min, l'alerte SUR TRANSITION :
 1. klines 1h fraîches (< 25 h — le nocturne 03:00)
 2. oi_history fraîche (< 30 min — timer 15 min, la munition H4/H5 du 06-07)
-3. liq_events fraîche (< 30 min)
-4. block_trades fraîche (< 30 min)
-5. premium_history fraîche (< 10 min — WS !markPrice@arr @1s, service
+3. oi_history_bulk fraîche (< 30 min — la passe bulk bapi de oi_collector,
+   ~642 symboles en 1 appel, unités notional ×2)
+4. liq_events fraîche (< 30 min)
+5. block_trades fraîche (< 30 min)
+6. premium_history fraîche (< 10 min — WS !markPrice@arr @1s, service
    aster-markprice-ws 24/7, remplace le REST 15 min depuis le 30/09)
-6. depth_meta fraîche (< 10 min — le collecteur 24/7, cadence ~1 min)
-7. depth CONTINUITÉ : 0 trou > 15 min dans depth_meta sur 24 h (le tir
+7. depth_meta fraîche (< 10 min — le collecteur 24/7, cadence ~1 min)
+8. depth CONTINUITÉ : 0 trou > 15 min dans depth_meta sur 24 h (le tir
    depth/murs du 06-07 exige 14 j sans coupure — tolérance zéro)
-8. le cache funding (< 25 h — le nocturne)
-9. rate_weight : le budget X-MBX-USED-WEIGHT-1M vu par les collecteurs
-   (< 1800 = 75 % de 2 400/min — au-delà, risque 429 puis ban 418)
+9. funding_meta fraîche (< 90 min — le timer aster-funding-bulk 2×/h,
+   764 symboles, les intervalles 1/2/4/8 h par symbole pour funding_fade)
+10. le cache funding (< 25 h — le nocturne)
+11. rate_weight : le budget X-MBX-USED-WEIGHT-1M vu par les collecteurs
+   (< 1800 = 75 % de 2 400/min — seuil INCHANGÉ ; le bulk bapi n'expose pas
+   le header, seul fapi alimente le compteur)
 État : data/warehouse/aster_health_state.json. Journal [aster-health].
 Exit 0 toujours (un timer ne doit pas spammer d'unités failed)."""
 import json, os, sqlite3, subprocess, sys, time
@@ -102,6 +107,10 @@ CHECKS = [
      "klines 1h > 25 h — le nocturne 03:00 n'a pas tourné"),
     ("oi_history", lambda: (max_age(KL, "SELECT MAX(captured_at_ms) FROM oi_history") or 9e9) < 1800,
      "oi_history > 30 min — le timer 15 min est mort (la munition H4/H5 du 06-07)"),
+    ("oi_history_bulk", lambda: (max_age(KL, "SELECT MAX(captured_at_ms) FROM oi_history_bulk") or 9e9) < 1800,
+     "oi_history_bulk > 30 min — la passe bulk bapi (ticker/pair, ~642 syms) de oi_collector ne couvre plus"),
+    ("funding_meta", lambda: (max_age(KL, "SELECT MAX(captured_at_ms) FROM funding_meta") or 9e9) < 5400,
+     "funding_meta > 90 min — le timer aster-funding-bulk (2×/h) ne tire plus"),
     ("liq_events", lambda: svc_active("aster-liq-collector.service"),
      "le collecteur liq 24/7 est down"),
     ("block_trades", lambda: (timer_age("aster-blocktrades.timer") or 9e9) < 1800,

@@ -1,0 +1,8 @@
+[Unit]
+Description=Aster funding bulk — 764 symboles en 1 appel bapi (meta intervalles 1/2/4/8 h, caps, taux)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_funding_bulk.py
+TimeoutStartSec=120

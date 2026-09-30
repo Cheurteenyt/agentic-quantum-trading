@@ -1,0 +1,9 @@
+[Unit]
+Description=Aster funding bulk 2×/h (décalé :07/:37, hors des passes oi-collector)
+
+[Timer]
+OnCalendar=*:07,37
+Persistent=true
+
+[Install]
+WantedBy=timers.target
