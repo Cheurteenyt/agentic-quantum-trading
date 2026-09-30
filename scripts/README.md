@@ -226,6 +226,8 @@ vivant ne l'importe.
 | `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** — stdlib pure, une commande |
 | `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 13 scripts → **75,5 %** (vague 3 : trail natif, ocaName, cancelAll, rapport natif — verdicts : `docs/27-pouvoirs-kscript.md`) |
 | `x501_verdict_ab.py` | **le moteur de verdict des A/B pré-enregistrés** (docs/28) : bootstrap 10 000 seed 501, 4 verdicts DATA_ABSENTE/PROMOTION/KILL/INCONCLU — stdlib pure, bit-à-bit |
+| `x501_fill_maker_surface.py` + `pool_P1_entrees.csv` + `fill_maker_surface.json` | **la chaîne de preuve maker** (docs/29) : surface de fill δ×TTL (80 symboles × 733 j, 2 053 015 tentatives), sélection réelle sur le pool P1 (fallback −88,6 bps, biais A4), grille δ×TTL, sortie analytique — verdict : le maker réel vaut +0,931 bps/jambe (candidat v21 : médianes 306,2/364,0 $) |
+| `x501_mk_compteurs.py` | **la boucle de surveillance maker** (docs/29 § 7) : relevés CSV des compteurs `_MK` → verdict binomial exact INSUFFISANT/DIVERGENCE/CONFORME/DÉRIVE — stdlib pure, `--demo` |
 
 ---
 

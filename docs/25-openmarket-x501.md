@@ -44,6 +44,21 @@ USDT-perp) : fee taker 5,5 bps, fee maker 2,0, demi-spread 0,6 ; fill
 maker δ=2 mesuré **97,9 % sur 52 728 tentatives** (1h/708 j), fallback
 taker 2,1 % → 2,1 bps/côté effectif (arrondi défavorable).
 
+> ⚠ **NOTE DE RÉVISION EN ATTENTE DE REVIEW (01/10/2026 — docs/29)** : la
+> mesure reproductible du fill maker sur le pool P1 (surface δ×TTL + sélection
+> réelle, data premium 80 symboles × 733 j) **réfute l'hypothèse d'entrée** de
+> cette table : le delta réel de l'entrée maker δ=2/TTL=2 est **+0,375 bps** sur
+> les signaux (93,82 % de fill, fallback taker à −88,6 bps — sélection adverse
+> concentrée sur A4), contre 4,0 bps crédités ici. Candidat v21 chiffré par le
+> noyau MC (contrôles verts) : médiane **306,2 $** (TTL=2) / **364,0 $**
+> (TTL=6, +33,6 % vs taker) au lieu de 468,4 $. **Les chiffres officiels de
+> cette table restent v20** tant que la review n'a pas validé docs/29 ; le
+> chiffre durci « 97,9 % » a désormais une méthodologie reconstructible
+> (surface § 3 de docs/29). La jambe de sortie TP (1,488 bps pondéré) tient.
+> La règle des coûts ci-dessous n'est pas affectée — elle en est renforcée :
+> le fallback taker est le coût le plus cher du système (~88 bps par
+> rattrapage).
+
 ## LA RÈGLE DES COÛTS (le levier le plus sous-estimé)
 
 Mesure empirique confirmée par v20 : **chaque +2 bps de coût/côté coûte

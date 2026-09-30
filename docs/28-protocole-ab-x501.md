@@ -14,7 +14,7 @@ Aucune des deux nouveautés ne touche la config officielle (MC v20, baseline
 2026-10-01) tant que ce protocole n'a pas produit un verdict PROMOTION ;
 KILL ou INCONCLU laissent la référence intacte et le registre tranchera.
 
-## LES 6 RUNS (le testeur kScript, exports « trades » CSV)
+## LES 8 RUNS (le testeur kScript, exports « trades » CSV)
 
 | # | test | jambe A (contrôle) | jambe B (traitement) | symbole | N_MIN |
 |---|---|---|---|---|---|
@@ -24,6 +24,16 @@ KILL ou INCONCLU laissent la référence intacte et le registre tranchera.
 | 4 | ABS-ETH | idem | idem | ETHUSDT 1h | 12 |
 | 5 | TRAIL-BTC (optionnel, vague 3) | `_MK` useNativeTrail=false | `_MK` useNativeTrail=true | BTCUSDT 1h | 20 |
 | 6 | TRAIL-ETH (optionnel, vague 3) | idem | idem | ETHUSDT 1h | 20 |
+| 7 | MK6-BTC (extension du 01/10/2026, docs/29 § 7) | `_MK` makerTTL=2 | `_MK` makerTTL=6 | BTCUSDT 1h | 20 |
+| 8 | MK6-ETH (extension du 01/10/2026) | idem | idem | ETHUSDT 1h | 20 |
+
+> **Extension MK6 (pré-enregistrée le 01/10/2026, source : docs/29)** : la mesure
+> du fill maker sur le pool P1 montre que le TTL=2 laisse 6,18 % des signaux
+> tomber dans le fallback taker à −88,6 bps de delta, écrasant l'avantage maker
+> à +0,375 bps (vs +2,897 bps à TTL=6). Le TTL=6 est donc un **candidat
+> pré-enregistré**, mais la mesure historique ne peut pas dire si l'edge du
+> signal survit à 6 h d'attente (limite L6 de docs/29) : ces deux runs
+> répondent. Critères inchangés ; convention CSV `ab_x501_BTCUSDT_mk6_off/on.csv`.
 
 **Discipline de run** : même fenêtre temporelle et mêmes inputs pour les
 deux jambes d'un même test (seul le filtre / le pattern change) ; les 8 flux
