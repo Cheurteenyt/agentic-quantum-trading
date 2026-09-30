@@ -114,6 +114,17 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    d'altération de la QA prouve la plomberie vivante (look-ahead :
    AUC 0,5306/0,6103 BTC). Le pattern absorption ÉVÉNEMENTIEL (vague 2)
    n'est pas réfuté par ce banc — son juge reste le protocole A/B.
+5. **Banc d'événements de l'absorption (vague 6, 01/10, `docs/31`)** : le
+   pattern absorption passé au banc en PROXY klines (mur volume / attaque /
+   tenue / reprise, 3 définitions imbriquées × 2 directions × 2 horizons,
+   12 cellules + prime de structure E3 vs E1) AVANT les runs ABS —
+   **prime de structure RÉFUTÉE (0/4)** : −26,4/−54,2 bps côté LONG (la
+   confirmation SOUSTRAIT — elle est TARDIVE, le rebond se joue dans la
+   barre de tenue), CONTEXTE anti-signal côté SHORT (AUC 0,477–0,489, le
+   mur perd), et le proxy du mur sélectionne la plaine illiquide (62,7 %
+   de rendements forward exactement nuls). Le pattern ORDERBOOK réel
+   (maxBidAmount) reste au protocole A/B — désormais EN QUEUE de file
+   (ABS_DEPRIORISE, derrière RI/MK6).
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -187,6 +198,16 @@ est re-éditée.
    diagnostic « tu n'exploites aucun pouvoir » reçoit sa réponse
    définitive : les pouvoirs data sont désormais TOUS banc-testés —
    fz, flush OI, ML, flux taker, funding.
+6. **Banc d'événements de l'absorption + priorisation de la file de runs
+   — FAIT (01/10, `docs/31`)** — la structure événementielle (la voie que
+   la vague 5 laissait ouverte) passée au banc en proxy klines : prime de
+   structure réfutée 0/4, la confirmation est TARDIVE (le rebond se joue
+   dans la barre de tenue), le miroir SHORT est anti-signal — les runs ABS
+   plateforme passent DERRIÈRE RI/MK6 dans la file du user (décision
+   pré-déclarée, ABS_DEPRIORISE) ; le pattern orderbook réel reste jugé
+   par le protocole A/B, avec un contraste désormais mesurable (un verdict
+   ABS positif là où l'ombre klines est morte prouverait la valeur unique
+   du champ carnet).
 
 ## LES RÈGLES NON NÉGOCIABLES
 

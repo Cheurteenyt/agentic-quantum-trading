@@ -38,7 +38,12 @@ dormants (`docs/30`) — le flux taker natif et le funding passés au banc
 AVANT tout run kScript : 12/12 cellules KILL au critère AUC** (80 symboles
 × 1 092 j = 2 053 975 barres, grille pré-déclarée, plomberie prouvée
 vivante ; les pouvoirs data sont désormais TOUS banc-testés : fz, flush
-OI, ML, flux, funding).
+OI, ML, flux, funding) · **vague 6 : le banc d'événements de l'absorption
+(`docs/31`) — la structure événementielle passée au banc en proxy klines
+AVANT les runs ABS : prime de structure RÉFUTÉE 0/4 (la confirmation est
+TARDIVE, le rebond se joue dans la barre de tenue), miroir SHORT
+anti-signal, ABS_DEPRIORISE — file de runs recommandée : RI → MK6 → TRAIL
+→ ABS**).
 **MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
@@ -47,7 +52,7 @@ règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane.
 reproductible du fill maker (surface δ×TTL 2 053 015 tentatives + sélection
 sur le pool P1) **réfute l'hypothèse d'entrée v20** (delta réel +0,375 bps,
 fallback à −88,6 bps, biais concentré sur A4) → candidat v21 : médiane
-**306,2 $** (TTL=2) / **364,0 $** (TTL=6, +33,6 % vs taker). Le code : 12 kScripts + 6 QA **PASS** dans
+**306,2 $** (TTL=2) / **364,0 $** (TTL=6, +33,6 % vs taker). Le code : 12 kScripts + 7 QA **PASS** dans
 `scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
 référence, fill 97,9 % à δ=2 ; l'audit d'exploitation kScript
 `x501_exploit_audit.py` ; **vagues 1-2 du plan d'exploitation ACTIVÉES le
