@@ -39,7 +39,7 @@ règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 9 kS
 `scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
 référence, fill 97,9 % à δ=2 ; l'audit d'exploitation kScript
 `x501_exploit_audit.py`). Les livrables : `docs/reference/openmarket-x501/`
-(9 PDF + 2 protocoles). Baseline : `reports/openmarket-x501-baseline-2026-10-01.md`
+(9 PDF + 2 protocoles). La baseline du 01/10 : voir le commit de la branche (le fichier reports/ n'est pas versionné — à committer par le domaine OpenMarket)
 (v20, l'édition 30/09 est conservée pour la trace).
 **Pivot 30/09 : la recherche Aster/FOMO est gelée au profit d'OpenMarket**
 (les collecteurs continuent, plus aucun effort de recherche).

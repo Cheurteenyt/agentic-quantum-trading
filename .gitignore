@@ -130,3 +130,6 @@ reports/*
 *.bak-*
 backend/services/onchain/aster/archive/research_artifacts/
 scripts/.gt_pool_cache.json
+
+# les side-effects des QA openmarket (le domaine x501)
+scripts/studies/x501_openmarket/results/
