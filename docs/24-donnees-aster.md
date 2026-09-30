@@ -77,3 +77,18 @@ dans le handler `request` pompe la boucle d'événements = les statuts perdus
 à vie (utiliser `req.headers` local — nos sondes fomo portaient le même
 pattern) ; la 2e socket du site = `sstream.asterdex.com`, le principal =
 `fstream5.asterdex.com/plain/stream`.
+
+## P6 FAIT (30/09) : l'API interne bapi câblée
+
+- **oi_collector** : la passe bulk (1 appel `bapi/…/ticker/pair`) →
+  `oi_history_bulk` (table DÉDIÉE — le bulk est un notional USDT ×2, la double
+  face, prouvé ratio 2,0000 sur les majors ; JAMAIS mixé avec les unités base
+  de fapi) + la cross-check intégrée par passe (écart vs ×2 loggué) = la
+  validation indépendante de l'endpoint OI non documenté.
+- **aster_funding_bulk** (horaire :07/:37) : `funding_meta` — interval_hours
+  (1h/2h/4h/8h par symbole), fee_cap/floor, settle_price — la précision
+  funding_fade. 764/764 upserts, 0 échec.
+- **L'univers OI : 39 → 642 symboles** (exotiques + perps actions).
+- Découverte : le header de poids est ABSENT sur bapi — cette famille ne pèse
+  PAS sur le budget fapi 2 400/min (les sondes 11 = +bulk +funding_meta).
+- Différé : `!miniTicker@arr` (pas de consommateur — la leçon zéro-pour-rien).
