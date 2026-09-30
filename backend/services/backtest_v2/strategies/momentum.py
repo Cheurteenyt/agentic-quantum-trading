@@ -78,6 +78,7 @@ MAINTENANCE_MARGIN_RATE = 0.005
 DEFAULT_SYMBOL = "BTCUSDT"
 DEFAULT_EXECUTION_MODEL = "taker_market"
 FEE_FRACTION_ROUND_TRIP = 8.0 / 10_000.0  # 8 bps aller-retour (taker USDT)
+FEE_FRACTION_PER_FILL = FEE_FRACTION_ROUND_TRIP / 2.0  # 4 bps taker PAR fill
 
 
 # ----------------------------------------------------------------- indicateurs
@@ -197,9 +198,25 @@ def simulate(bars: Sequence[Bar], params: dict) -> tuple[list[Trade], list[float
     pos = 0  # +1 / -1 / 0
     entry_price = 0.0
     entry_index = 0
+    last_mark = 0.0  # dernier prix de valorisation de la position ouverte
+
+    def open_trade(i: int, price: float, side: int) -> None:
+        nonlocal pos, entry_price, entry_index, last_mark
+        pos = side
+        entry_price = price
+        entry_index = i
+        last_mark = price
+        # Frais d'entree bookes SUR la barre d'entree (taker par fill) :
+        # sans eux l'equite oubliait la moitie des frais (bug T7).
+        bar_ret[i] += -FEE_FRACTION_PER_FILL
 
     def close_trade(idx: int, price: float, reason: str) -> None:
-        nonlocal pos
+        nonlocal pos, last_mark
+        # Jambe de sortie : du dernier mark au prix de sortie REEL (stop, take,
+        # open de retournement, close d'eod). AVANT le fix, la barre de stop
+        # restait a 0.0 : la perte stoppee n'entrait JAMAIS dans l'equite
+        # (bug T7, reports/aster_deep_regimes.md).
+        bar_ret[idx] += pos * (price / last_mark - 1.0) - FEE_FRACTION_PER_FILL
         trades.append(
             Trade(
                 entry_index=entry_index,
@@ -222,9 +239,7 @@ def simulate(bars: Sequence[Bar], params: dict) -> tuple[list[Trade], list[float
                 if pos != 0:
                     close_trade(i, bar.open, "reverse")
                 if desired != 0:
-                    pos = desired
-                    entry_price = bar.open
-                    entry_index = i
+                    open_trade(i, bar.open, desired)
 
         # B. Stop / take pendant la barre (high/low), y compris barre d'entree.
         if pos != 0:
@@ -243,9 +258,14 @@ def simulate(bars: Sequence[Bar], params: dict) -> tuple[list[Trade], list[float
                 elif bar.low <= take_price:
                     close_trade(i, take_price, "take")
 
-        # C. Rendement par barre selon la position active pendant la barre.
-        if i >= 1 and pos != 0:
-            bar_ret[i] = pos * (bar.close / bars[i - 1].close - 1.0)
+        # C. Mark-to-market : la position ouverte est valorisee du dernier mark
+        #    (open d'entree ou close precedent) au close de la barre. Pour une
+        #    barre portee sans evenement, c'est identique au close-to-close
+        #    d'avant ; la difference porte sur l'entree (base = open reel) et
+        #    la barre de sortie (bookee au prix de sortie, pas 0).
+        if pos != 0:
+            bar_ret[i] += pos * (bar.close / last_mark - 1.0)
+            last_mark = bar.close
 
     # Sortie forcee de fin de serie : une position ouverte doit etre valorisee.
     if pos != 0:

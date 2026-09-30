@@ -83,6 +83,7 @@ MAINTENANCE_MARGIN_RATE = 0.005
 DEFAULT_SYMBOL = "BTCUSDT"
 DEFAULT_EXECUTION_MODEL = "taker_market"
 FEE_FRACTION_ROUND_TRIP = 8.0 / 10_000.0  # 8 bps aller-retour (taker USDT)
+FEE_FRACTION_PER_FILL = FEE_FRACTION_ROUND_TRIP / 2.0  # 4 bps taker PAR fill
 
 
 # ----------------------------------------------------------------- trades
@@ -142,11 +143,28 @@ def simulate(
     entry_price = 0.0
     entry_index = 0
     held = 0
+    last_mark = 0.0  # dernier prix de valorisation de la position ouverte
+
+    def open_at(i: int, price: float) -> None:
+        nonlocal entry_price, entry_index, held, pos_open, last_mark
+        entry_price = price
+        entry_index = i
+        held = 1
+        pos_open = True
+        last_mark = price
+        # Frais d'entree bookes SUR la barre d'entree (taker par fill) :
+        # sans eux l'equite oubliait la moitie des frais (bug T7).
+        bar_ret[i] += -FEE_FRACTION_PER_FILL
 
     def close_trade(idx: int, price: float, reason: str) -> None:
-        nonlocal pos_open, entry_price, entry_index, held
+        nonlocal pos_open, entry_price, entry_index, held, last_mark
         if not pos_open:
             return
+        # Jambe de sortie : du dernier mark au prix de sortie REEL (stop, open
+        # de roulement, close d'eod). AVANT le fix, la barre de stop restait a
+        # 0.0 : la perte stoppee n'entrait JAMAIS dans l'equite (bug T7,
+        # reports/aster_deep_regimes.md).
+        bar_ret[idx] += sd * (price / last_mark - 1.0) - FEE_FRACTION_PER_FILL
         trades.append(
             Trade(
                 entry_index=entry_index,
@@ -166,10 +184,7 @@ def simulate(
         # A. Ouverture si plat. Le sens est constant et exogene : on entre des
         #    qu'une barre d'execution existe. Aucune info future n'est lue.
         if not pos_open:
-            entry_price = bar.open
-            entry_index = i
-            held = 1
-            pos_open = True
+            open_at(i, bar.open)
         else:
             held += 1
 
@@ -189,14 +204,16 @@ def simulate(
         if pos_open and held >= hold_max_bars:
             close_trade(i, bar.open, "roll")
             if not pos_open:  # roule au meme open
-                entry_price = bar.open
-                entry_index = i
-                held = 1
-                pos_open = True
+                open_at(i, bar.open)
 
-        # D. Rendement par barre (position active pendant la barre).
-        if i >= 1 and pos_open:
-            bar_ret[i] = sd * (bar.close / bars[i - 1].close - 1.0)
+        # D. Mark-to-market : la position ouverte est valorisee du dernier mark
+        #    (open d'entree/roulement ou close precedent) au close de la barre.
+        #    Pour une barre portee sans evenement, c'est le close-to-close
+        #    d'avant ; la difference porte sur l'entree (base = open reel) et
+        #    la barre de sortie (bookee au prix de sortie, pas 0).
+        if pos_open:
+            bar_ret[i] += sd * (bar.close / last_mark - 1.0)
+            last_mark = bar.close
 
     # Sortie forcee de fin de serie : une position ouverte doit etre valorisee.
     if pos_open:
