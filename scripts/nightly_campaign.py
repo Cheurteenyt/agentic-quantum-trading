@@ -63,6 +63,13 @@ MIN_BARS = 3000
 ~20 % du temps de campagne ; le ciblage --target-bars 3000 des fetches
 est la même doctrine.)"""
 
+MAX_BARS_NIGHTLY = 3000
+"""La fenêtre glissante du validateur nocturne (30/09, forcée par le
+backfill T6) : la campagne juge le RÉGIME RÉCENT — les séries 1m du
+backfill profond à 2,67 M bougies auraient explosé la campagne en heures.
+L'historique profond 2021→ (la couche ÉTUDE, one-shots) est séparé du
+validateur : deux questions, deux outils."""
+
 MATURITY_DAYS = 30
 """Delai minimal avant reevaluation d'un candidat. Evaluer plus tot revient a
 reutiliser les donnees de la decouverte — le contraire d'une validation."""
@@ -268,6 +275,8 @@ def run_nightly(
             if not bars:
                 print(f"  ! {sym} {itv} : aucune bougie chargee — skip")
                 continue
+            if len(bars) > MAX_BARS_NIGHTLY:
+                bars = bars[-MAX_BARS_NIGHTLY:]
             series_bars.append(
                 (sym, itv, bars, snap_by_key.get((sym, itv), f"unknown-{sym}-{itv}"))
             )
