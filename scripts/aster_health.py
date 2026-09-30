@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """LE WATCHDOG DE SANTÉ ASTER (30/09) — le symétrique de fomo_health.py pour
-le domaine Aster. 11 sondes toutes les 5 min, l'alerte SUR TRANSITION :
+le domaine Aster. 12 sondes toutes les 5 min, l'alerte SUR TRANSITION :
 1. klines 1h fraîches (< 25 h — le nocturne 03:00)
 2. oi_history fraîche (< 30 min — timer 15 min, la munition H4/H5 du 06-07)
 3. oi_history_bulk fraîche (< 30 min — la passe bulk bapi de oi_collector,
@@ -18,6 +18,8 @@ le domaine Aster. 11 sondes toutes les 5 min, l'alerte SUR TRANSITION :
 11. rate_weight : le budget X-MBX-USED-WEIGHT-1M vu par les collecteurs
    (< 1800 = 75 % de 2 400/min — seuil INCHANGÉ ; le bulk bapi n'expose pas
    le header, seul fapi alimente le compteur)
+12. traders_registry : le registre longitudinal des traders (< 30 h — le
+   timer 06:50 aster-traders-registry, leaderboard + points par adresse)
 État : data/warehouse/aster_health_state.json. Journal [aster-health].
 Exit 0 toujours (un timer ne doit pas spammer d'unités failed)."""
 import json, os, sqlite3, subprocess, sys, time
@@ -29,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 KL = ROOT / "data" / "warehouse" / "klines.db"
 DEPTH = ROOT / "data" / "warehouse" / "depth.db"
 STATE = ROOT / "data" / "warehouse" / "aster_health_state.json"
+STATE_REG = ROOT / "data" / "warehouse" / "aster_traders_state.json"
 CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / "aster_public_funding_history_cache.json"
 
 
@@ -74,6 +77,34 @@ def funding_cache_age() -> float:
         return round(time.time() - os.path.getmtime(CACHE), 1)
     except Exception:
         return None
+
+
+def traders_registry_fresh() -> bool:
+    """La fraîcheur du registre des traders Aster : < 30 h depuis le dernier
+    tir du timer quotidien 06:50 (aster-traders-registry). captured_day est une
+    DATE (minuit local) : un âge brut sur minuit donnerait une fausse fenêtre
+    06:00-06:50 chaque jour (le tir de 06:50 écrit la date du jour) → on exige
+    captured_day <= 1 jour puis l'epoch du dernier tir réussi
+    (aster_traders_state.json, écrit APRÈS commit) ; fallback minuit si absent."""
+    from datetime import date, datetime
+    try:
+        con = ro(KL)
+        v = con.execute("SELECT MAX(captured_day) FROM aster_traders").fetchone()[0]
+        con.close()
+        if not v:
+            return False
+        if (date.today() - date.fromisoformat(str(v))).days >= 2:
+            return False
+        try:
+            epoch = json.loads(STATE_REG.read_text()).get("last_run_epoch")
+        except Exception:
+            epoch = None
+        if epoch:
+            return (time.time() - epoch) < 30 * 3600
+        d = datetime.strptime(str(v), "%Y-%m-%d")
+        return (time.time() - d.timestamp()) < 30 * 3600
+    except Exception:
+        return False
 
 
 def timer_age(unit: str) -> float:
@@ -124,6 +155,8 @@ CHECKS = [
      "trous > 15 min dans depth sur 24 h — la continuité 14 j du tir 06-07 est amputée"),
     ("funding_cache", lambda: (funding_cache_age() or 9e9) < 25 * 3600,
      "le cache funding > 25 h — le nocturne n'a pas rafraîchi"),
+    ("traders_registry", traders_registry_fresh,
+     "le registre traders Aster > 30 h — le timer quotidien 06:50 (aster-traders-registry) ne tire plus"),
     ("rate_weight", lambda: (aster_rate.worst_weight() or 0) < aster_rate.ALERT,
      "budget weight >= 1800/2400/min (75 %) — réduire le pacing, risque 429/ban 418"),
 ]
