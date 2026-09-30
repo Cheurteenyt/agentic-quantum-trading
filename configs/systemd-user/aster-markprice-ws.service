@@ -1,0 +1,14 @@
+[Unit]
+Description=Aster — collecteur premium WS !markPrice@arr @1s (24/7, remplace le REST 15 min)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_markprice_ws.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

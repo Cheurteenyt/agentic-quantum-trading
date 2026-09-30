@@ -5,7 +5,8 @@ le domaine Aster. 9 sondes toutes les 5 min, l'alerte SUR TRANSITION :
 2. oi_history fraîche (< 30 min — timer 15 min, la munition H4/H5 du 06-07)
 3. liq_events fraîche (< 30 min)
 4. block_trades fraîche (< 30 min)
-5. premium_history fraîche (< 30 min)
+5. premium_history fraîche (< 10 min — WS !markPrice@arr @1s, service
+   aster-markprice-ws 24/7, remplace le REST 15 min depuis le 30/09)
 6. depth_meta fraîche (< 10 min — le collecteur 24/7, cadence ~1 min)
 7. depth CONTINUITÉ : 0 trou > 15 min dans depth_meta sur 24 h (le tir
    depth/murs du 06-07 exige 14 j sans coupure — tolérance zéro)
@@ -105,8 +106,9 @@ CHECKS = [
      "le collecteur liq 24/7 est down"),
     ("block_trades", lambda: (timer_age("aster-blocktrades.timer") or 9e9) < 1800,
      "le timer block_trades ne tire plus (> 30 min)"),
-    ("premium_history", lambda: (max_age(KL, "SELECT MAX(captured_at_ms) FROM premium_history") or 9e9) < 1800,
-     "premium_history > 30 min"),
+    ("premium_history", lambda: svc_active("aster-markprice-ws.service") and
+     (max_age(KL, "SELECT MAX(captured_at_ms) FROM premium_history") or 9e9) < 600,
+     "premium_history > 10 min ou aster-markprice-ws down (le WS 1 s a remplacé le REST 15 min)"),
     ("depth_meta", lambda: (max_age(DEPTH, "SELECT MAX(ts) FROM depth_meta") or 9e9) < 600,
      "depth_meta > 10 min — le collecteur 24/7 stalle sans exit"),
     ("depth_continuity", lambda: depth_gaps_24h() == 0,
