@@ -35,6 +35,25 @@
 //         Le levier nominal ne fait que libérer de la marge : le risque réel
 //         vient de la formule de sizing, jamais du curseur de levier.
 // ----------------------------------------------------------------------------
+// VAGUE 3 — HYGIÈNE BROKER (docs/27 + docs/28, pré-enregistré le 01/10/2026) :
+//   1. ocaName nommé PAR TRANCHE (TP1/TP2/RUN distincts) : les noms remontent
+//      au log du testeur (preuve live) ; sémantique OCA = « quand l'un
+//      remplit, les autres s'annulent » — l'échelle ne partage JAMAIS un même
+//      groupe, un TP1 rempli ne doit pas tuer le runner (piège docs/28).
+//   2. Trail NATIF du runner (useNativeTrail, défaut false = la référence
+//      MC v20 reste bit-à-bit) : le RUN porte trailPoints/trailOffset —
+//      l'engine ratatine INTRABAR (la piste manuelle ne ratatine qu'à la
+//      clôture) ; le stop piste manuelle reste en plancher sur la même jambe.
+//   3. strategy.cancelAll() au coupe-circuit -25% : bug réel corrigé — un
+//      ordre limite maker encore en file pouvait remplir APRÈS l'arrêt du
+//      plan et rouvrir une position ; la file est purgée intégralement.
+//   4. Rapport fin de run : closedTradeCount/win/loss/maxDrawdown NATIFS du
+//      testeur croisent nos compteurs internes (toute divergence = bug d'état
+//      à traiter avant la preuve live, protocole v11).
+//   5. REFUS PRÉ-ENREGISTRÉ : strategy.exit profit=/loss= (ticks) — dépendant
+//      de la taille de tick du symbole ; notre échelle utilise des prix
+//      absolus calculés depuis la distance de stop réelle.
+// ----------------------------------------------------------------------------
 // DOCUMENT ÉDUCATIF — ne constitue pas un conseil en investissement.
 // ============================================================================
 
@@ -78,6 +97,10 @@ var tp2Pct       = input(name="tp2Pct", type="number", defaultValue=25, label="T
 var trailLen     = input(name="trailLen", type="int", defaultValue=24,   label="Trail : fenêtre swing (barres)", constraints={min: 6, max: 96, step: 1}, group="Gestion & sorties");
 var trailBufPct  = input(name="trailBufPct", type="number", defaultValue=0.5, label="Trail : marge (%)",       constraints={min: 0, max: 3, step: 0.1}, group="Gestion & sorties");
 var useTrendExit = input(name="useTrendExit", type="boolean", defaultValue=true, label="Sortie si retournement D1", group="Gestion & sorties");
+// Vague 3 — trail natif du runner (défaut false : la référence MC v20 reste
+// bit-à-bit ; le run A/B vague 3 active explicitement, docs/28)
+var useNativeTrail = input(name="useNativeTrail", type="boolean", defaultValue=false, label="Trail natif du runner (vague 3)", group="Gestion & sorties");
+var trailNativePct = input(name="trailNativePct", type="number", defaultValue=1.5, label="Trail natif : offset (% du prix)", constraints={min: 0.25, max: 5, step: 0.25}, group="Gestion & sorties");
 
 // Groupe Coupe-circuits (chapitre 6)
 var killDD       = input(name="killDD", type="number", defaultValue=25,   label="Drawdown absolu max (%)",    constraints={min: 5, max: 50, step: 1}, group="Coupe-circuits");
@@ -177,6 +200,13 @@ var flat = strategy.positionSize() == 0;
 if (halted == 1 && flat == false) {
   strategy.closeAll(comment="Coupe-circuit -25%");
 }
+// Vague 3 (bug réel corrigé) : après l'arrêt du plan, un ordre limite maker
+// encore en file pouvait remplir et rouvrir une position APRÈS le -25%. La
+// file est purgée intégralement (cancelAll vide la file entière, y compris
+// un pending closeAll) ; no-op si la file est déjà vide (idempotent).
+if (halted == 1 && flat == true) {
+  strategy.cancelAll();
+}
 
 // ----------------- EXÉCUTION MAKER : SUIVI DE FILE (v20) --------------------
 // Ordre des événements plateforme (fill-simulation) : les ordres placés à la
@@ -227,9 +257,9 @@ if (pendSide != 0 && flatNow == true && pendFb == 0) {
     strategy.cancel(pendSide == 1 ? "L" : "S");
     if (fallbackTaker == true) {
       if (pendSide == 1) {
-        strategy.entry("L", "long", qty=pendQty, comment="x501 long taker-fb");
+        strategy.entry("L", "long", qty=pendQty, comment="x501 long taker-fb", ocaName="x501L");
       } else {
-        strategy.entry("S", "short", qty=pendQty, comment="x501 short taker-fb");
+        strategy.entry("S", "short", qty=pendQty, comment="x501 short taker-fb", ocaName="x501S");
       }
       pendFb = 1;
       pendAge = 0;
@@ -320,18 +350,25 @@ if (flat == false) {
     stopNow = trailStop;
   }
 
-  // Bracket : TP1 (moitié) + TP2 (quart) + runner — le stop est commun
+  // Brackets OCA nommés PAR TRANCHE (vague 3) — un groupe par tranche et par
+  // côté ("x501L-TP1"...) : les noms remontent au log du testeur. PRÉ-
+  // ENREGISTRÉ (docs/28) : ocaName = « quand l'un remplit, les autres
+  // s'annulent » — l'échelle TP1/TP2/RUN ne partage JAMAIS un même groupe :
+  // un TP1 rempli ne doit pas tuer le runner. Trail natif : trailPoints = la
+  // distance TP2 (l'excursion favorable atteinte à l'armement -> activation
+  // immédiate), trailOffset = % du prix d'entrée ; la piste manuelle reste en
+  // stop plancher sur la même jambe (les deux vivent, le plus serré sort).
   if (tp1Done == 0) {
-    strategy.exit("TP1", fromEntry=entryId, qty=planQty * tp1Pct / 100, limit=tp1Px, stop=stopNow);
-    strategy.exit("TP2", fromEntry=entryId, qty=planQty * tp2Pct / 100, limit=tp2Px, stop=stopNow);
-    strategy.exit("RUN", fromEntry=entryId, qty=planQty * runPct / 100, stop=stopNow);
+    strategy.exit("TP1", fromEntry=entryId, qty=planQty * tp1Pct / 100, limit=tp1Px, stop=stopNow, ocaName="x501-"+entryId+"-TP1");
+    strategy.exit("TP2", fromEntry=entryId, qty=planQty * tp2Pct / 100, limit=tp2Px, stop=stopNow, ocaName="x501-"+entryId+"-TP2");
+    strategy.exit("RUN", fromEntry=entryId, qty=planQty * runPct / 100, stop=stopNow, ocaName="x501-"+entryId+"-RUN", trailPoints=useNativeTrail == true ? tp2R * riskPx : na, trailOffset=useNativeTrail == true ? planEntry * trailNativePct / 100 : na);
   }
   if (tp1Done == 1 && tp2Done == 0) {
-    strategy.exit("TP2", fromEntry=entryId, qty=planQty * tp2Pct / 100, limit=tp2Px, stop=stopNow);
-    strategy.exit("RUN", fromEntry=entryId, qty=planQty * runPct / 100, stop=stopNow);
+    strategy.exit("TP2", fromEntry=entryId, qty=planQty * tp2Pct / 100, limit=tp2Px, stop=stopNow, ocaName="x501-"+entryId+"-TP2");
+    strategy.exit("RUN", fromEntry=entryId, qty=planQty * runPct / 100, stop=stopNow, ocaName="x501-"+entryId+"-RUN", trailPoints=useNativeTrail == true ? tp2R * riskPx : na, trailOffset=useNativeTrail == true ? planEntry * trailNativePct / 100 : na);
   }
   if (tp2Done == 1) {
-    strategy.exit("RUN", fromEntry=entryId, qty=planQty * runPct / 100, stop=stopNow);
+    strategy.exit("RUN", fromEntry=entryId, qty=planQty * runPct / 100, stop=stopNow, ocaName="x501-"+entryId+"-RUN", trailPoints=useNativeTrail == true ? tp2R * riskPx : na, trailOffset=useNativeTrail == true ? planEntry * trailNativePct / 100 : na);
   }
 
   // Retournement de structure D1 contre la position : sortie défensive
@@ -381,12 +418,12 @@ if (longSignal) {
         pendAge = 0;
         pendFb = 0;
         var limL = trade.close * (1 - makerDeltaBps / 10000);
-        strategy.entry("L", "long", qty=qtyL, limit=limL, comment="x501 long maker");
+        strategy.entry("L", "long", qty=qtyL, limit=limL, comment="x501 long maker", ocaName="x501L");
       } else {
         planQty = qtyL;
         planStop = stopL;
         side = 1;
-        strategy.entry("L", "long", qty=qtyL, comment="x501 long");
+        strategy.entry("L", "long", qty=qtyL, comment="x501 long", ocaName="x501L");
       }
     }
   }
@@ -406,15 +443,39 @@ if (shortSignal) {
         pendAge = 0;
         pendFb = 0;
         var limS = trade.close * (1 + makerDeltaBps / 10000);
-        strategy.entry("S", "short", qty=qtyS, limit=limS, comment="x501 short maker");
+        strategy.entry("S", "short", qty=qtyS, limit=limS, comment="x501 short maker", ocaName="x501S");
       } else {
         planQty = qtyS;
         planStop = stopS;
         side = -1;
-        strategy.entry("S", "short", qty=qtyS, comment="x501 short");
+        strategy.entry("S", "short", qty=qtyS, comment="x501 short", ocaName="x501S");
       }
     }
   }
+}
+
+// ------------------- RAPPORT FIN DE RUN (vague 3) ----------------------------
+// Les getters NATIFS du testeur croisent nos compteurs internes : toute
+// divergence = bug d'état à corriger AVANT la preuve live (protocole v11,
+// 4 relevés/jour). Le maxDD natif est en USD, le interne en % — les deux
+// sont affichés pour le croisement au rapport de preuve.
+if (isLastBar) {
+  var nTr   = strategy.closedTradeCount();
+  var nWin  = strategy.winTradeCount();
+  var nLos  = strategy.lossTradeCount();
+  var wrNat = nTr > 0 ? nWin * 100.0 / nTr : 0;
+  var ddNat = strategy.maxDrawdown();
+  plotTable(data=[
+    ["RAPPORT x501", ""],
+    ["trades clôturés", "" + nTr],
+    ["gagnants / perdants", nWin + " / " + nLos],
+    ["WR natif (%)", "" + wrNat],
+    ["maxDD natif (USD)", "" + ddNat],
+    ["maxDD interne (%)", "" + ddPct],
+    ["fills maker / fb", mkFills + " / " + mkFb],
+    ["TTL morts / invalidés", mkTOut + " / " + mkInv]
+  ], position="bottom_right");
+  alert("x501 rapport fin de run : trades=" + nTr + " WR=" + wrNat + "% maxDDnat=" + ddNat + " maker=" + mkFills + " fb=" + mkFb + " tOut=" + mkTOut + " inv=" + mkInv, isLastBar);
 }
 
 // ------------------------------- AFFICHAGE ----------------------------------

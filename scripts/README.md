@@ -223,8 +223,9 @@ vivant ne l'importe.
 | `Operation_x501_Absorption_H1.ks` | **vague 2 (docs/27)** : les murs natifs `maxBidAmount`/`maxAskAmount` + attaque absorbée + déséquilibre `sumBids`/`sumAsks` — le pattern Aster dans le backtester |
 | `x501_observe_*.ks` | 3 collecteurs d'observation (zéro ordre, C4) |
 | `x501_setup_kscript.js` | l'installation codifiée (49 contrôles QA) |
-| `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2 (122 contrôles)** — stdlib pure, une commande |
-| `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 13 scripts → **67,9 %** (fix review-2 : regex options/skew invalide corrigée — verdicts : `docs/27-pouvoirs-kscript.md`) |
+| `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** — stdlib pure, une commande |
+| `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 13 scripts → **75,5 %** (vague 3 : trail natif, ocaName, cancelAll, rapport natif — verdicts : `docs/27-pouvoirs-kscript.md`) |
+| `x501_verdict_ab.py` | **le moteur de verdict des A/B pré-enregistrés** (docs/28) : bootstrap 10 000 seed 501, 4 verdicts DATA_ABSENTE/PROMOTION/KILL/INCONCLU — stdlib pure, bit-à-bit |
 
 ---
 
