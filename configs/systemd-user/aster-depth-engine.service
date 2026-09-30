@@ -1,0 +1,14 @@
+[Unit]
+Description=Moteur de carnet Aster diff-depth WS (tables ombre depth_*_ws, docs/24)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart=/usr/bin/systemd-inhibit --what=sleep:idle "/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_depth_engine.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

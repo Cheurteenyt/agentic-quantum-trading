@@ -1,0 +1,14 @@
+[Unit]
+Description=Capteur de profondeur Aster 24/7 (fondations heatmap maison)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart=/usr/bin/systemd-inhibit --what=sleep:idle "/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/depth_collector.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
