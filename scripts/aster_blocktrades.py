@@ -55,7 +55,9 @@ CLUSTER_PRINT_USD = 100_000.0       # seuil des clusters d'analyse
 CLUSTER_WINDOW_MS = 30 * 60 * 1000
 CLUSTER_MIN_PRINTS = 3
 BOOTSTRAP_DAYS = 3
-MAX_PAGES_PER_SYMBOL = 1200         # garde-fou (1200 * 1000 trades)
+MAX_PAGES_PER_SYMBOL = 1200         # garde-fou bootstrap (1200 * 1000 trades)
+MAX_PAGES_INCREMENTAL = 12          # 12k trades/15 min/symbole : au-dela, tronque
+WEIGHT_PAUSE = 1500                 # >= 1500/2400 -> pause fin de minute (fenetre 1M roule)
 PAGE_LIMIT = 1000
 SLEEP_BETWEEN_REQ = 0.20            # aggTrades weight ~5, IP limit large
 REQUEST_TIMEOUT = 20
@@ -95,14 +97,16 @@ def log(msg: str) -> None:
     print(f"[{datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S}Z] {msg}", flush=True)
 
 
-def http_get_json(url: str, retries: int = 3) -> list | dict:
+def http_get_json(url: str, retries: int = 3) -> tuple[list | dict, int | None]:
+    """Retourne (payload, poids lu X-MBX-USED-WEIGHT-1M) — le poids sert au
+    garde-fou budget de fetch_window (None si header absent)."""
     delay = 1.0
     for attempt in range(1, retries + 1):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "trading-agent-blocktrades/1.0"})
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-                aster_rate.note_weight(getattr(resp, "headers", None), "aster_blocktrades")
-                return json.loads(resp.read().decode("utf-8"))
+                weight = aster_rate.note_weight(getattr(resp, "headers", None), "aster_blocktrades")
+                return json.loads(resp.read().decode("utf-8")), weight
         except urllib.error.HTTPError as exc:
             if exc.code == 429:                       # cooldown prudent
                 log(f"  429 rate limit, cooldown 65s")
@@ -148,14 +152,25 @@ def active_symbols(con: sqlite3.Connection, max_symbols: int, min_qv_usd: float)
     return out[:max_symbols]
 
 
-def fetch_window(symbol: str, since_ms: int, until_ms: int) -> list[dict]:
-    """Pagine aggTrades en avant par startTime = dernier T + 1."""
+def fetch_window(symbol: str, since_ms: int, until_ms: int,
+                 max_pages: int = MAX_PAGES_PER_SYMBOL) -> list[dict]:
+    """Pagine aggTrades en avant par startTime = dernier T + 1.
+    Garde-fous budget (bug 1995/2400 du 30/09) :
+      - apres CHAQUE page, poids >= WEIGHT_PAUSE -> pause jusqu'a la minute
+        suivante : la fenetre 1M roule et rend le budget (on ne re-boucle
+        pas ici, la page suivante relit le header a jour) ;
+      - max_pages plafonne la depense par symbole, troncature logguee
+        (le tape fine est le moins critique)."""
     trades: list[dict] = []
     cursor = since_ms
-    for _ in range(MAX_PAGES_PER_SYMBOL):
+    for page in range(1, max_pages + 1):
         url = (f"{API_BASE}/fapi/v1/aggTrades?symbol={symbol}"
                f"&startTime={cursor}&limit={PAGE_LIMIT}")
-        batch = http_get_json(url)
+        batch, weight = http_get_json(url)
+        if weight is not None and weight >= WEIGHT_PAUSE:
+            pause = 60.0 - (time.time() % 60.0) + 0.5
+            log(f"  {symbol} poids={weight}>={WEIGHT_PAUSE} : pause {pause:.0f}s (fin de minute)")
+            time.sleep(pause)
         if not isinstance(batch, list) or not batch:
             break
         trades.extend(batch)
@@ -164,6 +179,10 @@ def fetch_window(symbol: str, since_ms: int, until_ms: int) -> list[dict]:
             last_t = cursor + 1
         cursor = last_t + 1
         if cursor >= until_ms or len(batch) < PAGE_LIMIT:
+            break
+        if page == max_pages:
+            log(f"  {symbol} TRONCATURE {max_pages} pages ({len(trades)} trades), "
+                f"reprise au prochain tir")
             break
         time.sleep(SLEEP_BETWEEN_REQ)
     return trades
@@ -231,6 +250,17 @@ def persist_symbol(con: sqlite3.Connection, symbol: str, trades: list[dict],
 
 
 def last_ts(con: sqlite3.Connection, symbol: str) -> int:
+    """Curseur incremental = la fin du TAPE COMPLET (tape_1m, ecrit a chaque
+    tir), PAS les gros prints (block_trades, filtre >= seuil) : un symbole
+    sans print recent gardait un curseur de plusieurs JOURS et re-fetchait
+    des dizaines de pages a chaque tir (bug poids 1995/2400 du 30/09).
+    On repart du debut de la derniere minute vue : overlap < 60 s, dedup
+    par PK/upsert."""
+    row = con.execute(
+        "SELECT MAX(minute_ts) FROM tape_1m WHERE symbol=?", (symbol,)
+    ).fetchone()
+    if row and row[0]:
+        return int(row[0])
     row = con.execute(
         "SELECT MAX(ts_ms) FROM block_trades WHERE symbol=?", (symbol,)
     ).fetchone()
@@ -256,7 +286,8 @@ def run(args: argparse.Namespace) -> None:
                 lt = last_ts(con, sym)
                 since = lt + 1 if lt else now - args.days * 86400 * 1000
             t0 = time.time()
-            trades = fetch_window(sym, since, now)
+            max_pages = MAX_PAGES_PER_SYMBOL if args.bootstrap else MAX_PAGES_INCREMENTAL
+            trades = fetch_window(sym, since, now, max_pages=max_pages)
             n_blocks, thr, p99 = persist_symbol(con, sym, trades, since)
             totals[sym] = (len(trades), n_blocks, thr)
             log(f"  {sym:14s} trades={len(trades):7d} prints>=${thr:,.0f}: {n_blocks:4d} "

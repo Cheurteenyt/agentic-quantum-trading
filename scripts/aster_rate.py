@@ -30,19 +30,30 @@ def _read() -> dict:
 
 def note_weight(headers, source: str):
     """Lit X-MBX-USED-WEIGHT-1M (HTTPMessage urllib OU dict simple) et note
-    le max récent de la source. Retourne le poids lu, None si absent/échec."""
+    le max récent de la source. Retourne le poids lu, None si absent/échec.
+    Rotation PAR SOURCE (fix 30/09) : un max vu il y a > ROTATE_S pour CETTE
+    source expire, même si d'autres collecteurs rafraîchissent le fichier
+    entre-temps (sinon un pic vieux de 10 min reste épinglé et fausse la
+    sonde aster_health)."""
     try:
         raw = headers.get("X-MBX-USED-WEIGHT-1M") if headers is not None else None
         if raw is None:
             return None
         w = int(str(raw).strip())
+        now = time.time()
         st = _read()
-        recent = {} if time.time() - float(st.get("updated_at") or 0) > ROTATE_S \
-            else dict(st.get("max_recent") or {})
+        seen = dict(st.get("seen_at") or {})
+        recent = dict(st.get("max_recent") or {})
+        recent = {s: v for s, v in recent.items()
+                  if now - float(seen.get(s) or 0) <= ROTATE_S}
+        seen = {s: t for s, t in seen.items()
+                if now - float(t) <= ROTATE_S}
         recent[source] = max(w, int(recent.get(source) or 0))
+        seen[source] = now
         STATE.parent.mkdir(parents=True, exist_ok=True)
-        STATE.write_text(json.dumps(
-            {"updated_at": int(time.time()), "max_recent": recent}, indent=1))
+        out = dict(st)                       # préserve toute clé inconnue
+        out.update({"updated_at": int(now), "max_recent": recent, "seen_at": seen})
+        STATE.write_text(json.dumps(out, indent=1))
         return w
     except Exception:
         return None
