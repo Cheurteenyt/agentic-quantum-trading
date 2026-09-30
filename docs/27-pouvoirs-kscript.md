@@ -105,8 +105,19 @@ vite — ça veut dire tester plus de portes, avec la même clé.
 
 Les trois scripts ci-dessous sont écrits, pré-enregistrés et passent la QA
 statique (`qa_vagues_x501.py` — 122 contrôles, 0 échec ; les 4 QA existantes
-restent PASS). Ils EXPLOITENT les familles dormantes : sources premium
-1/8 → 8 flux branchés, orderbook 1/3 → les 4 fonctions natives utilisées.
+restent PASS). Ils EXPLOITENT les familles dormantes : **le taux d'exploitation
+monte de 28/53 (52,8 %) à 36/53 (67,9 %)** — sources premium **1/8 → 7/8**
+(reste `ethena_positions`, sans use case à ce stade), orderbook **1/3 → 2/3**,
+données 7/9 → 8/9. 17 dormants restants : la vague 3 (5 sorties broker, hygiène
+sans edge), `minBid/minAsk`, volume profile, le langage (collections, loops,
+bibliothèques — dette de style, pas d'edge).
+
+**Le fix review-2 (dans l'esprit des 3 correctifs de la review PR #1)** : la
+regex de la capacité `options_oi / options_volume / skew` était invalide
+(parenthèse capture non fermée → fallback `re.escape` = chaîne littérale jamais
+matchée → capacité comptée DORMANTE à tort). Le bug se révélait précisément
+parce que la vague 1 branche ces flux. Corrigé en `"(?:options_[a-z_]*|skew)"`,
+l'audit reste bit-à-bit reproductible (13 scripts : 12 .ks + le scanner).
 
 | Fichier | Vague | Ce qu'il fait |
 |---|---|---|

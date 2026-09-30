@@ -20,7 +20,7 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `x501_observe_flow_H1.ks` / `x501_observe_cvd4_btc_H1.ks` | collecteurs d'observation (zéro ordre, C4) |
 | `x501_setup_kscript.js` | l'installation codifiée des kScripts |
 | `x501_backtest_trades_BTCUSDT.csv` / `_ETHUSDT.csv` | exemples de sortie backtest |
-| `x501_exploit_audit.py` + `exploit_audit.json` | l'audit d'exploitation kScript (53 capacités × 10 scripts → 52,8 %) |
+| `x501_exploit_audit.py` + `exploit_audit.json` | l'audit d'exploitation kScript (53 capacités × 13 scripts → **67,9 %** : sources premium 7/8, orderbook 2/3) |
 | `qa_kscript_x501.py` | QA générale des 5 stratégies (doc kScript scrapée) |
 | `qa_scanner_x501.py` | QA du scanner (49 contrôles) |
 | `qa_maker_x501.py` | QA des versions maker (M1–M15, non-régression M13) |
@@ -46,8 +46,9 @@ résolus relativement à ce dossier.
 - 5/5 QA **PASS** (122 contrôles pour `qa_vagues_x501.py`, les 4 existantes inchangées).
 - Les `_MK` sont la version d'exécution de référence (fill 97,9 % à δ=2).
 - **Vagues 1-2 activées** (registre d'exploitation : `docs/27-pouvoirs-kscript.md`) :
-  8 flux premium branchés (sources premium 1/8 → 8), les 4 fonctions orderbook
-  natives utilisées (1/3 → 4/3). Backtests A/B pré-enregistrés à exécuter :
+  le taux d'exploitation monte de 52,8 % à **67,9 %** (36/53) — 8 flux premium
+  branchés (sources premium 1/8 → 7/8), les 4 fonctions orderbook natives
+  utilisées (1/3 → 2/3). Backtests A/B pré-enregistrés à exécuter :
   RI on/off sur BTC et ETH, absorption vs signature — verdict au registre `docs/20`.
 - **Vague 3 (hygiène, aucun edge espéré)** : `trailPoints` dans les `_MK`,
   `ocaName`, `strategy.maxDrawdown()` dans les rapports — à faire.

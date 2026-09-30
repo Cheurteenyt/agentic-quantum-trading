@@ -224,7 +224,7 @@ vivant ne l'importe.
 | `x501_observe_*.ks` | 3 collecteurs d'observation (zéro ordre, C4) |
 | `x501_setup_kscript.js` | l'installation codifiée (49 contrôles QA) |
 | `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2 (122 contrôles)** — stdlib pure, une commande |
-| `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 10 scripts → **52,8 %** (verdicts : `docs/27-pouvoirs-kscript.md`) |
+| `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 13 scripts → **67,9 %** (fix review-2 : regex options/skew invalide corrigée — verdicts : `docs/27-pouvoirs-kscript.md`) |
 
 ---
 

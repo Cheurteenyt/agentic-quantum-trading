@@ -29,9 +29,8 @@ Le programme **100 $ → 50 100 $ en 12 mois** (×501, DD ≤ 25 % strict,
 zéro intervention) — `docs/25-openmarket-x501.md` (mission, chiffres
 officiels, doctrine, roadmap) · `docs/26-openmarket-donnees.md`
 (l'entrepôt om_v27 audité vert : 226 800 doublons purgés, index UNIQUE) ·
-`docs/27-pouvoirs-kscript.md` (l'audit d'exploitation : **28/53 capacités
-= 52,8 %**, 7 flux institutionnels gratuits dormants — ETF, CME, Deribit,
-options/skew, LSR — plan d'activation en 3 vagues).
+`docs/27-pouvoirs-kscript.md` (l'audit d'exploitation : **36/53 capacités
+= 67,9 %** — sources premium 7/8, orderbook 2/3 ; vagues 1-2 activées).
 **MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
