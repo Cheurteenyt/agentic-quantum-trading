@@ -92,6 +92,23 @@ orderbook native, `docs/27`**). Les livrables : `docs/reference/openmarket-x501/
 
 ## 📜 SCRIPTS VIVANTS par domaine (`scripts/`)
 
+### Aster — la journée du 30/09 (la chaîne T1-T13, les commits 80a4b0e → 9c9d0e6)
+- La couche de données refaite : le moteur diff-depth EN PROD (cutover, 0 trou),
+  4 WS natifs, le bulk bapi 642 symboles, le compteur de poids, les 2 watchdogs
+  (11+4 sondes), la rétention câblée — docs/24 (la carte + la feuille de route P1-P6 FAIT)
+- **Le backtest arrière POSSIBLE sur Aster** (klines sans trou jusqu'à 2021-09 —
+  9,1 M bougies backfillées) : la règle forward-only ne s'applique pas ici
+- **LE BUG DU HARNAIS corrigé** (les pertes de stop jamais comptées + les frais
+  omis → l'accounting mark-to-market) : le nocturne 01/10 = la 1re campagne honnête
+- **T8 : la machine codifiée = un artefact de fenêtre** (la cascade 10x liquidée
+  dans 6/7 régimes ; les ABSOLUS docs/21 dépendent du warm-up, les RELATIFS
+  tiennent) — les décisions au registre docs/20, section 30/09
+- **Le gate fund7 > 0,5 bps/8h PRÉ-ENREGISTRÉ** (le mécanisme P3 validé N=61) —
+  les verdicts à 90 j ; le registre traders Aster (06h53, 245 adresses jour 1)
+- **Le domaine OpenMarket x501 mergé** (les PR #1-4 de l'agent web, review
+  passée : 4 QA, bit-à-bit, la vague 4 = 40/53 pouvoirs) — la recherche Aster/FOMO
+  gelée au profit d'OpenMarket (les collecteurs continuent)
+
 ### Aster — données & indicateurs
 - `fetch_klines.py` / `fetch_deep_klines.py` — klines (standard / 1 an profond)
 - `refresh_aster_cache.py`, `funding_scanner.py`, `carry_hedged.py`, `basis_guard.py`
