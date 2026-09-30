@@ -18,37 +18,44 @@ méthode, et tout ce qui n'a pas survécu à la falsification est inscrit
 comme tel — la doctrine est la même que celle du registre Aster
 (`docs/20-registre-indicateurs.md`) : pré-enregistrer avant de croire.
 
-## LES CHIFFRES OFFICIELS (config honnête, MC v18 — 12 000 trajectoires)
+## LES CHIFFRES OFFICIELS (MC v20 — 12 000 trajectoires, SANS haircut gate)
 
-| Régime | Médiane 12 m | P(≥ 250 $) | Note |
-|---|---|---|---|
-| V1 taker (S3, ~6,1 bps/côté) | **216 $** | — | le plan de base à frais taker |
-| **V1 maker (δ=2, ~2 bps/côté)** | **475 $** | **80 %** | **le plan de référence actuel** |
-| V2 (empilement 2 alphas) | 1 012 $ | 92,5 % | nécessite V1 viable |
-| V3 (3 alphas, DD mesuré 22,09 %) | 2 353 $ | 98,7 % | sous la borne DD 25 % |
-| V4 (borne sup « parfaite ») | 38 991 $ | — | **PAS un plan** — plafond théorique |
-| V5 (stress défavorable) | 215,7 $ | — | le plan survit au stress |
+> MC v20 (01/10) remplace v18 : le gate signal-6 et ses variantes étant
+> falsifiés (voir plus bas), ils ne retranchent plus rien. 4 audits verts :
+> T0 (référence 641,99 $ bit à bit), T3 (repro bit à bit), T2v20 (0 rupture
+> au pire cas R=−1,5 sous taker), T4v20 (monotonie des médianes). DD cap
+> 25 % respecté au bit près (max 25,0000 %), 0 rupture sur 60 000 trajectoires.
 
-La cible ×501 complète (les 50 100 $) est atteinte dans **96,5 % des
-trajectoires à 36 mois** : en 12 mois le programme vise la médiane V1/V3,
-la trajectoire complète prend le temps qu'elle prend. Aucun de ces chiffres
-n'est une promesse : ce sont des médianes de simulation Monte Carlo sous
-bandes de coûts explicites (taker 6,1 bps, maker 2 bps), avec les slippages
-et les gaps pessimistes du harnais. Le régime V4 est affiché uniquement
-pour borner le modèle ; croire à V4 serait la même erreur que croire aux
-sharpe OOS du harnais optimiste (cf. le bug T7 du domaine Aster).
+| Scénario | Coût/côté | Médiane 12 m | P(≥ 250 $) | P(≥ 500 $) | P(≥ 1 250 $) | x501 @ 36 m |
+|---|---|---|---|---|---|---|
+| S0 référence certifiée | 0,0 bps | 642,0 $ | 80,1 % | 60,1 % | 33,2 % | 35,7 % |
+| **MAKER δ=2 central** | **2,1 bps** | **468,4 $** | **73,0 %** | **50,4 %** | **25,3 %** | **21,3 %** |
+| MAKER δ=2 pur (sans fallback) | 2,0 bps | 475,4 $ | 73,3 % | 50,8 % | 25,7 % | 21,8 % |
+| MAKER stress (fill 90 %) | 3,0 bps | 412,9 $ | 69,8 % | 46,1 % | 22,2 % | 16,4 % |
+| TAKER all-in | 6,1 bps | 272,7 $ | 57,2 % | 33,5 % | 13,6 % | 5,8 % |
+
+Lecture : le régime d'exécution **maker δ=2** est le plan de référence —
+**+71,8 % de médiane vs taker** (468,4 $ vs 272,7 $), et la probabilité de
+la cible complète ×501 passe de 5,8 % (taker) à **21,3 % (maker)** à 36
+mois. La cible complète en 12 mois reste hors médiane (P(50 100 $, 12 m) ≈ 0) :
+le programme vise V1→V3 en 12 mois et la cible complète prend le temps
+qu'elle prend. Constantes d'exécution mesurées (v16/v17/v27, Bybit VIP0
+USDT-perp) : fee taker 5,5 bps, fee maker 2,0, demi-spread 0,6 ; fill
+maker δ=2 mesuré **97,9 % sur 52 728 tentatives** (1h/708 j), fallback
+taker 2,1 % → 2,1 bps/côté effectif (arrondi défavorable).
 
 ## LA RÈGLE DES COÛTS (le levier le plus sous-estimé)
 
-Mesure empirique de la v18 : **chaque −2 bps de coût/côté ≈ +25 % de médiane
-12 m** sur l'horizon de la mission. À 6,1 bps taker, les frais consomment la
-majorité de l'espérance brute des signaux H1/H4 ; à 2 bps maker, la même
-séquence de trades produit une médiane ×2,2 (216 $ → 475 $). Conséquence
-opérationnelle : la priorité absolue n'est pas de trouver un nouveau signal
-mais de **réduire le coût d'exécution** de ceux qui existent déjà. Toute
-nouvelle variante de signal qui n'améliore pas le net-after-cost de plus de
-~2 bps/côté est indistinguible du bruit à cet horizon — autant ne pas la
-promouvoir.
+Mesure empirique confirmée par v20 : **chaque +2 bps de coût/côté coûte
+≈ 20–28 % de médiane 12 m** (v20 : 2,1 → 6,1 bps = −41,8 % de médiane pour
++4 bps). À 6,1 bps taker, les frais consomment la majorité de l'espérance
+brute des signaux H1/H4 ; à 2,1 bps maker, la même séquence de trades
+produit une médiane ×1,72 (272,7 $ → 468,4 $). Conséquence opérationnelle :
+la priorité absolue n'est pas de trouver un nouveau signal mais de
+**réduire le coût d'exécution** de ceux qui existent déjà, et de ne
+promouvoir que des filtres dont le gain attendu dépasse ~2 bps/côté.
+Le registre des pouvoirs (`docs/27-pouvoirs-kscript.md`) liste les
+futurs filtres testés sous cette règle.
 
 ## L'EXÉCUTION MAKER — LE SEUL LEVIER NOUVEAU POSITIF VALIDÉ
 
@@ -135,17 +142,21 @@ ne migre pas.
 
 ## LA ROADMAP (ordre d'exécution)
 
-1. **MC v20** — re-simulation 12 000 trajectoires du régime V1 **sans
-   haircut gate** (le gate forçait la sortie au pire moment), sous les deux
-   bandes de coûts {taker 6,1 ; maker 2} → médiane 12 m + P(250 $) par
-   régime. C'est la mise à jour officielle attendue de la table ci-dessus.
+1. **MC v20 — FAIT (01/10)** — 12 000 trajectoires V1 **sans haircut
+gate**, 5 scénarios de coûts, 4 audits verts : médiane 12 m maker 468,4 $
+(P(250) 73,0 %) / taker 272,7 $ (P(250) 57,2 %) ; x501 @ 36 m 21,3 % vs
+5,8 %. Les chiffres de ce doc sont ceux de v20 ; la baseline `reports/`
+est re-éditée.
 2. **Instrumentation maker δ=2–5 dans le kScript** — fait côté scripts
    (`_MK` + QA M1–M15) ; reste le suivi de fill réel (les compteurs
    `mkFills/mkFb/mkTOut/mkInv` remplis en papier forward).
 3. **Protocole de preuve live 90 j** (v11) — relevés 4×/jour, équité,
    fills, DD, dérive vs simulation ; c'est LE juge avant tout capital réel.
-4. **MC v20 → table officielle mise à jour** dans ce doc + baseline
-   `reports/` rafraîchie.
+4. **Activation des pouvoirs kScript** (`docs/27-pouvoirs-kscript.md`) —
+   vague 1 : régime institutionnel sur les 7 sources premium (ETF, CME,
+   Deribit, options/skew, LSR) ; vague 2 : absorption orderbook native ;
+   vague 3 : hygiène broker (trail natif, OCA, stats). Même discipline de
+   promotion, zéro raccourci.
 
 ## LES RÈGLES NON NÉGOCIABLES
 
