@@ -530,3 +530,13 @@ Rapports : reports/aster_cvd_tape.md (script : scripts/archive_studies/aster_cvd
 | aster_tape re-catégorisé : CONTEXTE confirmé — la valeur résiduelle = le diagnostic d'exécution (la latence, les spreads, le slippage), pas la prédiction | l'archive 45 j s'étend par tranches si une étude d'exécution l'exige | **CONTEXTE** — confirmé |
 
 Rapports : reports/aster_absorption_tape.md (script : scripts/archive_studies/aster_absorption_tape.py — 126 lignes, les tables événement × signature × outcome train/val des 2 passes).
+
+## 01/10 — LES DÉCISIONS DU COORDINATEUR (suite T8, la chaîne T1-T13)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| cascade majors 10x | la machine codifiée = un artefact de la fenêtre 2025-2026 (T8 : liquidée dans 6/7 régimes deep, le wallet mort fin 2023 ; le gate AL inerte sur 3 majors) ; le levier sûr mesuré 4,3x (bear) → 8,3x (bull24) | **CONTEXTE** — le 10x n'est pas transférable hors fenêtre haussière |
+| L'asservissement du levier | levier cascade majors effectif = 4x sur le cycle, 10x seulement si le moniteur MAE 6 majors reste < 9,5 % (l'état mae_state.json écrit au nocturne, lu par paper_forward et le tracker ; l'état absent/périmé = 4x, le défaut sûr) | **PRÉ-ENREGISTRÉ** (01/10) — le forward juge |
+| La cible 60-70 %/mois | observée UNIQUEMENT dans la fenêtre haussière majors 2025-2026 — re-qualifiée : la cible sur le cycle complet = la robustesse (0-liq à 4x, un ROI positif en bear), le forward tranche la fenêtre | **RE-QUALIFIÉE** — docs/21 mis à jour |
+
+L'étude : scripts/studies/aster_machine_deep_regimes.py + reports/aster_machine_deep_regimes.md (le backfill 9,1 M bougies 2021-2026, docs/24).
