@@ -520,3 +520,13 @@ origin/main
 | La valeur conservée du tape : la granularité SUB-MINUTE pour les études d'absorption événementielles (le déséquilibre intra-bougie, l'absorption au bid/ask — le style vague 2 x501) | l'archive 45 j s'étend par tranches (J-90/180/365, les coûts chiffrés) | **MATIÈRE** — phase 2 |
 
 Rapports : reports/aster_cvd_tape.md (script : scripts/archive_studies/aster_cvd_tape.py — 32 tests déclarés, le re-verdict mécanique, DB ro).
+
+## 01/10 — T18 : L'ABSORPTION ÉVÉNEMENTIELLE sub-minute (les événements ±1 %/5 min, BTC/ETH, 45 j) — NUL comme signal, le fait descriptif : les extrêmes sont des PURGES
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| 116 événements (BTC 33, ETH 83) — le flux dans le mouvement : PURGE 71-89 % (le flux agressif continue DANS le sens du mouvement sur les 60 s finales et s'épuise), l'absorption franche 11-29 % minoritaire | les mouvements s'achèvent sur une impulsion qui s'épuise, pas sur une foule qui absorbe — le fait descriptif robuste (à 0,5 % aussi : purge 69-81 %, n=729) | **FAIT DESCRIPTIF** — la lecture microstructure du token home |
+| La prédiction (le signature à l'extrême → le retour 30 min) : 13 tests × 2 passes, 0/26 après re-vérification mécanique (les hints train 0,60-0,69 S'INVERSENT en VAL — le contrôle inverse naturel passé) ; à n VAL 14-19, ~4/13 brutes = le taux de faux positifs attendu | les bougies 1m portent déjà toute l'information — le flux intra-minute n'ajoute rien de mesurable | **NUL** — la lignée tape-signal close aux deux niveaux (le régime T17, l'événement T18) |
+| aster_tape re-catégorisé : CONTEXTE confirmé — la valeur résiduelle = le diagnostic d'exécution (la latence, les spreads, le slippage), pas la prédiction | l'archive 45 j s'étend par tranches si une étude d'exécution l'exige | **CONTEXTE** — confirmé |
+
+Rapports : reports/aster_absorption_tape.md (script : scripts/archive_studies/aster_absorption_tape.py — 126 lignes, les tables événement × signature × outcome train/val des 2 passes).
