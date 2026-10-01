@@ -1,0 +1,484 @@
+{
+ "bybit": {},
+ "vision": {},
+ "api_compl": {},
+ "api_back": {},
+ "funding": {},
+ "qa": {
+  "klines": {
+   "bn": {
+    "1000FLOKIUSDT": {
+     "n": 29840,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "1000PEPEUSDT": {
+     "n": 29864,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "1000SHIBUSDT": {
+     "n": 47263,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "AAVEUSDT": {
+     "n": 52217,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ADAUSDT": {
+     "n": 58432,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "APTUSDT": {
+     "n": 34630,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ARBUSDT": {
+     "n": 30897,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ATOMUSDT": {
+     "n": 58260,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "AVAXUSDT": {
+     "n": 52769,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "BCHUSDT": {
+     "n": 59160,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "BNBUSDT": {
+     "n": 58192,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "BTCUSDT": {
+     "n": 61903,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "DOGEUSDT": {
+     "n": 54567,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "DOTUSDT": {
+     "n": 53537,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ETCUSDT": {
+     "n": 58792,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ETHUSDT": {
+     "n": 59993,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "FETUSDT": {
+     "n": 32470,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "FILUSDT": {
+     "n": 52218,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "GALAUSDT": {
+     "n": 44133,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "HBARUSDT": {
+     "n": 48569,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ICPUSDT": {
+     "n": 46627,
+     "gap_max_h": 627.0,
+     "nulls_taker": 0
+    },
+    "IMXUSDT": {
+     "n": 40629,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "INJUSDT": {
+     "n": 36142,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "JUPUSDT": {
+     "n": 23358,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "LDOUSDT": {
+     "n": 35268,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "LINKUSDT": {
+     "n": 58768,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "LTCUSDT": {
+     "n": 58960,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "NEARUSDT": {
+     "n": 52240,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "OPUSDT": {
+     "n": 37978,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ORDIUSDT": {
+     "n": 25404,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "SEIUSDT": {
+     "n": 27382,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "SOLUSDT": {
+     "n": 52985,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "STXUSDT": {
+     "n": 31618,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "SUIUSDT": {
+     "n": 29912,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "TIAUSDT": {
+     "n": 25566,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "TRXUSDT": {
+     "n": 58816,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "UNIUSDT": {
+     "n": 52889,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "VETUSDT": {
+     "n": 58096,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "WLDUSDT": {
+     "n": 27948,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "XRPUSDT": {
+     "n": 59032,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    }
+   },
+   "bb": {
+    "1000PEPEUSDT": {
+     "n": 29941,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ADAUSDT": {
+     "n": 48569,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "APTUSDT": {
+     "n": 34654,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "AVAXUSDT": {
+     "n": 44223,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "BNBUSDT": {
+     "n": 46096,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "BTCUSDT": {
+     "n": 57157,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "DOGEUSDT": {
+     "n": 46000,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "ETHUSDT": {
+     "n": 48647,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "LINKUSDT": {
+     "n": 52118,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "SOLUSDT": {
+     "n": 43511,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "SUIUSDT": {
+     "n": 29939,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    },
+    "XRPUSDT": {
+     "n": 47222,
+     "gap_max_h": 1.0,
+     "nulls_taker": 0
+    }
+   }
+  },
+  "funding": {
+   "1000FLOKIUSDT": {
+    "n": 3733,
+    "gap_max_s": 28800
+   },
+   "1000PEPEUSDT": {
+    "n": 3736,
+    "gap_max_s": 28800
+   },
+   "1000SHIBUSDT": {
+    "n": 5911,
+    "gap_max_s": 28800
+   },
+   "AAVEUSDT": {
+    "n": 6530,
+    "gap_max_s": 28800
+   },
+   "ADAUSDT": {
+    "n": 7342,
+    "gap_max_s": 28800
+   },
+   "APTUSDT": {
+    "n": 4333,
+    "gap_max_s": 28800
+   },
+   "ARBUSDT": {
+    "n": 3866,
+    "gap_max_s": 28800
+   },
+   "ATOMUSDT": {
+    "n": 7288,
+    "gap_max_s": 28800
+   },
+   "AVAXUSDT": {
+    "n": 6601,
+    "gap_max_s": 28800
+   },
+   "BCHUSDT": {
+    "n": 7401,
+    "gap_max_s": 28800
+   },
+   "BNBUSDT": {
+    "n": 7277,
+    "gap_max_s": 28800
+   },
+   "BTCUSDT": {
+    "n": 7736,
+    "gap_max_s": 28800
+   },
+   "DOGEUSDT": {
+    "n": 6824,
+    "gap_max_s": 28800
+   },
+   "DOTUSDT": {
+    "n": 6701,
+    "gap_max_s": 28800
+   },
+   "ETCUSDT": {
+    "n": 7352,
+    "gap_max_s": 28800
+   },
+   "ETHUSDT": {
+    "n": 7502,
+    "gap_max_s": 28800
+   },
+   "FETUSDT": {
+    "n": 4064,
+    "gap_max_s": 28800
+   },
+   "FILUSDT": {
+    "n": 6530,
+    "gap_max_s": 28800
+   },
+   "GALAUSDT": {
+    "n": 5521,
+    "gap_max_s": 28800
+   },
+   "HBARUSDT": {
+    "n": 6074,
+    "gap_max_s": 28800
+   },
+   "ICPUSDT": {
+    "n": 4479,
+    "gap_max_s": 28800
+   },
+   "IMXUSDT": {
+    "n": 8337,
+    "gap_max_s": 28800
+   },
+   "INJUSDT": {
+    "n": 4522,
+    "gap_max_s": 28800
+   },
+   "JUPUSDT": {
+    "n": 5842,
+    "gap_max_s": 28800
+   },
+   "LDOUSDT": {
+    "n": 4412,
+    "gap_max_s": 28800
+   },
+   "LINKUSDT": {
+    "n": 7349,
+    "gap_max_s": 28800
+   },
+   "LTCUSDT": {
+    "n": 7373,
+    "gap_max_s": 28800
+   },
+   "NEARUSDT": {
+    "n": 6535,
+    "gap_max_s": 28800
+   },
+   "OPUSDT": {
+    "n": 4751,
+    "gap_max_s": 28800
+   },
+   "ORDIUSDT": {
+    "n": 6355,
+    "gap_max_s": 28800
+   },
+   "SEIUSDT": {
+    "n": 3427,
+    "gap_max_s": 28800
+   },
+   "SOLUSDT": {
+    "n": 6703,
+    "gap_max_s": 28800
+   },
+   "STXUSDT": {
+    "n": 3956,
+    "gap_max_s": 28800
+   },
+   "SUIUSDT": {
+    "n": 3742,
+    "gap_max_s": 28800
+   },
+   "TIAUSDT": {
+    "n": 6396,
+    "gap_max_s": 28800
+   },
+   "TRXUSDT": {
+    "n": 7355,
+    "gap_max_s": 28800
+   },
+   "UNIUSDT": {
+    "n": 6617,
+    "gap_max_s": 28800
+   },
+   "VETUSDT": {
+    "n": 7265,
+    "gap_max_s": 28800
+   },
+   "WLDUSDT": {
+    "n": 3496,
+    "gap_max_s": 28800
+   },
+   "XRPUSDT": {
+    "n": 7382,
+    "gap_max_s": 28800
+   }
+  },
+  "cross_venue": {
+   "BTCUSDT": {
+    "n": 57134,
+    "med": 1.3,
+    "p99": 13.2
+   },
+   "ETHUSDT": {
+    "n": 48624,
+    "med": 1.2,
+    "p99": 9.1
+   },
+   "BNBUSDT": {
+    "n": 46073,
+    "med": 4.2,
+    "p99": 14.4
+   },
+   "XRPUSDT": {
+    "n": 47199,
+    "med": 1.8,
+    "p99": 11.2
+   },
+   "ADAUSDT": {
+    "n": 48545,
+    "med": 2.5,
+    "p99": 13.4
+   },
+   "LINKUSDT": {
+    "n": 52095,
+    "med": 2.1,
+    "p99": 14.6
+   },
+   "DOGEUSDT": {
+    "n": 45977,
+    "med": 1.7,
+    "p99": 16.3
+   },
+   "SOLUSDT": {
+    "n": 43488,
+    "med": 1.5,
+    "p99": 10.5
+   },
+   "AVAXUSDT": {
+    "n": 44200,
+    "med": 2.0,
+    "p99": 12.3
+   }
+  }
+ }
+}

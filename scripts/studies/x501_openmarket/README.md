@@ -38,6 +38,10 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `x501_probe_floor_v29.py` + `floor_v29.json` | **v29 (docs/37) — la sonde des PLANCHERS de données** : bisection 1 j sur 2 venues (Bybit + Binance fapi) × 12 symboles, date de listing perp USDT mesurée par symbole → l'horizon MAX de backtest (pool 12 = 3,42 ans ; 6 ans sur 9 symboles ; BTC 7,07 ans) |
 | `x501_collect_deep_v29.py` + `collect_deep_v29.json` | **v29 (docs/37) — le collecteur DEEP** : klines 1h jusqu'au plancher de listing (Bybit 12 symboles + Binance 9 symboles = 1 041 871 barres) + funding Binance vers plancher (76 479 pts) — pacing weight-aware (0,42 s), backoffs 429/418, INSERT OR IGNORE UNIQUE, ts funding en SECONDES — DB locale git-ignorée (`om_v27.db`, tables `*_deep`) |
 | `x501_baseline_6y_v29.py` + `baseline_6y_v29.json` | **v29 (docs/37) — la BASELINE 6 ANS** : f24 / MFE48 / MAE48 / vol par année sur 9 symboles × 6-7 ans, funding APR par année, stationnarité 60/40 chrono GLOBAL (train +33,8 → test +8,4 bps), cohérence cross-venue (méd 1,2–4,2 bps), 0 trou — la fenêtre de calibration MC v20 (23 mois) = pire cas du cycle 2019-2026 |
+| `x501_collect_deep40_v31.py` + `collect_deep40_v31.json` | **v31 (docs/38) — le collecteur DEEP 40 SYMBOLES** : Binance Vision (zips mensuels/daily, sans rate-limit, taker natif) + compléments API blindés + Bybit API backward — 1 817 324 barres bn / 40 sym (BTC 2019-09-08 →), 528 077 bb / 12 sym, 238 616 fundings — le trou ICPUSDT 627 h est RÉEL (vérifié absent de Binance) |
+| `qa_deep40_v31.py` | **v31 (docs/38) — la QA de la base deep 40 sym + du pool** : 15 contrôles (contiguïté 2 venues, 0 NULL taker, funding 8 h pile, cross-venue méd ≤ 5 bps, pool 868 bit à bit, cohérence research) — PASS ; skips déclarés sans data locale |
+| `x501_v8_scale_deep_v31.py` + `research_v8_deep.json` + `trades_v8_deep.csv` | **v31 (docs/38) — le HARNAIS v8 porté sur la base deep** (transformation contrôlée du source v8, moteur bit à bit) : 40 perps × 82,8 mois, L1 gate ATR REJETÉ 4/4, L2 → V3 retenu, pool 868 trades E[R] +0,093 (sat +0,135), A3 +0,210 / A4 +0,119 — contraction ÷1,9 seulement (vs ÷4,5 moteur 8 sym v30) |
+| `x501_mc_v31.py` + `mc_v31.json` | **v31 (docs/38) — le MC du pool v8 deep** (noyau v12 bit à bit, 12 000 chemins × 5 scénarios coûts v20) : W0 146,7 $ [100;253] P250 30,3 %, bande 97,5–146,7 $, maxDD 25,000000 % inviolé, P(50 100)@12m = 0,00 % — audits T2/T3 OK |
 | `qa_kscript_x501.py` | QA générale des stratégies (doc kScript scrapée) |
 | `qa_scanner_x501.py` | QA du scanner (49 contrôles) |
 | `qa_maker_x501.py` | QA des versions maker (M1–M15, non-régression M13) |
@@ -74,6 +78,13 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
 
 ## Statut (02/10/2026)
 
+- **v31 — le harnais v8 officiel est porté sur la base deep « depuis le début de l'actif »**
+  (`docs/38-openmarket-harnais-deep-40sym.md`) : base étendue 9 → **40 symboles** via Binance Vision
+  (2,34 M barres au total, QA 15 contrôles PASS, trou ICP réel documenté) ; portage par transformation
+  contrôlée (moteur/règles bit à bit) ; **L1 gate ATR REJETÉ 4/4, L2 → V3 retenu** ; pool 868 trades
+  E[R] +0,093 (contraction ÷1,9 vs fenêtre 34 mois — 2,4× plus douce que le moteur 8 sym) ;
+  **MC v31 : W0 146,7 $ [100;253], P(50 100)@12m = 0,00 %, maxDD 25,000000 % inviolé** —
+  le re-chiffrement le plus complet du domaine, meilleure configuration mesurée (+25 % vs v30).
 - **v29 — l'horizon de backtest est verrouillé « depuis le début de l'actif » et la base deep est en place** (`docs/37-openmarket-horizon-backtest.md`) : sonde des planchers (bisection 2 venues × 12 symboles — la limite est le LISTING des perps USDT, pas l'API), collecte deep **1 041 871 barres klines 1h + 76 479 fundings, 0 trou, cohérence cross-venue méd 1,2–4,2 bps** (p99 ≤ 16,3) ; pool 12/12 = **3,42 ans**, **6 ans validés sur 9/12 symboles**, plafond absolu **7,07 ans (BTC)** ; baseline 6 ans : 513 637 obs f24, stationnarité 60/40 chrono train **+33,8 → test +8,4 bps** (même signe, contraction ×4), f24 BTC 2025-2026 ~0 bps, funding APR 30,6 % (2021) → 2,9 % (2026), MFE48 médian 3,69 % → 1,76 % — **la fenêtre de calibration MC v20 (23 mois) est le PIRE CAS du cycle 2019-2026** : la trajectoire officielle reste calibrée conservatrice.
 - 10/10 QA **PASS** (200 contrôles pour `qa_vagues_x501.py`, les existantes re-vérifiées) :
   `qa_oi_local_x501.py` (47), `qa_fill_maker_x501.py` (71→74), `qa_flux_local_x501.py` (27,
