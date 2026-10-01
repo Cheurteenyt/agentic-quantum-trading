@@ -606,3 +606,13 @@ Rapports : reports/aster_quantile_cap_probe.md (script : scripts/studies/aster_q
 | La prédiction (le régime courant → le return forward 24 h) : 0/8 tests x501 (AUC train ≤ 0,558 ; les val 0,672 = non confirmés + la multiplicité 8) | les seuils absolus (spoof/absorption) s'expriment en multiples de la densité courante, pas en absolus | **NUL** — la prédiction directionnelle par densité |
 
 Rapports : reports/aster_orderflow_regimes.md (script : scripts/studies/aster_orderflow_regimes.py — tri (ts_ms, agg_id), les reculs 759/476 confirmés propriété de la source, DB ro). Correction T16bis : le « 108 k/j » = l'estimation de sonde, la mesure réelle 73,3 k/j.
+
+## 01/10 — T22 : LE WALLET SÉQUENTIEL du carry T21 — REFUS (l'edge était un artefact triple)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Le carry seul au harnais honnête : 1× $97,08 (−0,6 %/an, DD 17,2 %), 2,1× $91,53 (−1,7 %/an, DD 33,1 %) — 0 liq, WR 44 %, 30+/31− | les cibles user échouées : ROI négatif à tout levier, DD > 25 % dès 2,1× ; la seule qui tient = 0 liq (maxMAE 46,1 % vs ligne 47,1 %) | **NUL — promotion REFUSÉE** |
+| L'ARTEFACT TRIPLE de T21 : (a) l'unité funding ×8 (les events 8 h sommés ffilled horaires : +1085 % annoncés → +102 % réels) ; (b) la dénomination short inversée (entry/exit−1 vs (entry−exit)/entry : −27,9 % nets) ; (c) le biais de survie du leaderboard (pnl > 0 par construction) | le « +599 bps VAL » était l'empilement des trois — chacun suffisant | **LA LEÇON** — le wallet séquentiel a attrapé ce que le backtest avait gonflé |
+| La corrélation au stack : −0,03/−0,24 avec les cascades (légèrement décorrelant MAIS un flux perdant décorrelé = une fuite, pas de la diversification) | le refus tient même décorrelé | **NUL** — confirmé |
+
+Rapports : reports/aster_carry_wallet.md (script : scripts/studies/aster_carry_wallet.py — le harnais run_stack importé tel quel, 999 trades bit-reproduits, l'économie correcte funding exact 8 h + short dénominé).
