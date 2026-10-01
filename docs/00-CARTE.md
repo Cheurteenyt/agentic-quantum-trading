@@ -92,6 +92,20 @@ sépare dans le même sens (ΔR −0,315, P(Δ<0) = 0,8009 ≥ gate de contexte,
 3ᵉ contexte, jamais promu, ambiguïté de signe du gate pool assumée) — la
 direction qui se montre sans jamais franchir le gate d'amplitude n'est pas
 un signal**).
+candidats entrent dans la liste A/B sans toucher à la file**).
+A/B, jamais promotion depuis un banc**).
+falsification, collecteur versionné `x501_collect_oi_v8.py`**).
+docs/27 est CLOSE**).
+→ ABS**).
+OI, ML, flux, funding).
+3 tests au registre docs/20).
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 **MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
@@ -101,6 +115,24 @@ reproductible du fill maker (surface δ×TTL 2 053 015 tentatives + sélection
 sur le pool P1) **réfute l'hypothèse d'entrée v20** (delta réel +0,375 bps,
 fallback à −88,6 bps, biais concentré sur A4) → candidat v21 : médiane
 **306,2 $** (TTL=2) / **364,0 $** (TTL=6, +33,6 % vs taker). Le code : 12 kScripts + 10 QA **PASS** dans
+**306,2 $** (TTL=2) / **364,0 $** (TTL=6, +33,6 % vs taker). Le code : 12 kScripts + 7 QA **PASS** dans
+**306,2 $** (TTL=2) / **364,0 $** (TTL=6, +33,6 % vs taker). Le code : 12 kScripts + 6 QA **PASS** dans
+= les A/B PRÉ-ENREGISTRÉS des vagues 1-2, 3 tests au registre docs/20).
+`docs/27-pouvoirs-kscript.md` (l'audit d'exploitation : **36/53 capacités
+= 67,9 %** — sources premium 7/8, orderbook 2/3 ; vagues 1-2 activées).
+origin/main
+**MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
+**468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
+**+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
+règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 12 kScripts + 6 QA **PASS** dans
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 `scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
 référence, fill 97,9 % à δ=2 ; l'audit d'exploitation kScript
 `x501_exploit_audit.py` ; **vagues 1-2 du plan d'exploitation ACTIVÉES le
@@ -140,6 +172,23 @@ orderbook native, `docs/27`**). Les livrables : `docs/reference/openmarket-x501/
 (dès que ≥ 2 flux indépendants : dispatch en agents parallèles).
 
 ## 📜 SCRIPTS VIVANTS par domaine (`scripts/`)
+
+### Aster — la journée du 30/09 (la chaîne T1-T13, les commits 80a4b0e → 9c9d0e6)
+- La couche de données refaite : le moteur diff-depth EN PROD (cutover, 0 trou),
+  4 WS natifs, le bulk bapi 642 symboles, le compteur de poids, les 2 watchdogs
+  (11+4 sondes), la rétention câblée — docs/24 (la carte + la feuille de route P1-P6 FAIT)
+- **Le backtest arrière POSSIBLE sur Aster** (klines sans trou jusqu'à 2021-09 —
+  9,1 M bougies backfillées) : la règle forward-only ne s'applique pas ici
+- **LE BUG DU HARNAIS corrigé** (les pertes de stop jamais comptées + les frais
+  omis → l'accounting mark-to-market) : le nocturne 01/10 = la 1re campagne honnête
+- **T8 : la machine codifiée = un artefact de fenêtre** (la cascade 10x liquidée
+  dans 6/7 régimes ; les ABSOLUS docs/21 dépendent du warm-up, les RELATIFS
+  tiennent) — les décisions au registre docs/20, section 30/09
+- **Le gate fund7 > 0,5 bps/8h PRÉ-ENREGISTRÉ** (le mécanisme P3 validé N=61) —
+  les verdicts à 90 j ; le registre traders Aster (06h53, 245 adresses jour 1)
+- **Le domaine OpenMarket x501 mergé** (les PR #1-4 de l'agent web, review
+  passée : 4 QA, bit-à-bit, la vague 4 = 40/53 pouvoirs) — la recherche Aster/FOMO
+  gelée au profit d'OpenMarket (les collecteurs continuent)
 
 ### Aster — données & indicateurs
 - `fetch_klines.py` / `fetch_deep_klines.py` — klines (standard / 1 an profond)

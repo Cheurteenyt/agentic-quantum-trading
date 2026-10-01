@@ -14,6 +14,20 @@
 | Liquidations | **0, sans exception** |
 | ROI annuel | ≥ 1 000 % backtesté, confirmé forward |
 
+## ⚠️ LE VERDICT DEEP DU 30/09 (T8) — les absolus ci-dessous sont des artefacts de fenêtre
+
+L'étude `scripts/studies/aster_machine_deep_regimes.py` (le backfill 9,1 M bougies
+2021-2026, docs/24) a re-joué la machine codifiée sur 6 régimes : **la cascade
+majors 10x est liquidée dans 6 régimes sur 7** (14 liqs deep, le wallet mort fin
+2023 : −87 % bull21, −37 % bear22, −92 % recov23 ; seul 2026 = +168 % liq0) ; le
+levier sûr mesuré = 4,3x (bear) → 8,3x (bull24) ; le gate AL est INERTE sur
+l'univers 3 majors (~45 év/90 j contre les 50 requis) ; et le résultat de
+méthode : le même moteur sur 3 états de warm-up DB donne ROI +651 % → +3 905 % —
+**les ABSOLUS dépendent de l'état de la base, les RELATIFS (l'ordre des flux, la
+structure des gates) tiennent**. Les décisions (cascade_10x → CONTEXTE,
+l'asservissement du levier au MAE par régime, la cible re-qualifiée) sont au
+registre docs/20, section 30/09. Le forward paper reste le seul juge.
+
 ## L'état de la machine au 27/09 (les 3 configs au forward)
 
 | Config | Poids [majors, meme, survivor, vol_spike] | Levier | FULL (100 $) | Annalisé | DD max | Record | Pire mois | Liq | Statut |

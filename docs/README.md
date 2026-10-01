@@ -4,6 +4,12 @@
 des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 
 ## LE VIVANT (19 docs, à jour)
+## LE VIVANT (18 docs, à jour)
+## LE VIVANT (12 docs, à jour)
+origin/main
+origin/main
+origin/main
+origin/main
 
 | Doc | Ce que c'est | Quand le lire |
 |---|---|---|
@@ -20,6 +26,17 @@ des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 | **34-oi-regime-banc-local** | le banc de l'OI en contexte de régime : le NIVEAU du capital (z-score roulant) ne conditionne ni la magnitude (H_R1 de la théorie du levier refusée) ni la direction — la 9ᵉ falsification ; le conditionnel pool P1 franchit le gate de contexte (P = 0,8192) sans promotion possible | avant de croire au « régime OI » ou de vouloir conditionner un kScript à l'OI |
 | **35-openmarket-oi-ushape** | le banc de la forme en U de H_R1 : le U joint NON ÉTABLI (4/4 INCONCLU sous le gate, la composition pré-déclarée refuse), le miroir directionnel KILL 4/4 — MAIS le côté bas de la purge CANDIDAT à L2160 (AUC 0,4415/0,4454, Δ\|fwd\| +52 à +83 bps) — les 2 premiers candidats marginaux du domaine — et le pool strates \|z\| franchit le gate de contexte une 2ᵉ fois (P = 0,7381) | avant de croire au « U des extrêmes » ou de brancher le régime de purge dans un kScript |
 | **36-openmarket-lsr-banc-local** | le banc du LSR (long/short account ratio Bybit, la dernière source premium du filtre RI, portée de 8 j à ~2,74 ans par le collecteur versionné) : le contrarian NIVEAU est KILL 4/4 + réplication 4/4, le flux 1 j KILL, le flux 7 j INCONCLU sous le gate (2 IC excluent 0,5, delta −52,7 bps > étalon mais sans AUC pas un plan) — la 10ᵉ falsification ; le pool P1 sépare dans le sens contrarian (P(Δ<0) = 0,8009, 3ᵉ contexte, jamais promu) | avant de croire au « contrarian LSR » ou de vouloir brancher la foule dans un kScript |
+| **28-protocole-ab-x501** | le protocole A/B PRÉ-ENREGISTRÉ : 6 runs, critères figés 01/10/2026, moteur déterministe | avant et après tout run A/B des vagues 1-2 |
+| **27-pouvoirs-kscript** | le registre d'exploitation : 36/53 capacités (67,9 %), vagues 1-2 ACTIVÉES (régime institutionnel + absorption), backtests A/B à venir | avant d'écrire tout nouveau kScript |
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 | **22-nos-indicateurs** | LES 10 CRÉATIONS : chaque indicateur, sa règle, sa preuve | pour savoir ce qu'on possède |
 | **20-registre-indicateurs** | la source de vérité des verdicts (25+ datés + les 25 réfutés) | avant de croire quoi que ce soit |
 | **21-goal-performances** | le plan P1-P5 + les dates de tir + le volet institutionnel | pour savoir où on va |

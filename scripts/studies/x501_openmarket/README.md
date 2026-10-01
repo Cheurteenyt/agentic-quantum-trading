@@ -3,6 +3,15 @@
 **Le domaine de la mission x501** (100 $ → 50 100 $, DD ≤ 25 % —
 `docs/25-openmarket-x501.md`). Tout le code du domaine tient dans ce
 dossier : les 12 kScripts, le scanner d'installation et les 10 QA statiques.
+dossier : les 12 kScripts, le scanner d'installation et les 9 QA statiques.
+dossier : les 12 kScripts, le scanner d'installation et les 7 QA statiques.
+dossier : les 12 kScripts, le scanner d'installation et les 6 QA statiques.
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 
 ## Contenu
@@ -11,6 +20,22 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 |---|---|
 | `Operation_x501_Signature_H1.ks` / `_H4.ks` | le signal de base (signature), cadence H1 / H4 |
 | `Operation_x501_Signature_H1_MK.ks` / `_H4_MK.ks` | **les versions maker** (limite δ=2–5, TTL, fallback taker, verrous pend*) + **vague 3 (docs/27-28)** : trail natif du runner (`useNativeTrail`, défaut false), groupes OCA nommés par tranche, `cancelAll()` post-halt (bug réel corrigé), rapport fin de run natif (closedTradeCount/WR/maxDrawdown) |
+<<<<<<< HEAD
+| `Operation_x501_Signature_H1_MK.ks` / `_H4_MK.ks` | **les versions maker** (limite δ=2–5, TTL, fallback taker, verrous pend*) + **vague 3 (docs/27-28)** : trail natif du runner (`useNativeTrail`, défaut false), groupes OCA nommés par tranche, `cancelAll()` post-halt (bug réel corrigé), rapport fin de run natif (closedTradeCount/WR/maxDrawdown) |
+=======
+<<<<<<< HEAD
+| `Operation_x501_Signature_H1_MK.ks` / `_H4_MK.ks` | **les versions maker** (limite δ=2–5, TTL, fallback taker, verrous pend*) + **vague 3 (docs/27-28)** : trail natif du runner (`useNativeTrail`, défaut false), groupes OCA nommés par tranche, `cancelAll()` post-halt (bug réel corrigé), rapport fin de run natif (closedTradeCount/WR/maxDrawdown) |
+=======
+| `Operation_x501_Signature_H1_MK.ks` / `_H4_MK.ks` | **les versions maker** (limite δ=2–5, TTL, fallback taker, verrous pend*) |
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+>>>>>>> origin/main
+>>>>>>> origin/main
 | `Operation_x501_Signature_H1_RI.ks` | **vague 1 (docs/27)** — la Signature H1 + le filtre de RÉGIME INSTITUTIONNEL : score RI = 5 composantes écrêtées (ETF flow 3 j, CME OI × signe prix, DVOL vs MM 30, skew 1W, LSR contrarian), seuil ±0,10, no-repaint via buckets quotidiens complétés (`htf 1D`, jamais `[0]`), fail-open si les flux sont absents |
 | `x501_observe_regime.ks` | **vague 1** — l'observe des 8 flux premium : table de disponibilité par flux, composantes RI brutes, alerte de bascule de quadrant (9 souscriptions) |
 | `Operation_x501_Absorption_H1.ks` | **vague 2 (docs/27)** — l'absorption orderbook NATIVE : mur = `maxBidAmount`/`maxAskAmount` ≥ 3× sa moyenne 200, attaque = vague taker ≥ 2× sa moyenne, tenue = écrasement ≤ 0,8 %, reprise = EMA flux net + déséquilibre `sumBids`/`sumAsks` ≥ 1,2 — le pattern qui a produit l'AL Score d'Aster, dans le backtester |
@@ -20,6 +45,14 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `x501_observe_flow_H1.ks` / `x501_observe_cvd4_btc_H1.ks` | collecteurs d'observation (zéro ordre, C4) |
 | `x501_setup_kscript.js` | l'installation codifiée des kScripts |
 | `x501_backtest_trades_BTCUSDT.csv` / `_ETHUSDT.csv` | exemples de sortie backtest |
+<<<<<<< HEAD
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 | `x501_exploit_audit.py` + `exploit_audit.json` | l'audit d'exploitation kScript (53 capacités × 13 scripts → **75,5 %** : sources premium 7/8, orderbook 2/3, broker 15/16 — la case `profit=/loss=` en ticks REFUSÉE par design, docs/28) |
 | `x501_verdict_ab.py` | **le moteur de verdict des A/B pré-enregistrés (docs/28)** : lit 2 CSV trades, bootstrap 10 000 seed 501, verdicts DATA_ABSENTE / PROMOTION / KILL / INCONCLU — stdlib pure, bit-à-bit, `--demo` pour la plomberie |
 | `x501_fill_maker_surface.py` + `pool_P1_entrees.csv` + `fill_maker_surface.json` | **la chaîne de preuve maker (docs/29)** : surface de fill δ×TTL (80 symboles × 733 j = 2 053 015 tentatives), sélection réelle sur les 469 entrées du pool P1 (fallback −88,6 bps, biais concentré sur A4), grille δ×TTL, sortie analytique TP — verdict : delta réel +0,931 bps/jambe = 23,3 % du crédit MC v20 → candidat v21 (médianes 306,2 $ TTL=2 / 364,0 $ TTL=6) |
@@ -33,6 +66,24 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `x501_lsr_local.py` + `lsr_local.json` | **le banc du LSR (docs/36, vague 11)** : la dernière source premium du filtre RI (la fraction de comptes longs Bybit, 72 000 lignes 4h + 13 200 lignes 1d sur ~2,74 ans) — Étude A contrarian NIVEAU (z_L(buyRatio) → fwd signé, sens −1, l'hypothèse RI) : 4/4 KILL ; Étude B FLUX du positionnement (ΔbuyRatio, la bascule des comptes, sens −1) : 2 KILL + 2 INCONCLU (D42 : 2 IC excluent 0,5 mais 2–3× sous le gate — delta −52,7 bps au-dessus de l'étalon, sans AUC pas un plan) ; Étude C réplication 1d : 4/4 KILL — **la 10ᵉ falsification du domaine** ; Étude D pool P1 : ΔR −0,315, P(Δ<0) = 0,8009 dans le sens contrarian pré-déclaré (3ᵉ contexte au-dessus du gate, CONTEXTE jamais promu, ambiguïté de signe du gate pool assumée) — numpy + `X501_LSR_DIR` |
 | `x501_collect_lsr_v11.py` + `x501_lsr_probe_v11.py` + `lsr_probe_v11.jsonl` | **le collecteur versionné du banc LSR (docs/36)** + la sonde de sémantique et sa preuve horodatée : Bybit v5 public (0 clé), `/v5/market/account-ratio` 4h/1d (pagination `cursor`, le paramètre `interval` n'existe pas — mesuré) + klines 4h/1d, règle anti-partiel pré-enregistrée (ligne T > now − 3P droppée) ; la sonde a TRANCHÉ la sémantique : END (ligne T = fenêtre [T−P, T), publiée finalisée ≤ ~4,7 min après T, aucune ligne partielle — correction datée de la note 02:47) — la re-collecte n'est pas bit-compatible (data live) |
 | `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
+| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
+| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
+| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
+=======
+<<<<<<< HEAD
+| `x501_exploit_audit.py` + `exploit_audit.json` | l'audit d'exploitation kScript (53 capacités × 13 scripts → **75,5 %** : sources premium 7/8, orderbook 2/3, broker 15/16 — la case `profit=/loss=` en ticks REFUSÉE par design, docs/28) |
+| `x501_verdict_ab.py` | **le moteur de verdict des A/B pré-enregistrés (docs/28)** : lit 2 CSV trades, bootstrap 10 000 seed 501, verdicts DATA_ABSENTE / PROMOTION / KILL / INCONCLU — stdlib pure, bit-à-bit, `--demo` pour la plomberie |
+=======
+| `x501_exploit_audit.py` + `exploit_audit.json` | l'audit d'exploitation kScript (53 capacités × 13 scripts → **67,9 %** : sources premium 7/8, orderbook 2/3) |
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+>>>>>>> origin/main
+>>>>>>> origin/main
 | `qa_kscript_x501.py` | QA générale des 5 stratégies (doc kScript scrapée) |
 | `qa_scanner_x501.py` | QA du scanner (49 contrôles) |
 | `qa_maker_x501.py` | QA des versions maker (M1–M15, non-régression M13) |
@@ -43,6 +94,22 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `qa_oi_local_x501.py` | QA du banc OI (47 contrôles) : le DÉTECTEUR (OI planté corrélé au forward → AUC 0,66 CANDIDAT, cas nul KILL), le zéro look-ahead par MUTATION multiplicative+additive des snapshots futurs (scores passés bit à bit), les 4 branches du verdict en unitaire, le pool 469/469 (entry = open×(1 + side×2 bps)), l'audit de collecte, la re-exécution bit à bit (digest gravé) |
 | `qa_oi_regime_x501.py` | QA du banc régime (63 contrôles) : rolling_z en unitaires (cas à la main L=3, amorçage, boucle naïve, snapshot NaN propagé, fenêtre plate → NaN — bug réel corrigé), le DÉTECTEUR monotone (niveau planté dans la magnitude avec le décalage vague 8 → CANDIDAT ; la même plomberie décolle sur le signé pour l'étude B, verdict CONTEXTE forcé par sens=0), le cas nul KILL, le zéro look-ahead par MUTATION des snapshots ET des barres futures, le snapshot simultané jamais lu par sa barre (test segmenté), les 4 branches + sens=0 ne promeut jamais, le pool 469/469, l'audit de collecte, la re-exécution bit à bit (digest gravé) |
 | `qa_oi_ushape_x501.py` | QA du banc U-shape (79 contrôles, 1 skip déclaré) : le DÉTECTEUR du U planté (magnitude en U dans le forward → A1 CANDIDAT + A2 CANDIDAT → composition **U VIVANT**), le DÉTECTEUR MONOTONE REFUSÉ par la composition (A2 sens opposé → **KILL-U** même si A1 décolle — le banc distingue les deux formes), le cas nul KILL, la COMPOSITION en 7 branches unitaires, le score \|z\| et la sélection A2 en cas à la main (2 bugs de CAS corrigés : médiane −1,5, premier jet plantait un monotone), le zéro look-ahead par MUTATION des snapshots ET des barres futures (scores signés ET \|z\| bit à bit), le snapshot simultané jamais lu, le pool 469/469, l'audit de collecte, la re-exécution bit à bit (digest gravé) |
+<<<<<<< HEAD
+| `qa_vagues_x501.py` | QA des vagues 1-2-3 : RI + observe régime + absorption + les 2 `_MK` + le moteur de verdict (200 contrôles : no-repaint, fail-open, budget sources ≤ 10, pièges doc, piège OCA, pré-enregistrement, cohérence docs/28 ↔ moteur) |
+=======
+<<<<<<< HEAD
+| `qa_vagues_x501.py` | QA des vagues 1-2-3 : RI + observe régime + absorption + les 2 `_MK` + le moteur de verdict (200 contrôles : no-repaint, fail-open, budget sources ≤ 10, pièges doc, piège OCA, pré-enregistrement, cohérence docs/28 ↔ moteur) |
+=======
+| `qa_vagues_x501.py` | QA des vagues 1-2 : RI + observe régime + absorption (122 contrôles : no-repaint, fail-open, budget sources ≤ 10, pièges doc, pré-enregistrement) |
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+>>>>>>> origin/main
+>>>>>>> origin/main
 
 ## Comment valider (une commande, zéro dépendance)
 
@@ -61,6 +128,13 @@ leur data : `X501_DATA_DIR` / `X501_OI_DIR`). Certaines QA
 écrivent leurs détails JSON dans `results/` (artefact de run local — ne pas
 commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
 études avec data 1h : `X501_DATA_DIR`, `X501_OI_DIR`).
+premium pour les re-exécutions bit à bit). Certaines QA
+écrivent leurs détails JSON dans `results/` (artefact de run local — ne pas
+commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
+2 études avec data 1h : `X501_DATA_DIR`).
+origin/main
+origin/main
+origin/main
 
 ## Statut (01/10/2026)
 
@@ -96,6 +170,7 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   partout, l'AMPLITUDE ne franchit jamais le gate — pas un signal ; le pool P1 sépare dans le
   sens contrarian (ΔR −0,315, P(Δ<0) = 0,8009 ≥ gate de contexte, 3ᵉ contexte, jamais promu,
   ambiguïté de signe du gate pool assumée) ; le comptage des CANDIDATS marginaux reste à 2.
+origin/main
 - **Vague 10 — le banc de la FORME EN U : le U joint NON ÉTABLI, le côté bas de la purge
   CANDIDAT** (`docs/35-openmarket-oi-ushape.md`) : le U joint reste sous le gate du domaine
   (4/4 INCONCLU, la composition pré-déclarée refuse) et le miroir directionnel KILL 4/4 —
@@ -104,6 +179,8 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   candidats marginaux du domaine en 10 vagues** — et le pool en strates |z| franchit le gate
   de contexte une 2ᵉ fois (ΔR +0,934, P = 0,7381) ; régime de purge unilatéral, candidats au
   protocole A/B sans toucher à la file (RI → MK6 → TRAIL → ABS).
+origin/main
+origin/main
 - **Vague 9 — le banc de l'OI en contexte de régime est FERMÉ pour le mécanisme marginal**
   (`docs/34-oi-regime-banc-local.md`) : le NIVEAU du capital (z-score roulant) ne conditionne
   ni la magnitude (H_R1 de la théorie du levier REFUSÉE : 3 KILL + 1 INCONCLU) ni la direction
@@ -115,6 +192,47 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   le capital affiché ne finance pas une direction prévisible — 10/10 KILL aux deux hypothèses
   (capital brut + mouvement financé), collecteur versionné, la 8ᵉ falsification du domaine.
   La case ouverte « OI en contexte de régime » → **fermée par la vague 9** (docs/34).
+- **Vague 8 — le banc de l'open interest 1h est FERMÉ** (`docs/33-oi-banc-local.md`) :
+  le capital affiché ne finance pas une direction prévisible — 10/10 KILL aux deux hypothèses
+  (capital brut + mouvement financé), collecteur versionné, la 8ᵉ falsification du domaine.
+- 9/9 QA **PASS** (200 contrôles pour `qa_vagues_x501.py`, les 7 existantes re-vérifiées)
+  && python3 qa_flux_local_x501.py
+```
+
+Attendu : **7× PASS — 0 échec** (384 contrôles au total, +3 avec la data
+origin/main
+premium pour les re-exécutions bit à bit). Certaines QA
+écrivent leurs détails JSON dans `results/` (artefact de run local — ne pas
+commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
+2 études avec data 1h : `X501_DATA_DIR`).
+
+## Statut (01/10/2026)
+
+- 8/8 QA **PASS** (200 contrôles pour `qa_vagues_x501.py`, les 7 existantes re-vérifiées)
+<<<<<<< HEAD
+  && python3 qa_vagues_x501.py && python3 qa_fill_maker_x501.py
+```
+
+Attendu : **6× PASS — 0 échec** (357 contrôles au total, +3 avec la data
+premium pour la re-exécution bit à bit). Certaines QA
+écrivent leurs détails JSON dans `results/` (artefact de run local — ne pas
+commiter). Aucune dépendance externe : stdlib pure, les fichiers cibles sont
+résolus relativement à ce dossier (l'étude de fill a besoin de numpy et de la
+data 1h : `X501_DATA_DIR`).
+origin/main
+
+## Statut (01/10/2026)
+
+- 5/5 QA **PASS** (200 contrôles pour `qa_vagues_x501.py`, les 4 existantes re-vérifiées)
+origin/main
+origin/main
+  + `qa_fill_maker_x501.py` (**71 contrôles**, 74 avec la re-exécution bit à bit de l'étude)
+  + `qa_flux_local_x501.py` (**27 contrôles**, dont le test d'altération qui prouve que la
+  plomberie du banc détecte un vrai signal : AUC look-ahead BTC 0,6103 / ETH 0,6065).
+origin/main
+origin/main
+origin/main
+origin/main
 - **Vague 5 — le banc de test des flux dormants est FERMÉ** (`docs/30-flux-funding-banc-local.md`) :
   le flux taker natif des klines et le funding multi-années, derniers pouvoirs data dormants,
   passés au banc AVANT tout run kScript — **12/12 cellules KILL** au critère AUC du domaine
@@ -140,6 +258,14 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   0,929, zéro look-ahead par mutation — le profil de la journée en cours n'entre jamais),
   re-exécution bit à bit (39 contrôles, digest 6af839e09c6136e8…) — la famille analyse de
   docs/27 est CLOSE (ltf/minBid : sans data locale ; langage/visu : dette de style).
+  + `qa_fill_maker_x501.py` (**71 contrôles**, 74 avec la re-exécution bit à bit de l'étude).
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 - **⚠ Révision exécution (docs/29)** : le fill « 97,9 % à δ=2 » durci dans la MC v20
   n'avait pas sa méthode versionnée — la mesure reproductible (surface δ×TTL +
   sélection sur le pool P1) donne 93,82 % aux barres de signal, avec un fallback
@@ -149,6 +275,32 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   pré-enregistré au protocole A/B (docs/28) pour falsifier l'érosion temporelle.
 - Les `_MK` gardent δ=2/TTL=2 par défaut — `useNativeTrail=false` : la référence
   MC v20 reste bit-à-bit tant que la review n'a pas tranché.
+=======
+  && python3 qa_vagues_x501.py
+```
+
+<<<<<<< HEAD
+Attendu : **5× PASS — 0 échec** (286 contrôles au total). Certaines QA
+=======
+Attendu : **5× PASS — 0 échec** (208 contrôles au total). Certaines QA
+origin/main
+écrivent leurs détails JSON dans `results/` (artefact de run local — ne pas
+commiter). Aucune dépendance externe : stdlib pure, les fichiers cibles sont
+résolus relativement à ce dossier.
+
+## Statut (01/10/2026)
+
+- 5/5 QA **PASS** (200 contrôles pour `qa_vagues_x501.py`, les 4 existantes re-vérifiées).
+- Les `_MK` sont la version d'exécution de référence (fill 97,9 % à δ=2) —
+  `useNativeTrail=false` par défaut : la référence MC v20 reste bit-à-bit.
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+>>>>>>> origin/main
+>>>>>>> origin/main
 - **Vagues 1-2-3 activées** (registre d'exploitation : `docs/27-pouvoirs-kscript.md`) :
   le taux d'exploitation monte de 52,8 % à **75,5 %** (40/53) — 8 flux premium
   branchés (7/8), les 4 fonctions orderbook natives (2/3), le broker hygiène
@@ -159,5 +311,35 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   RI on/off sur BTC et ETH, absorption vs signature (+ trail natif on/off,
   + MK6 TTL=2 vs 6) — les CSV déposés dans `ab/`, le verdict tombe,
   l'entrée au registre `docs/20`.
+<<<<<<< HEAD
+  RI on/off sur BTC et ETH, absorption vs signature (+ trail natif on/off,
+  + MK6 TTL=2 vs 6) — les CSV déposés dans `ab/`, le verdict tombe,
+  l'entrée au registre `docs/20`.
+<<<<<<< HEAD
+  RI on/off sur BTC et ETH, absorption vs signature (+ trail natif on/off,
+  + MK6 TTL=2 vs 6) — les CSV déposés dans `ab/`, le verdict tombe,
+  l'entrée au registre `docs/20`.
+=======
+  RI on/off sur BTC et ETH, absorption vs signature (+ trail natif on/off) —
+  les CSV déposés dans `ab/`, le verdict tombe, l'entrée au registre `docs/20`.
+=======
+- 5/5 QA **PASS** (122 contrôles pour `qa_vagues_x501.py`, les 4 existantes inchangées).
+- Les `_MK` sont la version d'exécution de référence (fill 97,9 % à δ=2).
+- **Vagues 1-2 activées** (registre d'exploitation : `docs/27-pouvoirs-kscript.md`) :
+  le taux d'exploitation monte de 52,8 % à **67,9 %** (36/53) — 8 flux premium
+  branchés (sources premium 1/8 → 7/8), les 4 fonctions orderbook natives
+  utilisées (1/3 → 2/3). Backtests A/B pré-enregistrés à exécuter :
+  RI on/off sur BTC et ETH, absorption vs signature — verdict au registre `docs/20`.
+- **Vague 3 (hygiène, aucun edge espéré)** : `trailPoints` dans les `_MK`,
+  `ocaName`, `strategy.maxDrawdown()` dans les rapports — à faire.
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+>>>>>>> origin/main
+>>>>>>> origin/main
 - Protocoles d'exécution : `docs/reference/openmarket-x501/PROTOCOLE_*`.
 - Statut de la mission et roadmap : `docs/25-openmarket-x501.md`.

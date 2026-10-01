@@ -1,0 +1,8 @@
+[Unit]
+Description=aster_traders_registry — le registre longitudinal des traders Aster (leaderboard 4 combos + points, 1 tir/jour)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_traders_registry.py
+TimeoutStartSec=300

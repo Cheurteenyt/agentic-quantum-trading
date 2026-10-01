@@ -10,8 +10,9 @@ PAS de nouveaux signaux).
 CONVENTIONS (reprises telles quelles des harnais) :
 - ret_pct du ledger = rendement au niveau PRIX, net (coûts + funding déjà
   déduits par paper_forward.py à la clôture), SANS levier.
-- Exposition d'un trade = base[flux] × lev[flux] × poids[flux] (paper_forward
-  L359-375 : majors base 0.24 @ 10x, meme/survivor/vol_spike base 0.10 @ 1x).
+- Exposition d'un trade = base[flux] × lev[flux] × poids[flux] (paper_forward :
+  majors base 0.24 @ levier ASSERVI MAE — 4x défaut sûr, 10x si lev_safe>=10
+  dans mae_state.json (T8, 01/10/2026) ; meme/survivor/vol_spike 0.10 @ 1x).
   PnL fraction = ret_pct / 100 × exposition ; wallet séquentiel composé.
 - Créneaux run_stack (stacked_portfolio.py L161) : 1 slot par flux — un flux
   ne re-trade pas tant qu'une position est ouverte (entry_ts < busy_until) ;
@@ -27,17 +28,41 @@ tracker s'appende lui-même, l'unité nocturne ne redirige pas).
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 
-# les 4 flux de la machine : (base marge, levier) — paper_forward.py L359-362
+# ——— LEVIER CASCADE MAJORS ASSERVI AU MAE (T8, pré-enregistré 01/10/2026,
+# reports/aster_machine_deep_regimes.md) — MÊME RÈGLE que paper_forward.py ———
+# Règle gravée : levier ≤ 100/(MAE_pire_régime + 0,5) → 4x sur le cycle ;
+# 10x SEULEMENT si le moniteur MAE 6 majors (the_machine.py →
+# data/warehouse/mae_state.json) donne lev_safe >= 10. DÉFAUT SÛR = 4x :
+# état absent, illisible ou périmé (> 8 j sans tir de la machine nocturne).
+# Le tracker suit le MÊME levier effectif que paper_forward (sinon les
+# wallets et le forward divergent). Base 0.24 et poids INCHANGÉS.
+def _cascade_majors_lever(state_path: Path | None = None) -> float:
+    p = state_path if state_path is not None else (
+        ROOT / "data" / "warehouse" / "mae_state.json")
+    try:
+        st = json.loads(p.read_text(encoding="utf-8"))
+        age = (datetime.now(timezone.utc)
+               - datetime.fromisoformat(str(st["updated_at"])))
+        if age > timedelta(days=8):
+            return 4.0   # périmé : le défaut SÛR
+        return 10.0 if float(st["lev_safe"]) >= 10.0 else 4.0
+    except Exception:
+        return 4.0       # absent/illisible : le défaut SÛR
+
+
+# les 4 flux de la machine : (base marge, levier) — paper_forward.py, mais le
+# levier majors est résolu au CHARGEMENT via le moniteur MAE (défaut sûr 4x).
 FLOWS: dict[str, tuple[float, float]] = {
-    "machine_cascade_majors": (0.24, 10.0),
+    "machine_cascade_majors": (0.24, _cascade_majors_lever()),
     "machine_cascade_meme": (0.10, 1.0),
     "machine_survivor_long": (0.10, 1.0),
     "machine_vol_spike_6h": (0.10, 1.0),
@@ -158,7 +183,8 @@ def main() -> int:
     L.append(f"=== QUBO FORWARD TRACKER — {now:%d/%m/%Y %H:%M} UTC ===")
     L.append("Convention : ret_pct = ret PRIX net (coûts+funding déduits, sans "
              "levier) ; PnL frac = ret/100 × base × lev × poids ; base/lev = "
-             "paper_forward (majors 0.24@10x, meme/survivor/vol 0.10@1x) ; "
+             f"paper_forward (majors 0.24@{FLOWS['machine_cascade_majors'][1]:.0f}x "
+             "asservi MAE, meme/survivor/vol 0.10@1x) ; "
              "créneaux run_stack (1 slot/flux, flux croisés), ordre entry_ts.")
     L.append(f"Ledger : {len(trades)} trades machine_* ({len(trades) - open_n} "
              f"closed, {open_n} open) ; joués aux créneaux : {len(played)}, "

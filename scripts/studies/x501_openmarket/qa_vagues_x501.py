@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""QA anti-bug des VAGUES 1-2-3 kScript x501 (docs/27, docs/28) — validation
-statique contre la doc kScript v3 scrapée (78 pages, research_ks/pages/).
+"""QA anti-bug des VAGUES 1-2 kScript x501 (docs/27) — validation statique
+contre la doc kScript v3 scrapée (78 pages, research_ks/pages/).
 Fichiers couverts :
   - Operation_x501_Signature_H1_RI.ks   (vague 1 : régime institutionnel)
   - x501_observe_regime.ks              (vague 1 : observe des 7 flux)
   - Operation_x501_Absorption_H1.ks     (vague 2 : absorption orderbook)
-  - Operation_x501_Signature_H1_MK.ks   (vague 3 : hygiène broker — trail
-    natif, ocaName par tranche, cancelAll post-halt, rapport natif)
-  - Operation_x501_Signature_H4_MK.ks   (idem H4)
-  - x501_verdict_ab.py                  (moteur de verdict A/B pré-enregistré)
 Chemins relatifs au script (portable repo), stdlib pure."""
 import re
 import sys
@@ -19,9 +15,6 @@ DOSSIER = Path(__file__).resolve().parent
 RI = DOSSIER / "Operation_x501_Signature_H1_RI.ks"
 OBS = DOSSIER / "x501_observe_regime.ks"
 ABS = DOSSIER / "Operation_x501_Absorption_H1.ks"
-MK1 = DOSSIER / "Operation_x501_Signature_H1_MK.ks"
-MK4 = DOSSIER / "Operation_x501_Signature_H4_MK.ks"
-VERDICT = DOSSIER / "x501_verdict_ab.py"
 
 # Whitelist issue des pages officielles scrapées (data-sources, orderbook-
 # functions, ta-library, math-functions, strategy-functions, alerts)
@@ -295,86 +288,6 @@ def main():
     # limite d'historique orderbook documentée (honnêteté)
     q("[ABS] limite de profondeur orderbook documentée en en-tête",
       "profondeur d'historique orderbook" in src)
-
-    # ---------------- VAGUE 3 : hygiène broker (les 2 _MK) ------------------
-    # + le moteur de verdict A/B pré-enregistré (docs/28)
-    for mk, cote in [(MK1, "H1"), (MK4, "H4")]:
-        src = mk.read_text(encoding="utf-8")
-        code_mk = check_commun(f"MK-{cote}", src, msgs)
-
-        q(f"[MK-{cote}] useNativeTrail input présent, défaut FALSE (référence MC v20 bit-à-bit)",
-          'name="useNativeTrail", type="boolean", defaultValue=false' in src)
-        q(f"[MK-{cote}] trailNativePct input borné (0.25..5, pas 0.25)",
-          'name="trailNativePct"' in src and "min: 0.25, max: 5" in src)
-        # trail natif : exactement 3 jambes RUN portent le pair trail
-        # (comptages sur le texte BRUT : strip_comments_strings écrase le
-        # contenu des chaînes quotées — les patterns avec "..." y survivent mal)
-        q(f"[MK-{cote}] 3 strategy.exit RUN",
-          len(re.findall(r'strategy\.exit\("RUN"', src)) == 3)
-        q(f"[MK-{cote}] trailPoints armé sur les 3 RUN (ternaires useNativeTrail)",
-          len(re.findall(r"trailPoints=useNativeTrail == true \? tp2R \* riskPx : na", code_mk)) == 3)
-        q(f"[MK-{cote}] trailOffset = planEntry * trailNativePct / 100 sur les 3 RUN",
-          len(re.findall(r"trailOffset=useNativeTrail == true \? planEntry \* trailNativePct / 100 : na", code_mk)) == 3)
-        # ocaName : 6 entrées (3 L + 3 S) + 6 exits PAR TRANCHE (jamais partagé)
-        q(f"[MK-{cote}] 6 entrées ocaName x501L/x501S",
-          src.count('ocaName="x501L"') == 3 and src.count('ocaName="x501S"') == 3)
-        for tranche, n_att in (("TP1", 1), ("TP2", 2), ("RUN", 3)):
-            q(f"[MK-{cote}] exits {tranche} : groupe OCA par tranche (x501-<id>-{tranche})",
-              len(re.findall(rf'ocaName="x501-"\+entryId\+"-{tranche}"', src)) == n_att)
-        # le piege OCA (docs/28) : l'echelle ne partage JAMAIS un meme groupe —
-        # aucun exit ne porte le groupe d'entree nu (x501L/x501S) [texte brut]
-        q(f"[MK-{cote}] piege OCA évité : aucun exit sur le groupe d'entrée nu",
-          not re.search(r'strategy\.exit\([^)]*ocaName="x501[LS]"', src))
-        # cancelAll post-halt (bug reel corrige)
-        q(f"[MK-{cote}] cancelAll après halt (halted == 1 && flat == true)",
-          "halted == 1 && flat == true" in code_mk and
-          "strategy.cancelAll()" in code_mk)
-        # rapport fin de run : les getters natifs croisent les compteurs
-        for getter in ["strategy.closedTradeCount()", "strategy.winTradeCount()",
-                       "strategy.lossTradeCount()", "strategy.maxDrawdown()"]:
-            q(f"[MK-{cote}] rapport fin de run : {getter}", getter in code_mk)
-        q(f"[MK-{cote}] rapport sur isLastBar (plotTable + alert)",
-          "if (isLastBar)" in code_mk and "plotTable(" in code_mk)
-        q(f"[MK-{cote}] refus pre-enregistre : AUCUN profit=/loss= (ticks) dans le code",
-          "profit=" not in code_mk and "loss=" not in code_mk)
-        q(f"[MK-{cote}] en-tete vague 3 gravée (pré-enregistré le 01/10/2026)",
-          "VAGUE 3 — HYGIÈNE BROKER" in src and "pré-enregistré le 01/10/2026" in src)
-
-    # ---------------- le moteur de verdict A/B (docs/28) --------------------
-    srcv = VERDICT.read_text(encoding="utf-8")
-    q("[VERDICT] fichier présent", VERDICT.exists())
-    q("[VERDICT] date de pré-enregistrement gravée (2026-10-01)",
-      'DATE_PRE_ENREGISTREMENT = "2026-10-01"' in srcv)
-    q("[VERDICT] bootstrap déterministe (seed 501, 10 000)",
-      "SEED_BOOTSTRAP = 501" in srcv and "N_BOOTSTRAP = 10_000" in srcv)
-    q("[VERDICT] seuils figés : P_PROMOTION 0.70 / P_KILL 0.40 / DELTA_R_MIN 0.10",
-      "P_PROMOTION = 0.70" in srcv and "P_KILL = 0.40" in srcv
-      and "DELTA_R_MIN = 0.10" in srcv)
-    q("[VERDICT] tolérance drawdown 2.0 R + filtre transparent 0.97",
-      "DD_TOLERANCE_R = 2.0" in srcv and "FILTRE_TRANSPARENT = 0.97" in srcv)
-    q("[VERDICT] 4 verdicts dans l'ordre : DATA_ABSENTE -> PROMOTION -> KILL -> INCONCLU",
-      srcv.index("DATA_ABSENTE\"") < srcv.index("PROMOTION\"") <
-      srcv.index("KILL\"") < srcv.index("INCONCLU\""))
-    q("[VERDICT] mode --demo (plomberie, jamais un verdict)",
-      '"--demo"' in srcv and "DEMO" in srcv)
-    q("[VERDICT] N_MIN par défaut 20, overridable (--n-min, 12 pour absorption)",
-      'default=20' in srcv and '"--n-min"' in srcv)
-    q("[VERDICT] stdlib pure (pas d'imports hors stdlib)",
-      not re.search(r"^\s*import\s+(?!argparse|csv|math|random|statistics|sys)(\w+)", srcv, re.M))
-    # docs/28 : le protocole est cohérent avec le moteur
-    doc28 = DOSSIER.parent.parent.parent / "docs" / "28-protocole-ab-x501.md"
-    q("[DOC28] docs/28-protocole-ab-x501.md présent", doc28.exists())
-    if doc28.exists():
-        d28 = doc28.read_text(encoding="utf-8")
-        q("[DOC28] 6 runs (RI-BTC/ETH, ABS-BTC/ETH, TRAIL-BTC/ETH)",
-          all(t in d28 for t in ["RI-BTC", "RI-ETH", "ABS-BTC", "ABS-ETH",
-                                 "TRAIL-BTC", "TRAIL-ETH"]))
-        q("[DOC28] N_MIN = 20 (RI) et 12 (absorption) alignés moteur",
-          "N_MIN = 20" in d28 and "N_MIN = 12" in d28)
-        q("[DOC28] les 4 verdicts documentés (même ordre que le moteur)",
-          all(v in d28 for v in ["DATA_ABSENTE", "PROMOTION", "KILL", "INCONCLU"]))
-        q("[DOC28] règle : JAMAIS de promotion sous N_MIN",
-          "JAMAIS de\n   promotion" in d28 or "JAMAIS de promotion" in d28)
 
     echecs = 0
     for ok, label in msgs:

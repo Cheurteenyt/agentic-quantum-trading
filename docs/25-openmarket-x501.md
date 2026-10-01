@@ -145,6 +145,12 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    sur le pool P1 franchit le gate de contexte (ΔR +0,469, P = 0,8192 ≥ 0,70,
    n = 181, in-sample + cross-exchange) : signal documenté pour la file de
    runs `docs/28`, jamais promotion depuis un banc.
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -284,6 +290,12 @@ est re-éditée.
    marginaux reste à 2, vague 10) ; 10/12 cellules ont un AUC < 0,5 : la
    DIRECTION contrarian se montre partout, l'AMPLITUDE ne franchit jamais
    le gate — pas un signal.
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 
 ## LES RÈGLES NON NÉGOCIABLES
 
