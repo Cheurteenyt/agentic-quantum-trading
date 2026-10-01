@@ -422,3 +422,39 @@ semaine de tirs continue.**
 **La plomberie est prouvée vivante** (le point qui fait la valeur du KILL) : le test d'altération de la QA — décaler le score d'une barre vers l'avant (look-ahead) fait DÉCOLLER l'AUC (BTC 0,5306 vs 0,5079 strict ; sur le rendement intrabar de la même barre : **BTC 0,6103 / ETH 0,6065**) — le flux taker contient de l'information, le harnais la voit, et le verdict strict ~0,5 est donc réel. AUC par symbole sur 8 liquides ≈ 0,5 (0,4978/0,5022/0,5009) : le pooling ne dilue rien. Re-exécution bit à bit.
 
 **Statut : KILL des filtres continus** (le niveau EMA du flux, la moyenne du funding — 5e falsification fermée du domaine après fz, flush OI, ML). **NON réfuté** : le pattern absorption ÉVÉNEMENTIEL de la vague 2 (mur/attaque/tenue/reprise à 4 conditions ordonnées — le champ orderbook n'a pas d'équivalent klines) — son juge reste le protocole A/B docs/28. Re-test interdit sans pré-enregistrement explicite d'une hypothèse nouvelle.
+## 30/09 — L'ÉTUDE DEEP P2 (4 ans, 12 séries, équité corrigée) : ré-catégorisation des familles + le 1er gate mécanisme-validé
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **Momentum 1h** (lane continue, majors + extension 12 séries) | majors 0/45, extension 0/180 en lane continue (gates campagne honnêtes, sharpe OOS corrigés) ; les cellules vivantes = le cycle 2023-2024 SEULEMENT (bull_2024H1 5/9) et **0/9 en 2025-2026** (bull 2021-H2, bear, période connue) ; l'extension deep 0/12 — l'edge était un cycle, détecté APRÈS coup | **CONTEXTE** — edge de cycle 2023-2024, mort 2025-2026 (0/12 deep) ; ré-armement PAR détection de régime, jamais une lane permanente |
+| **Mean reversion** | WR invariant 42 % sur toutes les périodes/univers, RR inversé (les pertes > les gains) + frais taker = NUL structurel en taker ; seule échappatoire = l'exécution MAKER (le spread travail pour nous) | **CONTEXTE** — NUL en taker ; la piste maker reste ouverte, à pré-enregistrer avant re-test |
+| **Breakout deep 1h** | NUL en lane continue 1h sur les 4 ans ; seul signe de vie : la fenêtre alts 2026-04→ (re-détection de vol, 6/12) = un régime, pas une lane | **NUL (deep 1h)** — ré-armable par détection de vol 2026 sur alts |
+| **Funding carry (unhedged)** | NUL partout SAUF bear (l'accident d'implémentation du régime court) ; le fix comptable (funding accrue barre à barre) a tué les sharpe biaisés — carry ETH 0,43 → −0,08 | **NUL** — le portage short bear reste la seule exception (exposition constante, T7§2) |
+| **Vol harvesting** | l'artefact microstructure (le fix du harnais l'a effacé) | **NUL** |
+| **Fade de funding RÉEL élevé (memes)** | sur funding RÉEL mesuré par symbole (l'artefact T7 disparaît) : 4/12 en 2025→2026-03, MOODENG +45 %/a DD 6 %, LTC +40 %/a DD 15 % — mais sharpe OOS 0,46 sous le gate campagne | **CANDIDAT phase-2** — le mécanisme P3 (le fade de la foule long) validé indépendamment du backtest |
+| **LA SONDE P3 — le lien crowding-long CONFIRMÉ sur N=61 (58 shorts, 29 fermés)** | 50/61 (90 %) activés à fund7 > 0, **32/61 (52 %) à fund7 > 0,5 bps/8h** (unité vérifiée : COUNT(fund7 > 0,005) sur paper_trades = 32 = la reproduction exacte, fund7 en %/8h) ; outcome des fermés par bucket : fund7 négatif → hit 44 %, ret méd −0,7 % (la foule déjà short = pas de carburant) ; fund7 ≥ 0,5 → hit 50 %, ret méd +2,0 % ; manie > 1 bp → hit 100 % (n=6). machine_cascade_meme méd +0,80 bps, sweep_liquidite_short méd +0,66 bps | **LE MÉCANISME VALIDÉ** — le carburant de la cascade EST le funding positif élevé |
+| **LE GATE fund7 > 0,5 bps/8h sur les shorts cascade/sweep — PRÉ-ENREGISTRÉ au forward le 30/09/2026** | câblé dans `paper_forward.py` (`fund7_gate_pass`, seuil GATE_FUND7_MIN_PCT = 0,005 %/8h, famille constant GATE_FUND7_SIGNALS = machine_cascade_meme n=23 + sweep_liquidite_short n=31) ; **vol_spike EXCLU** (fund7 méd −0,04 bps, pire famille — le gate les tuerait à tort) ; majors/deep_fast/cascade_funding_rank_low hors sonde = non gate-d ; les 32 ouverts tranchent à 90 j, le gate n'agit qu'aux activations futures ; skip loggé `[gate-fund7]` + compteur/taux dans le résumé de run ; simulation rétrospective sur la sonde : 24/61 skips (39 %). Tests : tests/test_paper_forward_gate.py (seuil 0,003 → skip, 0,008 → passe, borne ≤, chaîne d'unité fund7_at sur SQLite /tmp) | **PRÉ-ENREGISTRÉ** — le 1er filtre mécanisme-validé OOS de la sonde ; verdict au forward à 90 j (le taux de skip = la métrique du gate) |
+
+Rapports : reports/aster_deep_regimes_p2.md (script : scripts/mechanism_probe.py — fund7_at, klines.db lecture-seule ; gate : scripts/paper_forward.py).
+
+## 30/09 — T13 : le GATE d'exposition vol_spike par régime détecté — le trou n°1 était le vol_spike À 6,8 pts de DD, pas au-delà (aster_volspike_gate.py)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| **Gate vol_spike par régime détecté** (GA = OFF en bear détecté ; GB = OFF en bear ET en chop, le chop opérationnalisé par la BANDE MORTE de l'hystérésis elle-même \|close/SMA−1\| < 3 % — la règle du détecteur T10/T11, AUCUN nouveau paramètre ; causal det[i−1], la convention du gate momentum T9) | Comparaison APPARIÉE même run (BASE = T11 V2 re-simulé, hérédité exacte $146.42/DD 32.5) : BASE $146.42 (+7.8 %/an, DD 32.5, 36m−) → **GA $184.68 (+12.8 %/an, DD 26.2, 28m−)** → **GB $185.60 (+12.9 %/an, DD 25.7, 23m−, pire −12.9 %/record +43.0 %, 0 liq, garde-fous OK)** ; témoin GB1 (ON = bull confirmé seul) $189.70 (+13.4 %/an, DD 26.2) = borne de sensibilité. vol_spike : −19.2$ → **+19.5$** (7287 → 2465 events, 1612 → 588 trades wallet) ; **VAL −3.5 % → +18.7 %** (DD VAL 15.6, 0 liq). Le vol_spike PAR RÉGIME : PERD en bear détecté (bear_2022 −4.4$ → 0t) et en connu (−24.2$ → +11.3$), PAYE en bull (recovery_2023 +5.1$ et bull_2024H1 +2.7$ conservés — le vol_spike paye bien en bull, le gate ne coupe que les perdants) | **CANDIDAT** — le gate paie sur TOUTES les colonnes (DD −6.8 pts, NET +5.1 pts/an, mois− 36 → 23, VAL renforcée, 0 liq) ; MAIS la cible DD ≤ 25 % n'est PAS atteinte (GB 25.7 %) : **le trou n°1 n'est PAS le vol_spike seul** — le porteur restant du DD = le CARRY SHORT HYSTÉRÉSIS en fenêtre connue (tous les top pertes GB : whipsaws 2024-08-06 −15.1$, 2025-04-07 −14.7$, 2023-08-20 −10.1$ à SZ_CARRY 25 % × 2x, pire mois −12.9 % = 2025-04) ; l'étape suivante = le SIZING du carry par régime (pas un 2e gate, pas un re-calibrage de h) |
+
+Rapports : reports/aster_volspike_gate.md (script : scripts/studies/aster_volspike_gate.py — pattern verbatim T9/T10/T11, klines.db lecture-seule).
+origin/main
+origin/main
+
+## 01/10 — T16 : LA GRANULARITÉ 15m PROFONDE (178 k barres × 3 majors, 2021-2026) — le verdict intraday
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Les 6 familles à 15m profond | momentum 875t·17 %·−27 %·DD63·17m− (connu) ; mean_reversion WR 47 %·−40 % ; breakout −21 % ; funding_carry −33 % — 0 lane PASS aux gates honnêtes, sharpe OOS ≤ 0,04 hors artefacts | **NUL intraday** — aucun edge régime-indépendant à 15m dans les 6 familles |
+| La comparaison 1h→15m | l'edge momentum 1h (+55/+56/+61 % recov/bull24/chop) S'EFFONDRE à 15m (+7/−42/−14) : trades ×3-4 = ~4,5 pts de frais sur 5 ans + le whipsaw | **CONTEXTE** — l'edge momentum était un edge d'HORIZON (1h), pas du marché |
+| Les invariances inter-horizons | mean_reversion : WR invariant 43-59 % à 15m comme 38-52 % à 1h (structurel) mais PnL tué par RR+frais aux deux ; funding_carry bear +39→+23 % (le même accident du short passif) | **CONTEXTE** — confirmé multi-horizons |
+| L'orientation intraday | le forward intraday (les signaux 15m du tape) n'a AUCUNE base dans les 6 familles OHLCV — sa base est ailleurs : le carnet réel 1m (le depth engine), l'ordre-flow/CVD, le pont fomo | **DOCTRINE** — la quête intraday bascule du OHLCV vers l'ordre-flow |
+
+Rapports : reports/aster_15m_regimes.md (script : scripts/studies/aster_15m_regimes.py — configs REF T7, le harnais corrigé b825da9, DB ro).
+origin/main

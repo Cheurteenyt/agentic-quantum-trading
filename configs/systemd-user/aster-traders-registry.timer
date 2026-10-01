@@ -1,0 +1,9 @@
+[Unit]
+Description=aster_traders_registry chaque jour 06:53 (hors blocktrades :50) (hors oi-collector :00/:15/:30/:45 et funding-bulk :07/:37)
+
+[Timer]
+OnCalendar=*-*-* 06:53:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
