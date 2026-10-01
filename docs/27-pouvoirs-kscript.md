@@ -49,7 +49,12 @@ restants :
    spot.
 5. **`long_short_ratio`** — le LSR : on en avait collecté 8 jours à la main
    (angle mort documenté dans `docs/26-openmarket-donnees.md`)… il est
-   NATIF. L'angle mort disparaît.
+   NATIF. L'angle mort disparaît. **Banc vague 11 (`docs/36`)** : la
+   famille contrarian est KILL au critère du domaine (niveau 4/4 + 4/4,
+   flux 1 j KILL, flux 7 j sous le gate) et le contexte pool P1 (P =
+   0,8009, sens contrarian) reste non promu — la composante RI reste
+   câblée telle quelle (fail-open pré-enregistré), mais aucun usage
+   autonome du LSR n'est justifié par la data.
 6. **`binance_treasury_balance`** — la trésorerie Binance : pression
    structurelle d'échange.
 7. **`ethena_positions`** — le carry USDe : le flux de financement

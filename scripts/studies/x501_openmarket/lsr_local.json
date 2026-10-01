@@ -1,0 +1,383 @@
+{
+  "outils": "x501_lsr_local.py — vague 11 : banc du LSR (long/short account ratio Bybit)",
+  "grille_pre_declaree": {
+    "date": "2026-10-01",
+    "lookbacks_z_4h_barres": [
+      180,
+      540
+    ],
+    "deltas_l_4h_barres": [
+      6,
+      42
+    ],
+    "horizons_4h_barres": [
+      6,
+      18
+    ],
+    "lookbacks_z_1d_barres": [
+      30,
+      90
+    ],
+    "horizons_1d_barres": [
+      1,
+      3
+    ],
+    "pool_L": 180,
+    "hypothese_A": "contrarian niveau : foule longue -> baisse (sens -1, hypothèse RI docs/27)",
+    "hypothese_B": "flux du positionnement : bascule long -> reversal (sens -1, miroir flux vague 8)",
+    "hypothese_C": "réplication 1d du contrarian niveau (sens -1)",
+    "criterion": "AUC IC95 exclut 0,5 et |AUC-0,5|>=0.05 = CANDIDAT ; IC contient 0,5 et |AUC-0,5|<0.02 = KILL ; sinon INCONCLU",
+    "panel": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT",
+      "LINKUSDT",
+      "SUIUSDT",
+      "APTUSDT",
+      "1000PEPEUSDT"
+    ]
+  },
+  "fenetre": {
+    "lsr_dir": "x501_lsr",
+    "n_symboles": 12,
+    "n_barres_4h": 72000,
+    "t0": 1704412800000,
+    "t1": 1790798400000,
+    "dup_klines": 0,
+    "dup_lsr": 0,
+    "lsr_hors_domaine": 0,
+    "snap_absents": 48,
+    "invalidees_amorcage_L540": 6468,
+    "invalidees_std0_L540": 0,
+    "cout_ar_taker_bps": 12.2
+  },
+  "audit_par_symbole": {
+    "BTCUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "ETHUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "SOLUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "BNBUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "XRPUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "DOGEUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "ADAUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "AVAXUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "LINKUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "SUIUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "APTUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    },
+    "1000PEPEUSDT": {
+      "n_klines_4h": 6000,
+      "n_lsr_4h": 6000,
+      "gaps_klines_4h": 0,
+      "gaps_lsr_4h_in_win": 0,
+      "n_snap_absents": 2,
+      "n_lsr_hors_domaine": 0
+    }
+  },
+  "etude_A_contrarian_niveau_4h": {
+    "L180_H6": {
+      "n": 69768,
+      "n_haut": 34884,
+      "n_bas": 34884,
+      "mediane_score": 0.00995695642917729,
+      "auc": 0.491974494191051,
+      "ic95": [
+        0.47536330821546346,
+        0.503114772212235
+      ],
+      "fwd_bps_haut": -4.287703384268067,
+      "fwd_bps_bas": -1.8949759251012153,
+      "delta_bps": -2.3927274591668515,
+      "hypothese": "contrarian niveau : foule longue -> baisse (hypothèse RI, docs/27)",
+      "verdict": "KILL"
+    },
+    "L180_H18": {
+      "n": 69624,
+      "n_haut": 34812,
+      "n_bas": 34812,
+      "mediane_score": 0.0089952515335299,
+      "auc": 0.48627646227613985,
+      "ic95": [
+        0.4685487484570574,
+        0.5007176018121706
+      ],
+      "fwd_bps_haut": -27.017862715550677,
+      "fwd_bps_bas": -6.7395987541500535,
+      "delta_bps": -20.278263961400626,
+      "hypothese": "contrarian niveau : foule longue -> baisse (hypothèse RI, docs/27)",
+      "verdict": "KILL"
+    },
+    "L540_H6": {
+      "n": 65448,
+      "n_haut": 32724,
+      "n_bas": 32724,
+      "mediane_score": -0.042289241963000504,
+      "auc": 0.4914934734672587,
+      "ic95": [
+        0.4774330214811748,
+        0.5084217070377658
+      ],
+      "fwd_bps_haut": -6.643143933442519,
+      "fwd_bps_bas": -4.2076816832950215,
+      "delta_bps": -2.4354622501474976,
+      "hypothese": "contrarian niveau : foule longue -> baisse (hypothèse RI, docs/27)",
+      "verdict": "KILL"
+    },
+    "L540_H18": {
+      "n": 65304,
+      "n_haut": 32652,
+      "n_bas": 32652,
+      "mediane_score": -0.042996239344151914,
+      "auc": 0.48723534692255605,
+      "ic95": [
+        0.4678376661902218,
+        0.5044288402056436
+      ],
+      "fwd_bps_haut": -35.892432205812995,
+      "fwd_bps_bas": -17.887907502745104,
+      "delta_bps": -18.00452470306789,
+      "hypothese": "contrarian niveau : foule longue -> baisse (hypothèse RI, docs/27)",
+      "verdict": "KILL"
+    }
+  },
+  "etude_B_flux_positionnement_4h": {
+    "D6_H6": {
+      "n": 71844,
+      "n_haut": 35843,
+      "n_bas": 36001,
+      "mediane_score": 0.00019999999999997797,
+      "auc": 0.4919235423191826,
+      "ic95": [
+        0.4816375295295337,
+        0.5036626280670004
+      ],
+      "fwd_bps_haut": -4.399227993883621,
+      "fwd_bps_bas": -2.7307652372550004,
+      "delta_bps": -1.668462756628621,
+      "hypothese": "flux du positionnement : bascule long -> reversal (miroir flux vague 8)",
+      "verdict": "KILL"
+    },
+    "D6_H18": {
+      "n": 71700,
+      "n_haut": 35763,
+      "n_bas": 35937,
+      "mediane_score": 0.00019999999999997797,
+      "auc": 0.4905583477072132,
+      "ic95": [
+        0.4783923940344509,
+        0.5026607027037663
+      ],
+      "fwd_bps_haut": -20.957656397225097,
+      "fwd_bps_bas": -13.610071452874354,
+      "delta_bps": -7.347584944350743,
+      "hypothese": "flux du positionnement : bascule long -> reversal (miroir flux vague 8)",
+      "verdict": "KILL"
+    },
+    "D42_H6": {
+      "n": 71412,
+      "n_haut": 35703,
+      "n_bas": 35709,
+      "mediane_score": -0.00010000000000010001,
+      "auc": 0.48236466073134887,
+      "ic95": [
+        0.47071318719687,
+        0.49529618468649317
+      ],
+      "fwd_bps_haut": -9.811616954475193,
+      "fwd_bps_bas": 2.8512921537624094,
+      "delta_bps": -12.662909108237603,
+      "hypothese": "flux du positionnement : bascule long -> reversal (miroir flux vague 8)",
+      "verdict": "INCONCLU"
+    },
+    "D42_H18": {
+      "n": 71268,
+      "n_haut": 35606,
+      "n_bas": 35662,
+      "mediane_score": -0.00019999999999997797,
+      "auc": 0.47582401623450754,
+      "ic95": [
+        0.46049786945465926,
+        0.4879223526796396
+      ],
+      "fwd_bps_haut": -43.773136086262014,
+      "fwd_bps_bas": 8.884251406510309,
+      "delta_bps": -52.65738749277232,
+      "hypothese": "flux du positionnement : bascule long -> reversal (miroir flux vague 8)",
+      "verdict": "INCONCLU"
+    }
+  },
+  "etude_C_replication_1d": {
+    "L30_H1": {
+      "n": 12828,
+      "n_haut": 6414,
+      "n_bas": 6414,
+      "mediane_score": 0.0504069917268353,
+      "auc": 0.5054227825804735,
+      "ic95": [
+        0.4897343878692667,
+        0.5209510645385169
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -11.664686067987791,
+      "delta_bps": 11.664686067987791,
+      "hypothese": "réplication 1d du contrarian niveau (profondeur séculaire)",
+      "verdict": "KILL"
+    },
+    "L30_H3": {
+      "n": 12804,
+      "n_haut": 6402,
+      "n_bas": 6402,
+      "mediane_score": 0.04987320495654593,
+      "auc": 0.4999968281545881,
+      "ic95": [
+        0.4816264930989754,
+        0.5179506976652203
+      ],
+      "fwd_bps_haut": 0.8138084977893023,
+      "fwd_bps_bas": -6.337423116066342,
+      "delta_bps": 7.151231613855644,
+      "hypothese": "réplication 1d du contrarian niveau (profondeur séculaire)",
+      "verdict": "KILL"
+    },
+    "L90_H1": {
+      "n": 12108,
+      "n_haut": 6054,
+      "n_bas": 6054,
+      "mediane_score": -0.005216885567628938,
+      "auc": 0.49834558023051867,
+      "ic95": [
+        0.48054520300741244,
+        0.5162791072185671
+      ],
+      "fwd_bps_haut": -9.501969812037105,
+      "fwd_bps_bas": -11.327488025877443,
+      "delta_bps": 1.825518213840338,
+      "hypothese": "réplication 1d du contrarian niveau (profondeur séculaire)",
+      "verdict": "KILL"
+    },
+    "L90_H3": {
+      "n": 12084,
+      "n_haut": 6042,
+      "n_bas": 6042,
+      "mediane_score": -0.005216885567628938,
+      "auc": 0.488333705329383,
+      "ic95": [
+        0.47048935350061905,
+        0.5073521675235011
+      ],
+      "fwd_bps_haut": -26.29059710910157,
+      "fwd_bps_bas": -4.172849404479685,
+      "delta_bps": -22.117747704621884,
+      "hypothese": "réplication 1d du contrarian niveau (profondeur séculaire)",
+      "verdict": "KILL"
+    }
+  },
+  "resume_verdicts_panel": {
+    "INCONCLU": 2,
+    "KILL": 10
+  },
+  "etude_D_pool_P1": {
+    "nom": "z_lsr_L180",
+    "n": 239,
+    "n_hors_panel": 220,
+    "n_hors_fenetre": 3,
+    "n_score_nan": 7,
+    "mediane_split": -0.11967205033153944,
+    "n_haut": 119,
+    "n_bas": 120,
+    "R_med_haut": -0.5216076688531511,
+    "R_med_bas": -0.20694323664101955,
+    "R_moy_haut": 0.16856640462528583,
+    "R_moy_bas": 0.12608703070925903,
+    "WR_haut": 42.016806722689076,
+    "WR_bas": 48.333333333333336,
+    "delta_med_R": -0.3146644322121316,
+    "ic95_delta_med": [
+      -1.40311035596111,
+      0.48147271861624585
+    ],
+    "P_delta_sup_0": 0.1991,
+    "statut": "CONTEXTE (in-sample du pool + cross-exchange L4, jamais promotion)"
+  },
+  "digest_sha256": "c8478385f7fce1503ec1863a66ec56102558fb6a0d5b4e0904aeca607dc67e38"
+}

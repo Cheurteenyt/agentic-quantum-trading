@@ -211,7 +211,7 @@ vivant ne l'importe.
 
 > L'intégration du programme OpenMarket (100 $ → 50 100 $, DD ≤ 25 %) :
 > `docs/25-openmarket-x501.md`. Un dossier = le domaine entier : 12 kScripts,
-> le scanner d'installation, 11 QA statiques (PASS 0 échec).
+> le scanner d'installation, 13 QA statiques (PASS 0 échec).
 > La carte interne : `scripts/studies/x501_openmarket/README.md`.
 
 | Contenu | Une ligne |
@@ -223,7 +223,7 @@ vivant ne l'importe.
 | `Operation_x501_Absorption_H1.ks` | **vague 2 (docs/27)** : les murs natifs `maxBidAmount`/`maxAskAmount` + attaque absorbée + déséquilibre `sumBids`/`sumAsks` — le pattern Aster dans le backtester |
 | `x501_observe_*.ks` | 3 collecteurs d'observation (zéro ordre, C4) |
 | `x501_setup_kscript.js` | l'installation codifiée (49 contrôles QA) |
-| `qa_*_x501.py` (12) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** + **OI régime (63 contrôles, re-exécution bit à bit)** + **OI U-shape (79 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
+| `qa_*_x501.py` (13) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** + **OI régime (63 contrôles, re-exécution bit à bit)** + **OI U-shape (79 contrôles, re-exécution bit à bit)** + **LSR local (49 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
 | `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 13 scripts → **75,5 %** (vague 3 : trail natif, ocaName, cancelAll, rapport natif — verdicts : `docs/27-pouvoirs-kscript.md`) |
 | `x501_verdict_ab.py` | **le moteur de verdict des A/B pré-enregistrés** (docs/28) : bootstrap 10 000 seed 501, 4 verdicts DATA_ABSENTE/PROMOTION/KILL/INCONCLU — stdlib pure, bit-à-bit |
 | `x501_fill_maker_surface.py` + `pool_P1_entrees.csv` + `fill_maker_surface.json` | **la chaîne de preuve maker** (docs/29) : surface de fill δ×TTL (80 symboles × 733 j, 2 053 015 tentatives), sélection réelle sur le pool P1 (fallback −88,6 bps, biais A4), grille δ×TTL, sortie analytique — verdict : le maker réel vaut +0,931 bps/jambe (candidat v21 : médianes 306,2/364,0 $) |

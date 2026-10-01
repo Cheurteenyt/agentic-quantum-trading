@@ -269,6 +269,21 @@ est re-éditée.
    c'est un régime de purge unilatéral (côté haut faible vague 9, côté bas
    fort vague 10). Les deux candidats entrent dans la liste du protocole
    A/B sans toucher à la file.
+11. **Banc du LSR (long/short account ratio) — FAIT (01/10, `docs/36`)** —
+   la dernière source premium du filtre RI (composante n°5 « LSR top
+   traders contrarian ») passe enfin au banc : le collecteur versionné
+   `x501_collect_lsr_v11.py` (Bybit v5 public, pagination cursor, règle
+   anti-partiel mesurée par sonde) porte le LSR de 8 j intestables à
+   **72 000 lignes 4h + 13 200 lignes 1d sur ~2,74 ans** — le contrarian
+   NIVEAU est KILL 4/4 (panel 4h) ET 4/4 (réplication 1d), le flux du
+   positionnement 1 j est KILL, le flux 7 j laisse 2 IC excluant 0,5 mais
+   2–3× sous le gate CANDIDAT (INCONCLU), et le pool P1 sépare dans le
+   sens contrarian (ΔR −0,315, P(Δ<0) = 0,8009 ≥ gate de contexte,
+   CONTEXTE jamais promu, ambiguïté de signe du gate pool assumée) —
+   **la 10ᵉ falsification du domaine** (le comptage des CANDIDATS
+   marginaux reste à 2, vague 10) ; 10/12 cellules ont un AUC < 0,5 : la
+   DIRECTION contrarian se montre partout, l'AMPLITUDE ne franchit jamais
+   le gate — pas un signal.
 
 ## LES RÈGLES NON NÉGOCIABLES
 
