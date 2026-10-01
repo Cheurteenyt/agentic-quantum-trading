@@ -241,17 +241,18 @@ def phase_backfill(con: sqlite3.Connection, symbols: list[str],
         t_start = end_ts - window_days * DAY_MS
         if n_db[0]:
             db_max = int(n_db[1])
-            db_min = int(con.execute(
-                "SELECT MIN(agg_id) FROM aster_tape WHERE symbol = ?",
+            db_min_ts = int(con.execute(
+                "SELECT MIN(ts_ms) FROM aster_tape WHERE symbol = ?",
                 (sym,)).fetchone()[0])
-            fid = first_id_at(sym, t_start, last_id)
-            if db_min <= fid:
-                cursor = db_max + 1  # reprise exacte : le départ de fenêtre est couvert
+            if db_min_ts <= t_start:
+                # reprise exacte sans sonde : MIN(ts_ms) couvre le début de fenêtre
+                cursor = db_max + 1
                 log(f"=== {sym} REPRISE: curseur {cursor:,} (MAX DB) ===")
             else:
+                fid = first_id_at(sym, t_start, last_id)
                 cursor = fid  # fenêtre élargie : combler le trou côté passé
                 log(f"=== {sym} ÉLARGISSEMENT: départ {fid:,} "
-                    f"(MIN DB {db_min:,} > début de fenêtre) ===")
+                    f"(MIN ts DB {db_min_ts} > début de fenêtre {t_start}) ===")
         else:
             fid = first_id_at(sym, t_start, last_id)
             cursor = fid
@@ -305,7 +306,7 @@ def phase_backfill(con: sqlite3.Connection, symbols: list[str],
         if status == "interrompu" and cursor > last_id:
             status = "fenêtre complète"
         state[key] = {"window_days": window_days, "pages": pages,
-                      "rows": rows, "done": status not in ("interrompu",),
+                      "rows": rows, "done": status == "fenêtre complète",
                       "status": status,
                       "last_id": cursor - 1,
                       "updated_at": datetime.now(timezone.utc)
