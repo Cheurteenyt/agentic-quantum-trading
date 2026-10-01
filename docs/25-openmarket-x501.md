@@ -134,6 +134,18 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    0,5) sur 216 000 barres × 749 j, 0 doublon, 0 snapshot absent ; pool P1
    +0,281 R (P = 0,660, INCONCLU, CONTEXTE). Le capital affiché ne finance
    pas une direction prévisible à nos horizons.
+7. **Banc de l'OI en contexte de régime (vague 9, 01/10, `docs/34`)** : la
+   case laissée ouverte par la vague 8 — le NIVEAU du capital (z-score
+   roulant L∈{720,2160}) comme conditionneur de la distribution — grille
+   pré-déclarée de 8 cellules + pool : l'hypothèse de la théorie du levier
+   H_R1 (capital haut → |fwd| plus grand) **REFUSÉE** (3 KILL + 1 INCONCLU,
+   AUC 0,5028–0,5150, le seul IC non mort est 3,3× sous le gate), le test
+   directionnel sans hypothèse **4/4 KILL** — la 9ᵉ falsification du domaine
+   et le 5ᵉ verdict symétrique des familles de positionnement. Le conditionnel
+   sur le pool P1 franchit le gate de contexte (ΔR +0,469, P = 0,8192 ≥ 0,70,
+   n = 181, in-sample + cross-exchange) : signal documenté pour la file de
+   runs `docs/28`, jamais promotion depuis un banc.
+origin/main
 origin/main
 origin/main
 origin/main
@@ -242,6 +254,14 @@ est re-éditée.
    collecteur est versionné (`x501_collect_oi_v8.py`, Bybit v5 public) : la
    profondeur OI réelle Bybit (~4,5 ans collectés) reste disponible pour
    les bancs futurs.
+9. **Banc de l'OI en contexte de régime — FAIT (01/10, `docs/34`)** — la
+   case ouverte de la vague 8 fermée à son tour : le NIVEAU du capital
+   (z-score roulant 30 j / 90 j) ne conditionne ni la magnitude (H_R1 de la
+   théorie du levier REFUSÉE : 3 KILL + 1 INCONCLU) ni la direction (4/4
+   KILL) — 9ᵉ falsification du domaine ; le conditionnel pool P1 franchit
+   le gate de contexte (P = 0,8192) et entre dans la liste des filtres
+   candidats au protocole A/B sans toucher à la priorisation de la file.
+origin/main
 origin/main
 origin/main
 origin/main

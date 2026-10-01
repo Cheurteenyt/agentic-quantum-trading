@@ -57,11 +57,22 @@ brut ΔOI% + mouvement financé signe(r_L)×ΔOI%, × H{24,72} — sur 12 symbol
 avec klines ET OI du MÊME exchange (Bybit) → 10/10 KILL (AUC 0,4917–0,5019,
 216 000 barres × 749 j, 0 doublon, 0 snapshot absent, plomberie prouvée
 vivante détecteur 0,66, zéro look-ahead par mutation double) — la 8ᵉ
+falsification, collecteur versionné `x501_collect_oi_v8.py`**) · **vague 9 :
+le banc de l'OI en CONTEXTE DE RÉGIME (`docs/34`) — la case ouverte de la
+vague 8 fermée : le NIVEAU du capital (z-score roulant 30 j / 90 j, par
+opposition au flux ΔOI déjà tué) testé comme conditionneur de la distribution
+— l'hypothèse de la théorie du levier H_R1 (capital haut → |fwd| plus grand)
+REFUSÉE (3 KILL + 1 INCONCLU, AUC 0,5028–0,5150), direction 4/4 KILL — la 9ᵉ
+falsification, 5ᵉ verdict symétrique des familles de positionnement ; le
+conditionnel pool P1 franchit le gate de contexte (ΔR +0,469, P = 0,8192 ≥
+0,70, n = 181, in-sample + cross-exchange) — filtre candidat au protocole
+A/B, jamais promotion depuis un banc**).
 falsification, collecteur versionné `x501_collect_oi_v8.py`**).
 docs/27 est CLOSE**).
 → ABS**).
 OI, ML, flux, funding).
 3 tests au registre docs/20).
+origin/main
 origin/main
 origin/main
 origin/main
@@ -85,6 +96,7 @@ origin/main
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
 règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 12 kScripts + 6 QA **PASS** dans
+origin/main
 origin/main
 origin/main
 origin/main

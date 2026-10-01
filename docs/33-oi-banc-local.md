@@ -117,8 +117,13 @@ passés restent bit à bit ; la RE-EXÉCUTION BIT À BIT de l'étude complète
   désormais OI 1h).
 - **NON FERMÉ (hors périmètre de ce banc)** : l'OI en ÉVÉNEMENT de
   liquidation real-time (le flux websocket des liquidations — autre
+  mécanique, autre data, non couvert) ; ~~l'OI 1 j pré-2024 en contexte de
+  régime~~ → **FERMÉ par la vague 9 (`docs/34`)** : le niveau (z-score
+  roulant) ne conditionne ni la magnitude ni la direction — 9ᵉ
+  falsification ; le LSR 4 h (8 jours de data,
   mécanique, autre data, non couvert) ; l'OI 1 j pré-2024 en contexte de
   régime (statut `docs/26` inchangé) ; le LSR 4 h (8 jours de data,
+origin/main
   « collecté pour plus tard », statut inchangé).
 - Re-test interdit sans pré-enregistrement explicite d'une hypothèse
   nouvelle (règle `docs/26`).
