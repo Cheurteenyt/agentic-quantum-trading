@@ -1,0 +1,377 @@
+{
+ "ts": 1790834579.4053376,
+ "mission": "PR #2 volet 1 — signaux outils gratuits om_v27",
+ "protocol": "dédup temporelle + walk-forward chrono global 60/40 + verdict sur TEST (KILL < 5 bps ; ADVISORY >= 10 bps & n>=200 ; PROMU >= 25 bps & n>=500 & cohérence >= 8/12) — leçons v26/v27 gravées",
+ "signaux": {
+  "S1_carry_funding": {
+   "label": "S1 carry funding (annualisé, quintiles)",
+   "feature": "fund_ann_pct",
+   "verdict": "KILL",
+   "n_total": 8784,
+   "train": {
+    "n": 5270,
+    "baseline_med": -2.2,
+    "bins": {
+     "0": {
+      "n": 1054,
+      "f24_med": 5.8,
+      "excess_med": 8.0
+     },
+     "1": {
+      "n": 1054,
+      "f24_med": 2.5,
+      "excess_med": 4.7
+     },
+     "2": {
+      "n": 1055,
+      "f24_med": -1.0,
+      "excess_med": 1.1
+     },
+     "3": {
+      "n": 1821,
+      "f24_med": -14.6,
+      "excess_med": -12.4
+     },
+     "4": {
+      "n": 286,
+      "f24_med": 35.4,
+      "excess_med": 37.6
+     }
+    },
+    "spread_top_minus_bottom": 29.6
+   },
+   "test": {
+    "n": 3514,
+    "baseline_med": -16.6,
+    "bins": {
+     "0": {
+      "n": 703,
+      "f24_med": -19.4,
+      "excess_med": -2.8
+     },
+     "1": {
+      "n": 703,
+      "f24_med": -3.1,
+      "excess_med": 13.5
+     },
+     "2": {
+      "n": 702,
+      "f24_med": -5.7,
+      "excess_med": 10.9
+     },
+     "3": {
+      "n": 703,
+      "f24_med": -30.5,
+      "excess_med": -13.9
+     },
+     "4": {
+      "n": 703,
+      "f24_med": -28.0,
+      "excess_med": -11.4
+     }
+    },
+    "spread_top_minus_bottom": -8.6
+   },
+   "spread_train": 29.6,
+   "spread_test": -8.6,
+   "coherence_symboles": "7/12"
+  },
+  "S2_impulsion_oi_prix": {
+   "label": "S2 impulsion OI x prix (quadrants 24h, dedup 4h)",
+   "verdict": "ADVISORY",
+   "n_total": 50868,
+   "baseline_med_bps": -5.7,
+   "spread_train": 33.7,
+   "spread_test": 28.1,
+   "best_quadrant": {
+    "name": "flush(OI-p-)",
+    "n": 14033,
+    "train_excess_med": 20.9,
+    "test_excess_med": 9.9,
+    "test_n": 5612
+   },
+   "worst_quadrant": {
+    "name": "tendance_L(OI+p+)",
+    "n": 13567,
+    "train_excess_med": -4.9,
+    "test_excess_med": -18.2,
+    "test_n": 5208
+   },
+   "quadrants": {
+    "pression_S(OI+p-)": {
+     "n": 11890,
+     "train_excess_med": -7.5,
+     "test_excess_med": 9.6,
+     "test_n": 4925
+    },
+    "flush(OI-p-)": {
+     "n": 14033,
+     "train_excess_med": 20.9,
+     "test_excess_med": 9.9,
+     "test_n": 5612
+    },
+    "squeeze(OI-p+)": {
+     "n": 11378,
+     "train_excess_med": -12.8,
+     "test_excess_med": -3.8,
+     "test_n": 4603
+    },
+    "tendance_L(OI+p+)": {
+     "n": 13567,
+     "train_excess_med": -4.9,
+     "test_excess_med": -18.2,
+     "test_n": 5208
+    }
+   }
+  },
+  "S3a_position_range90": {
+   "label": "S3a position dans range 90j (quintiles)",
+   "feature": "pos90",
+   "verdict": "KILL",
+   "n_total": 49500,
+   "train": {
+    "n": 29700,
+    "baseline_med": -4.7,
+    "bins": {
+     "0": {
+      "n": 5940,
+      "f24_med": 18.2,
+      "excess_med": 22.9
+     },
+     "1": {
+      "n": 5940,
+      "f24_med": -11.3,
+      "excess_med": -6.6
+     },
+     "2": {
+      "n": 5940,
+      "f24_med": -6.8,
+      "excess_med": -2.1
+     },
+     "3": {
+      "n": 5940,
+      "f24_med": -3.6,
+      "excess_med": 1.1
+     },
+     "4": {
+      "n": 5940,
+      "f24_med": -18.5,
+      "excess_med": -13.9
+     }
+    },
+    "spread_top_minus_bottom": -36.8
+   },
+   "test": {
+    "n": 19800,
+    "baseline_med": -9.5,
+    "bins": {
+     "0": {
+      "n": 3960,
+      "f24_med": -4.8,
+      "excess_med": 4.7
+     },
+     "1": {
+      "n": 3960,
+      "f24_med": 9.5,
+      "excess_med": 18.9
+     },
+     "2": {
+      "n": 3960,
+      "f24_med": -35.4,
+      "excess_med": -25.9
+     },
+     "3": {
+      "n": 3960,
+      "f24_med": -20.8,
+      "excess_med": -11.3
+     },
+     "4": {
+      "n": 3960,
+      "f24_med": 0.0,
+      "excess_med": 9.5
+     }
+    },
+    "spread_top_minus_bottom": 4.8
+   },
+   "spread_train": -36.8,
+   "spread_test": 4.8
+  },
+  "S3b_compression_range": {
+   "label": "S3b compression range30/range90 (quintiles)",
+   "feature": "comp",
+   "verdict": "KILL",
+   "n_total": 49500,
+   "train": {
+    "n": 29700,
+    "baseline_med": -4.7,
+    "bins": {
+     "0": {
+      "n": 5959,
+      "f24_med": -23.2,
+      "excess_med": -18.5
+     },
+     "1": {
+      "n": 5923,
+      "f24_med": 0.0,
+      "excess_med": 4.7
+     },
+     "2": {
+      "n": 5984,
+      "f24_med": 1.5,
+      "excess_med": 6.2
+     },
+     "3": {
+      "n": 5933,
+      "f24_med": -11.8,
+      "excess_med": -7.1
+     },
+     "4": {
+      "n": 5901,
+      "f24_med": 14.8,
+      "excess_med": 19.4
+     }
+    },
+    "spread_top_minus_bottom": 37.9
+   },
+   "test": {
+    "n": 19800,
+    "baseline_med": -9.5,
+    "bins": {
+     "0": {
+      "n": 3964,
+      "f24_med": 10.3,
+      "excess_med": 19.8
+     },
+     "1": {
+      "n": 4024,
+      "f24_med": 4.5,
+      "excess_med": 14.0
+     },
+     "2": {
+      "n": 3895,
+      "f24_med": -15.0,
+      "excess_med": -5.5
+     },
+     "3": {
+      "n": 3969,
+      "f24_med": -24.9,
+      "excess_med": -15.4
+     },
+     "4": {
+      "n": 3948,
+      "f24_med": -43.9,
+      "excess_med": -34.4
+     }
+    },
+    "spread_top_minus_bottom": -54.2
+   },
+   "spread_train": 37.9,
+   "spread_test": -54.2
+  },
+  "S4_regime_vol_alphas": {
+   "label": "S4 régime vol x E[R] alphas (terciles ATR% 1h intra-symbole)",
+   "verdict": "DIAG (contexte only — leçon v26 : pas de gate sur tri in-sample)",
+   "n_trades": 183,
+   "terciles": {
+    "1": {
+     "n": 60,
+     "atr_med": 0.455,
+     "ER_short": 0.322,
+     "ER_long": 0.823
+    },
+    "2": {
+     "n": 58,
+     "atr_med": 0.712,
+     "ER_short": 0.351,
+     "ER_long": 0.441
+    },
+    "3": {
+     "n": 65,
+     "atr_med": 1.222,
+     "ER_short": -0.088,
+     "ER_long": -0.331
+    }
+   }
+  }
+ },
+ "contexte_courant": {
+  "funding_ann_pct": {
+   "SUIUSDT": 10.95,
+   "XRPUSDT": -2.304,
+   "SOLUSDT": 2.798,
+   "LINKUSDT": 2.586,
+   "BNBUSDT": 0.507,
+   "BTCUSDT": 8.428,
+   "ETHUSDT": 7.251,
+   "DOGEUSDT": 9.535,
+   "APTUSDT": 10.95,
+   "AVAXUSDT": 10.95,
+   "ADAUSDT": 10.583,
+   "1000PEPEUSDT": 10.95
+  },
+  "structure": {
+   "SUIUSDT": {
+    "pos90": 0.8196,
+    "comp": 0.9447
+   },
+   "XRPUSDT": {
+    "pos90": 0.7859,
+    "comp": 0.577
+   },
+   "SOLUSDT": {
+    "pos90": 0.9234,
+    "comp": 0.538
+   },
+   "LINKUSDT": {
+    "pos90": 0.9397,
+    "comp": 0.6016
+   },
+   "BNBUSDT": {
+    "pos90": 0.8401,
+    "comp": 0.503
+   },
+   "BTCUSDT": {
+    "pos90": 0.8927,
+    "comp": 0.4314
+   },
+   "ETHUSDT": {
+    "pos90": 0.9429,
+    "comp": 0.365
+   },
+   "DOGEUSDT": {
+    "pos90": 0.7376,
+    "comp": 0.7225
+   },
+   "APTUSDT": {
+    "pos90": 0.8712,
+    "comp": 1.0
+   },
+   "AVAXUSDT": {
+    "pos90": 0.9528,
+    "comp": 0.8383
+   },
+   "ADAUSDT": {
+    "pos90": 0.8867,
+    "comp": 0.6643
+   },
+   "1000PEPEUSDT": {
+    "pos90": 0.6729,
+    "comp": 0.6937
+   }
+  }
+ },
+ "synthese": {
+  "verdicts": {
+   "S1_carry_funding": "KILL",
+   "S2_impulsion_oi_prix": "ADVISORY",
+   "S3a_position_range90": "KILL",
+   "S3b_compression_range": "KILL",
+   "S4_regime_vol_alphas": "DIAG (contexte only — leçon v26 : pas de gate sur tri in-sample)"
+  },
+  "n_promus": 0,
+  "n_advisory": 1,
+  "n_kill": 3,
+  "message": "Aucun gate promu : les nouveaux signaux entrent en ADVISORY (loggé 4x/j, non bloquant) ou sont tués — la config certifiée 50/25/100 + maker reste l'autorité de blocage.",
+  "integration": "contexte_om_v29.json -> pont d'armement A7 (advisory, NON bloquant, même pattern que A6/ML v25)"
+ }
+}

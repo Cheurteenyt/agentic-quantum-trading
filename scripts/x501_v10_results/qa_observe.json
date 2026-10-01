@@ -1,0 +1,71 @@
+{
+  "x501_observe_flow_H1.ks": {
+    "passed": true,
+    "checks": {
+      "C1_equilibre_()": true,
+      "C1_equilibre_[]": true,
+      "C1_equilibre_{}": true,
+      "C2_version_ligne1": true,
+      "C3_define": true,
+      "C4_zero_ordre": true,
+      "C5_series_racine": true,
+      "_C5_lignes": [],
+      "C6_alerte_racine": true,
+      "C7_idiomes_doc": true,
+      "C8_bougie_fermee_[1]": true,
+      "C9_na_guard": true,
+      "C10_nouvelle_bougie": true,
+      "C11_inputs_utilises": true,
+      "_inputs": [
+        "bookDepth"
+      ]
+    }
+  },
+  "x501_observe_cvd4_btc_H1.ks": {
+    "passed": true,
+    "checks": {
+      "C1_equilibre_()": true,
+      "C1_equilibre_[]": true,
+      "C1_equilibre_{}": true,
+      "C2_version_ligne1": true,
+      "C3_define": true,
+      "C4_zero_ordre": true,
+      "C5_series_racine": true,
+      "_C5_lignes": [],
+      "C6_alerte_racine": true,
+      "C7_idiomes_doc": true,
+      "C8_bougie_fermee_[1]": true,
+      "C9_na_guard": true,
+      "C10_nouvelle_bougie": true,
+      "C11_inputs_utilises": true,
+      "_inputs": [
+        "spotBSymbol",
+        "perpBSymbol",
+        "perpYSymbol",
+        "perpOSymbol"
+      ]
+    }
+  },
+  "x501_observe_om_v29.ks": {
+    "passed": true,
+    "checks": {
+      "C1_equilibre_()": true,
+      "C1_equilibre_[]": true,
+      "C1_equilibre_{}": true,
+      "C2_version_ligne1": true,
+      "C3_define": true,
+      "C4_zero_ordre": true,
+      "C5_series_racine": true,
+      "_C5_lignes": [],
+      "C6_alerte_racine": true,
+      "C7_idiomes_doc": true,
+      "C8_bougie_fermee_[1]": true,
+      "C9_na_guard": true,
+      "C10_nouvelle_bougie": true,
+      "C11_inputs_utilises": true,
+      "_inputs": [
+        "rangeDays"
+      ]
+    }
+  }
+}

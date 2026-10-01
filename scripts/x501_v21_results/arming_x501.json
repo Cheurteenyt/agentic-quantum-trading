@@ -1,0 +1,218 @@
+{
+ "ts": 1790834947,
+ "status": "ARMED",
+ "source_pass_ts": 1790834924.9553168,
+ "pass_age_h": 0.01,
+ "kscript": {
+  "sha256": {
+   "Operation_x501_Signature_H1.ks": "375caa29e075869ee5d0c661eba18d20138bf178dae942b13e9628ea7f42177c",
+   "Operation_x501_Signature_H4.ks": "506c30d58c649a6663e014efcb631c6341f38d9a7232c7295ba4ce973b9dabc2",
+   "Operation_x501_Alpha2_Cascade_Financement_H4.ks": "cc8278be0970d8979893f0b672ee83362cdb360d4416994721b117b7dbbefdf2",
+   "Operation_x501_Alpha3_Eruption_Volatilite_H4.ks": "1d9c1e6edcfb9012646470ffee65422821b7d62d04980787058a3f110e7ab799",
+   "Operation_x501_Alpha4_Confluence_MTF_H4.ks": "566693c850b0db53fb9ef224c29d9e536e78c9ff8f47ebcca68b880c2795e1a0",
+   "x501_setup_kscript.js": "5044ad410835bda6a5618792d8bb44f33cbeb4982efdbf8f8cf747b62ac7825d"
+  },
+  "qa": "PASS",
+  "manifest": "MATCH"
+ },
+ "schedule": "0 3,9,15,21 * * * (UTC, hors fen\u00eatres funding 00/08/16)",
+ "signals": {
+  "1000PEPEUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": 0.623,
+   "liq_imb24": -0.088,
+   "oi_chg24_pct": -1.37,
+   "block_reasons": []
+  },
+  "ADAUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": 0.539,
+   "liq_imb24": -0.288,
+   "oi_chg24_pct": 1.77,
+   "block_reasons": []
+  },
+  "APTUSDT": {
+   "allow_long": true,
+   "allow_short": false,
+   "funding_z": -1.531,
+   "liq_imb24": 0.719,
+   "oi_chg24_pct": 1.54,
+   "block_reasons": [
+    "liq_imb24=0.719>0.55 (capitulation long -> rebond)",
+    "funding_z=-1.531<-1.5 (funding effondr\u00e9)"
+   ]
+  },
+  "AVAXUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": 0.761,
+   "liq_imb24": 0.537,
+   "oi_chg24_pct": -2.95,
+   "block_reasons": []
+  },
+  "BNBUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": -0.557,
+   "liq_imb24": -0.626,
+   "oi_chg24_pct": -1.23,
+   "block_reasons": []
+  },
+  "BTCUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": 0.297,
+   "liq_imb24": -0.379,
+   "oi_chg24_pct": 2.8,
+   "block_reasons": []
+  },
+  "DOGEUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": 0.95,
+   "liq_imb24": 0.107,
+   "oi_chg24_pct": -2.38,
+   "block_reasons": []
+  },
+  "ETHUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": 1.401,
+   "liq_imb24": -0.865,
+   "oi_chg24_pct": 0.8,
+   "block_reasons": []
+  },
+  "LINKUSDT": {
+   "allow_long": true,
+   "allow_short": false,
+   "funding_z": 0.215,
+   "liq_imb24": 0.594,
+   "oi_chg24_pct": 3.83,
+   "block_reasons": [
+    "liq_imb24=0.594>0.55 (capitulation long -> rebond)"
+   ]
+  },
+  "SOLUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": 1.617,
+   "liq_imb24": -0.638,
+   "oi_chg24_pct": 2.04,
+   "block_reasons": []
+  },
+  "SUIUSDT": {
+   "allow_long": true,
+   "allow_short": false,
+   "funding_z": 0.439,
+   "liq_imb24": 0.618,
+   "oi_chg24_pct": -2.61,
+   "block_reasons": [
+    "liq_imb24=0.618>0.55 (capitulation long -> rebond)"
+   ]
+  },
+  "XRPUSDT": {
+   "allow_long": true,
+   "allow_short": true,
+   "funding_z": -0.05,
+   "liq_imb24": 0.124,
+   "oi_chg24_pct": 1.6,
+   "block_reasons": []
+  }
+ },
+ "ml_advisory": {
+  "meta": {
+   "status": "absent"
+  },
+  "p_danger_short": {}
+ },
+ "contexte_om_v29": {
+  "meta": {
+   "status": "advisory",
+   "source": "om_v27.db",
+   "age_h": 0.1,
+   "verdicts": {
+    "S1_carry_funding": "KILL",
+    "S2_impulsion_oi_prix": "ADVISORY",
+    "S3a_position_range90": "KILL",
+    "S3b_compression_range": "KILL",
+    "S4_regime_vol_alphas": "DIAG (contexte only \u2014 le\u00e7on v26 : pas de gate sur tri in-sample)"
+   }
+  },
+  "features": {
+   "funding_ann_pct": {
+    "SUIUSDT": 10.95,
+    "XRPUSDT": -2.304,
+    "SOLUSDT": 2.798,
+    "LINKUSDT": 2.586,
+    "BNBUSDT": 0.507,
+    "BTCUSDT": 8.428,
+    "ETHUSDT": 7.251,
+    "DOGEUSDT": 9.535,
+    "APTUSDT": 10.95,
+    "AVAXUSDT": 10.95,
+    "ADAUSDT": 10.583,
+    "1000PEPEUSDT": 10.95
+   },
+   "structure": {
+    "SUIUSDT": {
+     "pos90": 0.8196,
+     "comp": 0.9447
+    },
+    "XRPUSDT": {
+     "pos90": 0.7859,
+     "comp": 0.577
+    },
+    "SOLUSDT": {
+     "pos90": 0.9234,
+     "comp": 0.538
+    },
+    "LINKUSDT": {
+     "pos90": 0.9397,
+     "comp": 0.6016
+    },
+    "BNBUSDT": {
+     "pos90": 0.8401,
+     "comp": 0.503
+    },
+    "BTCUSDT": {
+     "pos90": 0.8927,
+     "comp": 0.4314
+    },
+    "ETHUSDT": {
+     "pos90": 0.9429,
+     "comp": 0.365
+    },
+    "DOGEUSDT": {
+     "pos90": 0.7376,
+     "comp": 0.7225
+    },
+    "APTUSDT": {
+     "pos90": 0.8712,
+     "comp": 1.0
+    },
+    "AVAXUSDT": {
+     "pos90": 0.9528,
+     "comp": 0.8383
+    },
+    "ADAUSDT": {
+     "pos90": 0.8867,
+     "comp": 0.6643
+    },
+    "1000PEPEUSDT": {
+     "pos90": 0.6729,
+     "comp": 0.6937
+    }
+   }
+  }
+ },
+ "excluded_missing_features": [],
+ "summary": {
+  "n_symbols": 12,
+  "long_allowed": 12,
+  "short_allowed": 9,
+  "any_direction_blocked": 3
+ },
+ "elapsed_s": 0.13
+}

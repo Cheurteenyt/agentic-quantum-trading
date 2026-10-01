@@ -1,0 +1,64 @@
+{
+  "seed": 2026,
+  "generated_at": "2026-10-01T15:14:50+00:00",
+  "S0_reference": {
+    "median_12m": 641.9999031612194,
+    "p250": 0.9213333333333333,
+    "p500": 0.6384166666666666,
+    "p1250": 0.17658333333333334,
+    "x501_36m": 0.30683333333333335
+  },
+  "MAKER_DELTA2": {
+    "median_12m": 477.43394021559027,
+    "p250": 0.8275833333333333,
+    "p500": 0.47325,
+    "p1250": 0.09358333333333334,
+    "x501_36m": 0.11225
+  },
+  "MAKER_PURE": {
+    "median_12m": 484.15077146025095,
+    "p250": 0.8335,
+    "p500": 0.48141666666666666,
+    "p1250": 0.09658333333333333,
+    "x501_36m": 0.11916666666666667
+  },
+  "MAKER_STRESS": {
+    "median_12m": 420.3648715481407,
+    "p250": 0.7746666666666666,
+    "p500": 0.40175,
+    "p1250": 0.06966666666666667,
+    "x501_36m": 0.06133333333333333
+  },
+  "TAKER": {
+    "median_12m": 272.6999583599087,
+    "p250": 0.5515833333333333,
+    "p500": 0.20041666666666666,
+    "p1250": 0.021416666666666667,
+    "x501_36m": 0.005583333333333333
+  },
+  "meta": {
+    "engine": "x501_mc_v20",
+    "engine_version": "20.0.0-reconstruit-pr13",
+    "n_trajectories": 12000,
+    "horizon_months": 36,
+    "start_capital": 100.0,
+    "target_x501": 50100.0,
+    "dd_cap": 0.25,
+    "dd_mechanism": "ratchet/coupe-circuit: equite ramenee au plancher 0.75x pic (jamais au-dela)",
+    "random_numbers": "numpy default_rng PCG64, nombres communs entre scenarios (H4)",
+    "resampling": "bootstrap avec remise des retours par trade R=pnl_usd_net/risque_usd, pool unique",
+    "pool_size": 31,
+    "pool_files": [
+      "x501_backtest_trades_BTCUSDT.csv",
+      "x501_backtest_trades_ETHUSDT.csv"
+    ],
+    "backtest_span_months": 5.756331,
+    "trade_rate_per_month": 5.385375,
+    "n_trades_12m": 65,
+    "n_trades_36m": 194,
+    "risk_fraction": 0.04679422,
+    "effective_leverage": 11.170921,
+    "cost_model": "r = f*R - 2*bps*LEV/10000 (round-trip en fraction d'equite)",
+    "calibration": "f et LEV ancrees sur docs/25: mediane 12m S0=642.0 et TAKER=272.7 (H2)"
+  }
+}
