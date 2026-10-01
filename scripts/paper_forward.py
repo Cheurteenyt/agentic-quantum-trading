@@ -11,6 +11,7 @@ Ledger : klines.db:paper_trades. Rapport : reports/paper-forward-<date>.md
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import statistics
 import sys
@@ -31,6 +32,26 @@ from scripts import aster_indicators as ta  # noqa: E402
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
+
+# ——— LEVIER CASCADE MAJORS ASSERVI AU MAE (T8, pré-enregistré 01/10/2026,
+# reports/aster_machine_deep_regimes.md) ———
+# Règle gravée : levier ≤ 100/(MAE_pire_régime + 0,5) → 4x sur le cycle ;
+# 10x SEULEMENT si le moniteur MAE 6 majors (the_machine.py →
+# data/warehouse/mae_state.json) donne lev_safe >= 10. DÉFAUT SÛR = 4x :
+# état absent, illisible ou périmé (> 8 j sans tir de la machine nocturne).
+# Base inchangée (0.24) ; meme/survivor/vol_spike restent 1x.
+def _cascade_majors_lever(state_path: Path | None = None) -> float:
+    p = state_path if state_path is not None else (
+        ROOT / "data" / "warehouse" / "mae_state.json")
+    try:
+        st = json.loads(p.read_text(encoding="utf-8"))
+        age = (datetime.now(timezone.utc)
+               - datetime.fromisoformat(str(st["updated_at"])))
+        if age > timedelta(days=8):
+            return 4.0   # périmé : le défaut SÛR
+        return 10.0 if float(st["lev_safe"]) >= 10.0 else 4.0
+    except Exception:
+        return 4.0       # absent/illisible : le défaut SÛR
 
 # les 5 candidats de la campagne v5 : (signal, horizon_h, direction)
 CANDIDATES = [
@@ -478,9 +499,11 @@ def main() -> int:
                          f"WR {r[1]*100:.0f} %, moyen {r[2]:+.2f} %, "
                          f"cumulé {r[3]:+.2f} %")
     # ——— LE PORTEFEUILLE MACHINE en forward (les tailles réelles) ———
-    _lev = {"machine_cascade_majors": 10, "machine_cascade_meme": 1,
-            "machine_survivor_long": 1, "machine_vol_spike_6h": 1,
-            "machine_deep_fast": 7.5}
+    # levier majors asservi au MAE (T8, 01/10/2026) : 4x défaut sûr,
+    # 10x si le moniteur MAE 6 majors donne lev_safe >= 10.
+    _lev = {"machine_cascade_majors": _cascade_majors_lever(),
+            "machine_cascade_meme": 1, "machine_survivor_long": 1,
+            "machine_vol_spike_6h": 1, "machine_deep_fast": 7.5}
     _base = {"machine_cascade_majors": 0.24, "machine_cascade_meme": 0.10,
              "machine_survivor_long": 0.10, "machine_vol_spike_6h": 0.10,
              "machine_deep_fast": 0.10}
