@@ -19,9 +19,10 @@ import sqlite3
 import sys
 import datetime as dt
 
-sys.path.insert(0, "/home/z/my-project/scripts")
-DB = "/home/z/my-project/scripts/x501_v21_results/om_v27.db"
-OUT = "/home/z/my-project/scripts/x501_v21_results"
+EXT_ROOT = os.environ.get("X501_EXT_ROOT", "/home/z/my-project")  # data deep locale, hors git (docs/26/37)
+sys.path.insert(0, f"{EXT_ROOT}/scripts")
+DB = f"{EXT_ROOT}/scripts/x501_v21_results/om_v27.db"
+OUT = f"{EXT_ROOT}/scripts/x501_v21_results"
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT",
         "DOGEUSDT", "AVAXUSDT", "LINKUSDT"]
 FLOOR = json.load(open(f"{OUT}/floor_v29.json"))

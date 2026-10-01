@@ -38,8 +38,9 @@ import sqlite3
 import datetime as dt
 from dataclasses import dataclass, field
 
-DB_PATH = "/home/z/my-project/scripts/x501_v21_results/om_v27.db"
-OUT = os.environ.get("X501_OUT", "/home/z/my-project/scripts/x501_v21_results")
+EXT_ROOT = os.environ.get("X501_EXT_ROOT", "/home/z/my-project")  # data deep locale, hors git (docs/26/37)
+DB_PATH = f"{EXT_ROOT}/scripts/x501_v21_results/om_v27.db"
+OUT = os.environ.get("X501_OUT", f"{EXT_ROOT}/scripts/x501_v21_results")
 os.makedirs(OUT, exist_ok=True)
 
 CFG = dict(

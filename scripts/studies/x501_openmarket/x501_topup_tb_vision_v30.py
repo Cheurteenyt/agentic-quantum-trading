@@ -13,7 +13,7 @@ close_time, quote_volume, count, taker_buy_base, taker_buy_quote, ignore.
 """
 import io, json, os, sqlite3, time, urllib.request, zipfile, concurrent.futures as cf
 
-os.chdir("/home/z/my-project")
+os.chdir(os.environ.get("X501_EXT_ROOT", "/home/z/my-project"))  # data deep locale, hors git (docs/26/37)
 DB = "scripts/x501_v21_results/om_v27.db"
 LOG = "scripts/x501_v21_results/topup_tb_vision_v30.json"
 FLOOR = json.load(open("scripts/x501_v21_results/floor_v29.json"))

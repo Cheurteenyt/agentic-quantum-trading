@@ -15,7 +15,7 @@ l'actif » exige ce topup : même API, même paging, on ajoute la colonne.
 """
 import sqlite3, json, time, urllib.request, urllib.parse, os, sys
 
-os.chdir("/home/z/my-project")
+os.chdir(os.environ.get("X501_EXT_ROOT", "/home/z/my-project"))  # data deep locale, hors git (docs/26/37)
 DB = "scripts/x501_v21_results/om_v27.db"
 LOG = "scripts/x501_v21_results/topup_tb_v30.json"
 HDR = {"User-Agent": "Mozilla/5.0"}
