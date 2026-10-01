@@ -1,0 +1,290 @@
+{
+  "outils": "x501_oi_regime_local.py — vague 9 : banc de l'OI en contexte de régime",
+  "grille_pre_declaree": {
+    "date": "2026-10-01",
+    "lookbacks_z_barres": [
+      720,
+      2160
+    ],
+    "horizons_barres": [
+      24,
+      72
+    ],
+    "pool_L": 720,
+    "hypothese_A": "capital haut -> |fwd| plus grand (H_R1, AUC>0,5 attendu, théorie du levier)",
+    "hypothese_B": "niveau du capital -> direction : AUCUNE hypothèse pré-déclarée (sens=0, toute séparation = CONTEXTE)",
+    "criterion": "AUC IC95 exclut 0,5 et |AUC-0,5|>=0.05 = CANDIDAT ; IC contient 0,5 et |AUC-0,5|<0.02 = KILL ; sinon INCONCLU",
+    "panel": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT",
+      "LINKUSDT",
+      "SUIUSDT",
+      "APTUSDT",
+      "1000PEPEUSDT"
+    ]
+  },
+  "fenetre": {
+    "oi_dir": "data_oi_x501",
+    "n_symboles": 12,
+    "n_barres_1h": 216000,
+    "t0": 1726016400000,
+    "t1": 1790812800000,
+    "dup_klines": 0,
+    "dup_oi": 0,
+    "snap_absents": 0,
+    "invalidees_amorcage_L720": 8628,
+    "invalidees_std0_L720": 0,
+    "oi_profondeur_min_ts": 1646816400000,
+    "cout_ar_taker_bps": 12.2
+  },
+  "audit_par_symbole": {
+    "BTCUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "ETHUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "SOLUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "BNBUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "XRPUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "DOGEUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "ADAUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "AVAXUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "LINKUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "SUIUSDT": {
+      "n_klines": 18000,
+      "n_oi": 29915,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "APTUSDT": {
+      "n_klines": 18000,
+      "n_oi": 34631,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "1000PEPEUSDT": {
+      "n_klines": 18000,
+      "n_oi": 29917,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    }
+  },
+  "etude_A_magnitude": {
+    "L720_H24": {
+      "n": 207072,
+      "n_haut": 103536,
+      "n_bas": 103536,
+      "mediane_score": 0.16335553743200598,
+      "auc": 0.5116689459629611,
+      "ic95": [
+        0.49874718891895303,
+        0.5242863090887898
+      ],
+      "fwd_bps_haut": 215.97609644115272,
+      "fwd_bps_bas": 204.52108665223454,
+      "delta_bps": 11.455009788918176,
+      "hypothese": "capital haut -> grands mouvements (H_R1)",
+      "verdict": "KILL"
+    },
+    "L720_H72": {
+      "n": 206496,
+      "n_haut": 103248,
+      "n_bas": 103248,
+      "mediane_score": 0.16426100529258397,
+      "auc": 0.5150230743893327,
+      "ic95": [
+        0.5024454878789558,
+        0.5292399398468981
+      ],
+      "fwd_bps_haut": 391.94344412664645,
+      "fwd_bps_bas": 367.21891909853116,
+      "delta_bps": 24.724525028115295,
+      "hypothese": "capital haut -> grands mouvements (H_R1)",
+      "verdict": "INCONCLU"
+    },
+    "L2160_H24": {
+      "n": 189792,
+      "n_haut": 94896,
+      "n_bas": 94896,
+      "mediane_score": 0.16607701098551664,
+      "auc": 0.5062900030390447,
+      "ic95": [
+        0.49041672206424625,
+        0.5221621080437343
+      ],
+      "fwd_bps_haut": 210.0034308868058,
+      "fwd_bps_bas": 202.7142225775821,
+      "delta_bps": 7.28920830922371,
+      "hypothese": "capital haut -> grands mouvements (H_R1)",
+      "verdict": "KILL"
+    },
+    "L2160_H72": {
+      "n": 189216,
+      "n_haut": 94608,
+      "n_bas": 94608,
+      "mediane_score": 0.16356505887135542,
+      "auc": 0.5028075916901175,
+      "ic95": [
+        0.48665977575528463,
+        0.520200783851748
+      ],
+      "fwd_bps_haut": 372.4459095743145,
+      "fwd_bps_bas": 365.64350694164466,
+      "delta_bps": 6.802402632669839,
+      "hypothese": "capital haut -> grands mouvements (H_R1)",
+      "verdict": "KILL"
+    }
+  },
+  "etude_B_niveau_direction": {
+    "L720_H24": {
+      "n": 207072,
+      "n_haut": 103536,
+      "n_bas": 103536,
+      "mediane_score": 0.16335553743200598,
+      "auc": 0.5013583497693853,
+      "ic95": [
+        0.4879668599277525,
+        0.5191909478894392
+      ],
+      "fwd_bps_haut": -5.593958748068002,
+      "fwd_bps_bas": -5.3899596160906995,
+      "delta_bps": -0.20399913197730246,
+      "hypothese": "niveau du capital -> direction (aucune hypothèse, sens=0)",
+      "verdict": "KILL"
+    },
+    "L720_H72": {
+      "n": 206496,
+      "n_haut": 103248,
+      "n_bas": 103248,
+      "mediane_score": 0.16426100529258397,
+      "auc": 0.513030885725184,
+      "ic95": [
+        0.4943047233371957,
+        0.5290559839068157
+      ],
+      "fwd_bps_haut": -17.03655731535187,
+      "fwd_bps_bas": -32.99911592485108,
+      "delta_bps": 15.962558609499212,
+      "hypothese": "niveau du capital -> direction (aucune hypothèse, sens=0)",
+      "verdict": "KILL"
+    },
+    "L2160_H24": {
+      "n": 189792,
+      "n_haut": 94896,
+      "n_bas": 94896,
+      "mediane_score": 0.16607701098551664,
+      "auc": 0.5078868967618103,
+      "ic95": [
+        0.49378677504618784,
+        0.5317450387726612
+      ],
+      "fwd_bps_haut": -5.409944634691886,
+      "fwd_bps_bas": -12.526303123803649,
+      "delta_bps": 7.116358489111763,
+      "hypothese": "niveau du capital -> direction (aucune hypothèse, sens=0)",
+      "verdict": "KILL"
+    },
+    "L2160_H72": {
+      "n": 189216,
+      "n_haut": 94608,
+      "n_bas": 94608,
+      "mediane_score": 0.16356505887135542,
+      "auc": 0.5152451581995248,
+      "ic95": [
+        0.4976465048508433,
+        0.5422756446990489
+      ],
+      "fwd_bps_haut": -27.655399068571295,
+      "fwd_bps_bas": -48.52480167816964,
+      "delta_bps": 20.869402609598342,
+      "hypothese": "niveau du capital -> direction (aucune hypothèse, sens=0)",
+      "verdict": "KILL"
+    }
+  },
+  "resume_verdicts_panel": {
+    "INCONCLU": 1,
+    "KILL": 7
+  },
+  "etude_C_pool_P1": {
+    "nom": "z_oi_L720",
+    "n": 181,
+    "n_hors_panel": 283,
+    "mediane_split": 0.010213858933725435,
+    "n_haut": 90,
+    "n_bas": 91,
+    "R_med_haut": 0.08670292547607544,
+    "R_med_bas": -0.3818105795521703,
+    "R_moy_haut": 0.4060897149546261,
+    "R_moy_bas": 0.0643247710850888,
+    "WR_haut": 52.22222222222223,
+    "WR_bas": 45.05494505494506,
+    "delta_med_R": 0.46851350502824574,
+    "ic95_delta_med": [
+      -0.9033444014511153,
+      1.349481016152568
+    ],
+    "P_delta_sup_0": 0.8192,
+    "statut": "CONTEXTE (in-sample du pool + cross-exchange L4, jamais promotion)"
+  },
+  "digest_sha256": "bf0b77ac6a74d8be5127c81a4048f6b69288879f2123b6a9c50c3b8f548c54c2"
+}

@@ -64,6 +64,18 @@ gaps, slippage défavorable et fills dégradés en même temps.
 
 ## CE QUI MANQUE (les angles morts assumés)
 
+Deux séries restent trop courtes pour conclure et le sont documentées
+comme telles : le **funding Bybit (66 j)** ne sert qu'au contrôle de
+cohérence cross-exchange du funding Binance, pas à un signal autonome ; et
+l'**OI 1 j pré-2024** sert au contexte de régime (densités, percentiles de
+vie) mais pas à des backtests intraday. Toute proposition de signal qui
+repose sur ces séries courtes est invalide par construction jusqu'à
+extension de la collecte — c'est exactement le même statut que les données
+fomo pré-crack dans `docs/06-data.md` : on collecte, on ne conclut pas.
+(Mise à jour vague 11 : le **LSR 4 h**, troisième série courte de cette
+liste, a changé de statut — le collecteur versionné
+`x501_collect_lsr_v11.py` l'a porté à ~2,74 ans et la famille contrarian
+est passée au banc, verdict `docs/36` : KILL, la 10ᵉ falsification.)
 Trois séries sont trop courtes pour conclure et le sont documentées comme
 telles : le **LSR 4 h (8 jours)** ne permet aucun test de gate — il est
 collecté pour plus tard, pas exploité ; le **funding Bybit (66 j)** ne sert
@@ -74,6 +86,7 @@ proposition de signal qui repose sur ces séries courtes est invalide par
 construction jusqu'à extension de la collecte — c'est exactement le même
 statut que les données fomo pré-crack dans `docs/06-data.md` : on collecte,
 on ne conclut pas.
+origin/main
 
 ## CE QUI EST BANC-TESTÉ (requalification du 01/10, `docs/30`)
 
@@ -89,6 +102,9 @@ La collecte continue : les fenêtres se rallongent, l'entrepôt reste la
 matière première des prochains bancs — l'OI 1h, la tête de liste, l'a
 depuis passé : vague 8, mesurée et fermée (ci-dessous).
 matière première des prochains bancs (OI 1h en tête).
+origin/main
+origin/main
+origin/main
 origin/main
 
 **Vague 6 (`docs/31`)** : la même série `taker_buy_quote_volume` a servi de
@@ -110,6 +126,9 @@ avec le collecteur versionné `x501_collect_oi_v8.py` (Bybit v5 public,
 ~4,5 ans d'OI 1h collectés sur les majeures — profondeur disponible pour
 les bancs futurs) ; le statut des re-tests reste régi par la règle
 ci-dessus (pré-enregistrement explicite d'une hypothèse nouvelle).
+origin/main
+origin/main
+origin/main
 origin/main
 origin/main
 origin/main

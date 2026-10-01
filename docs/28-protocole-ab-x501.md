@@ -17,6 +17,9 @@
 origin/main
 origin/main
 origin/main
+origin/main
+origin/main
+origin/main
 
 ## LA RÈGLE (une phrase)
 
@@ -54,6 +57,9 @@ KILL ou INCONCLU laissent la référence intacte et le registre tranchera.
 > inchangé, et son rôle est précisé : un PROMOTION sur ABS alors que le
 > proxy klines est mort = preuve par contraste que le champ orderbook porte
 > une information unique (à valider en papier v11 comme tout PROMOTION).
+origin/main
+origin/main
+origin/main
 origin/main
 origin/main
 origin/main

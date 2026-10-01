@@ -9,6 +9,9 @@ dossier : les 12 kScripts, le scanner d'installation et les 6 QA statiques.
 origin/main
 origin/main
 origin/main
+origin/main
+origin/main
+origin/main
 Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 
 ## Contenu
@@ -24,6 +27,9 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `Operation_x501_Signature_H1_MK.ks` / `_H4_MK.ks` | **les versions maker** (limite δ=2–5, TTL, fallback taker, verrous pend*) + **vague 3 (docs/27-28)** : trail natif du runner (`useNativeTrail`, défaut false), groupes OCA nommés par tranche, `cancelAll()` post-halt (bug réel corrigé), rapport fin de run natif (closedTradeCount/WR/maxDrawdown) |
 =======
 | `Operation_x501_Signature_H1_MK.ks` / `_H4_MK.ks` | **les versions maker** (limite δ=2–5, TTL, fallback taker, verrous pend*) |
+origin/main
+origin/main
+origin/main
 origin/main
 origin/main
 origin/main
@@ -44,6 +50,9 @@ origin/main
 origin/main
 origin/main
 origin/main
+origin/main
+origin/main
+origin/main
 | `x501_exploit_audit.py` + `exploit_audit.json` | l'audit d'exploitation kScript (53 capacités × 13 scripts → **75,5 %** : sources premium 7/8, orderbook 2/3, broker 15/16 — la case `profit=/loss=` en ticks REFUSÉE par design, docs/28) |
 | `x501_verdict_ab.py` | **le moteur de verdict des A/B pré-enregistrés (docs/28)** : lit 2 CSV trades, bootstrap 10 000 seed 501, verdicts DATA_ABSENTE / PROMOTION / KILL / INCONCLU — stdlib pure, bit-à-bit, `--demo` pour la plomberie |
 | `x501_fill_maker_surface.py` + `pool_P1_entrees.csv` + `fill_maker_surface.json` | **la chaîne de preuve maker (docs/29)** : surface de fill δ×TTL (80 symboles × 733 j = 2 053 015 tentatives), sélection réelle sur les 469 entrées du pool P1 (fallback −88,6 bps, biais concentré sur A4), grille δ×TTL, sortie analytique TP — verdict : delta réel +0,931 bps/jambe = 23,3 % du crédit MC v20 → candidat v21 (médianes 306,2 $ TTL=2 / 364,0 $ TTL=6) |
@@ -52,6 +61,13 @@ origin/main
 | `x501_abs_events_local.py` + `abs_events_local.json` | **le banc d'événements de l'absorption (docs/31, vague 6)** : le pattern absorption en PROXY klines (mur volume T−3 ≥ 3× SMA200, attaque directionnelle T−2 ≥ 2× SMA100, tenue T−1 à 0,8 %, reprise T−1 = EMA(D,6) bascule), 3 définitions IMBRIQUÉES (E1 attaque / E2 structure / E3 complet) × 2 directions × 2 horizons = 12 cellules + prime de structure E3 vs E1 + projection pool P1 — verdict mécanique au critère AUC + seuil pré-déclaré (+6 bps = ½ aller-retour taker) |
 | `x501_refs_local.py` + `refs_local.json` | **le banc des références de liquidité (docs/32, vague 7)** : vwap de session (ancrage 00h UTC, reset journalier) + volume profile de la veille (48 bins, VPOC, value area 70 %), grille PRÉ-DÉCLARÉE de 28 cellules aux DEUX hypothèses (V1 aimant / V2 cross / P1 vpoc / P2 rejet VA / P3 breakout VA — P2 et P3 conditionnent les mêmes événements avec attentes opposées) × 2 panels (POOL80 + LIQUIDE8) + focus BTC/ETH + pool P1 en CONTEXTE (F1 mauvais côté vwap, F2 hors value area, flags sur open(T)) — 55 KILL / 1 INCONCLU / 0 CANDIDAT (7ᵉ falsification) — numpy + `X501_DATA_DIR` |
 | `x501_oi_local.py` + `oi_local.json` | **le banc de l'open interest 1h (docs/33, vague 8)** : le capital affiché testé en TÉMOIN DE CONTINUATION — Étude A capital brut (ΔOI%_L, L ∈ {24,72,168}) + Étude B mouvement financé (signe(r_L)×ΔOI%, cible alignée, L ∈ {24,72}) × H ∈ {24,72} + pool P1 en CONTEXTE — 10/10 KILL (AUC 0,4917–0,5019) sur 216 000 barres × 749 j (12 symboles om_v27, klines ET OI du même exchange Bybit, 0 snapshot absent, snapshot simultané JAMAIS lu) — numpy + `X501_OI_DIR` |
+| `x501_oi_regime_local.py` + `oi_regime_local.json` | **le banc de l'OI en contexte de régime (docs/34, vague 9)** : le NIVEAU du capital (z-score roulant L ∈ {720,2160}, std de population, fenêtre strictement au passé) comme conditionneur de la distribution des rendements — Étude A magnitude (H_R1 monotone, cible \|fwd\|, sens +1) : 3 KILL + 1 INCONCLU, la théorie du levier REFUSÉE ; Étude B direction (sens = 0, toute séparation = CONTEXTE) : 4/4 KILL — la 9ᵉ falsification ; Étude C pool P1 (z_720 au t_in, split médian, bootstrap 10 000) : ΔR +0,469, P = 0,8192 ≥ gate 0,70 (n = 181, CONTEXTE, jamais promotion) — numpy + `X501_OI_DIR` |
+| `x501_oi_ushape_local.py` + `oi_ushape_local.json` | **le banc de la forme en U de H_R1 (docs/35, vague 10)** : la FORME concurrente pré-enregistrée (volatilité maximale aux DEUX extrêmes du régime, centre calme, centre pré-déclaré à 0) — Étude A1 le U joint (\|z_L\| → \|fwd\|, sens +1) : 4/4 INCONCLU (l'IC exclut 0,5 mais tous sous le gate 0,05) ; Étude A2 le côté bas seul (le DISCRIMINANT, sens −1) : 2 KILL L720 + **2 CANDIDAT L2160** (AUC 0,4415/0,4454, Δ\|fwd\| +52 à +83 bps — les 2 premiers candidats marginaux du domaine en 10 vagues) ; composition pré-déclarée : U NON ÉTABLI ×4 ; Étude B miroir directionnel : 4/4 KILL ; Étude C pool strates \|z_720\| ≥ q80 : ΔR +0,934, P = 0,7381 ≥ gate 0,70 (2ᵉ contexte, in-sample + cross-exchange, jamais promotion) — numpy + `X501_OI_DIR` |
+| `x501_lsr_local.py` + `lsr_local.json` | **le banc du LSR (docs/36, vague 11)** : la dernière source premium du filtre RI (la fraction de comptes longs Bybit, 72 000 lignes 4h + 13 200 lignes 1d sur ~2,74 ans) — Étude A contrarian NIVEAU (z_L(buyRatio) → fwd signé, sens −1, l'hypothèse RI) : 4/4 KILL ; Étude B FLUX du positionnement (ΔbuyRatio, la bascule des comptes, sens −1) : 2 KILL + 2 INCONCLU (D42 : 2 IC excluent 0,5 mais 2–3× sous le gate — delta −52,7 bps au-dessus de l'étalon, sans AUC pas un plan) ; Étude C réplication 1d : 4/4 KILL — **la 10ᵉ falsification du domaine** ; Étude D pool P1 : ΔR −0,315, P(Δ<0) = 0,8009 dans le sens contrarian pré-déclaré (3ᵉ contexte au-dessus du gate, CONTEXTE jamais promu, ambiguïté de signe du gate pool assumée) — numpy + `X501_LSR_DIR` |
+| `x501_collect_lsr_v11.py` + `x501_lsr_probe_v11.py` + `lsr_probe_v11.jsonl` | **le collecteur versionné du banc LSR (docs/36)** + la sonde de sémantique et sa preuve horodatée : Bybit v5 public (0 clé), `/v5/market/account-ratio` 4h/1d (pagination `cursor`, le paramètre `interval` n'existe pas — mesuré) + klines 4h/1d, règle anti-partiel pré-enregistrée (ligne T > now − 3P droppée) ; la sonde a TRANCHÉ la sémantique : END (ligne T = fenêtre [T−P, T), publiée finalisée ≤ ~4,7 min après T, aucune ligne partielle — correction datée de la note 02:47) — la re-collecte n'est pas bit-compatible (data live) |
+| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
+| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
+| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
 | `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
 =======
 <<<<<<< HEAD
@@ -59,6 +75,9 @@ origin/main
 | `x501_verdict_ab.py` | **le moteur de verdict des A/B pré-enregistrés (docs/28)** : lit 2 CSV trades, bootstrap 10 000 seed 501, verdicts DATA_ABSENTE / PROMOTION / KILL / INCONCLU — stdlib pure, bit-à-bit, `--demo` pour la plomberie |
 =======
 | `x501_exploit_audit.py` + `exploit_audit.json` | l'audit d'exploitation kScript (53 capacités × 13 scripts → **67,9 %** : sources premium 7/8, orderbook 2/3) |
+origin/main
+origin/main
+origin/main
 origin/main
 origin/main
 origin/main
@@ -73,6 +92,8 @@ origin/main
 | `qa_flux_local_x501.py` | QA du banc de flux (27 contrôles) : grille + verdicts + étalonnage AUC exact + **TEST D'ALTÉRATION** (look-ahead = l'AUC décolle : la plomberie voit un vrai signal) + zéro look-ahead (mutation des barres futures) + convention funding recalculée + pool 469 + AUC par symbole (anti-dilution) + re-exécution bit à bit |
 | `qa_abs_events_x501.py` | QA du banc d'événements (62 contrôles, 9 familles) : le DÉTECTEUR testé sur séries synthétiques (chaque condition violée isolément + anti-batterie-triviale), invariant réel tbqv ≤ qv, nesting E3 ⊆ E2 ⊆ E1 sur données réelles, zéro look-ahead par mutation, règle NON_INTERPRETABLE en unitaire, re-exécution bit à bit |
 | `qa_oi_local_x501.py` | QA du banc OI (47 contrôles) : le DÉTECTEUR (OI planté corrélé au forward → AUC 0,66 CANDIDAT, cas nul KILL), le zéro look-ahead par MUTATION multiplicative+additive des snapshots futurs (scores passés bit à bit), les 4 branches du verdict en unitaire, le pool 469/469 (entry = open×(1 + side×2 bps)), l'audit de collecte, la re-exécution bit à bit (digest gravé) |
+| `qa_oi_regime_x501.py` | QA du banc régime (63 contrôles) : rolling_z en unitaires (cas à la main L=3, amorçage, boucle naïve, snapshot NaN propagé, fenêtre plate → NaN — bug réel corrigé), le DÉTECTEUR monotone (niveau planté dans la magnitude avec le décalage vague 8 → CANDIDAT ; la même plomberie décolle sur le signé pour l'étude B, verdict CONTEXTE forcé par sens=0), le cas nul KILL, le zéro look-ahead par MUTATION des snapshots ET des barres futures, le snapshot simultané jamais lu par sa barre (test segmenté), les 4 branches + sens=0 ne promeut jamais, le pool 469/469, l'audit de collecte, la re-exécution bit à bit (digest gravé) |
+| `qa_oi_ushape_x501.py` | QA du banc U-shape (79 contrôles, 1 skip déclaré) : le DÉTECTEUR du U planté (magnitude en U dans le forward → A1 CANDIDAT + A2 CANDIDAT → composition **U VIVANT**), le DÉTECTEUR MONOTONE REFUSÉ par la composition (A2 sens opposé → **KILL-U** même si A1 décolle — le banc distingue les deux formes), le cas nul KILL, la COMPOSITION en 7 branches unitaires, le score \|z\| et la sélection A2 en cas à la main (2 bugs de CAS corrigés : médiane −1,5, premier jet plantait un monotone), le zéro look-ahead par MUTATION des snapshots ET des barres futures (scores signés ET \|z\| bit à bit), le snapshot simultané jamais lu, le pool 469/469, l'audit de collecte, la re-exécution bit à bit (digest gravé) |
 <<<<<<< HEAD
 | `qa_vagues_x501.py` | QA des vagues 1-2-3 : RI + observe régime + absorption + les 2 `_MK` + le moteur de verdict (200 contrôles : no-repaint, fail-open, budget sources ≤ 10, pièges doc, piège OCA, pré-enregistrement, cohérence docs/28 ↔ moteur) |
 =======
@@ -80,6 +101,9 @@ origin/main
 | `qa_vagues_x501.py` | QA des vagues 1-2-3 : RI + observe régime + absorption + les 2 `_MK` + le moteur de verdict (200 contrôles : no-repaint, fail-open, budget sources ≤ 10, pièges doc, piège OCA, pré-enregistrement, cohérence docs/28 ↔ moteur) |
 =======
 | `qa_vagues_x501.py` | QA des vagues 1-2 : RI + observe régime + absorption (122 contrôles : no-repaint, fail-open, budget sources ≤ 10, pièges doc, pré-enregistrement) |
+origin/main
+origin/main
+origin/main
 origin/main
 origin/main
 origin/main
@@ -98,10 +122,19 @@ python3 qa_kscript_x501.py && python3 qa_scanner_x501.py \
 ```
 
 Attendu : **8× PASS — 0 échec** (446 contrôles au total, +3 avec la data
+premium pour les re-exécutions bit à bit ; les QA `qa_refs_local_x501.py`,
+`qa_oi_local_x501.py` et `qa_oi_regime_x501.py` s'exécutent en plus avec
+leur data : `X501_DATA_DIR` / `X501_OI_DIR`). Certaines QA
+écrivent leurs détails JSON dans `results/` (artefact de run local — ne pas
+commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
+études avec data 1h : `X501_DATA_DIR`, `X501_OI_DIR`).
 premium pour les re-exécutions bit à bit). Certaines QA
 écrivent leurs détails JSON dans `results/` (artefact de run local — ne pas
 commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
 2 études avec data 1h : `X501_DATA_DIR`).
+origin/main
+origin/main
+origin/main
 
 ## Statut (01/10/2026)
 
@@ -112,6 +145,53 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   + `qa_fill_maker_x501.py` (**71 contrôles**, 74 avec la re-exécution bit à bit de l'étude)
   + `qa_flux_local_x501.py` (**27 contrôles**, dont le test d'altération qui prouve que la
   plomberie du banc détecte un vrai signal : AUC look-ahead BTC 0,6103 / ETH 0,6065).
+  + `qa_oi_regime_x501.py` (**63 contrôles**, 0 échec : rolling_z en unitaires avec le bug réel
+  corrigé des fenêtres plates → NaN, détecteur monotone décalé vague 8, mutations snapshots
+  + barres, snapshot simultané test segmenté, re-exécution bit à bit — digest bf0b77ac6a74d8be…).
+  + `qa_oi_ushape_x501.py` (**79 contrôles**, 0 échec, 1 skip déclaré : le détecteur du U planté
+  → composition U VIVANT, le détecteur MONOTONE refusé → KILL-U même si A1 décolle — le banc
+  distingue les deux formes, la composition en 7 branches, 2 bugs de CAS de QA corrigés
+  (médiane −1,5 ; premier jet plantait un monotone), mutations double, re-exécution bit à bit
+  — digest 3f9fb7781eaeb401…).
+  + `qa_lsr_local_x501.py` (**49 contrôles**, 0 échec : détecteur contrarian planté sur pipeline
+  synthétique complet en 3 runs — 4h planté décolle CANDIDAT, le 1d nul du même run ne décolle
+  pas, le 1d planté décolle, le tout-nul jamais ; zéro look-ahead par mutation multiplicative
+  +additive des lignes LSR ET des opens klines avec contrôle inverse, ligne simultanée jamais
+  lue (test segmenté), 4 branches du verdict (KILL par multisets identiques → AUC pile 0,5),
+  pool 469/469 + règle searchsorted, audit de collecte, re-exécution bit à bit — digest
+  c8478385f7fce150…).
+- **Vague 11 — le banc du LSR : la dernière source premium est fermée, la 10ᵉ falsification**
+  (`docs/36-openmarket-lsr-banc-local.md`) : le collecteur versionné
+  `x501_collect_lsr_v11.py` porte le LSR Bybit de 8 j intestables à 72 000 lignes 4h + 13 200
+  lignes 1d sur ~2,74 ans (règle anti-partiel mesurée par sonde) — le contrarian NIVEAU
+  (l'hypothèse du filtre RI) est KILL 4/4 (panel 4h) ET 4/4 (réplication 1d), le flux du
+  positionnement 1 j est KILL, le flux 7 j laisse 2 IC excluant 0,5 mais 2–3× sous le gate
+  CANDIDAT (INCONCLU) ; 10/12 cellules ont un AUC < 0,5 : la DIRECTION contrarian se montre
+  partout, l'AMPLITUDE ne franchit jamais le gate — pas un signal ; le pool P1 sépare dans le
+  sens contrarian (ΔR −0,315, P(Δ<0) = 0,8009 ≥ gate de contexte, 3ᵉ contexte, jamais promu,
+  ambiguïté de signe du gate pool assumée) ; le comptage des CANDIDATS marginaux reste à 2.
+origin/main
+- **Vague 10 — le banc de la FORME EN U : le U joint NON ÉTABLI, le côté bas de la purge
+  CANDIDAT** (`docs/35-openmarket-oi-ushape.md`) : le U joint reste sous le gate du domaine
+  (4/4 INCONCLU, la composition pré-déclarée refuse) et le miroir directionnel KILL 4/4 —
+  le comptage des falsifications RESTE à 9 ; MAIS le côté bas de la purge franchit le gate
+  à L = 90 j (AUC 0,4415 / 0,4454, sens −1 confirmé, Δ|fwd| +52 à +83 bps) — **les 2 premiers
+  candidats marginaux du domaine en 10 vagues** — et le pool en strates |z| franchit le gate
+  de contexte une 2ᵉ fois (ΔR +0,934, P = 0,7381) ; régime de purge unilatéral, candidats au
+  protocole A/B sans toucher à la file (RI → MK6 → TRAIL → ABS).
+origin/main
+origin/main
+- **Vague 9 — le banc de l'OI en contexte de régime est FERMÉ pour le mécanisme marginal**
+  (`docs/34-oi-regime-banc-local.md`) : le NIVEAU du capital (z-score roulant) ne conditionne
+  ni la magnitude (H_R1 de la théorie du levier REFUSÉE : 3 KILL + 1 INCONCLU) ni la direction
+  (4/4 KILL) — la 9ᵉ falsification du domaine, 5ᵉ verdict symétrique des familles de
+  positionnement ; le conditionnel pool P1 franchit le gate de contexte (ΔR +0,469,
+  P = 0,8192 ≥ 0,70, n = 181) — filtre candidat au protocole A/B, jamais promotion depuis
+  un banc, la file du user reste RI → MK6 → TRAIL → ABS.
+- **Vague 8 — le banc de l'open interest 1h est FERMÉ** (`docs/33-oi-banc-local.md`) : 
+  le capital affiché ne finance pas une direction prévisible — 10/10 KILL aux deux hypothèses
+  (capital brut + mouvement financé), collecteur versionné, la 8ᵉ falsification du domaine.
+  La case ouverte « OI en contexte de régime » → **fermée par la vague 9** (docs/34).
 - **Vague 8 — le banc de l'open interest 1h est FERMÉ** (`docs/33-oi-banc-local.md`) :
   le capital affiché ne finance pas une direction prévisible — 10/10 KILL aux deux hypothèses
   (capital brut + mouvement financé), collecteur versionné, la 8ᵉ falsification du domaine.
@@ -150,6 +230,9 @@ origin/main
   + `qa_flux_local_x501.py` (**27 contrôles**, dont le test d'altération qui prouve que la
   plomberie du banc détecte un vrai signal : AUC look-ahead BTC 0,6103 / ETH 0,6065).
 origin/main
+origin/main
+origin/main
+origin/main
 - **Vague 5 — le banc de test des flux dormants est FERMÉ** (`docs/30-flux-funding-banc-local.md`) :
   le flux taker natif des klines et le funding multi-années, derniers pouvoirs data dormants,
   passés au banc AVANT tout run kScript — **12/12 cellules KILL** au critère AUC du domaine
@@ -176,6 +259,9 @@ origin/main
   re-exécution bit à bit (39 contrôles, digest 6af839e09c6136e8…) — la famille analyse de
   docs/27 est CLOSE (ltf/minBid : sans data locale ; langage/visu : dette de style).
   + `qa_fill_maker_x501.py` (**71 contrôles**, 74 avec la re-exécution bit à bit de l'étude).
+origin/main
+origin/main
+origin/main
 origin/main
 origin/main
 origin/main
@@ -207,6 +293,9 @@ résolus relativement à ce dossier.
 - 5/5 QA **PASS** (200 contrôles pour `qa_vagues_x501.py`, les 4 existantes re-vérifiées).
 - Les `_MK` sont la version d'exécution de référence (fill 97,9 % à δ=2) —
   `useNativeTrail=false` par défaut : la référence MC v20 reste bit-à-bit.
+origin/main
+origin/main
+origin/main
 origin/main
 origin/main
 origin/main
@@ -243,6 +332,9 @@ origin/main
   RI on/off sur BTC et ETH, absorption vs signature — verdict au registre `docs/20`.
 - **Vague 3 (hygiène, aucun edge espéré)** : `trailPoints` dans les `_MK`,
   `ocaName`, `strategy.maxDrawdown()` dans les rapports — à faire.
+origin/main
+origin/main
+origin/main
 origin/main
 origin/main
 origin/main

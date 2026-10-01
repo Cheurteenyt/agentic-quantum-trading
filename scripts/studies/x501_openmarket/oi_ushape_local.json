@@ -1,0 +1,368 @@
+{
+  "outils": "x501_oi_ushape_local.py — vague 10 : banc de la forme en U de H_R1",
+  "grille_pre_declaree": {
+    "date": "2026-10-01",
+    "lookbacks_z_barres": [
+      720,
+      2160
+    ],
+    "horizons_barres": [
+      24,
+      72
+    ],
+    "pool_L": 720,
+    "pool_quantile_extr": 0.8,
+    "hypothese_A1": "U : |z_L| haut -> |fwd| plus grand (les DEUX extrêmes sortent du centre calme, centre pré-déclaré à 0, sens +1)",
+    "hypothese_A2": "côté bas seul (discriminant) : z très négatif -> |fwd| grand (sens -1) — le monotone H_R1 prédit l'opposé",
+    "hypothese_B": "magnitude -> direction : AUCUNE hypothèse pré-déclarée (sens=0, toute séparation = CONTEXTE)",
+    "hypothese_C": "U : les entrées du pool aux extrêmes |z_720| font mieux que le centre (delta > 0)",
+    "composition_U": "U VIVANT = A1 CANDIDAT(+1) ET A2 CANDIDAT(-1) même cellule ; KILL-U = A2 AUC>0,5 hors IC ; sinon NON ÉTABLI",
+    "criterion": "AUC IC95 exclut 0,5 et |AUC-0,5|>=0.05 = CANDIDAT ; IC contient 0,5 et |AUC-0,5|<0.02 = KILL ; sinon INCONCLU",
+    "panel": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT",
+      "LINKUSDT",
+      "SUIUSDT",
+      "APTUSDT",
+      "1000PEPEUSDT"
+    ]
+  },
+  "fenetre": {
+    "oi_dir": "data_oi_x501",
+    "n_symboles": 12,
+    "n_barres_1h": 216000,
+    "t0": 1726016400000,
+    "t1": 1790812800000,
+    "dup_klines": 0,
+    "dup_oi": 0,
+    "snap_absents": 0,
+    "invalidees_amorcage_L720": 8628,
+    "invalidees_std0_L720": 0,
+    "oi_profondeur_min_ts": 1646816400000,
+    "cout_ar_taker_bps": 12.2
+  },
+  "audit_par_symbole": {
+    "BTCUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "ETHUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "SOLUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "BNBUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "XRPUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "DOGEUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "ADAUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "AVAXUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "LINKUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "SUIUSDT": {
+      "n_klines": 18000,
+      "n_oi": 29915,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "APTUSDT": {
+      "n_klines": 18000,
+      "n_oi": 34631,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "1000PEPEUSDT": {
+      "n_klines": 18000,
+      "n_oi": 29917,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    }
+  },
+  "etude_A1_u_joint": {
+    "L720_H24": {
+      "n": 207072,
+      "n_haut": 103536,
+      "n_bas": 103536,
+      "mediane_score": 0.9611647251071087,
+      "auc": 0.5220551027366793,
+      "ic95": [
+        0.5092828109109289,
+        0.5310704413505983
+      ],
+      "fwd_bps_haut": 220.29977211444367,
+      "fwd_bps_bas": 199.91036839705507,
+      "delta_bps": 20.389403717388603,
+      "hypothese": "U : |z| haut -> |fwd| haut (les DEUX extrêmes)",
+      "verdict": "INCONCLU"
+    },
+    "L720_H72": {
+      "n": 206496,
+      "n_haut": 103248,
+      "n_bas": 103248,
+      "mediane_score": 0.9619309817788959,
+      "auc": 0.5149192015496896,
+      "ic95": [
+        0.5024078939593394,
+        0.5259348921807863
+      ],
+      "fwd_bps_haut": 390.8614293164477,
+      "fwd_bps_bas": 367.2559400689004,
+      "delta_bps": 23.605489247547325,
+      "hypothese": "U : |z| haut -> |fwd| haut (les DEUX extrêmes)",
+      "verdict": "INCONCLU"
+    },
+    "L2160_H24": {
+      "n": 189792,
+      "n_haut": 94896,
+      "n_bas": 94896,
+      "mediane_score": 0.9890925250774067,
+      "auc": 0.5349941214230363,
+      "ic95": [
+        0.5239541783841211,
+        0.5498289719872781
+      ],
+      "fwd_bps_haut": 223.4106089861046,
+      "fwd_bps_bas": 190.41440341929837,
+      "delta_bps": 32.996205566806225,
+      "hypothese": "U : |z| haut -> |fwd| haut (les DEUX extrêmes)",
+      "verdict": "INCONCLU"
+    },
+    "L2160_H72": {
+      "n": 189216,
+      "n_haut": 94608,
+      "n_bas": 94608,
+      "mediane_score": 0.9909275276893765,
+      "auc": 0.5268260952207139,
+      "ic95": [
+        0.5167213746427654,
+        0.548283102668597
+      ],
+      "fwd_bps_haut": 391.1105903232946,
+      "fwd_bps_bas": 346.5822779954376,
+      "delta_bps": 44.52831232785701,
+      "hypothese": "U : |z| haut -> |fwd| haut (les DEUX extrêmes)",
+      "verdict": "INCONCLU"
+    }
+  },
+  "etude_A2_cote_bas": {
+    "L720_H24": {
+      "n": 94994,
+      "n_haut": 47497,
+      "n_bas": 47497,
+      "mediane_score": -0.8812534737486812,
+      "auc": 0.4845751240107111,
+      "ic95": [
+        0.471688630324088,
+        0.5021596096207083
+      ],
+      "fwd_bps_haut": 198.15059445178252,
+      "fwd_bps_bas": 212.14430894309004,
+      "delta_bps": -13.993714491307514,
+      "hypothese": "côté bas du U : z très négatif -> |fwd| grand (sens -1)",
+      "verdict": "KILL"
+    },
+    "L720_H72": {
+      "n": 94700,
+      "n_haut": 47350,
+      "n_bas": 47350,
+      "mediane_score": -0.8820744271587757,
+      "auc": 0.49151467302402185,
+      "ic95": [
+        0.4760208597822858,
+        0.5082615259106795
+      ],
+      "fwd_bps_haut": 361.55855160390126,
+      "fwd_bps_bas": 373.54126634484624,
+      "delta_bps": -11.98271474094497,
+      "hypothese": "côté bas du U : z très négatif -> |fwd| grand (sens -1)",
+      "verdict": "KILL"
+    },
+    "L2160_H24": {
+      "n": 86813,
+      "n_haut": 43406,
+      "n_bas": 43407,
+      "mediane_score": -0.8590896419495043,
+      "auc": 0.44146605699264707,
+      "ic95": [
+        0.41982495909339157,
+        0.4588411587688698
+      ],
+      "fwd_bps_haut": 178.51720505998526,
+      "fwd_bps_bas": 230.6805074971165,
+      "delta_bps": -52.16330243713125,
+      "hypothese": "côté bas du U : z très négatif -> |fwd| grand (sens -1)",
+      "verdict": "CANDIDAT"
+    },
+    "L2160_H72": {
+      "n": 86681,
+      "n_haut": 43340,
+      "n_bas": 43341,
+      "mediane_score": -0.8604297669821415,
+      "auc": 0.44542761028176475,
+      "ic95": [
+        0.420636335792339,
+        0.46917656733326607
+      ],
+      "fwd_bps_haut": 325.5862667302422,
+      "fwd_bps_bas": 408.38164134196745,
+      "delta_bps": -82.79537461172526,
+      "hypothese": "côté bas du U : z très négatif -> |fwd| grand (sens -1)",
+      "verdict": "CANDIDAT"
+    }
+  },
+  "etude_B_miroir_direction": {
+    "L720_H24": {
+      "n": 207072,
+      "n_haut": 103536,
+      "n_bas": 103536,
+      "mediane_score": 0.9611647251071087,
+      "auc": 0.49537450751845885,
+      "ic95": [
+        0.4815608873845226,
+        0.5073994360146363
+      ],
+      "fwd_bps_haut": -8.28328882073329,
+      "fwd_bps_bas": -3.09753437367214,
+      "delta_bps": -5.18575444706115,
+      "hypothese": "magnitude -> direction (aucune hypothèse, sens=0)",
+      "verdict": "KILL"
+    },
+    "L720_H72": {
+      "n": 206496,
+      "n_haut": 103248,
+      "n_bas": 103248,
+      "mediane_score": 0.9619309817788959,
+      "auc": 0.48700540762134514,
+      "ic95": [
+        0.4759230633699145,
+        0.5054339583173326
+      ],
+      "fwd_bps_haut": -38.577577057608494,
+      "fwd_bps_bas": -12.09581614923782,
+      "delta_bps": -26.481760908370674,
+      "hypothese": "magnitude -> direction (aucune hypothèse, sens=0)",
+      "verdict": "KILL"
+    },
+    "L2160_H24": {
+      "n": 189792,
+      "n_haut": 94896,
+      "n_bas": 94896,
+      "mediane_score": 0.9890925250774067,
+      "auc": 0.4909110025725684,
+      "ic95": [
+        0.473159928041713,
+        0.50732974477892
+      ],
+      "fwd_bps_haut": -12.629871925870388,
+      "fwd_bps_bas": -5.936649289981041,
+      "delta_bps": -6.693222635889347,
+      "hypothese": "magnitude -> direction (aucune hypothèse, sens=0)",
+      "verdict": "KILL"
+    },
+    "L2160_H72": {
+      "n": 189216,
+      "n_haut": 94608,
+      "n_bas": 94608,
+      "mediane_score": 0.9909275276893765,
+      "auc": 0.48314345320097685,
+      "ic95": [
+        0.4630851699154602,
+        0.5034975382806631
+      ],
+      "fwd_bps_haut": -53.09031035139731,
+      "fwd_bps_bas": -25.46315243806365,
+      "delta_bps": -27.627157913333658,
+      "hypothese": "magnitude -> direction (aucune hypothèse, sens=0)",
+      "verdict": "KILL"
+    }
+  },
+  "resume_verdicts_panel": {
+    "CANDIDAT": 2,
+    "INCONCLU": 4,
+    "KILL": 6
+  },
+  "composition_u": {
+    "L720_H24": "U NON ÉTABLI",
+    "L720_H72": "U NON ÉTABLI",
+    "L2160_H24": "U NON ÉTABLI",
+    "L2160_H72": "U NON ÉTABLI"
+  },
+  "etude_C_pool_P1": {
+    "nom": "u_oi_L720_quantile0.8",
+    "n": 181,
+    "n_hors_panel": 283,
+    "quantile_u": 1.6146320601364434,
+    "n_extr": 37,
+    "n_centre": 144,
+    "R_med_extr": 0.6450266818623008,
+    "R_med_centre": -0.2889140262623763,
+    "R_moy_extr": 0.3828684947965078,
+    "R_moy_centre": 0.19607982088325449,
+    "WR_extr": 54.054054054054056,
+    "WR_centre": 47.22222222222222,
+    "delta_med_R": 0.9339407081246771,
+    "ic95_delta_med": [
+      -1.0254915284138277,
+      1.4436068748157425
+    ],
+    "P_delta_sup_0": 0.7381,
+    "hypothese": "U : les entrées aux extrêmes |z| font mieux que le centre (delta > 0)",
+    "statut": "CONTEXTE (in-sample du pool + cross-exchange L5, jamais promotion)"
+  },
+  "digest_sha256": "3f9fb7781eaeb4014f30f24c00dd36d36646137c7b19f67163e30dd502746020"
+}
