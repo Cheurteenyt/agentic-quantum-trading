@@ -53,6 +53,26 @@ PRINTS_PER_MIN = PAGES_PER_MIN * PAGE_LIMIT  # 30 000
 SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 GUARD_DAYS = {"BTCUSDT": 365, "ETHUSDT": 365}  # bornes mission (J-365)
 
+# Créneau de la campagne nocturne aster (heure LOCALE) : pendant cette
+# fenêtre le crawl se met en pause — jamais de contention de poids.
+NOCTURN_START_MIN = 3 * 60        # 03:00
+NOCTURN_END_MIN = 4 * 60 + 15     # 04:15
+
+
+def nocturn_wait() -> None:
+    """Pause si l'heure locale tombe dans le créneau du nocturne 03:00-04:15."""
+    while True:
+        now = datetime.now()
+        m = now.hour * 60 + now.minute
+        if NOCTURN_START_MIN <= m < NOCTURN_END_MIN:
+            wait_s = (NOCTURN_END_MIN * 60) - (now.hour * 3600
+                                               + now.minute * 60 + now.second) + 5
+            log(f"  .. créneau nocturne 03:00-04:15 — pause crawl "
+                f"{wait_s / 60:.0f} min (le checkpoint permettra la reprise)")
+            time.sleep(wait_s)
+        else:
+            return
+
 
 def log(msg: str) -> None:
     print(f"[{datetime.now(timezone.utc):%m-%d %H:%M:%S}] {msg}", flush=True)
@@ -90,6 +110,7 @@ def api_get(path: str, params: dict) -> tuple[int, object, str | None]:
     (status, json|None, err). note_weight sur CHAQUE réponse HTTP reçue."""
     url = f"{BASE}{path}?{urlencode(params)}"
     err: str | None = None
+    nocturn_wait()  # pause 03:00-04:15 locales (campagne nocturne aster)
     for attempt in range(5):
         if attempt:
             backoff = min(65.0, 5.0 * (2 ** (attempt - 1)))
@@ -320,6 +341,143 @@ def phase_backfill(con: sqlite3.Connection, symbols: list[str],
     return
 
 
+# ------------------------------------------------- ESTIMATION TRANCHE (J-90)
+def phase_estimate_tranche(con: sqlite3.Connection, symbols: list[str],
+                           window_days: int) -> None:
+    """Sonde bornée de la TRANCHE à combler : [first_id(t now-window_days), MIN(agg_id) DB).
+    Fige stop_id/t_start dans le state (clé |extend{N}) pour que le crawl
+    décroissant reprenne exactement sans refaire la binaire."""
+    log(f"=== ESTIMATION TRANCHE J-{window_days} (sondes binaires) ===")
+    now_ms = int(time.time() * 1000)
+    go = True
+    for sym in symbols:
+        n_db, db_min, db_max = con.execute(
+            "SELECT COUNT(*), MIN(agg_id), MAX(agg_id) FROM aster_tape "
+            "WHERE symbol = ?", (sym,)).fetchone()
+        if not n_db:
+            log(f"!! {sym}: aster_tape vide — backfill initial requis")
+            go = False
+            continue
+        t_start = now_ms - window_days * DAY_MS
+        stop_id = first_id_at(sym, t_start, int(db_max))
+        tranche = int(db_min) - stop_id
+        hours = tranche / PRINTS_PER_MIN / 60.0
+        mb = tranche * BYTES_PER_ROW_EST / 1e6
+        verdict = "GO" if hours <= 6.0 else "NO-GO"
+        if hours > 6.0:
+            go = False
+        log(f"{sym}: tranche [{stop_id:,} → {int(db_min):,}) = {tranche:,} prints "
+            f"≈ {mb:.0f} Mo, {hours:.2f} h à 0,5 req/s → {verdict} "
+            f"(borne {datetime.fromtimestamp(t_start / 1000, timezone.utc):%Y-%m-%d})")
+        st = load_state()
+        st[f"{sym}|extend{window_days}"] = {
+            "stop_id": stop_id, "t_start": t_start,
+            "estimate_rows": tranche, "estimate_hours": round(hours, 2),
+            "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        save_state(st)
+    log(f"VERDICT GLOBAL: {'GO' if go else 'NO-GO'} (seuil 6 h)")
+
+
+# ------------------------------------------------------- EXTENSION DÉCROISS.
+def phase_extend(con: sqlite3.Connection, symbols: list[str],
+                 window_days: int, max_minutes: float | None) -> None:
+    """Extension ARRIÈRE de la fenêtre : pagination fromId DÉCROISSANTE
+    depuis MIN(agg_id) en DB (frontière 45 j) vers la borne J-{window_days}.
+    Checkpoint : le vrai curseur = MIN(agg_id) en DB (pattern T6 inversé).
+    INSERT OR IGNORE (les pages peuvent chevaucher la frontière)."""
+    init_table(con)
+    budget_deadline = time.time() + max_minutes * 60 if max_minutes else None
+    for sym in symbols:
+        key = f"{sym}|extend{window_days}"
+        prev = (load_state().get(key) or {})
+        if prev.get("done"):
+            log(f"[skip] {key} déjà fait ({prev.get('rows'):,} rows) — --force pour rejouer")
+            continue
+        n_db, db_min, db_max = con.execute(
+            "SELECT COUNT(*), MIN(agg_id), MAX(agg_id) FROM aster_tape "
+            "WHERE symbol = ?", (sym,)).fetchone()
+        if not n_db:
+            log(f"!! {sym}: aster_tape vide — backfill initial requis")
+            continue
+        if prev.get("stop_id") and prev.get("t_start"):
+            stop_id = int(prev["stop_id"])
+            t_start = int(prev["t_start"])
+            log(f"=== {sym} REPRISE: curseur {int(db_min):,} → stop {stop_id:,} ===")
+        else:
+            t_start = int(time.time() * 1000) - window_days * DAY_MS
+            stop_id = first_id_at(sym, t_start, int(db_max))
+            log(f"=== {sym} ÉTENDUE J-{window_days}: MIN db {int(db_min):,} → "
+                f"stop {stop_id:,} ≈ {(int(db_min) - stop_id):,} prints "
+                f"(borne {datetime.fromtimestamp(t_start / 1000, timezone.utc):%Y-%m-%d}) ===")
+        pages, rows, t0 = 0, 0, time.time()
+        batch: list[tuple] = []
+        status = "interrompu"
+        cursor = int(db_min)  # borne haute EXCLUE de la prochaine page
+        while cursor > stop_id:
+            if budget_deadline and time.time() > budget_deadline:
+                status = f"cap --max-minutes atteint (reprise curseur {cursor})"
+                break
+            fid = max(1, cursor - PAGE_LIMIT)
+            pg = fetch_page(sym, fid)
+            if pg is None:
+                status = "erreur réseau persistante — reprise possible"
+                break
+            if not pg:
+                status = "fin (page vide)"
+                break
+            kept = [(int(t["a"]), sym, int(t["T"]), float(t["p"]),
+                     float(t["q"]), int(bool(t["m"]))) for t in pg
+                    if stop_id <= int(t["a"]) < cursor]
+            batch.extend(kept)
+            new_cursor = min(int(t["a"]) for t in pg)
+            if new_cursor >= cursor:
+                status = f"blocage pagination à {cursor} (page sans progression)"
+                break
+            cursor = new_cursor
+            pages += 1
+            if len(batch) >= BATCH_ROWS or cursor <= stop_id:
+                con.executemany(
+                    "INSERT OR IGNORE INTO aster_tape (agg_id, symbol, ts_ms, "
+                    "price, qty, is_buyer_maker) VALUES (?,?,?,?,?,?)", batch)
+                safe_commit(con)  # batch committé AVANT l'appel réseau suivant
+                rows += len(batch)
+                batch = []
+                st = load_state()
+                st[key] = {"window_days": window_days, "mode": "backward",
+                           "pages": pages, "rows": rows, "done": False,
+                           "status": "en cours", "stop_id": stop_id,
+                           "t_start": t_start, "cursor": cursor,
+                           "updated_at": datetime.now(timezone.utc)
+                                         .isoformat(timespec="seconds")}
+                save_state(st)  # checkpoint léger (le vrai curseur = MIN en DB)
+            if pages % 50 == 0:
+                rate = pages / max(1e-9, time.time() - t0) * PAGE_LIMIT
+                eta_min = (cursor - stop_id) / max(rate, 1e-9) / 60.0
+                log(f"  {sym} page {pages} | id {cursor:,} | +{rows:,} rows "
+                    f"| {rate:,.0f} prints/s | ETA {eta_min:.0f} min")
+        if batch:
+            con.executemany(
+                "INSERT OR IGNORE INTO aster_tape (agg_id, symbol, ts_ms, "
+                "price, qty, is_buyer_maker) VALUES (?,?,?,?,?,?)", batch)
+            safe_commit(con)
+            rows += len(batch)
+        if status == "interrompu" and cursor <= stop_id:
+            status = "tranche complète"
+        state = load_state()
+        state[key] = {"window_days": window_days, "mode": "backward",
+                      "pages": pages, "rows": rows,
+                      "done": status == "tranche complète", "status": status,
+                      "stop_id": stop_id, "t_start": t_start,
+                      "cursor": cursor,
+                      "updated_at": datetime.now(timezone.utc)
+                                    .isoformat(timespec="seconds")}
+        save_state(state)
+        dt = time.time() - t0
+        log(f"=== {sym} FIN: {status} | {pages} pages | +{rows:,} rows | "
+            f"{dt / 60:.1f} min ===")
+    return
+
+
 # ------------------------------------------------------------------- VERIFY
 def phase_verify(con: sqlite3.Connection, symbols: list[str]) -> None:
     log("=== VÉRIFICATION aster_tape ===")
@@ -366,7 +524,8 @@ def phase_verify(con: sqlite3.Connection, symbols: list[str]) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--phase", default="estimate",
-                    choices=["estimate", "backfill", "verify"])
+                    choices=["estimate", "estimate-j90", "backfill",
+                             "extend", "verify"])
     ap.add_argument("--symbols", default=",".join(SYMBOLS))
     ap.add_argument("--window-days", type=int, default=365)
     ap.add_argument("--max-minutes", type=float, default=None,
@@ -379,6 +538,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.phase == "estimate":
             phase_estimate(con, syms)
+        elif args.phase == "estimate-j90":
+            phase_estimate_tranche(con, syms, args.window_days)
+        elif args.phase == "extend":
+            phase_extend(con, syms, args.window_days, args.max_minutes)
         elif args.phase == "backfill":
             if args.force:
                 st = load_state()

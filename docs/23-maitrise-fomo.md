@@ -1,5 +1,8 @@
 # 23 — Matrice de maîtrise fomo.family
 
+> **domain: FOMO** · index : [`fomo/README.md`](fomo/README.md) · data : `data/fomo/` · reports : `reports/fomo/`  
+> **Ne pas** mélanger avec Aster (`the_machine`) ni OpenMarket.
+
 > La carte vivante de TOUT ce que le site expose vs ce qu'on capture.
 > Mise à jour à chaque nouveau chantier. Le standard : « capturé » = la table
 > peuplée en continu, « partiel » = le sous-ensemble visible seulement,

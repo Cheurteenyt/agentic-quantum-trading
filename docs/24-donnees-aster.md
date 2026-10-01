@@ -1,5 +1,7 @@
 # 24 — La couche de données Aster : l'état, les gaps, la feuille de route
 
+> **domain: ASTER** · index data : [`data/README.md`](data/README.md) · reports : `reports/aster/`
+>
 > L'audit complet du 30/09 : ce qu'on collecte, comment, ce que l'API officielle
 > offre, et le plan pour collecter mieux/vite/fiable. La source des docs API :
 > github.com/asterdex/api-docs (V3 recommandée ; v1 et v3 = mêmes capacités
@@ -22,73 +24,24 @@
 
 | Donnée | Aujourd'hui | Stream natif | Gain | Priorité |
 |---|---|---|---|---|
-| Depth 500 niveaux × 15 sym | ~~REST 30 s (2 880 req/j, ~43 k poids)~~ | `@depth@500ms` diff + resync snapshot | ✅ **P1 FAIT — CUTOVER (30/09)** : aster_depth_engine.py 24/7 (3 connexions × 5 sym, l'état maintenu, resync au trou de séquence, l'ancre Binance inapplicable à Aster corrigée au runtime) ; ACCEPTATION T+10 = 15/15, T+20 = 14/15 (le moteur fait MIEUX que 2 snapshots REST consécutifs : 12/20-17/20 de churn) ; l'ancien collector désactivé (fallback conservé) | **P1** ✅ |
-| Klines 1h/15m | nocturne 03:00 → **jusqu'à 24 h de retard** | `@kline_1h/15m` (250 ms, la bougie fermée est poussée) | la fraîcheur intra-journée pour le forward | **P2** |
-| Premium/funding | REST 15 min ×~12 | `!markPrice@arr` @1s (TOUS les symboles, 1 msg/s) | ✅ P3 FAIT (30/09) : aster_markprice_ws.py 24/7 (échantillonnage 1/min/symbole, ~26 000 lignes/jour, reconnect 23 h programmée) — l'ancien timer REST désactivé | **P3** (facile) |
-| OI | REST 15 min ×2 collecteurs en doublon (même table !) | **aucun stream** (polling inévitable) | ✅ P4 FAIT (30/09) : le nocturne retiré — il re-collectait l'univers entier en double | **P4** (facile) |
-| Liquidations | WS `!forceOrder@arr` ✅ déjà natif | — | déjà fait (le seul WS du parc) | — |
-| aggTrades/prints | REST 15 min paginé | `@aggTrade` 100 ms | tape_1m en temps réel MAIS gros débit (100 ms) — à réserver aux majors | P5 |
-| Le compteur de poids | aucun (429 subi) | header `X-MBX-USED-WEIGHT-1M` à lire partout | ✅ P5 FAIT (30/09) : scripts/aster_rate.py câblé dans les 7 collecteurs + la 9e sonde aster_health < 1800 | **P5** (transversal) |
-| Funding ×3 chemins | refresh_cache + funding_history_collector + premium_history (3 univers, 2 versions) | consolidation | un seul besoin, une seule source | P6 |
-| v1 vs v3 mélangés | depth/OI/aggTrades/premium en v1 ; klines/funding en v3 | v3 = « recommandée » (identique en market-data) | cohérence, préparation à la fin des clés v1 (03/2026) | P6 |
+| Depth 500 niveaux × 15 sym | ~~REST 30 s~~ | `@depth@500ms` | ✅ **P1 FAIT** aster_depth_engine 24/7 | **P1** ✅ |
+| Klines 1h/15m | nocturne → retard jusqu'à 24 h | `@kline_1h/15m` | fraîcheur forward | **P2** |
+| Premium/funding | REST 15 min | `!markPrice@arr` | ✅ P3 FAIT aster_markprice_ws | **P3** ✅ |
+| OI | REST 15 min (doublon nocturne retiré) | aucun stream | ✅ P4 FAIT | **P4** ✅ |
+| Liquidations | WS `!forceOrder@arr` | — | déjà natif | — |
+| Compteur poids | header lu | `X-MBX-USED-WEIGHT-1M` | ✅ P5 FAIT aster_rate + health | **P5** ✅ |
+| Funding bulk / univers | multi-chemins | bapi bulk | ✅ P6 FAIT | **P6** ✅ |
 
-## Les pièges déjà vus (gravés)
+## Pièges gravés
 
-- Les unités : depth_meta.ts en SECONDES, oi_history en ms, ts_ms ailleurs —
-  tout join/sonde vérifie l'unité AVANT (le vert mensonger du 30/09).
-- Le WS = connexion 24 h max : la reconnexion quotidienne est un événement
-  NORMAL à planifier (le pattern backoff du liq_collector est le modèle).
-- La veille S3 de la machine gèle TOUS les collecteurs (le trou de 4h49 du
-  29/09) — l'inhibition est scopée au depth collector ; l'étendre = décision
-  user (conso électrique).
+- Unités ts : secondes vs ms — vérifier AVANT tout join
+- WS max 24 h : reconnexion quotidienne = normal
+- Veille S3 machine : inhibition scopée depth (pas tout geler sans décision)
 
-## La feuille de route (l'ordre d'exécution)
+## API interne UI (bapi) — P6
 
-1. **P4 + P5-transversal** (faciles, ce soir) : dédoublonner OI (tuer le
-   nocturne dupliqué), le compteur de poids dans les 6 collecteurs REST
-   (header lu, loggé, sondé par aster_health).
-2. **P3 premium en `!markPrice@arr`** (1 stream, tous les symboles, 1 s) —
-   remplace le poll 15 min, donne aussi la prédiction de funding native.
-3. **P2 klines en WS** (les majors en `@kline_1h/15m` live → la fraîcheur
-   intra-journée pour le forward ; le nocturne garde le backfill complet).
-4. **P1 le moteur de carnet** (diff-depth + snapshot resync, stateful,
-   reconstruction 500 niveaux) — le gros morceau, à faire APRÈS que P2-P4
-   tournent, avec les tests de continuité de l'audit depth.
+- `ticker/pair` : 642 symboles OI bulk → `oi_history_bulk` (notional USDT ×2, table dédiée)
+- `real-time-funding-rate` : meta interval/cap → `funding_meta`
+- Header poids ABSENT sur bapi (hors budget fapi 2400)
 
-## Au-delà de l'API documentée : l'API INTERNE de l'UI (la sonde du 30/09)
-
-La sonde `scripts/studies/aster_ui_probe.py` + `aster_ui_replay.py` (les
-techniques fomo : capture CDP des frames WS + XHR en naviguant l'UI, puis
-rejoue curl_cffi chrome131) a découvert une famille d'endpoints NON
-documentés que l'UI asterdex.com consomme — **29/33 rejouables sans
-navigateur, pas d'auth, pas de Cloudflare** :
-
-| Flux | Contenu | Opportunité |
-|---|---|---|
-| `bapi/…/aster/ticker/pair` | **642 symboles en 1 appel** : lastPrice + volume + **openInterest** | remplace N appels openInterest non-documentés, couvre les exotiques et les perps actions |
-| `bapi/…/real-time-funding-rate` | bulk 764 syms : fundingIntervalHours, cap/floor ±0,02, estimatedSettlePrice | plus riche que premiumIndex |
-| WS `!miniTicker@arr` (sstream.asterdex.com) | 606+ symboles, temps réel | l'univers complet en 1 stream |
-| WS `!assetIndex@arr` | 42 assets : indices + taux d'emprunt bid/ask | la donnée d'emprunt n'existe pas dans fapi |
-| WS `!sfpriceIndex@arr` + `!tradingMode@arr` | les indices ACTIONS (COIN/AMD/GBP) + les fenêtres de session | les perps pre-market |
-
-Pièges gravés : curl_cffi 0.16 = impasse sur le WS aster (handshake OK puis
-recv bloquant — utiliser `websockets.sync`) ; patchright `req.all_headers()`
-dans le handler `request` pompe la boucle d'événements = les statuts perdus
-à vie (utiliser `req.headers` local — nos sondes fomo portaient le même
-pattern) ; la 2e socket du site = `sstream.asterdex.com`, le principal =
-`fstream5.asterdex.com/plain/stream`.
-
-## P6 FAIT (30/09) : l'API interne bapi câblée
-
-- **oi_collector** : la passe bulk (1 appel `bapi/…/ticker/pair`) →
-  `oi_history_bulk` (table DÉDIÉE — le bulk est un notional USDT ×2, la double
-  face, prouvé ratio 2,0000 sur les majors ; JAMAIS mixé avec les unités base
-  de fapi) + la cross-check intégrée par passe (écart vs ×2 loggué) = la
-  validation indépendante de l'endpoint OI non documenté.
-- **aster_funding_bulk** (horaire :07/:37) : `funding_meta` — interval_hours
-  (1h/2h/4h/8h par symbole), fee_cap/floor, settle_price — la précision
-  funding_fade. 764/764 upserts, 0 échec.
-- **L'univers OI : 39 → 642 symboles** (exotiques + perps actions).
-- Découverte : le header de poids est ABSENT sur bapi — cette famille ne pèse
-  PAS sur le budget fapi 2 400/min (les sondes 11 = +bulk +funding_meta).
-- Différé : `!miniTicker@arr` (pas de consommateur — la leçon zéro-pour-rien).
+Détail historique des acceptations T+10/T+20 depth : commit d'origine 30/09.
