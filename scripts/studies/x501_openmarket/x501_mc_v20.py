@@ -72,7 +72,7 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 TRADES_DIR = REPO_ROOT / "scripts" / "studies" / "x501_openmarket"
 RESULTS_PATH = Path(__file__).resolve().parent / "x501_mc_v20_results.json"
 
