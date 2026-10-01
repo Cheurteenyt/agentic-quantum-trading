@@ -596,3 +596,13 @@ origin/main
 | Le cap par quantile (q95/q50) des tailles vol-inverse : 0/3 trades ASTER capés (les entrées tombent à f = 0,45-0,67 de la médiane — ASTER calme vs med_meme) ; le flux cascade_meme n=59 : q95 −0,42 $, q50 −2,63 $ vs actuel | LA PRÉMISSE T14 RÉFUTÉE : corr(taille, ret) = +0,046 ≈ 0 ; ret moyen tailles > méd +1,23 % vs ≤ méd +0,84 % — LES GROSSES TAILLES PORTENT LES GAINS, caper dégrade | **NUL** — le sizing actuel (base 0,10 × atr/med, clip [0,02 ; 0,30]) conservé ; re-tester seulement si les entrées ASTER passent à f > 1 |
 
 Rapports : reports/aster_quantile_cap_probe.md (script : scripts/studies/aster_quantile_cap_probe.py — la reconstruction via collect_meme importé de the_machine, DB ro).
+
+## 01/10 — T20 : LES RÉGIMES D'ORDRE-FLOW sur le tape 90 j — CONTEXTE (descriptif, pas prédictif)
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Les régimes de densité : BTC 73,3 k prints/j (07-03→08-16) puis 64,1 k ; **l'effondrement daté : plancher 09-26 = 12,7 k BTC / 14 k ETH prints/j** (les 7 derniers jours 29,5 k/28,8 k = 2,5× sous la médiane train 76 k) ; la vitesse 51 → 20,5 prints/min | **le signal de marché réel : la microstructure ralentit** — daté, mesuré, à surveiller (le retour de densité = le retour d'activité) | **FAIT DESCRIPITIF** |
+| La densité EST le mouvement, pas son orientation : Spearman densité × \|ret\| journalier = 0,47-0,73 (stable train/val) ; l'agressivité buy 49,4-51,4 % partout ; en VAL BTC le CVD bascule en net sell (−1,0/−1,3 %/j) = un changement de régime de flux | **CONTEXTE** — densité = normaliseur, pas gate directionnel |
+| La prédiction (le régime courant → le return forward 24 h) : 0/8 tests x501 (AUC train ≤ 0,558 ; les val 0,672 = non confirmés + la multiplicité 8) | les seuils absolus (spoof/absorption) s'expriment en multiples de la densité courante, pas en absolus | **NUL** — la prédiction directionnelle par densité |
+
+Rapports : reports/aster_orderflow_regimes.md (script : scripts/studies/aster_orderflow_regimes.py — tri (ts_ms, agg_id), les reculs 759/476 confirmés propriété de la source, DB ro). Correction T16bis : le « 108 k/j » = l'estimation de sonde, la mesure réelle 73,3 k/j.
