@@ -33,7 +33,14 @@ officiels, doctrine, roadmap) · `docs/26-openmarket-donnees.md`
 = 75,5 %** — sources premium 7/8, orderbook 2/3, broker 15/16 ; vagues 1-2
 activées, **vague 3 hygiène broker activée**, `docs/28-protocole-ab-x501.md`
 = les A/B PRÉ-ENREGISTRÉS des vagues 1-2 (8 runs, dont MK6 TTL=2 vs 6),
+3 tests au registre docs/20) · **vague 5 : le banc de test local des flux
+dormants (`docs/30`) — le flux taker natif et le funding passés au banc
+AVANT tout run kScript : 12/12 cellules KILL au critère AUC** (80 symboles
+× 1 092 j = 2 053 975 barres, grille pré-déclarée, plomberie prouvée
+vivante ; les pouvoirs data sont désormais TOUS banc-testés : fz, flush
+OI, ML, flux, funding).
 3 tests au registre docs/20).
+origin/main
 **MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
@@ -51,6 +58,7 @@ origin/main
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
 règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 12 kScripts + 6 QA **PASS** dans
+origin/main
 origin/main
 `scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
 référence, fill 97,9 % à δ=2 ; l'audit d'exploitation kScript

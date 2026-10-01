@@ -1,0 +1,282 @@
+{
+  "outils": "x501_flux_local.py — vague 5 : banc de test local des flux dormants",
+  "grille_pre_declaree": {
+    "date": "2026-10-01",
+    "flux_lookbacks_barres": [
+      6,
+      24,
+      72
+    ],
+    "funding_lookbacks_paiements": [
+      9,
+      21,
+      90
+    ],
+    "horizons_barres": [
+      24,
+      72
+    ],
+    "hypothese_A": "continuation (AUC>0,5 attendu)",
+    "hypothese_B": "contrarian (AUC<0,5 attendu)",
+    "criterion": "AUC IC95 exclut 0,5 et |AUC-0,5|>=0.05 = CANDIDAT ; IC contient 0,5 et |AUC-0,5|<0.02 = KILL ; sinon INCONCLU"
+  },
+  "fenetre": {
+    "data_dir": "/home/z/my-project/scripts/data_x501",
+    "n_symboles": 80,
+    "n_symboles_2_series": 40,
+    "n_barres_1h": 2053975,
+    "t0": 1696118400000.0,
+    "t1": 1790463600000.0,
+    "gaps_1h": 0,
+    "cout_ar_taker_bps": 12.2
+  },
+  "etude_A_flux_taker": {
+    "L6_H24": {
+      "n": 2051975,
+      "n_haut": 1025987,
+      "n_bas": 1025988,
+      "mediane_score": -0.018604431759394666,
+      "auc": 0.5008272724488915,
+      "ic95": [
+        0.49023695391645566,
+        0.5053639026041095
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -9.345643804491369,
+      "delta_bps": 9.345643804491369,
+      "hypothese": "continuation (H_A)",
+      "verdict": "KILL"
+    },
+    "L6_H72": {
+      "n": 2048135,
+      "n_haut": 1024067,
+      "n_bas": 1024068,
+      "mediane_score": -0.018595077089383717,
+      "auc": 0.5012687351982744,
+      "ic95": [
+        0.49380282668077446,
+        0.5085299194068974
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -30.59208431199535,
+      "delta_bps": 30.59208431199535,
+      "hypothese": "continuation (H_A)",
+      "verdict": "KILL"
+    },
+    "L24_H24": {
+      "n": 2051975,
+      "n_haut": 1025987,
+      "n_bas": 1025988,
+      "mediane_score": -0.019133045378377126,
+      "auc": 0.5037912518016154,
+      "ic95": [
+        0.4951399425555206,
+        0.5126234610780177
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -10.108668182967044,
+      "delta_bps": 10.108668182967044,
+      "hypothese": "continuation (H_A)",
+      "verdict": "KILL"
+    },
+    "L24_H72": {
+      "n": 2048135,
+      "n_haut": 1024067,
+      "n_bas": 1024068,
+      "mediane_score": -0.019118379696759266,
+      "auc": 0.5015548383675196,
+      "ic95": [
+        0.49297878432885806,
+        0.5123648706380737
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -29.620853080568132,
+      "delta_bps": 29.620853080568132,
+      "hypothese": "continuation (H_A)",
+      "verdict": "KILL"
+    },
+    "L72_H24": {
+      "n": 2051975,
+      "n_haut": 1025987,
+      "n_bas": 1025988,
+      "mediane_score": -0.019247621129772602,
+      "auc": 0.5032169227279487,
+      "ic95": [
+        0.49607164487968164,
+        0.5142384630713197
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -9.727626459144062,
+      "delta_bps": 9.727626459144062,
+      "hypothese": "continuation (H_A)",
+      "verdict": "KILL"
+    },
+    "L72_H72": {
+      "n": 2048135,
+      "n_haut": 1024067,
+      "n_bas": 1024068,
+      "mediane_score": -0.019231054996507187,
+      "auc": 0.5026700017879374,
+      "ic95": [
+        0.4942215401015472,
+        0.5156340496058474
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -31.874765749594268,
+      "delta_bps": 31.874765749594268,
+      "hypothese": "continuation (H_A)",
+      "verdict": "KILL"
+    }
+  },
+  "etude_B_funding": {
+    "K9_H24": {
+      "n": 2047106,
+      "n_haut": 1023549,
+      "n_bas": 1023557,
+      "mediane_score": 5.355111111110533e-05,
+      "auc": 0.4957910880219339,
+      "ic95": [
+        0.47997295949413143,
+        0.5084921192793976
+      ],
+      "fwd_bps_haut": -8.484762780174258,
+      "fwd_bps_bas": 0.0,
+      "delta_bps": -8.484762780174258,
+      "hypothese": "contrarian (H_B)",
+      "verdict": "KILL"
+    },
+    "K9_H72": {
+      "n": 2043266,
+      "n_haut": 1021629,
+      "n_bas": 1021637,
+      "mediane_score": 5.350777777777794e-05,
+      "auc": 0.49559291959519075,
+      "ic95": [
+        0.4762957961260926,
+        0.5109399139109558
+      ],
+      "fwd_bps_haut": -25.324469768913183,
+      "fwd_bps_bas": -3.635041802980334,
+      "delta_bps": -21.68942796593285,
+      "hypothese": "contrarian (H_B)",
+      "verdict": "KILL"
+    },
+    "K21_H24": {
+      "n": 2039713,
+      "n_haut": 1015810,
+      "n_bas": 1023903,
+      "mediane_score": 4.999999999999449e-05,
+      "auc": 0.4996676276459463,
+      "ic95": [
+        0.48485383341255944,
+        0.5176020870578716
+      ],
+      "fwd_bps_haut": -4.78205773037158,
+      "fwd_bps_bas": 0.0,
+      "delta_bps": -4.78205773037158,
+      "hypothese": "contrarian (H_B)",
+      "verdict": "KILL"
+    },
+    "K21_H72": {
+      "n": 2035873,
+      "n_haut": 1013049,
+      "n_bas": 1022824,
+      "mediane_score": 4.999999999999449e-05,
+      "auc": 0.4982669025214227,
+      "ic95": [
+        0.48402876363254044,
+        0.5207319422273633
+      ],
+      "fwd_bps_haut": -22.08114821970774,
+      "fwd_bps_bas": -6.036460241723459,
+      "delta_bps": -16.04468797798428,
+      "hypothese": "contrarian (H_B)",
+      "verdict": "KILL"
+    },
+    "K90_H24": {
+      "n": 1997649,
+      "n_haut": 998817,
+      "n_bas": 998832,
+      "mediane_score": 4.9138999999995885e-05,
+      "auc": 0.5066659865461831,
+      "ic95": [
+        0.49293898807591313,
+        0.5251838131298114
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -16.077170418006446,
+      "delta_bps": 16.077170418006446,
+      "hypothese": "contrarian (H_B)",
+      "verdict": "KILL"
+    },
+    "K90_H72": {
+      "n": 1993809,
+      "n_haut": 996900,
+      "n_bas": 996909,
+      "mediane_score": 4.912355555555217e-05,
+      "auc": 0.5102871634497887,
+      "ic95": [
+        0.4911244248221163,
+        0.5295886762690373
+      ],
+      "fwd_bps_haut": 0.0,
+      "fwd_bps_bas": -46.692607003890224,
+      "delta_bps": 46.692607003890224,
+      "hypothese": "contrarian (H_B)",
+      "verdict": "KILL"
+    }
+  },
+  "resume_verdicts": {
+    "A": {
+      "KILL": 6
+    },
+    "B": {
+      "KILL": 6
+    }
+  },
+  "etude_C_pool_P1": {
+    "n_pool_utilise": 469,
+    "score_A": {
+      "nom": "flux_EMA_L24",
+      "n": 469,
+      "n_hors": 0,
+      "mediane_split": -0.012651731853607465,
+      "n_haut": 234,
+      "n_bas": 235,
+      "R_med_haut": -0.28116608699760093,
+      "R_med_bas": -0.3699736848686363,
+      "R_moy_haut": 0.21625061865502745,
+      "R_moy_bas": 0.14327216915069643,
+      "WR_haut": 47.863247863247864,
+      "WR_bas": 45.1063829787234,
+      "delta_med_R": 0.08880759787103537,
+      "ic95_delta_med": [
+        -0.8846562242676603,
+        1.0955102583749912
+      ],
+      "P_delta_sup_0": 0.686,
+      "statut": "CONTEXTE (in-sample du pool, jamais promotion)"
+    },
+    "score_B": {
+      "nom": "funding_K21",
+      "n": 469,
+      "n_hors": 0,
+      "mediane_split": 2.4062857142857313e-05,
+      "n_haut": 234,
+      "n_bas": 235,
+      "R_med_haut": -0.34950479427883185,
+      "R_med_bas": -0.2537336316833707,
+      "R_moy_haut": 0.2177322829086848,
+      "R_moy_bas": 0.14179680985130994,
+      "WR_haut": 45.2991452991453,
+      "WR_bas": 47.65957446808511,
+      "delta_med_R": -0.09577116259546115,
+      "ic95_delta_med": [
+        -1.1216558597472808,
+        0.5691487882805243
+      ],
+      "P_delta_sup_0": 0.3594,
+      "statut": "CONTEXTE (in-sample du pool, jamais promotion)"
+    }
+  }
+}
