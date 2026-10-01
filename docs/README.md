@@ -16,6 +16,13 @@ des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 | **30-flux-funding-banc-local** | le banc de test des flux dormants : flux taker natif + funding au banc, 12/12 cellules KILL, plomberie prouvée vivante | avant de proposer un filtre de flux ou de funding |
 | **31-absorption-banc-evenements** | le banc d'événements de l'absorption (proxy klines) : prime de structure réfutée 0/4, la confirmation est TARDIVE, ABS_DEPRIORISE — la file de runs priorisée | avant de lancer les runs ABS ou de croire au pattern sans ordrebook |
 | **32-references-banc-local** | le banc des références de liquidité : vwap de session + volume profile de la veille aux DEUX hypothèses, 55 KILL / 1 INCONCLU / 0 CANDIDAT — la famille analyse est close (7ᵉ falsification) | avant de brancher un vwap, un profil de volume, ou de croire au « benchmark institutionnel » |
+| **28-protocole-ab-x501** | le protocole A/B PRÉ-ENREGISTRÉ : 6 runs, critères figés 01/10/2026, moteur déterministe | avant et après tout run A/B des vagues 1-2 |
+| **27-pouvoirs-kscript** | le registre d'exploitation : 36/53 capacités (67,9 %), vagues 1-2 ACTIVÉES (régime institutionnel + absorption), backtests A/B à venir | avant d'écrire tout nouveau kScript |
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
 | **22-nos-indicateurs** | LES 10 CRÉATIONS : chaque indicateur, sa règle, sa preuve | pour savoir ce qu'on possède |
 | **20-registre-indicateurs** | la source de vérité des verdicts (25+ datés + les 25 réfutés) | avant de croire quoi que ce soit |
 | **21-goal-performances** | le plan P1-P5 + les dates de tir + le volet institutionnel | pour savoir où on va |

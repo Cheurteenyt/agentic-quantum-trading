@@ -14,6 +14,8 @@
 > protocole (le juge de l'ordrebook ne change pas) mais passe EN QUEUE —
 > avec un rôle renforcé : un verdict ABS positif là où l'ombre klines est
 > morte prouverait la valeur UNIQUE du champ carnet.
+origin/main
+origin/main
 
 ## LA RÈGLE (une phrase)
 
@@ -51,6 +53,8 @@ KILL ou INCONCLU laissent la référence intacte et le registre tranchera.
 > inchangé, et son rôle est précisé : un PROMOTION sur ABS alors que le
 > proxy klines est mort = preuve par contraste que le champ orderbook porte
 > une information unique (à valider en papier v11 comme tout PROMOTION).
+origin/main
+origin/main
 
 **Discipline de run** : même fenêtre temporelle et mêmes inputs pour les
 deux jambes d'un même test (seul le filtre / le pattern change) ; les 8 flux

@@ -125,6 +125,8 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    de rendements forward exactement nuls). Le pattern ORDERBOOK réel
    (maxBidAmount) reste au protocole A/B — désormais EN QUEUE de file
    (ABS_DEPRIORISE, derrière RI/MK6).
+origin/main
+origin/main
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -220,6 +222,8 @@ est re-éditée.
    flux/funding, absorption-proxy, et désormais vwap + volume profile). La famille analyse de `docs/27` est CLOSE :
    chaque pouvoir est exploité, mesuré et fermé, refusé par design, sans
    data locale, ou de la dette de style.
+origin/main
+origin/main
 
 ## LES RÈGLES NON NÉGOCIABLES
 

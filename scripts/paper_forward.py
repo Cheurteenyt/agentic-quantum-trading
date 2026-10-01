@@ -84,6 +84,46 @@ def probe_fields(con: sqlite3.Connection, sym: str, t0_ms: float) -> tuple:
         return 0.0, 0.0, 0.0
 
 
+# ——— LE GATE fund7 (MÉCANISME P3 VALIDÉ — PRÉ-ENREGISTRÉ le 30/09/2026) ———
+# Sonde p2 (reports/aster_deep_regimes_p2.md, N=61, 29 fermés) : les shorts
+# cascade/sweep activés en funding POSITIF élevé gagnent (fund7 ≥ 0,5 bps/8h
+# → hit 50 %, ret méd +2,0 % ; manie > 1 bp → hit 100 % n=6) ; en funding
+# négatif ils perdent (hit 44 %, ret −0,7 % — la foule déjà short = pas de
+# carburant). UNITÉ VERIFIÉE sur les données : fund7_at retourne des % /8h
+# (rate décimal ×100) et COUNT(fund7 > 0,005) sur paper_trades = 32/61,
+# la reproduction exacte des « 32/61 à fund7 > 0,5 bps/8h » de p2 →
+# le seuil exact dans l'échelle stockée = 0,005 %/8h (= 0,5 bps).
+GATE_FUND7_MIN_PCT = 0.005   # 0,5 bps/8h
+# Familles gate-d : les shorts CASCADE/SWEEP de la sonde uniquement.
+# PAS machine_vol_spike_6h (fund7 méd −0,04 bps, pire famille — le gate
+# les tuerait à tort). machine_cascade_majors / machine_deep_fast /
+# cascade_funding_rank_low : hors sonde (aucun n=61) — non gate-d, le
+# verdict 90 j tranchera. Les trades déjà ouverts ne sont PAS touchés.
+GATE_FUND7_SIGNALS = frozenset({
+    "machine_cascade_meme",    # cascade memecoins (n=23, méd +0,80 bps)
+    "sweep_liquidite_short",   # sweep de liquidité (n=31, méd +0,66 bps)
+})
+GATE_STATS = {"checked": 0, "skipped": 0}
+
+
+def fund7_gate_pass(name: str, sym: str, fund7_pct: float) -> bool:
+    """True = le signal passe le gate fund7 (protocole pré-enregistré 30/09).
+
+    Skip si fund7 ≤ 0,5 bps/8h : pas de carburant de cascade. fund7 = 0.0
+    (données funding absentes) → skip : sans données on ne peut PAS
+    confirmer le carburant, le gate est mécanisme-dépendant.
+    """
+    if name not in GATE_FUND7_SIGNALS:
+        return True
+    GATE_STATS["checked"] += 1
+    if fund7_pct <= GATE_FUND7_MIN_PCT:
+        GATE_STATS["skipped"] += 1
+        print(f"[gate-fund7] {sym} fund7={fund7_pct:.4f} %/8h < 0,5 bps — "
+              "skip (mécanisme P3, pré-enregistré 30/09)")
+        return False
+    return True
+
+
 def load_env_funding_stats(con: sqlite3.Connection) -> dict[str, float]:
     """taux de funding moyen PAR HEURE par symbole (comme le harnais)."""
     import statistics
@@ -218,6 +258,8 @@ def main() -> int:
                     status = "open"
                     closed_n += 0
                 f7, v7, l24 = probe_fields(con, sym, sig_ts)   # sonde P3
+                if not fund7_gate_pass(name, sym, f7):
+                    continue   # gate fund7 : pas de carburant → pas de trade
                 con.execute(
                     "INSERT OR IGNORE INTO paper_trades (signal, symbol, "
                     "horizon_h, direction, signal_ts, entry_ts, entry_price, "
@@ -363,6 +405,8 @@ def main() -> int:
                     "AND signal_ts=?", (_sig, e["sym"], sig_ms)).fetchone():
                     continue
                 _f7, _v7, _l24 = probe_fields(con, e["sym"], sig_ms)
+                if not fund7_gate_pass(_sig, e["sym"], _f7):
+                    continue   # gate fund7 : pas de carburant → pas de trade
                 con.execute(
                     "INSERT OR IGNORE INTO paper_trades (signal, symbol, "
                     "horizon_h, direction, signal_ts, entry_ts, entry_price, "
@@ -412,7 +456,9 @@ def main() -> int:
                        "AVG(ret_pct) FROM paper_trades GROUP BY 1,2,3").fetchall()
     lines = [f"# Paper Forward — {datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC",
              "Les 5 candidats de la campagne v5 jugés sur les données fraîches.",
-             f"Cette exécution : {opened} ouvertures, {closed_n} clôtures.", "",
+             f"Cette exécution : {opened} ouvertures, {closed_n} clôtures.",
+             f"Gate fund7 (pré-enregistré 30/09) : {GATE_STATS['checked']} "
+             f"contrôles, {GATE_STATS['skipped']} skips.", "",
              "| Candidat | H | Statut | N | WR | Ret moyen |", "|---|---|---|---|---|---|"]
     for sig, h, status, n, avg in rows:
         wr = con.execute("SELECT AVG(ret_pct > 0) FROM paper_trades "
@@ -481,6 +527,11 @@ def main() -> int:
     out = (REPORTS / f"paper-forward-{datetime.now(timezone.utc):%Y-%m-%d-%H%M}.md")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[paper] {opened} ouvertures, {closed_n} clôtures -> {out}")
+    _gs = GATE_STATS
+    _gpct = 100.0 * _gs["skipped"] / _gs["checked"] if _gs["checked"] else 0.0
+    print(f"[gate-fund7] run : {_gs['checked']} contrôles, "
+          f"{_gs['skipped']} skips ({_gpct:.0f} %) — le taux de skip = "
+          "la métrique du gate")
     con.close()
     return 0
 
