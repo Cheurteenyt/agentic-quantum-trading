@@ -1,0 +1,38 @@
+{
+ "bybit": {
+  "1000PEPEUSDT": 0,
+  "ADAUSDT": 0,
+  "APTUSDT": 0,
+  "AVAXUSDT": 0,
+  "BNBUSDT": 0,
+  "BTCUSDT": 0,
+  "DOGEUSDT": 0,
+  "ETHUSDT": 0,
+  "LINKUSDT": 0,
+  "SOLUSDT": 0,
+  "SUIUSDT": 0,
+  "XRPUSDT": 0
+ },
+ "binance": {
+  "BTCUSDT": 0,
+  "ETHUSDT": 0,
+  "BNBUSDT": 0,
+  "XRPUSDT": 29050,
+  "ADAUSDT": 15000,
+  "LINKUSDT": 0,
+  "DOGEUSDT": 39585,
+  "SOLUSDT": 50003,
+  "AVAXUSDT": 33287
+ },
+ "funding": {
+  "BTCUSDT": 0,
+  "ETHUSDT": 0,
+  "BNBUSDT": 0,
+  "XRPUSDT": 0,
+  "ADAUSDT": 0,
+  "LINKUSDT": 0,
+  "DOGEUSDT": 0,
+  "SOLUSDT": 0,
+  "AVAXUSDT": 0
+ }
+}

@@ -1,0 +1,74 @@
+{
+ "1000PEPEUSDT": {
+  "kline1h_bybit": 1683072000000,
+  "kline1h_binance": 1683244800000,
+  "oi1d_bybit": 1683072000000,
+  "funding_binance": 1683244800000
+ },
+ "ADAUSDT": {
+  "kline1h_bybit": 1616025600000,
+  "kline1h_binance": 1593734400000,
+  "oi1d_bybit": 1616025600000,
+  "funding_binance": 1579392000000
+ },
+ "APTUSDT": {
+  "kline1h_bybit": 1666137600000,
+  "kline1h_binance": 1666137600000,
+  "oi1d_bybit": 1666137600000,
+  "funding_binance": 1666051200000
+ },
+ "AVAXUSDT": {
+  "kline1h_bybit": 1631664000000,
+  "kline1h_binance": 1600819200000,
+  "oi1d_bybit": 1631664000000,
+  "funding_binance": 1600732800000
+ },
+ "BNBUSDT": {
+  "kline1h_bybit": 1624924800000,
+  "kline1h_binance": 1581292800000,
+  "oi1d_bybit": 1624924800000,
+  "funding_binance": 1581292800000
+ },
+ "BTCUSDT": {
+  "kline1h_bybit": 1585094400000,
+  "kline1h_binance": 1567900800000,
+  "oi1d_bybit": 1596499200000,
+  "funding_binance": 1568073600000
+ },
+ "DOGEUSDT": {
+  "kline1h_bybit": 1627344000000,
+  "kline1h_binance": 1596153600000,
+  "oi1d_bybit": 1622592000000,
+  "funding_binance": 1594339200000
+ },
+ "ETHUSDT": {
+  "kline1h_bybit": 1615680000000,
+  "kline1h_binance": 1574812800000,
+  "oi1d_bybit": 1603238400000,
+  "funding_binance": 1574812800000
+ },
+ "LINKUSDT": {
+  "kline1h_bybit": 1603238400000,
+  "kline1h_binance": 1579219200000,
+  "oi1d_bybit": 1603238400000,
+  "funding_binance": 1579219200000
+ },
+ "SOLUSDT": {
+  "kline1h_bybit": 1634169600000,
+  "kline1h_binance": 1600041600000,
+  "oi1d_bybit": 1624924800000,
+  "funding_binance": 1599955200000
+ },
+ "SUIUSDT": {
+  "kline1h_bybit": 1683072000000,
+  "kline1h_binance": 1694649600000,
+  "oi1d_bybit": 1683072000000,
+  "funding_binance": 1683072000000
+ },
+ "XRPUSDT": {
+  "kline1h_bybit": 1620864000000,
+  "kline1h_binance": 1578268800000,
+  "oi1d_bybit": 1620864000000,
+  "funding_binance": 1578268800000
+ }
+}

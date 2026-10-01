@@ -9,14 +9,15 @@
 | [`openmarket/`](openmarket/) | OPENMARKET | baselines x501, MC |
 | [`x/`](x/) | X | harvest / calls |
 
-## Fichiers migrés (01/10/2026)
+## Fichiers migrés (01/10/2026, stubs supprimés le 02/10/2026)
 
-| Ancien path (stub) | Nouveau path |
+| Ancien path | Nouveau path |
 |---|---|
 | `reports/openmarket-x501-baseline-2026-10-01.md` | [`openmarket/x501-baseline-2026-10-01.md`](openmarket/x501-baseline-2026-10-01.md) |
 | `reports/openmarket-x501-baseline-2026-09-30.md` | [`openmarket/x501-baseline-2026-09-30.md`](openmarket/x501-baseline-2026-09-30.md) |
 | `reports/decay-curve-2026-09-28.md` | [`aster/decay-curve-2026-09-28.md`](aster/decay-curve-2026-09-28.md) |
 
-Les stubs à l'ancien emplacement pointent vers le nouveau fichier (liens docs inchangés).
+Les stubs intermédiaires ont été supprimés (les liens pointent désormais directement
+vers `openmarket/` et `aster/` ; seule référence externe mise à jour : docs/25).
 
 Runtime logs → `logs/`, pas ici.

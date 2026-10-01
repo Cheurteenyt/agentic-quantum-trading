@@ -23,7 +23,7 @@ non simulées.
 Procédure par chart : coller le script → créer l'alerte sur la condition du
 collecteur → régler la fréquence « une fois par clôture de bougie » → router
 vers le journal (webhook/e-mail de la plateforme). Aucun `strategy.*` dans les
-deux scripts (vérifié par QA statique : `scripts/qa_observe_x501.py`, 13/13
+deux scripts (vérifié par QA statique : `scripts/studies/x501_openmarket/qa_observe_x501.py`, 13/13
 contrôles par fichier) : la collecte n'interfère avec AUCUN trade du déploiement.
 
 ## 3. Format des lignes

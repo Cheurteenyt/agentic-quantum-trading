@@ -22,7 +22,11 @@ KILL, S4 régime vol DIAG, et une seule survie — S2 impulsion OI × prix, ADVI
 (dispersion test 28,1 bps : flush +9,9 vs tendance_L −18,2). Aucun de ces signaux ne
 bloque : le pont d'armement logge le contexte om_v29 en A7 à chaque relevé (preuve
 temporelle 4×/j) et le collecteur `x501_observe_om_v29.ks` expose la couche sur le
-graphe sans abonnement. Détail complet : `reports/openmarket-x501-baseline-2026-10-01.md`.
+graphe sans abonnement. Détail complet : [`reports/openmarket/x501-baseline-2026-10-01.md`](../reports/openmarket/x501-baseline-2026-10-01.md).
+
+**Horizon de backtest (v29, règle verrouillée)** : tout backtest part du début de
+l'actif (listing perp mesuré) — planchers, base deep 1 041 871 barres et baseline
+6 ans : [`docs/37-openmarket-horizon-backtest.md`](37-openmarket-horizon-backtest.md).
 
 ## LA MISSION
 
