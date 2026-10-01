@@ -188,3 +188,33 @@ INCONCLU (n_B < 20) : la règle « fenêtre élargie, JAMAIS de promotion sous
 N_MIN — pas même quand le bootstrap sourit » est écrite AVANT les runs, et
 la démo du moteur sur les CSV de référence l'illustre (P = 0,9358, n_B = 15
 → INCONCLU imposé).
+
+## EXÉCUTION — LA VAGUE 7 FERME LA FAMILLE ANALYSE (le 01/10/2026, `docs/32`)
+
+Les deux derniers pouvoirs d'analyse réels — `vwap` et `volume profile`
+(0 script depuis le début) — sont passés au banc local (`x501_refs_local.py`,
+grille PRÉ-DÉCLARÉE de 28 cellules, critère AUC du domaine, seed 501) AVANT
+tout run plateforme : **55 KILL / 1 INCONCLU / 0 CANDIDAT** sur 56 cellules
+(80 symboles × 1 092 j = 2 048 055 décisions ; les deux hypothèses opposées
+mean-reversion/continuation testées sur les MÊMES événements ; panel
+LIQUIDE8 ; focus BTC/ETH ; pool P1 en CONTEXTE — F1 mauvais côté vwap
+ΔR −0,581, P = 0,42, INCONCLU au gate, jamais une promotion in-sample).
+La plomberie est prouvée vivante (le détecteur voit une aimantation plantée
+à AUC 0,911 et une continuation plantée à 0,929 ; zéro look-ahead par
+mutation, y compris le profil de la journée en cours). **La famille analyse
+est CLOSE** — chaque pouvoir du registre est désormais dans l'un des cinq
+états : exploité, mesuré et fermé, refusé par design, sans data locale, ou
+dette de style :
+
+| pouvoir restant | état final | pourquoi |
+|---|---|---|
+| `strategy.exit profit=/loss=` | refusé par design | distances en ticks symbol-dépendantes ; notre échelle calcule des prix absolus (docs/28) |
+| `ethena_positions` | sans use case | le carry USDe n'entre dans aucun filtre du domaine |
+| `ltf()` (TF inférieur) | **sans data locale** | aucun équivalent klines 1h sur disque — non falsifiable localement, documenté tel quel |
+| `minBidAmount/minAskAmount` | **sans data locale** | la L1 du carnet n'est pas dans les klines ; le mur RÉEL reste jugé par le run ABS (rôle renforcé par le contraste, docs/31) |
+| collections / loops / types / streams / panes / libraries, `plot/label` | dette de style | sans edge espéré (décision vague 1) — à activer seulement si un futur besoin le justifie |
+
+Le taux d'exploitation brut reste 40/53 (75,5 %) — il ne bougera plus sans
+nouveau use case ; la différence, c'est qu'**aucune case du registre n'est
+désormais ignorée par ignorance** : chaque case est une décision datée et
+chiffrée.

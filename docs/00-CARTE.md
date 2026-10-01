@@ -43,7 +43,14 @@ OI, ML, flux, funding) · **vague 6 : le banc d'événements de l'absorption
 AVANT les runs ABS : prime de structure RÉFUTÉE 0/4 (la confirmation est
 TARDIVE, le rebond se joue dans la barre de tenue), miroir SHORT
 anti-signal, ABS_DEPRIORISE — file de runs recommandée : RI → MK6 → TRAIL
-→ ABS**).
+→ ABS**) · **vague 7 : le banc des références de liquidité (`docs/32`) —
+vwap de session + volume profile de la veille (les 2 derniers pouvoirs
+d'analyse réels, les briques payantes de TradingView) passés au banc AVANT
+tout run : grille pré-déclarée de 28 cellules aux DEUX hypothèses
+(mean-reversion ET continuation) → 55 KILL / 1 INCONCLU / 0 CANDIDAT sur 56
+cellules (2 048 055 décisions, plomberie prouvée vivante AUC 0,91/0,93,
+zéro look-ahead par mutation) — la 7ᵉ falsification, la famille analyse de
+docs/27 est CLOSE**).
 **MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
