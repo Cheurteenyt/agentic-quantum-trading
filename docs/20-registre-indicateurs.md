@@ -588,3 +588,11 @@ L'étude : scripts/studies/aster_machine_deep_regimes.py + reports/aster_machine
 origin/main
 origin/main
 origin/main
+
+## 01/10 — LA SONDE DU CAP QUANTILE (ASTERUSDT, suite T14) — NUL, le sizing actuel conservé
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Le cap par quantile (q95/q50) des tailles vol-inverse : 0/3 trades ASTER capés (les entrées tombent à f = 0,45-0,67 de la médiane — ASTER calme vs med_meme) ; le flux cascade_meme n=59 : q95 −0,42 $, q50 −2,63 $ vs actuel | LA PRÉMISSE T14 RÉFUTÉE : corr(taille, ret) = +0,046 ≈ 0 ; ret moyen tailles > méd +1,23 % vs ≤ méd +0,84 % — LES GROSSES TAILLES PORTENT LES GAINS, caper dégrade | **NUL** — le sizing actuel (base 0,10 × atr/med, clip [0,02 ; 0,30]) conservé ; re-tester seulement si les entrées ASTER passent à f > 1 |
+
+Rapports : reports/aster_quantile_cap_probe.md (script : scripts/studies/aster_quantile_cap_probe.py — la reconstruction via collect_meme importé de the_machine, DB ro).
