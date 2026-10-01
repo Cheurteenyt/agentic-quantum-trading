@@ -59,6 +59,9 @@ hermes-cloudflare/
 data/*
 !data/README.md
 backend/data/
+# le domaine openmarket x501 : data runtime (docs/26)
+data_x501/*
+!data_x501/.gitkeep
 
 # Node (frontend has its own frontend/node_modules; root one is a stray build artifact)
 node_modules/

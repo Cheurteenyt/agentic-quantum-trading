@@ -22,12 +22,14 @@ import json
 import os
 import re
 
-OUT = "/home/z/my-project/scripts/x501_v10_results"
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # racine du repo
+KS_DIR = os.path.join(BASE, "scripts", "studies", "x501_openmarket")
+OUT = os.path.join(BASE, "scripts", "x501_v10_results")
 os.makedirs(OUT, exist_ok=True)
 FILES = [
-    "/home/z/my-project/download/kscript/x501_observe_flow_H1.ks",
-    "/home/z/my-project/download/kscript/x501_observe_cvd4_btc_H1.ks",
-    "/home/z/my-project/download/kscript/x501_observe_om_v29.ks",
+    os.path.join(KS_DIR, "x501_observe_flow_H1.ks"),
+    os.path.join(KS_DIR, "x501_observe_cvd4_btc_H1.ks"),
+    os.path.join(BASE, "download", "kscript", "x501_observe_om_v29.ks"),
 ]
 
 def eq_bal(s, op, cl):

@@ -48,14 +48,15 @@ import json
 import pickle
 import sqlite3
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-BASE = "/home/z/my-project/scripts"
-OUT = f"{BASE}/x501_v21_results"
+ROOT = Path(__file__).resolve().parents[1]   # racine du repo
+OUT = str(ROOT / "scripts" / "x501_v21_results")
 DB = f"{OUT}/om_v27.db"
-POOL = f"{BASE}/x501_v8_results/pool_v8_P1.pkl"
+POOL = str(ROOT / "data_x501" / "pool_v8_P1.pkl")   # data runtime (git-ignorée)
 DB_TS_S = True          # om_v27.db : ts en SECONDES (pool pickle : ms -> //1000)
 DAY_S = 86_400
 H4_S = 14_400

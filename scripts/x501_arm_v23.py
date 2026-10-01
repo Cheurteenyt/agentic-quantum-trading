@@ -20,10 +20,12 @@ Sorties :
   code retour 0 = ARMED, 1 = NO-ARM
 """
 import hashlib, json, os, sqlite3, subprocess, sys, time
+from pathlib import Path
 
-BASE = "/home/z/my-project"
-sys.path.insert(0, BASE + "/scripts")
-OUT = f"{BASE}/scripts/x501_v21_results"
+BASE = Path(__file__).resolve().parents[1]   # racine du repo
+KS_DIR = BASE / "scripts" / "studies" / "x501_openmarket"
+sys.path.insert(0, str(BASE / "scripts"))
+OUT = str(BASE / "scripts" / "x501_v21_results")
 DB = f"{OUT}/om_v21.db"
 JOURNAL = f"{OUT}/scheduler_journal_v22.jsonl"
 ARMING = f"{OUT}/arming_x501.json"
@@ -33,12 +35,12 @@ ML_SCORES = f"{OUT}/ml_scores_v25.json"
 CONTEXTE_V29 = f"{OUT}/contexte_om_v29.json"
 
 KS_FILES = [
-    f"{BASE}/download/kscript/Operation_x501_Signature_H1.ks",
-    f"{BASE}/download/kscript/Operation_x501_Signature_H4.ks",
-    f"{BASE}/download/kscript/Operation_x501_Alpha2_Cascade_Financement_H4.ks",
-    f"{BASE}/download/kscript/Operation_x501_Alpha3_Eruption_Volatilite_H4.ks",
-    f"{BASE}/download/kscript/Operation_x501_Alpha4_Confluence_MTF_H4.ks",
-    f"{BASE}/download/kscript/x501_setup_kscript.js",
+    str(KS_DIR / "Operation_x501_Signature_H1.ks"),
+    str(KS_DIR / "Operation_x501_Signature_H4.ks"),
+    str(KS_DIR / "Operation_x501_Alpha2_Cascade_Financement_H4.ks"),
+    str(KS_DIR / "Operation_x501_Alpha3_Eruption_Volatilite_H4.ks"),
+    str(KS_DIR / "Operation_x501_Alpha4_Confluence_MTF_H4.ks"),
+    str(KS_DIR / "x501_setup_kscript.js"),
 ]
 ARM_MAX_AGE_H = 7.0
 SCHEDULE = "0 3,9,15,21 * * * (UTC, hors fenêtres funding 00/08/16)"
@@ -109,7 +111,7 @@ def main():
         json.dump({"ts": int(time.time()), "files": now_h}, open(MANIFEST, "w"), indent=1)
 
     # ---- A5 : QA statique kScript (0 échec requis) -------------------------
-    r = subprocess.run([sys.executable, f"{BASE}/scripts/qa_kscript_x501.py"],
+    r = subprocess.run([sys.executable, str(KS_DIR / "qa_kscript_x501.py")],
                        capture_output=True, text=True, timeout=60)
     qa_ok = "0 échec" in (r.stdout + r.stderr) or r.returncode == 0
     if not qa_ok:
