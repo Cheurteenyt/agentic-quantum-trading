@@ -62,7 +62,7 @@ d'ordres : `depth.db` (54 M bins, 30 s, 15 symboles), `wall_detector.py`,
 `aster_absorption.py`. kScript embarque la même couche **en natif** :
 `sumBids`/`sumAsks` (pression par profondeur `depthPct`), et surtout
 `maxBidAmount`/`maxAskAmount` — **la détection des baleines dans le
-carnet, une ligne, dans le backtest**. Usage actuel : `sumBids/sumAsks`
+cartet, une ligne, dans le backtest**. Usage actuel : `sumBids/sumAsks`
 dans 1 script sur 10, les max/min amounts nulle part. C'est la vague 2 du
 plan ci-dessous.
 
@@ -214,13 +214,7 @@ dette de style :
 | `minBidAmount/minAskAmount` | **sans data locale** | la L1 du carnet n'est pas dans les klines ; le mur RÉEL reste jugé par le run ABS (rôle renforcé par le contraste, docs/31) |
 | collections / loops / types / streams / panes / libraries, `plot/label` | dette de style | sans edge espéré (décision vague 1) — à activer seulement si un futur besoin le justifie |
 
-Le taux d'exploitation brut reste 40/53 (75,5 %) — il ne bougera plus sans
+Le taux d'exploitation brut reste **40/53 (75,5 %)** — il ne bougera plus sans
 nouveau use case ; la différence, c'est qu'**aucune case du registre n'est
 désormais ignorée par ignorance** : chaque case est une décision datée et
 chiffrée.
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main

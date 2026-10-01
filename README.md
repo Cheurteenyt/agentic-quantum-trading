@@ -27,14 +27,26 @@ features), executed **maker-only at 10x** — where the leverage rule
 `lev ≤ 100/(maxMAE + 0.5)` guarantees **zero liquidations by
 construction** (observed max MAE 7.84% vs a 9.5% death line).
 
-Official 1-year backtest (100 USD, maker costs, real funding):
+Official 1-year backtest table (100 USD, maker costs, real funding):
 **+3,905%/yr at 24.8% max drawdown, 0 liquidations** (4 streams: majors
 cascade, memecoin cascade, long-only survivor, vol_spike_6h). Two QUBO
-candidates run in parallel paper-forward on the same live trades — the
-best point of the project: **+5,082%/yr at 23.3% max drawdown, best month
+candidates run in parallel paper-forward on the same live trades — best
+point of the table: **+5,082%/yr at 23.3% max drawdown, best month
 +83.7%** (QUBO joint weights×leverage, MAE margin under permanent watch).
-Every indicator, verdict and date lives in
-`docs/20-registre-indicateurs.md` — the living registry.
+
+> **Honesty (T8, 2026-09-30):** these **absolute** ROI figures are
+> **window / DB warm-up artefacts**. The same engine on three warm-up states
+> yields +651% → +3,905%; the 10x cascade is liquidated in 6 of 7 deep
+> regimes. **Relatives** (stream ranking, gate structure) hold. Paper
+> forward is the only judge — see `docs/21-goal-performances.md` and
+> `docs/20-registre-indicateurs.md` § 30/09.
+
+Every indicator, verdict and date lives in `docs/20-registre-indicateurs.md`
+— the living registry.
+
+**Research pivot (2026-09-30):** Aster/FOMO *research* is frozen in favor of
+the **OpenMarket x501** program (`docs/25`–`docs/33`). Collectors keep
+running; no new research effort on those axes.
 
 ## Discipline (the part that matters)
 
@@ -57,10 +69,11 @@ Every indicator, verdict and date lives in
 
 | Path | What lives there |
 |---|---|
-| `scripts/` | 135 live tools (Aster data, X harvesting, fomo mining, backtests, paper forward) |
+| `scripts/` | live tools (Aster data, X harvesting, fomo mining, backtests, paper forward) |
 | `scripts/archive/` | retired one-offs (kept for the record) |
 | `docs/00-CARTE.md` | **the living map** — everything, one page (FR) |
 | `docs/19-liquidations-aster.md` | Aster liquidation mechanics study |
+| `docs/25`–`docs/33` | OpenMarket x501 (mission, data, kScript powers, A/B, maker fill, local benches) |
 | `backend/` | FastAPI backend (onchain services, legacy research artifacts) |
 | `data/` | warehouses (git-ignored): klines.db, fomo.db, x_posts.db, depth.db |
 
