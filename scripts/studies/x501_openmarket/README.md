@@ -28,6 +28,7 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `x501_abs_events_local.py` + `abs_events_local.json` | **le banc d'événements de l'absorption (docs/31, vague 6)** : le pattern absorption en PROXY klines (mur volume T−3 ≥ 3× SMA200, attaque directionnelle T−2 ≥ 2× SMA100, tenue T−1 à 0,8 %, reprise T−1 = EMA(D,6) bascule), 3 définitions IMBRIQUÉES (E1 attaque / E2 structure / E3 complet) × 2 directions × 2 horizons = 12 cellules + prime de structure E3 vs E1 + projection pool P1 — verdict mécanique au critère AUC + seuil pré-déclaré (+6 bps = ½ aller-retour taker) |
 | `x501_refs_local.py` + `refs_local.json` | **le banc des références de liquidité (docs/32, vague 7)** : vwap de session (ancrage 00h UTC, reset journalier) + volume profile de la veille (48 bins, VPOC, value area 70 %), grille PRÉ-DÉCLARÉE de 28 cellules aux DEUX hypothèses (V1 aimant / V2 cross / P1 vpoc / P2 rejet VA / P3 breakout VA — P2 et P3 conditionnent les mêmes événements avec attentes opposées) × 2 panels (POOL80 + LIQUIDE8) + focus BTC/ETH + pool P1 en CONTEXTE (F1 mauvais côté vwap, F2 hors value area, flags sur open(T)) — 55 KILL / 1 INCONCLU / 0 CANDIDAT (7ᵉ falsification) — numpy + `X501_DATA_DIR` |
 | `x501_oi_local.py` + `oi_local.json` | **le banc de l'open interest 1h (docs/33, vague 8)** : le capital affiché testé en TÉMOIN DE CONTINUATION — Étude A capital brut (ΔOI%_L, L ∈ {24,72,168}) + Étude B mouvement financé (signe(r_L)×ΔOI%, cible alignée, L ∈ {24,72}) × H ∈ {24,72} + pool P1 en CONTEXTE — 10/10 KILL (AUC 0,4917–0,5019) sur 216 000 barres × 749 j (12 symboles om_v27, klines ET OI du même exchange Bybit, 0 snapshot absent, snapshot simultané JAMAIS lu) — numpy + `X501_OI_DIR` |
+| `x501_oi_regime_local.py` + `oi_regime_local.json` | **le banc de l'OI en contexte de régime (docs/34, vague 9)** : le NIVEAU du capital (z-score roulant L ∈ {720,2160}, std de population, fenêtre strictement au passé) comme conditionneur de la distribution des rendements — Étude A magnitude (H_R1 monotone, cible \|fwd\|, sens +1) : 3 KILL + 1 INCONCLU, la théorie du levier REFUSÉE ; Étude B direction (sens = 0, toute séparation = CONTEXTE) : 4/4 KILL — la 9ᵉ falsification ; Étude C pool P1 (z_720 au t_in, split médian, bootstrap 10 000) : ΔR +0,469, P = 0,8192 ≥ gate 0,70 (n = 181, CONTEXTE, jamais promotion) — numpy + `X501_OI_DIR` |
 | `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
 | `qa_kscript_x501.py` | QA générale des 5 stratégies (doc kScript scrapée) |
 | `qa_scanner_x501.py` | QA du scanner (49 contrôles) |
@@ -37,6 +38,7 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `qa_flux_local_x501.py` | QA du banc de flux (27 contrôles) : grille + verdicts + étalonnage AUC exact + **TEST D'ALTÉRATION** (look-ahead = l'AUC décolle : la plomberie voit un vrai signal) + zéro look-ahead (mutation des barres futures) + convention funding recalculée + pool 469 + AUC par symbole (anti-dilution) + re-exécution bit à bit |
 | `qa_abs_events_x501.py` | QA du banc d'événements (62 contrôles, 9 familles) : le DÉTECTEUR testé sur séries synthétiques (chaque condition violée isolément + anti-batterie-triviale), invariant réel tbqv ≤ qv, nesting E3 ⊆ E2 ⊆ E1 sur données réelles, zéro look-ahead par mutation, règle NON_INTERPRETABLE en unitaire, re-exécution bit à bit |
 | `qa_oi_local_x501.py` | QA du banc OI (47 contrôles) : le DÉTECTEUR (OI planté corrélé au forward → AUC 0,66 CANDIDAT, cas nul KILL), le zéro look-ahead par MUTATION multiplicative+additive des snapshots futurs (scores passés bit à bit), les 4 branches du verdict en unitaire, le pool 469/469 (entry = open×(1 + side×2 bps)), l'audit de collecte, la re-exécution bit à bit (digest gravé) |
+| `qa_oi_regime_x501.py` | QA du banc régime (63 contrôles) : rolling_z en unitaires (cas à la main L=3, amorçage, boucle naïve, snapshot NaN propagé, fenêtre plate → NaN — bug réel corrigé), le DÉTECTEUR monotone (niveau planté dans la magnitude avec le décalage vague 8 → CANDIDAT ; la même plomberie décolle sur le signé pour l'étude B, verdict CONTEXTE forcé par sens=0), le cas nul KILL, le zéro look-ahead par MUTATION des snapshots ET des barres futures, le snapshot simultané jamais lu par sa barre (test segmenté), les 4 branches + sens=0 ne promeut jamais, le pool 469/469, l'audit de collecte, la re-exécution bit à bit (digest gravé) |
 
 ## Comment valider (une commande, zéro dépendance)
 
@@ -49,10 +51,12 @@ python3 qa_kscript_x501.py && python3 qa_scanner_x501.py \
 ```
 
 Attendu : **8× PASS — 0 échec** (446 contrôles au total, +3 avec la data
-premium pour les re-exécutions bit à bit). Certaines QA
+premium pour les re-exécutions bit à bit ; les QA `qa_refs_local_x501.py`,
+`qa_oi_local_x501.py` et `qa_oi_regime_x501.py` s'exécutent en plus avec
+leur data : `X501_DATA_DIR` / `X501_OI_DIR`). Certaines QA
 écrivent leurs détails JSON dans `results/` (artefact de run local — ne pas
 commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
-2 études avec data 1h : `X501_DATA_DIR`).
+études avec data 1h : `X501_DATA_DIR`, `X501_OI_DIR`).
 
 ## Statut (01/10/2026)
 
@@ -63,9 +67,20 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   + `qa_fill_maker_x501.py` (**71 contrôles**, 74 avec la re-exécution bit à bit de l'étude)
   + `qa_flux_local_x501.py` (**27 contrôles**, dont le test d'altération qui prouve que la
   plomberie du banc détecte un vrai signal : AUC look-ahead BTC 0,6103 / ETH 0,6065).
-- **Vague 8 — le banc de l'open interest 1h est FERMÉ** (`docs/33-oi-banc-local.md`) :
+  + `qa_oi_regime_x501.py` (**63 contrôles**, 0 échec : rolling_z en unitaires avec le bug réel
+  corrigé des fenêtres plates → NaN, détecteur monotone décalé vague 8, mutations snapshots
+  + barres, snapshot simultané test segmenté, re-exécution bit à bit — digest bf0b77ac6a74d8be…).
+- **Vague 9 — le banc de l'OI en contexte de régime est FERMÉ pour le mécanisme marginal**
+  (`docs/34-oi-regime-banc-local.md`) : le NIVEAU du capital (z-score roulant) ne conditionne
+  ni la magnitude (H_R1 de la théorie du levier REFUSÉE : 3 KILL + 1 INCONCLU) ni la direction
+  (4/4 KILL) — la 9ᵉ falsification du domaine, 5ᵉ verdict symétrique des familles de
+  positionnement ; le conditionnel pool P1 franchit le gate de contexte (ΔR +0,469,
+  P = 0,8192 ≥ 0,70, n = 181) — filtre candidat au protocole A/B, jamais promotion depuis
+  un banc, la file du user reste RI → MK6 → TRAIL → ABS.
+- **Vague 8 — le banc de l'open interest 1h est FERMÉ** (`docs/33-oi-banc-local.md`) : 
   le capital affiché ne finance pas une direction prévisible — 10/10 KILL aux deux hypothèses
   (capital brut + mouvement financé), collecteur versionné, la 8ᵉ falsification du domaine.
+  La case ouverte « OI en contexte de régime » → **fermée par la vague 9** (docs/34).
 - **Vague 5 — le banc de test des flux dormants est FERMÉ** (`docs/30-flux-funding-banc-local.md`) :
   le flux taker natif des klines et le funding multi-années, derniers pouvoirs data dormants,
   passés au banc AVANT tout run kScript — **12/12 cellules KILL** au critère AUC du domaine
