@@ -3,7 +3,7 @@
 *Le projet = 2 livres (régime + anti-régime), une machine (the_machine.py),
 des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 
-## LE VIVANT (18 docs, à jour)
+## LE VIVANT (19 docs, à jour)
 
 | Doc | Ce que c'est | Quand le lire |
 |---|---|---|
@@ -18,6 +18,7 @@ des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 | **32-references-banc-local** | le banc des références de liquidité : vwap de session + volume profile de la veille aux DEUX hypothèses, 55 KILL / 1 INCONCLU / 0 CANDIDAT — la famille analyse est close (7ᵉ falsification) | avant de brancher un vwap, un profil de volume, ou de croire au « benchmark institutionnel » |
 | **33-oi-banc-local** | le banc de l'open interest 1h : le capital affiché testé en TÉMOIN DE CONTINUATION (capital brut + mouvement financé), 10/10 KILL sur 216 000 barres Bybit — la 8ᵉ falsification | avant de croire que « l'OI monte donc ça monte » ou de brancher l'OI dans un kScript |
 | **34-oi-regime-banc-local** | le banc de l'OI en contexte de régime : le NIVEAU du capital (z-score roulant) ne conditionne ni la magnitude (H_R1 de la théorie du levier refusée) ni la direction — la 9ᵉ falsification ; le conditionnel pool P1 franchit le gate de contexte (P = 0,8192) sans promotion possible | avant de croire au « régime OI » ou de vouloir conditionner un kScript à l'OI |
+| **35-openmarket-oi-ushape** | le banc de la forme en U de H_R1 : le U joint NON ÉTABLI (4/4 INCONCLU sous le gate, la composition pré-déclarée refuse), le miroir directionnel KILL 4/4 — MAIS le côté bas de la purge CANDIDAT à L2160 (AUC 0,4415/0,4454, Δ\|fwd\| +52 à +83 bps) — les 2 premiers candidats marginaux du domaine — et le pool strates \|z\| franchit le gate de contexte une 2ᵉ fois (P = 0,7381) | avant de croire au « U des extrêmes » ou de brancher le régime de purge dans un kScript |
 | **22-nos-indicateurs** | LES 10 CRÉATIONS : chaque indicateur, sa règle, sa preuve | pour savoir ce qu'on possède |
 | **20-registre-indicateurs** | la source de vérité des verdicts (25+ datés + les 25 réfutés) | avant de croire quoi que ce soit |
 | **21-goal-performances** | le plan P1-P5 + les dates de tir + le volet institutionnel | pour savoir où on va |

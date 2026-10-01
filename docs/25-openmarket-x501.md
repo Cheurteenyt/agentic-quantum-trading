@@ -257,6 +257,18 @@ est re-éditée.
    KILL) — 9ᵉ falsification du domaine ; le conditionnel pool P1 franchit
    le gate de contexte (P = 0,8192) et entre dans la liste des filtres
    candidats au protocole A/B sans toucher à la priorisation de la file.
+10. **Banc de la forme en U de H_R1 — FAIT (01/10, `docs/35`)** — la case
+   ouverte de la vague 9 (limite L8) passée au banc avec son
+   pré-enregistrement : le U joint reste sous le gate du domaine (4/4
+   INCONCLU, la composition pré-déclarée refuse) et le miroir directionnel
+   KILL 4/4 — le comptage des falsifications RESTE à 9 ; MAIS le côté bas
+   de la purge franchit le gate à L = 90 j (AUC 0,4415 / 0,4454, sens −1
+   confirmé, Δ|fwd| +52 à +83 bps) — **les 2 premiers CANDIDATS marginaux
+   du domaine en 10 vagues** — et le pool en strates |z| franchit le gate
+   de contexte une 2ᵉ fois (P = 0,7381). La forme n'est pas un U symétrique :
+   c'est un régime de purge unilatéral (côté haut faible vague 9, côté bas
+   fort vague 10). Les deux candidats entrent dans la liste du protocole
+   A/B sans toucher à la file.
 
 ## LES RÈGLES NON NÉGOCIABLES
 

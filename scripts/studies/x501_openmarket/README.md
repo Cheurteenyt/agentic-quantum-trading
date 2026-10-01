@@ -29,6 +29,7 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `x501_refs_local.py` + `refs_local.json` | **le banc des références de liquidité (docs/32, vague 7)** : vwap de session (ancrage 00h UTC, reset journalier) + volume profile de la veille (48 bins, VPOC, value area 70 %), grille PRÉ-DÉCLARÉE de 28 cellules aux DEUX hypothèses (V1 aimant / V2 cross / P1 vpoc / P2 rejet VA / P3 breakout VA — P2 et P3 conditionnent les mêmes événements avec attentes opposées) × 2 panels (POOL80 + LIQUIDE8) + focus BTC/ETH + pool P1 en CONTEXTE (F1 mauvais côté vwap, F2 hors value area, flags sur open(T)) — 55 KILL / 1 INCONCLU / 0 CANDIDAT (7ᵉ falsification) — numpy + `X501_DATA_DIR` |
 | `x501_oi_local.py` + `oi_local.json` | **le banc de l'open interest 1h (docs/33, vague 8)** : le capital affiché testé en TÉMOIN DE CONTINUATION — Étude A capital brut (ΔOI%_L, L ∈ {24,72,168}) + Étude B mouvement financé (signe(r_L)×ΔOI%, cible alignée, L ∈ {24,72}) × H ∈ {24,72} + pool P1 en CONTEXTE — 10/10 KILL (AUC 0,4917–0,5019) sur 216 000 barres × 749 j (12 symboles om_v27, klines ET OI du même exchange Bybit, 0 snapshot absent, snapshot simultané JAMAIS lu) — numpy + `X501_OI_DIR` |
 | `x501_oi_regime_local.py` + `oi_regime_local.json` | **le banc de l'OI en contexte de régime (docs/34, vague 9)** : le NIVEAU du capital (z-score roulant L ∈ {720,2160}, std de population, fenêtre strictement au passé) comme conditionneur de la distribution des rendements — Étude A magnitude (H_R1 monotone, cible \|fwd\|, sens +1) : 3 KILL + 1 INCONCLU, la théorie du levier REFUSÉE ; Étude B direction (sens = 0, toute séparation = CONTEXTE) : 4/4 KILL — la 9ᵉ falsification ; Étude C pool P1 (z_720 au t_in, split médian, bootstrap 10 000) : ΔR +0,469, P = 0,8192 ≥ gate 0,70 (n = 181, CONTEXTE, jamais promotion) — numpy + `X501_OI_DIR` |
+| `x501_oi_ushape_local.py` + `oi_ushape_local.json` | **le banc de la forme en U de H_R1 (docs/35, vague 10)** : la FORME concurrente pré-enregistrée (volatilité maximale aux DEUX extrêmes du régime, centre calme, centre pré-déclaré à 0) — Étude A1 le U joint (\|z_L\| → \|fwd\|, sens +1) : 4/4 INCONCLU (l'IC exclut 0,5 mais tous sous le gate 0,05) ; Étude A2 le côté bas seul (le DISCRIMINANT, sens −1) : 2 KILL L720 + **2 CANDIDAT L2160** (AUC 0,4415/0,4454, Δ\|fwd\| +52 à +83 bps — les 2 premiers candidats marginaux du domaine en 10 vagues) ; composition pré-déclarée : U NON ÉTABLI ×4 ; Étude B miroir directionnel : 4/4 KILL ; Étude C pool strates \|z_720\| ≥ q80 : ΔR +0,934, P = 0,7381 ≥ gate 0,70 (2ᵉ contexte, in-sample + cross-exchange, jamais promotion) — numpy + `X501_OI_DIR` |
 | `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
 | `qa_kscript_x501.py` | QA générale des 5 stratégies (doc kScript scrapée) |
 | `qa_scanner_x501.py` | QA du scanner (49 contrôles) |
@@ -39,6 +40,7 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `qa_abs_events_x501.py` | QA du banc d'événements (62 contrôles, 9 familles) : le DÉTECTEUR testé sur séries synthétiques (chaque condition violée isolément + anti-batterie-triviale), invariant réel tbqv ≤ qv, nesting E3 ⊆ E2 ⊆ E1 sur données réelles, zéro look-ahead par mutation, règle NON_INTERPRETABLE en unitaire, re-exécution bit à bit |
 | `qa_oi_local_x501.py` | QA du banc OI (47 contrôles) : le DÉTECTEUR (OI planté corrélé au forward → AUC 0,66 CANDIDAT, cas nul KILL), le zéro look-ahead par MUTATION multiplicative+additive des snapshots futurs (scores passés bit à bit), les 4 branches du verdict en unitaire, le pool 469/469 (entry = open×(1 + side×2 bps)), l'audit de collecte, la re-exécution bit à bit (digest gravé) |
 | `qa_oi_regime_x501.py` | QA du banc régime (63 contrôles) : rolling_z en unitaires (cas à la main L=3, amorçage, boucle naïve, snapshot NaN propagé, fenêtre plate → NaN — bug réel corrigé), le DÉTECTEUR monotone (niveau planté dans la magnitude avec le décalage vague 8 → CANDIDAT ; la même plomberie décolle sur le signé pour l'étude B, verdict CONTEXTE forcé par sens=0), le cas nul KILL, le zéro look-ahead par MUTATION des snapshots ET des barres futures, le snapshot simultané jamais lu par sa barre (test segmenté), les 4 branches + sens=0 ne promeut jamais, le pool 469/469, l'audit de collecte, la re-exécution bit à bit (digest gravé) |
+| `qa_oi_ushape_x501.py` | QA du banc U-shape (79 contrôles, 1 skip déclaré) : le DÉTECTEUR du U planté (magnitude en U dans le forward → A1 CANDIDAT + A2 CANDIDAT → composition **U VIVANT**), le DÉTECTEUR MONOTONE REFUSÉ par la composition (A2 sens opposé → **KILL-U** même si A1 décolle — le banc distingue les deux formes), le cas nul KILL, la COMPOSITION en 7 branches unitaires, le score \|z\| et la sélection A2 en cas à la main (2 bugs de CAS corrigés : médiane −1,5, premier jet plantait un monotone), le zéro look-ahead par MUTATION des snapshots ET des barres futures (scores signés ET \|z\| bit à bit), le snapshot simultané jamais lu, le pool 469/469, l'audit de collecte, la re-exécution bit à bit (digest gravé) |
 
 ## Comment valider (une commande, zéro dépendance)
 
@@ -70,6 +72,19 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
   + `qa_oi_regime_x501.py` (**63 contrôles**, 0 échec : rolling_z en unitaires avec le bug réel
   corrigé des fenêtres plates → NaN, détecteur monotone décalé vague 8, mutations snapshots
   + barres, snapshot simultané test segmenté, re-exécution bit à bit — digest bf0b77ac6a74d8be…).
+  + `qa_oi_ushape_x501.py` (**79 contrôles**, 0 échec, 1 skip déclaré : le détecteur du U planté
+  → composition U VIVANT, le détecteur MONOTONE refusé → KILL-U même si A1 décolle — le banc
+  distingue les deux formes, la composition en 7 branches, 2 bugs de CAS de QA corrigés
+  (médiane −1,5 ; premier jet plantait un monotone), mutations double, re-exécution bit à bit
+  — digest 3f9fb7781eaeb401…).
+- **Vague 10 — le banc de la FORME EN U : le U joint NON ÉTABLI, le côté bas de la purge
+  CANDIDAT** (`docs/35-openmarket-oi-ushape.md`) : le U joint reste sous le gate du domaine
+  (4/4 INCONCLU, la composition pré-déclarée refuse) et le miroir directionnel KILL 4/4 —
+  le comptage des falsifications RESTE à 9 ; MAIS le côté bas de la purge franchit le gate
+  à L = 90 j (AUC 0,4415 / 0,4454, sens −1 confirmé, Δ|fwd| +52 à +83 bps) — **les 2 premiers
+  candidats marginaux du domaine en 10 vagues** — et le pool en strates |z| franchit le gate
+  de contexte une 2ᵉ fois (ΔR +0,934, P = 0,7381) ; régime de purge unilatéral, candidats au
+  protocole A/B sans toucher à la file (RI → MK6 → TRAIL → ABS).
 - **Vague 9 — le banc de l'OI en contexte de régime est FERMÉ pour le mécanisme marginal**
   (`docs/34-oi-regime-banc-local.md`) : le NIVEAU du capital (z-score roulant) ne conditionne
   ni la magnitude (H_R1 de la théorie du levier REFUSÉE : 3 KILL + 1 INCONCLU) ni la direction

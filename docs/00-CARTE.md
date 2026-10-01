@@ -66,7 +66,19 @@ REFUSÉE (3 KILL + 1 INCONCLU, AUC 0,5028–0,5150), direction 4/4 KILL — la 9
 falsification, 5ᵉ verdict symétrique des familles de positionnement ; le
 conditionnel pool P1 franchit le gate de contexte (ΔR +0,469, P = 0,8192 ≥
 0,70, n = 181, in-sample + cross-exchange) — filtre candidat au protocole
-A/B, jamais promotion depuis un banc**).
+A/B, jamais promotion depuis un banc**) · **vague 10 : le banc de la FORME
+EN U de H_R1 (`docs/35`) — la case ouverte de la vague 9 (limite L8 : la
+dichotomie médiane ne capte que le monotone) passée au banc avec son
+pré-enregistrement : le U joint (|z| → |fwd|) reste sous le gate du domaine
+(4/4 INCONCLU, la composition pré-déclarée refuse), le miroir directionnel
+KILL 4/4 — le comptage des falsifications RESTE à 9 — MAIS le côté bas de
+la purge franchit le gate à L = 90 j (AUC 0,4415 / 0,4454, sens −1 confirmé,
+Δ|fwd| +52 à +83 bps au-dessus de l'étalon 12,2 bps A/R taker) — LES 2
+PREMIERS CANDIDATS MARGINAUX DU DOMAINE EN 10 VAGUES — et le pool en
+strates |z| franchit le gate de contexte une 2ᵉ fois (ΔR +0,934, P =
+0,7381) ; la forme n'est pas un U symétrique : un régime de purge
+unilatéral (côté haut faible vague 9, côté bas fort vague 10) ; les deux
+candidats entrent dans la liste A/B sans toucher à la file**).
 **MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
