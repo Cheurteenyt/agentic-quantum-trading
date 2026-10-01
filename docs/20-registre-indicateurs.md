@@ -510,3 +510,13 @@ origin/main
 origin/main
 origin/main
 origin/main
+
+## 01/10 — T17 : LE CVD DU TAPE (5,65 M prints BTC/ETH, 45 j) — NUL comme signal, la matière sub-minute reste
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Le tape REPRODUIT les bougies : corr ΔCVD 1m = 0,9999/1,0000 BTC/ETH, l'écart de volume journalier méd 0,0000 % | les bougies 1m fapi et aster_tape viennent du MÊME flux de trades — le CVD tape ≡ le CVD klines à 6 décimales | **aster_tape = CONTEXTE** (la matière ordre-flow, pas un signal) |
+| Les features tape (dcvd 15m/1h/4h, aggressivité, vitesse) : 32 tests déclarés, 1/32 promo brute (= le bruit H0 attendu), **0/32 après la re-vérification mécanique** (AUC TR ≥ 0,55 + le signe TR→VA stable) ; les sharpe ±5-13 à AUC ≈ 0,5 = l'artefact de queues grasses + toujours-long déguisé | la discipline x501 (l'AUC temporel ≥ 0,60) appliquée et respectée — la seule cellule ≥ 0,60 rejetée mécaniquement | **NUL** — les features CVD/agressivité 1h-4h n'ont pas d'information prédictive que les bougies ne donnent pas |
+| La valeur conservée du tape : la granularité SUB-MINUTE pour les études d'absorption événementielles (le déséquilibre intra-bougie, l'absorption au bid/ask — le style vague 2 x501) | l'archive 45 j s'étend par tranches (J-90/180/365, les coûts chiffrés) | **MATIÈRE** — phase 2 |
+
+Rapports : reports/aster_cvd_tape.md (script : scripts/archive_studies/aster_cvd_tape.py — 32 tests déclarés, le re-verdict mécanique, DB ro).
