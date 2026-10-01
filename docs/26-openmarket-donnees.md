@@ -1,134 +1,49 @@
 # 26 · OPENMARKET — LES DONNÉES (l'entrepôt om_v27)
 
-> Créé le 30/09/2026. Ce que le domaine x501 a pour matière première, ce qui
-> a été audité, ce qui manque. Les chiffres de recherche : `docs/25-openmarket-x501.md`.
+> **domain: OPENMARKET** · index data : [`data/README.md`](data/README.md)  
+> Chiffres de recherche : `docs/25-openmarket-x501.md`.
 
 ## L'ENTREPÔT (om_v27.db — local, git-ignoré)
 
-Un seul entrepôt SQLite pour tout le domaine : **12 symboles perp USDT,
-~560 000 points**, structuré en 6 familles de séries. La convention est la
-même que pour le domaine Aster (`docs/06-data.md`) : la base ne rentre PAS
-dans git (volume + binaire), seuls le schéma, l'audit et les manifestes
-sont versionnés — tout backtest cité dans les docs doit rester reproductible
-depuis les sources publiques listées ci-dessous.
+Un entrepôt SQLite domaine x501 : **12 symboles** perp USDT de base, panel
+élargi **80 symboles** en CSV `data_x501/` (git-ignoré).
 
-| Série | Granularité | Profondeur | Points |
+| Série | Granularité | Profondeur | Notes |
 |---|---|---|---|
-| Klines OHLCV | 1 h | 733 jours | 211 200 |
-| Open Interest | 1 h | 708 jours | 204 000 |
-| Open Interest | 1 j | depuis 2020 | — |
-| Funding (Binance) | 8 h | 3,4–5,5 ans | 65 799 |
-| Funding (Bybit) | 8 h | 66 jours | — |
-| Long/Short Ratio | 4 h | 8 jours | — |
+| Klines OHLCV | 1 h | 733 j (om) / **1 092 j** (panel 80) | 0 gap panel |
+| Open Interest | 1 h | 708 j+ | bancs 33–35 |
+| Open Interest | 1 j | depuis 2020 | contexte régime |
+| Funding Binance | 8 h | 3,4–5,5 ans | banc 30 |
+| Funding Bybit | 8 h | 66 j | cohérence cross-ex seulement |
+| LSR | 4 h | **~2,74 ans** (collecteur v11) | banc 36 KILL |
 
-Mise à jour du manifest CSV (re-collecte v16/v17 du 01/10) : le répertoire
-`data_x501/` couvre désormais **80 symboles**, klines 1h sur **1 092 jours**
-(01/10/2023 → 27/10/2026, 26 208 barres par symbole, **0 gap** sur le panel
-complet) et funding 8h assorti — c'est la fenêtre qu'a consommée le banc de
-test des flux dormants (`docs/30`).
+## AUDIT VERT (v27)
 
-## L'AUDIT VERT (ce qui a été purgé et verrouillé)
+1. **226 800 doublons** purgés + index UNIQUE `(symbol, ts)`
+2. Sémantique OI 1 j Bybit : timestamp = **ouverture** (pas clôture)
+3. Fenêtres réelles documentées (pas d'angle mort caché)
 
-L'audit v27 a rendu l'entrepôt **vert** en trois corrections définitives.
-Premier point, les doublons : **226 800 lignes dupliquées purgées**
-(fusions de backfills partiels qui réinséraient des fenêtres déjà présentes)
-et verrouillage structurel par un **index UNIQUE `(symbol, ts)`** — une
-réinsertion en double est désormais impossible au niveau du schéma, pas
-seulement détectée après coup. Deuxième point, la sémantique : l'OI 1 j
-Bybit avait son timestamp interprété comme la **clôture** du jour alors
-qu'il marque l'**ouverture** — corrigé, faute de quoi tout alignement
-funding×OI×prix à la journée était décalé d'une barre. Troisième point,
-la couverture : chaque série a sa fenêtre réelle documentée (le tableau
-ci-dessus), y compris les angles morts assumés.
+## BANDES DE COÛTS
 
-## LE MANIFEST CSV (la reproductibilité)
+- Taker **6,1 bps/côté** · Maker **2 bps/côté** (δ=2)
+- Aucun chiffre de perf sans bande
 
-Les sources brutes sont ré-exportées en CSV plats (klines 1 h + funding par
-symbole) dans le répertoire de travail local `data_x501/` (git-ignoré, même
-politique que les entrepôts du domaine Aster). Le principe : chaque chiffre
-des docs 25/26 doit pouvoir être recalculé depuis (a) l'entrepôt local ou
-(b) une re-téléchargement depuis les sources publiques (openmarket.xyz,
-Binance, Bybit) avec les fenêtres exactes listées ici. Les 2 CSV de trades
-de backtest (BTC/ETH) embarqués dans `scripts/studies/x501_openmarket/`
-servent d'exemples de format de sortie du harnais.
+## ANGLES MORTS
 
-## LES BANDES DE COÛTS (la convention anti-optimisme)
+- Funding Bybit court → pas de signal autonome
+- OI 1 j pré-2024 → contexte seulement
+- LSR : était 8 j → étendu et **banc-testé KILL** (`docs/36`)
 
-Toute simulation du domaine utilise des bandes de coûts explicites et
-symétriques : **taker 6,1 bps/côté** (frais + slippage mesurés) et
-**maker 2 bps/côté** (limite δ=2, fills 97,9 %). Aucun chiffre de
-performance n'est cité sans sa bande — la règle empirique v18 (−2 bps/côté
-≈ +25 % de médiane) rend toute omission de bande immédiatement trompeuse.
-Le stress V5 (215,7 $ de médiane) est la bande pessimiste de référence :
-gaps, slippage défavorable et fills dégradés en même temps.
+## BANC-TESTÉ (requalification)
 
-## CE QUI MANQUE (les angles morts assumés)
+| Série / famille | Doc | Statut |
+|---|---|---|
+| Flux taker + funding continus | 30 | mesuré fermé (KILL) |
+| Absorption proxy klines | 31 | fermé / ABS_DEPRIORISE |
+| OI continuation 1h | 33 | 10/10 KILL |
+| OI régime / U | 34–35 | falsifié + candidats marginaux purge |
+| LSR | 36 | 10ᵉ falsification |
 
-Deux séries restent trop courtes pour conclure et le sont documentées
-comme telles : le **funding Bybit (66 j)** ne sert qu'au contrôle de
-cohérence cross-exchange du funding Binance, pas à un signal autonome ; et
-l'**OI 1 j pré-2024** sert au contexte de régime (densités, percentiles de
-vie) mais pas à des backtests intraday. Toute proposition de signal qui
-repose sur ces séries courtes est invalide par construction jusqu'à
-extension de la collecte — c'est exactement le même statut que les données
-fomo pré-crack dans `docs/06-data.md` : on collecte, on ne conclut pas.
-(Mise à jour vague 11 : le **LSR 4 h**, troisième série courte de cette
-liste, a changé de statut — le collecteur versionné
-`x501_collect_lsr_v11.py` l'a porté à ~2,74 ans et la famille contrarian
-est passée au banc, verdict `docs/36` : KILL, la 10ᵉ falsification.)
-Trois séries sont trop courtes pour conclure et le sont documentées comme
-telles : le **LSR 4 h (8 jours)** ne permet aucun test de gate — il est
-collecté pour plus tard, pas exploité ; le **funding Bybit (66 j)** ne sert
-qu'au contrôle de cohérence cross-exchange du funding Binance, pas à un
-signal autonome ; et l'**OI 1 j pré-2024** sert au contexte de régime
-(densités, percentiles de vie) mais pas à des backtests intraday. Toute
-proposition de signal qui repose sur ces séries courtes est invalide par
-construction jusqu'à extension de la collecte — c'est exactement le même
-statut que les données fomo pré-crack dans `docs/06-data.md` : on collecte,
-on ne conclut pas.
-origin/main
+Re-test = hypothèse **nouvelle** pré-enregistrée au registre — pas un re-run de curiosité.
 
-## CE QUI EST BANC-TESTÉ (requalification du 01/10, `docs/30`)
-
-Deux familles de séries qui dormaient ont passé le banc de test local et en
-sortent **fermées comme filtres continus** : le **flux taker natif des
-klines** (`taker_buy_quote_volume` — 6/6 cellules KILL) et le **funding
-Binance multi-années** (6/6 KILL) — grille pré-déclarée, plomberie prouvée
-vivante par le test d'altération de la QA, re-exécution bit à bit. Le statut
-de ces séries change : elles ne sont plus « dormantes » mais **mesurées et
-fermées** — tout re-test exige un pré-enregistrement explicite d'une
-hypothèse nouvelle au registre (`docs/20`), pas un re-run de curiosité.
-La collecte continue : les fenêtres se rallongent, l'entrepôt reste la
-matière première des prochains bancs — l'OI 1h, la tête de liste, l'a
-depuis passé : vague 8, mesurée et fermée (ci-dessous).
-matière première des prochains bancs (OI 1h en tête).
-origin/main
-origin/main
-origin/main
-origin/main
-
-**Vague 6 (`docs/31`)** : la même série `taker_buy_quote_volume` a servi de
-matière première au banc d'ÉVÉNEMENTS de l'absorption (mur volume / attaque
-/ tenue / reprise en proxy klines) — prime de structure réfutée 0/4, la
-série reste **mesurée et fermée** aux deux niveaux (filtre continu ET
-structure événementielle klines). Le champ orderbook réel (`maxBidAmount`)
-n'est PAS couvert par ces bancs : son juge reste le run ABS du protocole
-A/B (`docs/28`), désormais en queue de file.
-
-**Vague 8 (`docs/33`)** : la série phare de ce doc — l'OI 1h — a passé le
-banc en TÉMOIN DE CONTINUATION (les deux hypothèses : capital brut ΔOI% et
-mouvement financé signe(r_L)×ΔOI%) : **10/10 KILL** au critère AUC sur
-216 000 barres (12 symboles om_v27, klines ET OI du même exchange Bybit,
-749 jours, 0 doublon, 0 snapshot absent — l'existence PILE des snapshots
-exigée, aucun fill-forward). La série passe de « matière première en
-tête » à **mesurée et fermée** au critère du domaine. La collecte continue
-avec le collecteur versionné `x501_collect_oi_v8.py` (Bybit v5 public,
-~4,5 ans d'OI 1h collectés sur les majeures — profondeur disponible pour
-les bancs futurs) ; le statut des re-tests reste régi par la règle
-ci-dessus (pré-enregistrement explicite d'une hypothèse nouvelle).
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
+Orderbook réel (`maxBidAmount`) : juge = protocole A/B (`docs/28`), pas ces bancs klines.

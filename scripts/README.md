@@ -1,5 +1,10 @@
 # scripts/ — LA CARTE
 
+> **Domaines (01/10/2026)** : ASTER ≠ FOMO ≠ OPENMARKET ≠ X.  
+> **Horizons** : taguer chaque backtest `H-1Y` | `H-MULTI` | `H-LIVE` | `H-MICRO`.  
+> **Lab** : `docs/lab/` — mortuary, primitives, hypothèses avant code.  
+> Détail : `PROJECT_STRUCTURE.md`.
+
 **Les 3 nocturnes (30/09)** : le domaine ASTER = trading-agent-nightly (03:00,
 65 steps), le domaine X = x-nightly (03:21, 20 steps), le domaine FOMO =
 fomo-nightly (03:55, 9 steps) — un domaine = une unité, jamais éditer une
@@ -10,27 +15,29 @@ naît en one-shot (`scripts/studies/`, ou racine si la brique est destinée
 au nocturne) → discipline complète (baseline, train/val
 temporel, wallet séquentiel, contrôle inverse, BLOC STATS) → verdict
 inscrit dans `docs/20-registre-indicateurs.md` → si CANDIDAT/VALIDÉ, le
-script est **câblé au nocturne** (`trading-agent-nightly.service`) ; sinon
+script est **câblé au nocturne du même domaine** ; sinon
 il est **archivé dans `scripts/archive_studies/`** (§7), on ne supprime
 jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
+
+**Hypothèse d'abord** : `docs/lab/hypotheses/` + protocole `docs/lab/protocol.md`.
 
 **La vérité** : `docs/20-registre-indicateurs.md` (statuts, chiffres, dates).
 **Le graphe** : Ariad (MCP) — notes d'architecture liées au code.
 
 ---
 
-## 1. LE NOYAU — ce qui EST la stratégie (ne jamais casser)
+## 1. LE NOYAU ASTER — ce qui EST la stratégie (ne jamais casser)
 
 | Fichier | Rôle |
 |---|---|
-| `the_machine.py` | **Le portefeuille officiel** (3 flux, BLOC STATS, table mensuelle, moniteur MAE) — câblé nocturne |
+| `the_machine.py` | **Le portefeuille officiel** (3 flux, BLOC STATS, table mensuelle, moniteur MAE) — câblé nocturne ASTER |
 | `anti_liq.py` | Le collecteur cascade discipliné + l'AL Score (rangs roulants) — câblé |
 | `portfolio_sim.py` | Le simulateur + moniteur MAE + garde-fous ROI — câblé |
 | `stacked_portfolio.py` | `run_stack` (le wallet partagé) + les flux funding — câblé |
 | `backtest_indicators.py` | **Le harnais v5** — LA référence des définitions de signaux — câblé |
 | `aster_indicators.py` | La lib d'indicateurs (RSI, ATR, vwap…) utilisée par le harnais |
 
-## 2. LES SIGNAUX & JUGES — câblés au nocturne
+## 2. LES SIGNAUX & JUGES ASTER — câblés au nocturne
 
 | Fichier | Rôle |
 |---|---|
@@ -40,11 +47,13 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `regime_filter.py` | Le régime BTC × volatilité (le quadrant à éviter) |
 | `cascade_funding.py` | Le conditionnement funding de la cascade (verdict : nul) |
 | `liq_storm.py` | La lecture live des liquidations (notre série forceOrder) |
-| `paper_forward.py` | **LE JUGE** — les candidats sur données vivantes, 2×/jour |
+| `paper_forward.py` | **LE JUGE ASTER** — les candidats sur données vivantes, 2×/jour |
 | `lcs.py` | Le Lifecycle Composite Score (filtre de contexte) |
 | `signal_audit.py` | La re-vérification à la main des définitions (après tout changement) |
 
-## 3. LES COLLECTEURS — la matière première (24/7 ou nocturne)
+## 3. LES COLLECTEURS — par domaine (la matière première, 24/7 ou nocturne)
+
+### 3a. ASTER
 
 | Fichier | Série |
 |---|---|
@@ -53,21 +62,37 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `depth_collector.py` | carnet d'ordres (1 Go, 15 symboles) |
 | `refresh_aster_cache.py` | caches Aster (funding agrégés, tickers) |
 | `fetch_klines.py` / `fetch_deep_klines.py` | bougies 1h/15m (1 an+) |
+| `aster_health.py` | **watchdog ASTER (30/09, timer 5 min)** : 8 sondes — klines 1h > 25 h, OI/liq/blocks/premium/depth fraîcheur, CONTINUITÉ depth (0 trou > 15 min sur 24 h = la tolérance zéro du tir 06-07), cache funding > 25 h ; les tables d'ÉVÉNEMENTS se sondent au LastTriggerUSec du timer (un vieux MAX = un marché calme, pas un collecteur mort), état dans data/warehouse/aster_health_state.json |
+| `aster_oi_history.py` | open interest (maison) |
+| `oi_collector.py` | OI Aster toutes les 15 min → `klines.db` (timer) |
+| `aster_blocktrades.py` | gros prints aggTrades (seuils adaptatifs BTC 99k/ETH 23k/SOL 2k) — timer 15 min |
+| `basis_guard.py` / `flow_snapshot.py` | basis + flow |
+
+### 3b. FOMO (préfixe `fomo_*` — ne pas brancher dans the_machine)
+
+| Fichier | Série |
+|---|---|
 | `whale_radar.py` / `whale_flow.py` / `fomo_harvest.py` | la couche fomo |
 | `fomo_tick_collector.py` | ticks fomo 24/7 → 1m OHLCV (flock anti-orphan, filtre QUOTE_MINTS) |
 | `fomo_ws_daemon.py` | **daemon WS natif 24/7 (d9e23b4→v2)** : le socket prod-api/ws sans navigateur — le feed GLOBAL des swaps (ws_swaps typées, flag top_trader, ws_traders auto-appris) + les prix LRU 78 topics ; protocole : challenge JWT + subscribe, plafond ~80 topics, pacing 0.05 s |
 | `fomo_rest_collector.py` | **collector REST (29/09, timer 30 min)** : les endpoints prod-api en Python pur (curl_cffi chrome131 + JWT partagé) — hodlers/top (97/appel + totalHolders), sortedThesis 24 h (500/token), swaps élite 100/appel, trades fermés, leaderboard/clans/trending → `fomo_rest.db` dédiée (1 écrivain) ; le DOM = le fallback |
 | `fomo_health.py` | **watchdog (29/09, timer 5 min)** : 4 sondes — ticks figés > 300 s, collector REST > 40 min, chaîne JWT cassée, > 10 locks/30 min — alerte journal SUR TRANSITION seulement, état dans data/fomo/health_state.json |
-| `aster_health.py` | **watchdog ASTER (30/09, timer 5 min)** : 8 sondes — klines 1h > 25 h, OI/liq/blocks/premium/depth fraîcheur, CONTINUITÉ depth (0 trou > 15 min sur 24 h = la tolérance zéro du tir 06-07), cache funding > 25 h ; les tables d'ÉVÉNEMENTS se sondent au LastTriggerUSec du timer (un vieux MAX = un marché calme, pas un collecteur mort), état dans data/warehouse/aster_health_state.json |
+| `fomo_paper_forward.py` | **LE JUGE FOMO** — le ledger forward des lancements (entrée à la naissance, anti-rug) + la règle `replication_derek` câblée (verdict à ≥ 5 CLOSED) — timer 15 min |
+| `fomo_access.py` | **LA couche d'accès unifiée fomo (29/09)** — scrapling Fetcher (impersonation TLS, passe le Cloudflare, testé 200) : `fetch_fomo` / `fetch_mobula` / `fetch_prod_api` + rate-limit et retries backoffés ; urllib direct banni |
+| `fomo_swaps_collector.py` | swaps des 13 baleines (pagination lastSwapId crackée, 12 562 swaps) — `_resolve`/`_store` **archivés 29/09** (doublons couverts + bug mint inversé dans _store) |
+| `swaps_forward_v2.py` | re-run post-backfill complet (2 233 events) — **PASS** (edge +8,4 %, TRAIN +6,7 → VAL +12,3 %) |
 | `derek_watch.py` | la détection temps réel des achats de derek518 (swap API in-page CDP, 1 passe/min) — bloqué par le mur d'auth 29/09 |
 | `login_window_miner.py` | le mineur DOM résident de la fenêtre de login (:9223) — sans API, sans ban (1×/5 min) |
 | `fomo_window_guard.py` | le garde de la fenêtre fomo-whale sur special:fomo (-98) (restart daemon+collector si dérive) |
 | `fomo_bonding_monitor.py` | le moniteur de pré-graduation fomo → DEX |
 | `fomo_history_collector.py` / `fomo_master_backfill.py` | backfill GT via mapping `_TF` (minute 1/5/15, hour 1h/4h) + top-up sélectif |
+| … | les one-shots data fomo de la session 27-28/09 en §6b |
+
+### 3c. X
+
+| Fichier | Série |
+|---|---|
 | `x_harvest.py` / `fetch_x_posts.py` / `score_x_calls.py` | la couche X |
-| `aster_oi_history.py` | open interest (maison) |
-| `aster_blocktrades.py` | gros prints aggTrades (seuils adaptatifs BTC 99k/ETH 23k/SOL 2k) — timer 15 min |
-| `basis_guard.py` / `flow_snapshot.py` | basis + flow |
 
 ## 4. LA RECHERCHE — one-shots à verdict rendu (on ne supprime pas)
 
@@ -207,72 +232,28 @@ vivant ne l'importe.
 (re-tir 06-07/10), `tilt_frontier.py`, `qubo_sizing.py` / `qubo_joint_lev.py`
 (CANDIDATS en paper forward), `p5_frequency_test.py` (vol_spike câblé 4e flux).
 
-## 8. LE DOMAINE OPENMARKET x501 (`scripts/studies/x501_openmarket/`) — le 30/09
+## 8. LE DOMAINE OPENMARKET x501 (`scripts/studies/x501_openmarket/`)
 
-> L'intégration du programme OpenMarket (100 $ → 50 100 $, DD ≤ 25 %) :
-> `docs/25-openmarket-x501.md`. Un dossier = le domaine entier : 12 kScripts,
-> le scanner d'installation, 13 QA statiques (PASS 0 échec).
-> le scanner d'installation, 11 QA statiques (PASS 0 échec).
-> le scanner d'installation, 10 QA statiques (PASS 0 échec).
-> le scanner d'installation, 9 QA statiques (PASS 0 échec).
-> le scanner d'installation, 7 QA statiques (PASS 0 échec).
-> le scanner d'installation, 6 QA statiques (PASS 0 échec).
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-> La carte interne : `scripts/studies/x501_openmarket/README.md`.
+> **DOMAINE ISOLÉ** — ne jamais mélanger avec La Machine / FOMO / X.
+> Programme OpenMarket (100 $ → 50 100 $, DD ≤ 25 %) : `docs/25-openmarket-x501.md`.
+> Un dossier = le domaine entier. Carte interne : `scripts/studies/x501_openmarket/README.md`.
+> Rapports → `reports/openmarket/` uniquement.
 
 | Contenu | Une ligne |
 |---|---|
-| `Operation_x501_Signature_H1/H4.ks` + 3 alphas `_H4` | les 5 stratégies (signature, cascade financement, éruption vol, confluence MTF) |
-| `Operation_x501_Signature_*_MK.ks` | les versions **maker** δ=2–5 (TTL, fallback taker, verrous pend*) — fill 97,9 % à δ=2 |
-| `Operation_x501_Signature_H1_RI.ks` | **vague 1 (docs/27)** : la Signature H1 + le filtre régime institutionnel (5 flux premium, no-repaint `htf 1D`, fail-open pré-enregistré) |
-| `x501_observe_regime.ks` | **vague 1** : l'observe des 8 flux premium (table de disponibilité, composantes RI, alerte de bascule) |
-| `Operation_x501_Absorption_H1.ks` | **vague 2 (docs/27)** : les murs natifs `maxBidAmount`/`maxAskAmount` + attaque absorbée + déséquilibre `sumBids`/`sumAsks` — le pattern Aster dans le backtester |
-| `x501_observe_*.ks` | 3 collecteurs d'observation (zéro ordre, C4) |
-| `x501_setup_kscript.js` | l'installation codifiée (49 contrôles QA) |
-| `qa_*_x501.py` (13) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** + **OI régime (63 contrôles, re-exécution bit à bit)** + **OI U-shape (79 contrôles, re-exécution bit à bit)** + **LSR local (49 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
-| `qa_*_x501.py` (12) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** + **OI régime (63 contrôles, re-exécution bit à bit)** + **OI U-shape (79 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
-| `qa_*_x501.py` (11) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** + **OI régime (63 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
-| `qa_*_x501.py` (10) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
-| `qa_*_x501.py` (9) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
-| `qa_*_x501.py` (7) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** — stdlib pure (+numpy pour 2), une commande |
-| `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** — stdlib pure (+numpy pour 2), une commande |
-| `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** — stdlib pure, une commande |
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-| `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 13 scripts → **75,5 %** (vague 3 : trail natif, ocaName, cancelAll, rapport natif — verdicts : `docs/27-pouvoirs-kscript.md`) |
-| `x501_verdict_ab.py` | **le moteur de verdict des A/B pré-enregistrés** (docs/28) : bootstrap 10 000 seed 501, 4 verdicts DATA_ABSENTE/PROMOTION/KILL/INCONCLU — stdlib pure, bit-à-bit |
-| `x501_fill_maker_surface.py` + `pool_P1_entrees.csv` + `fill_maker_surface.json` | **la chaîne de preuve maker** (docs/29) : surface de fill δ×TTL (80 symboles × 733 j, 2 053 015 tentatives), sélection réelle sur le pool P1 (fallback −88,6 bps, biais A4), grille δ×TTL, sortie analytique — verdict : le maker réel vaut +0,931 bps/jambe (candidat v21 : médianes 306,2/364,0 $) |
-| `x501_mk_compteurs.py` | **la boucle de surveillance maker** (docs/29 § 7) : relevés CSV des compteurs `_MK` → verdict binomial exact INSUFFISANT/DIVERGENCE/CONFORME/DÉRIVE — stdlib pure, `--demo` |
-| `x501_flux_local.py` + `flux_local.json` | **le banc de test des flux dormants (docs/30, vague 5)** : flux taker natif des klines + funding multi-années, grille pré-déclarée 12 cellules, verdict mécanique au critère AUC (IC bootstrap seed 501) — **12/12 KILL** sur 2 053 975 barres, plomberie prouvée vivante (test d'altération QA-04) — numpy + `X501_DATA_DIR` |
-| `x501_abs_events_local.py` + `abs_events_local.json` | **le banc d'événements de l'absorption (docs/31, vague 6)** : le pattern absorption en proxy klines (mur/attaque/tenue/reprise, 3 définitions imbriquées × 2 directions × 2 horizons) AVANT les runs ABS — prime de structure E3 vs E1 **RÉFUTÉE 0/4** (−26,4/−54,2 bps LONG, la confirmation est tardive ; SHORT anti-signal) → **ABS_DEPRIORISE**, file priorisée RI → MK6 → TRAIL → ABS — numpy + `X501_DATA_DIR` |
-| `x501_refs_local.py` + `refs_local.json` | **le banc des références de liquidité (docs/32, vague 7)** : vwap de session + volume profile de la veille aux DEUX hypothèses (mean-reversion ET continuation), grille pré-déclarée 28 cellules × 2 panels — **55 KILL / 1 INCONCLU / 0 CANDIDAT** sur 2 048 055 décisions, la famille analyse est CLOSE (7ᵉ falsification) — numpy + `X501_DATA_DIR` |
-| `x501_oi_local.py` + `oi_local.json` | **le banc de l'open interest 1h (docs/33, vague 8)** : le capital affiché testé en TÉMOIN DE CONTINUATION (capital brut ΔOI% L∈{24,72,168} + mouvement financé signe(r_L)×ΔOI% L∈{24,72}, × H∈{24,72}) sur les 12 symboles om_v27 avec klines ET OI du MÊME exchange (Bybit) — **10/10 KILL** (AUC 0,4917–0,5019) sur 216 000 barres × 749 j, 0 doublon, 0 snapshot absent, la 8ᵉ falsification — numpy + `X501_OI_DIR` |
-| `x501_oi_regime_local.py` + `oi_regime_local.json` | **le banc de l'OI en contexte de régime (docs/34, vague 9)** : le NIVEAU du capital (z-score roulant L∈{720,2160}, std de population, fenêtre au passé) comme conditionneur de la distribution — Étude A magnitude (H_R1 monotone, cible \|fwd\|, sens +1) : **3 KILL + 1 INCONCLU, la théorie du levier REFUSÉE** ; Étude B direction (sens = 0, aucune hypothèse) : **4/4 KILL** — la 9ᵉ falsification ; Étude C pool P1 en CONTEXTE (z_720 au t_in, split médian) : ΔR +0,469, **P = 0,8192 ≥ gate 0,70** (n = 181, in-sample + cross-exchange, jamais promotion) — numpy + `X501_OI_DIR` |
-| `x501_oi_ushape_local.py` + `oi_ushape_local.json` | **le banc de la forme en U de H_R1 (docs/35, vague 10)** : la FORME concurrente pré-enregistrée (volatilité maximale aux DEUX extrêmes du régime, centre calme) — Étude A1 le U joint (\|z_L\| → \|fwd\|, sens +1) : **4/4 INCONCLU** (l'IC exclut 0,5 mais tous sous le gate 0,05) ; Étude A2 le côté bas seul (le DISCRIMINANT, sens −1) : **2 KILL L720 + 2 CANDIDAT L2160** (AUC 0,4415/0,4454, Δ\|fwd\| +52 à +83 bps) — **les 2 premiers candidats marginaux du domaine en 10 vagues** ; composition pré-déclarée : **U NON ÉTABLI ×4** ; Étude B miroir directionnel : **4/4 KILL** ; Étude C pool strates \|z_720\| ≥ q80 : ΔR +0,934, **P = 0,7381 ≥ gate 0,70** (2ᵉ contexte, 37 extrêmes vs 144 centre, in-sample + cross-exchange, jamais promotion) — numpy + `X501_OI_DIR` |
-| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor` — le paramètre `end` est ignoré par cet endpoint), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
-| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor` — le paramètre `end` est ignoré par cet endpoint), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
-| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor` — le paramètre `end` est ignoré par cet endpoint), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
-| `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2 (122 contrôles)** — stdlib pure, une commande |
-| `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 13 scripts → **67,9 %** (fix review-2 : regex options/skew invalide corrigée — verdicts : `docs/27-pouvoirs-kscript.md`) |
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
-origin/main
+| `Operation_x501_Signature_*.ks` | stratégies signature / maker / RI / absorption |
+| `x501_observe_*.ks` | observe (zéro ordre) |
+| `x501_setup_kscript.js` | installation codifiée |
+| `qa_*_x501.py` | QA statiques (stdlib) |
+
+## 9. LAB GRIND + DOMAINES (01/10/2026)
+
+Voir `PROJECT_STRUCTURE.md` et `docs/lab/README.md`.
+
+- **4 domaines** : ASTER / FOMO / OPENMARKET / X — zéro mélange de métriques.
+- **Horizons** : tout backtest tagué `H-1Y` | `H-MULTI` | `H-LIVE` | `H-MICRO`.
+- **Nouvelles idées** : hypothèse dans `docs/lab/hypotheses/` → étude → registre → mortuary/primitives.
+- **Nocturnes** restent séparés (Aster / X / FOMO) — ne pas fusionner les units.
 
 ---
 

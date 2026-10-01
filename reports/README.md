@@ -1,9 +1,22 @@
-# Reports
+# Reports — par domaine
 
-Generated reports, PDFs, thread drafts and experiment outputs live here.
+**Règle** : un rapport = un domaine. Pas de mélange FOMO / Aster / OpenMarket dans le même fichier « officiel ».
 
-Current domains:
+| Dossier | Domaine | Contenu typique |
+|---|---|---|
+| [`aster/`](aster/) | ASTER | machine, régimes, decay cascade, paper Aster |
+| [`fomo/`](fomo/) | FOMO | paper fomo, lifecycle |
+| [`openmarket/`](openmarket/) | OPENMARKET | baselines x501, MC |
+| [`x/`](x/) | X | harvest / calls |
 
-- `experiments/`: raw experiment outputs that should not live at repository root.
+## Fichiers migrés (01/10/2026)
 
-Do not put runtime logs here; use `logs/`.
+| Ancien path (stub) | Nouveau path |
+|---|---|
+| `reports/openmarket-x501-baseline-2026-10-01.md` | [`openmarket/x501-baseline-2026-10-01.md`](openmarket/x501-baseline-2026-10-01.md) |
+| `reports/openmarket-x501-baseline-2026-09-30.md` | [`openmarket/x501-baseline-2026-09-30.md`](openmarket/x501-baseline-2026-09-30.md) |
+| `reports/decay-curve-2026-09-28.md` | [`aster/decay-curve-2026-09-28.md`](aster/decay-curve-2026-09-28.md) |
+
+Les stubs à l'ancien emplacement pointent vers le nouveau fichier (liens docs inchangés).
+
+Runtime logs → `logs/`, pas ici.
