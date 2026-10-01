@@ -145,6 +145,10 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    sur le pool P1 franchit le gate de contexte (ΔR +0,469, P = 0,8192 ≥ 0,70,
    n = 181, in-sample + cross-exchange) : signal documenté pour la file de
    runs `docs/28`, jamais promotion depuis un banc.
+origin/main
+origin/main
+origin/main
+origin/main
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -257,6 +261,10 @@ est re-éditée.
    KILL) — 9ᵉ falsification du domaine ; le conditionnel pool P1 franchit
    le gate de contexte (P = 0,8192) et entre dans la liste des filtres
    candidats au protocole A/B sans toucher à la priorisation de la file.
+origin/main
+origin/main
+origin/main
+origin/main
 
 ## LES RÈGLES NON NÉGOCIABLES
 

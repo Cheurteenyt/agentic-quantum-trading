@@ -218,3 +218,10 @@ Le taux d'exploitation brut reste 40/53 (75,5 %) — il ne bougera plus sans
 nouveau use case ; la différence, c'est qu'**aucune case du registre n'est
 désormais ignorée par ignorance** : chaque case est une décision datée et
 chiffrée.
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main
+origin/main

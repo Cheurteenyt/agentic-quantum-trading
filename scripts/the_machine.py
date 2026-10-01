@@ -23,6 +23,7 @@ mois vs balance finale, somme des PnL mensuels.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -42,6 +43,30 @@ from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, MAKER_RT, TAKER_RT, funding_hourly_all, run_stack)
 
 REPORTS = ROOT / "reports"
+
+# ——— T8 (pré-enregistré 01/10/2026, reports/aster_machine_deep_regimes.md) ———
+# L'état du moniteur MAE 6 majors est ÉCRIT pour asservir le levier cascade
+# majors des consommateurs (paper_forward.py, qubo_forward_tracker.py).
+# Règle gravée : levier ≤ 100/(MAE_pire_régime + 0,5) → 4x sur le cycle ;
+# 10x SEULEMENT si lev_safe >= 10 dans cet état.
+MAE_STATE = ROOT / "data" / "warehouse" / "mae_state.json"
+
+
+def write_mae_state(mae_gated: float, lev_safe: float,
+                    path: Path | None = None) -> None:
+    """Écrit mae_state.json {mae_gated, lev_safe, updated_at} (UTC ISO).
+    Tolérante aux échecs (disque/path) : le rapport ne doit JAMAIS être
+    bloqué par l'écriture de l'état."""
+    p = path if path is not None else MAE_STATE
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({
+            "mae_gated": round(float(mae_gated), 4),
+            "lev_safe": round(float(lev_safe), 4),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }), encoding="utf-8")
+    except Exception as exc:
+        print(f"[machine] mae_state.json non écrit : {exc}")
 
 
 def collect_meme(con: sqlite3.Connection) -> list[dict]:
@@ -107,6 +132,7 @@ def main() -> int:
     med_majors = float(np.median([e["atr_pct"] for e in gated]))
     mae_gated = max(e["mae_adverse"] for e in gated)
     lev_safe = 100 / (mae_gated + 0.5)
+    write_mae_state(mae_gated, lev_safe)   # l'état du moniteur MAE (T8)
 
     def size_cascade(e, st=None):
         return min(max(0.24 * (e["atr_pct"] / med_majors), 0.08), 0.40)
