@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """LE WATCHDOG DE SANTÉ ASTER (30/09) — le symétrique de fomo_health.py pour
-le domaine Aster. 12 sondes toutes les 5 min, l'alerte SUR TRANSITION :
+le domaine Aster. 13 sondes toutes les 5 min, l'alerte SUR TRANSITION :
 1. klines 1h fraîches (< 25 h — le nocturne 03:00)
 2. oi_history fraîche (< 30 min — timer 15 min, la munition H4/H5 du 06-07)
 3. oi_history_bulk fraîche (< 30 min — la passe bulk bapi de oi_collector,
@@ -20,6 +20,10 @@ le domaine Aster. 12 sondes toutes les 5 min, l'alerte SUR TRANSITION :
    le header, seul fapi alimente le compteur)
 12. traders_registry : le registre longitudinal des traders (< 30 h — le
    timer 06:50 aster-traders-registry, leaderboard + points par adresse)
+13. survivors_forward : le ledger papier des survivants T21 (< 30 h — le
+   timer quotidien 06:55 aster-survivors-forward ; fraîcheur = l'epoch du
+   dernier tir réussi, aster_survivors_meta.last_run_epoch écrit APRÈS commit
+   — un marché sans signal ne fait pas vieillir la sonde)
 État : data/warehouse/aster_health_state.json. Journal [aster-health].
 Exit 0 toujours (un timer ne doit pas spammer d'unités failed)."""
 import json, os, sqlite3, subprocess, sys, time
@@ -157,6 +161,9 @@ CHECKS = [
      "le cache funding > 25 h — le nocturne n'a pas rafraîchi"),
     ("traders_registry", traders_registry_fresh,
      "le registre traders Aster > 30 h — le timer quotidien 06:50 (aster-traders-registry) ne tire plus"),
+    ("survivors_forward", lambda: (max_age(KL, "SELECT MAX(CAST(value AS INTEGER)) FROM "
+                                        "aster_survivors_meta WHERE key='last_run_epoch'") or 9e9) < 30 * 3600,
+     "survivors_forward > 30 h — le timer quotidien 06:55 (aster-survivors-forward) ne tire plus"),
     ("rate_weight", lambda: (aster_rate.worst_weight() or 0) < aster_rate.ALERT,
      "budget weight >= 1800/2400/min (75 %) — réduire le pacing, risque 429/ban 418"),
 ]

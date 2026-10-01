@@ -1,0 +1,9 @@
+[Unit]
+Description=aster_survivors_forward chaque jour 06:55 (après le registre traders 06:53, avant la journée)
+
+[Timer]
+OnCalendar=*-*-* 06:55:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "scripts" / "x501_openmarket"))
+sys.path.insert(0, str(REPO / "scripts" / "studies" / "x501_openmarket"))
 
 import x501_mc_v20 as mc  # noqa: E402
 

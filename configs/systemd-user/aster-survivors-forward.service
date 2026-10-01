@@ -1,0 +1,8 @@
+[Unit]
+Description=aster_survivors_forward — le ledger papier des survivants T21 (4 stratégies 1h, 1 slot/stratégie, verdict 90 j)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/aster_survivors_forward.py
+TimeoutStartSec=300
