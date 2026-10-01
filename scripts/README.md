@@ -211,11 +211,13 @@ vivant ne l'importe.
 
 > L'intégration du programme OpenMarket (100 $ → 50 100 $, DD ≤ 25 %) :
 > `docs/25-openmarket-x501.md`. Un dossier = le domaine entier : 12 kScripts,
+> le scanner d'installation, 13 QA statiques (PASS 0 échec).
 > le scanner d'installation, 11 QA statiques (PASS 0 échec).
 > le scanner d'installation, 10 QA statiques (PASS 0 échec).
 > le scanner d'installation, 9 QA statiques (PASS 0 échec).
 > le scanner d'installation, 7 QA statiques (PASS 0 échec).
 > le scanner d'installation, 6 QA statiques (PASS 0 échec).
+origin/main
 origin/main
 origin/main
 origin/main
@@ -232,6 +234,7 @@ origin/main
 | `Operation_x501_Absorption_H1.ks` | **vague 2 (docs/27)** : les murs natifs `maxBidAmount`/`maxAskAmount` + attaque absorbée + déséquilibre `sumBids`/`sumAsks` — le pattern Aster dans le backtester |
 | `x501_observe_*.ks` | 3 collecteurs d'observation (zéro ordre, C4) |
 | `x501_setup_kscript.js` | l'installation codifiée (49 contrôles QA) |
+| `qa_*_x501.py` (13) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** + **OI régime (63 contrôles, re-exécution bit à bit)** + **OI U-shape (79 contrôles, re-exécution bit à bit)** + **LSR local (49 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
 | `qa_*_x501.py` (12) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** + **OI régime (63 contrôles, re-exécution bit à bit)** + **OI U-shape (79 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
 | `qa_*_x501.py` (11) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** + **OI régime (63 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
 | `qa_*_x501.py` (10) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** + **références locales (39 contrôles, re-exécution bit à bit)** + **OI local (47 contrôles, re-exécution bit à bit)** — stdlib pure (+numpy pour 2), une commande |
@@ -239,6 +242,7 @@ origin/main
 | `qa_*_x501.py` (7) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** + **abs events (62 contrôles)** — stdlib pure (+numpy pour 2), une commande |
 | `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** + **fill maker (71)** + **flux local (24 contrôles)** — stdlib pure (+numpy pour 2), une commande |
 | `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2-3 (200 contrôles)** — stdlib pure, une commande |
+origin/main
 origin/main
 origin/main
 origin/main
@@ -260,6 +264,7 @@ origin/main
 | `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor` — le paramètre `end` est ignoré par cet endpoint), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
 | `qa_*_x501.py` (6) | QA générale + scanner + maker (M1–M15) + observation + **vagues 1-2 (122 contrôles)** — stdlib pure, une commande |
 | `x501_exploit_audit.py` + `exploit_audit.json` | **l'audit d'exploitation kScript** : 53 capacités de la doc × 13 scripts → **67,9 %** (fix review-2 : regex options/skew invalide corrigée — verdicts : `docs/27-pouvoirs-kscript.md`) |
+origin/main
 origin/main
 origin/main
 origin/main

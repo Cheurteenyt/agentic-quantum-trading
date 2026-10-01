@@ -125,6 +125,7 @@ passés restent bit à bit ; la RE-EXÉCUTION BIT À BIT de l'étude complète
   régime (statut `docs/26` inchangé) ; le LSR 4 h (8 jours de data,
 origin/main
 origin/main
+origin/main
   « collecté pour plus tard », statut inchangé).
 - Re-test interdit sans pré-enregistrement explicite d'une hypothèse
   nouvelle (règle `docs/26`).

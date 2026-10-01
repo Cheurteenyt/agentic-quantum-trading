@@ -139,6 +139,7 @@ mécanique P ≥ 0,70.**
   (limite L8 : la dichotomie médiane ne capte que le monotone — une
   extension exigerait un pré-enregistrement) ; le LSR 4 h (8 j de data).
 origin/main
+origin/main
 - Re-test interdit sans pré-enregistrement explicite d'une hypothèse
   nouvelle (règle `docs/26`).
 

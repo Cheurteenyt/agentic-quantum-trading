@@ -78,6 +78,20 @@ PREMIERS CANDIDATS MARGINAUX DU DOMAINE EN 10 VAGUES — et le pool en
 strates |z| franchit le gate de contexte une 2ᵉ fois (ΔR +0,934, P =
 0,7381) ; la forme n'est pas un U symétrique : un régime de purge
 unilatéral (côté haut faible vague 9, côté bas fort vague 10) ; les deux
+candidats entrent dans la liste A/B sans toucher à la file**) · **vague 11 :
+le banc du LSR (`docs/36`) — la dernière source premium du filtre RI (la
+fraction de comptes longs Bybit, portée de 8 j intestables à ~2,74 ans par
+le collecteur versionné `x501_collect_lsr_v11.py`, règle anti-partiel
+mesurée par sonde) : le contrarian NIVEAU (l'hypothèse RI « foule longue →
+baisse ») est KILL 4/4 sur le panel 4h ET 4/4 sur la réplication 1d, le
+flux du positionnement 1 j est KILL, le flux 7 j laisse 2 IC excluant 0,5
+mais 2–3× sous le gate CANDIDAT (INCONCLU) — **la 10ᵉ falsification du
+domaine**, le comptage des CANDIDATS marginaux reste à 2 ; 10/12 cellules
+ont un AUC < 0,5 (la DIRECTION contrarian se montre partout) et le pool P1
+sépare dans le même sens (ΔR −0,315, P(Δ<0) = 0,8009 ≥ gate de contexte,
+3ᵉ contexte, jamais promu, ambiguïté de signe du gate pool assumée) — la
+direction qui se montre sans jamais franchir le gate d'amplitude n'est pas
+un signal**).
 candidats entrent dans la liste A/B sans toucher à la file**).
 A/B, jamais promotion depuis un banc**).
 falsification, collecteur versionné `x501_collect_oi_v8.py`**).
@@ -85,6 +99,7 @@ docs/27 est CLOSE**).
 → ABS**).
 OI, ML, flux, funding).
 3 tests au registre docs/20).
+origin/main
 origin/main
 origin/main
 origin/main
@@ -110,6 +125,7 @@ origin/main
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
 règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane. Le code : 12 kScripts + 6 QA **PASS** dans
+origin/main
 origin/main
 origin/main
 origin/main
