@@ -214,6 +214,11 @@ REAL = Path(os.environ.get("X501_LSR_DIR", HERE / "../../../data/x501_lsr"))
 SYM = "BTCUSDT"
 kl = st.load_klines(SYM, "240")
 ls = st.load_lsr(SYM, "4h")
+# le garde data-absente (la convention qa_fill_maker/qa_oi v8) : skip propre
+# au lieu d'un TypeError — la claim 49/0/0 tient sur la machine à data
+if kl is None or ls is None or kl.get("ts") is None:
+    print("S4 : data LSR/klines absentes — skip (le garde de la vague 11)")
+    sys.exit(0)
 ot, op = kl["ts"], kl["o"]
 arr = st.snap_lsr_sur_barres(ot, ls["ts"], ls["buy"])
 z_base = st.rolling_z(arr, 180)
