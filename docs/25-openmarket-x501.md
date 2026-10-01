@@ -125,6 +125,7 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    de rendements forward exactement nuls). Le pattern ORDERBOOK réel
    (maxBidAmount) reste au protocole A/B — désormais EN QUEUE de file
    (ABS_DEPRIORISE, derrière RI/MK6).
+origin/main
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -208,6 +209,7 @@ est re-éditée.
    par le protocole A/B, avec un contraste désormais mesurable (un verdict
    ABS positif là où l'ombre klines est morte prouverait la valeur unique
    du champ carnet).
+origin/main
 
 ## LES RÈGLES NON NÉGOCIABLES
 
