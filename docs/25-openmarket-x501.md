@@ -134,6 +134,9 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    0,5) sur 216 000 barres × 749 j, 0 doublon, 0 snapshot absent ; pool P1
    +0,281 R (P = 0,660, INCONCLU, CONTEXTE). Le capital affiché ne finance
    pas une direction prévisible à nos horizons.
+origin/main
+origin/main
+origin/main
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -239,6 +242,9 @@ est re-éditée.
    collecteur est versionné (`x501_collect_oi_v8.py`, Bybit v5 public) : la
    profondeur OI réelle Bybit (~4,5 ans collectés) reste disponible pour
    les bancs futurs.
+origin/main
+origin/main
+origin/main
 
 ## LES RÈGLES NON NÉGOCIABLES
 
