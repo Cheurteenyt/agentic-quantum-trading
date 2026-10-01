@@ -125,6 +125,15 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    de rendements forward exactement nuls). Le pattern ORDERBOOK réel
    (maxBidAmount) reste au protocole A/B — désormais EN QUEUE de file
    (ABS_DEPRIORISE, derrière RI/MK6).
+6. **Banc de l'open interest 1h (vague 8, 01/10, `docs/33`)** : l'OI — le
+   capital total affiché — testé en TÉMOIN DE CONTINUATION (l'hypothèse
+   inverse du flush OI déjà tué) sur les 12 symboles om_v27, klines ET OI du
+   même exchange (Bybit v5), grille pré-déclarée de 10 cellules (capital
+   brut ΔOI% L∈{24,72,168} + mouvement financé signe(r_L)×ΔOI% L∈{24,72},
+   × H∈{24,72}) : **10/10 KILL** (AUC 0,4917–0,5019, tous les IC contiennent
+   0,5) sur 216 000 barres × 749 j, 0 doublon, 0 snapshot absent ; pool P1
+   +0,281 R (P = 0,660, INCONCLU, CONTEXTE). Le capital affiché ne finance
+   pas une direction prévisible à nos horizons.
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -220,6 +229,16 @@ est re-éditée.
    flux/funding, absorption-proxy, et désormais vwap + volume profile). La famille analyse de `docs/27` est CLOSE :
    chaque pouvoir est exploité, mesuré et fermé, refusé par design, sans
    data locale, ou de la dette de style.
+8. **Banc de l'open interest 1h — FAIT (01/10, `docs/33`)** — la matière
+   première désignée par `docs/26` (« OI 1h en tête ») passée au banc AVANT
+   tout usage : les DEUX hypothèses de continuation (capital brut, mouvement
+   financé) **KILL 10/10** au critère AUC (216 000 barres Bybit, 12
+   symboles × 749 j, 0 snapshot absent, plomberie prouvée vivante par le
+   détecteur planté AUC > 0,55, zéro look-ahead par mutation multiplicative
+   + additive des snapshots futurs) — la 8ᵉ falsification du domaine. Le
+   collecteur est versionné (`x501_collect_oi_v8.py`, Bybit v5 public) : la
+   profondeur OI réelle Bybit (~4,5 ans collectés) reste disponible pour
+   les bancs futurs.
 
 ## LES RÈGLES NON NÉGOCIABLES
 

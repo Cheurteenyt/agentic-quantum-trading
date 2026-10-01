@@ -2,7 +2,7 @@
 
 **Le domaine de la mission x501** (100 $ → 50 100 $, DD ≤ 25 % —
 `docs/25-openmarket-x501.md`). Tout le code du domaine tient dans ce
-dossier : les 12 kScripts, le scanner d'installation et les 9 QA statiques.
+dossier : les 12 kScripts, le scanner d'installation et les 10 QA statiques.
 Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 
 ## Contenu
@@ -27,6 +27,8 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `x501_flux_local.py` + `flux_local.json` | **le banc de test des flux dormants (docs/30, vague 5)** : le flux taker natif des klines (EMA 6/24/72 h) et le funding multi-années (3/7/30 j) en filtres continus, grille PRÉ-DÉCLARÉE 12 cellules + 2 sur le pool P1, verdict mécanique au critère AUC du domaine — **12/12 KILL** sur 2 053 975 barres (80 symboles × 1 092 j), plomberie prouvée vivante |
 | `x501_abs_events_local.py` + `abs_events_local.json` | **le banc d'événements de l'absorption (docs/31, vague 6)** : le pattern absorption en PROXY klines (mur volume T−3 ≥ 3× SMA200, attaque directionnelle T−2 ≥ 2× SMA100, tenue T−1 à 0,8 %, reprise T−1 = EMA(D,6) bascule), 3 définitions IMBRIQUÉES (E1 attaque / E2 structure / E3 complet) × 2 directions × 2 horizons = 12 cellules + prime de structure E3 vs E1 + projection pool P1 — verdict mécanique au critère AUC + seuil pré-déclaré (+6 bps = ½ aller-retour taker) |
 | `x501_refs_local.py` + `refs_local.json` | **le banc des références de liquidité (docs/32, vague 7)** : vwap de session (ancrage 00h UTC, reset journalier) + volume profile de la veille (48 bins, VPOC, value area 70 %), grille PRÉ-DÉCLARÉE de 28 cellules aux DEUX hypothèses (V1 aimant / V2 cross / P1 vpoc / P2 rejet VA / P3 breakout VA — P2 et P3 conditionnent les mêmes événements avec attentes opposées) × 2 panels (POOL80 + LIQUIDE8) + focus BTC/ETH + pool P1 en CONTEXTE (F1 mauvais côté vwap, F2 hors value area, flags sur open(T)) — 55 KILL / 1 INCONCLU / 0 CANDIDAT (7ᵉ falsification) — numpy + `X501_DATA_DIR` |
+| `x501_oi_local.py` + `oi_local.json` | **le banc de l'open interest 1h (docs/33, vague 8)** : le capital affiché testé en TÉMOIN DE CONTINUATION — Étude A capital brut (ΔOI%_L, L ∈ {24,72,168}) + Étude B mouvement financé (signe(r_L)×ΔOI%, cible alignée, L ∈ {24,72}) × H ∈ {24,72} + pool P1 en CONTEXTE — 10/10 KILL (AUC 0,4917–0,5019) sur 216 000 barres × 749 j (12 symboles om_v27, klines ET OI du même exchange Bybit, 0 snapshot absent, snapshot simultané JAMAIS lu) — numpy + `X501_OI_DIR` |
+| `x501_collect_oi_v8.py` | **le collecteur versionné du banc OI (docs/33)** : Bybit v5 public (0 clé), klines 1h (pagination `end`) + OI 1h (pagination `cursor`), panel 12 symboles, JSONL + manifest — la re-collecte n'est pas bit-compatible (data live), la reproductibilité porte sur l'étude à data fixée |
 | `qa_kscript_x501.py` | QA générale des 5 stratégies (doc kScript scrapée) |
 | `qa_scanner_x501.py` | QA du scanner (49 contrôles) |
 | `qa_maker_x501.py` | QA des versions maker (M1–M15, non-régression M13) |
@@ -34,6 +36,7 @@ Les données restent locales (git-ignorées, `docs/26-openmarket-donnees.md`).
 | `qa_vagues_x501.py` | QA des vagues 1-2-3 : RI + observe régime + absorption + les 2 `_MK` + le moteur de verdict (200 contrôles : no-repaint, fail-open, budget sources ≤ 10, pièges doc, piège OCA, pré-enregistrement, cohérence docs/28 ↔ moteur) |
 | `qa_flux_local_x501.py` | QA du banc de flux (27 contrôles) : grille + verdicts + étalonnage AUC exact + **TEST D'ALTÉRATION** (look-ahead = l'AUC décolle : la plomberie voit un vrai signal) + zéro look-ahead (mutation des barres futures) + convention funding recalculée + pool 469 + AUC par symbole (anti-dilution) + re-exécution bit à bit |
 | `qa_abs_events_x501.py` | QA du banc d'événements (62 contrôles, 9 familles) : le DÉTECTEUR testé sur séries synthétiques (chaque condition violée isolément + anti-batterie-triviale), invariant réel tbqv ≤ qv, nesting E3 ⊆ E2 ⊆ E1 sur données réelles, zéro look-ahead par mutation, règle NON_INTERPRETABLE en unitaire, re-exécution bit à bit |
+| `qa_oi_local_x501.py` | QA du banc OI (47 contrôles) : le DÉTECTEUR (OI planté corrélé au forward → AUC 0,66 CANDIDAT, cas nul KILL), le zéro look-ahead par MUTATION multiplicative+additive des snapshots futurs (scores passés bit à bit), les 4 branches du verdict en unitaire, le pool 469/469 (entry = open×(1 + side×2 bps)), l'audit de collecte, la re-exécution bit à bit (digest gravé) |
 
 ## Comment valider (une commande, zéro dépendance)
 
@@ -53,10 +56,16 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
 
 ## Statut (01/10/2026)
 
-- 9/9 QA **PASS** (200 contrôles pour `qa_vagues_x501.py`, les 7 existantes re-vérifiées)
+- 10/10 QA **PASS** (200 contrôles pour `qa_vagues_x501.py`, les existantes re-vérifiées)
+  + `qa_oi_local_x501.py` (**47 contrôles**, 0 échec : détecteur planté AUC 0,66 / cas nul KILL,
+  zéro look-ahead par mutation multiplicative+additive des snapshots OI futurs, re-exécution
+  bit à bit de l'étude complète — digest b4b55400b05a69d1…, pool re-vérifié 469/469).
   + `qa_fill_maker_x501.py` (**71 contrôles**, 74 avec la re-exécution bit à bit de l'étude)
   + `qa_flux_local_x501.py` (**27 contrôles**, dont le test d'altération qui prouve que la
   plomberie du banc détecte un vrai signal : AUC look-ahead BTC 0,6103 / ETH 0,6065).
+- **Vague 8 — le banc de l'open interest 1h est FERMÉ** (`docs/33-oi-banc-local.md`) :
+  le capital affiché ne finance pas une direction prévisible — 10/10 KILL aux deux hypothèses
+  (capital brut + mouvement financé), collecteur versionné, la 8ᵉ falsification du domaine.
 - **Vague 5 — le banc de test des flux dormants est FERMÉ** (`docs/30-flux-funding-banc-local.md`) :
   le flux taker natif des klines et le funding multi-années, derniers pouvoirs data dormants,
   passés au banc AVANT tout run kScript — **12/12 cellules KILL** au critère AUC du domaine

@@ -86,7 +86,8 @@ de ces séries change : elles ne sont plus « dormantes » mais **mesurées et
 fermées** — tout re-test exige un pré-enregistrement explicite d'une
 hypothèse nouvelle au registre (`docs/20`), pas un re-run de curiosité.
 La collecte continue : les fenêtres se rallongent, l'entrepôt reste la
-matière première des prochains bancs (OI 1h en tête).
+matière première des prochains bancs — l'OI 1h, la tête de liste, l'a
+depuis passé : vague 8, mesurée et fermée (ci-dessous).
 
 **Vague 6 (`docs/31`)** : la même série `taker_buy_quote_volume` a servi de
 matière première au banc d'ÉVÉNEMENTS de l'absorption (mur volume / attaque
@@ -95,3 +96,15 @@ série reste **mesurée et fermée** aux deux niveaux (filtre continu ET
 structure événementielle klines). Le champ orderbook réel (`maxBidAmount`)
 n'est PAS couvert par ces bancs : son juge reste le run ABS du protocole
 A/B (`docs/28`), désormais en queue de file.
+
+**Vague 8 (`docs/33`)** : la série phare de ce doc — l'OI 1h — a passé le
+banc en TÉMOIN DE CONTINUATION (les deux hypothèses : capital brut ΔOI% et
+mouvement financé signe(r_L)×ΔOI%) : **10/10 KILL** au critère AUC sur
+216 000 barres (12 symboles om_v27, klines ET OI du même exchange Bybit,
+749 jours, 0 doublon, 0 snapshot absent — l'existence PILE des snapshots
+exigée, aucun fill-forward). La série passe de « matière première en
+tête » à **mesurée et fermée** au critère du domaine. La collecte continue
+avec le collecteur versionné `x501_collect_oi_v8.py` (Bybit v5 public,
+~4,5 ans d'OI 1h collectés sur les majeures — profondeur disponible pour
+les bancs futurs) ; le statut des re-tests reste régi par la règle
+ci-dessus (pré-enregistrement explicite d'une hypothèse nouvelle).

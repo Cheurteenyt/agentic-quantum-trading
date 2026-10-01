@@ -50,7 +50,14 @@ tout run : grille pré-déclarée de 28 cellules aux DEUX hypothèses
 (mean-reversion ET continuation) → 55 KILL / 1 INCONCLU / 0 CANDIDAT sur 56
 cellules (2 048 055 décisions, plomberie prouvée vivante AUC 0,91/0,93,
 zéro look-ahead par mutation) — la 7ᵉ falsification, la famille analyse de
-docs/27 est CLOSE**).
+docs/27 est CLOSE**) · **vague 8 : le banc de l'open interest 1h (`docs/33`)
+— la matière première désignée par docs/26 (« OI 1h en tête ») testée en
+TÉMOIN DE CONTINUATION — l'hypothèse INVERSE du flush OI déjà tué : capital
+brut ΔOI% + mouvement financé signe(r_L)×ΔOI%, × H{24,72} — sur 12 symboles
+avec klines ET OI du MÊME exchange (Bybit) → 10/10 KILL (AUC 0,4917–0,5019,
+216 000 barres × 749 j, 0 doublon, 0 snapshot absent, plomberie prouvée
+vivante détecteur 0,66, zéro look-ahead par mutation double) — la 8ᵉ
+falsification, collecteur versionné `x501_collect_oi_v8.py`**).
 **MC v20, SANS haircut gate (01/10), 4 audits verts** : maker δ=2
 **468,4 $** (P(250) 73,0 %) vs taker 272,7 $ (P(250) 57,2 %) —
 **+71,8 % de médiane pour le maker**, x501 @ 36 m 21,3 % vs 5,8 % ;
@@ -59,7 +66,7 @@ règle : +2 bps de coût/côté ≈ −20 à −28 % de médiane.
 reproductible du fill maker (surface δ×TTL 2 053 015 tentatives + sélection
 sur le pool P1) **réfute l'hypothèse d'entrée v20** (delta réel +0,375 bps,
 fallback à −88,6 bps, biais concentré sur A4) → candidat v21 : médiane
-**306,2 $** (TTL=2) / **364,0 $** (TTL=6, +33,6 % vs taker). Le code : 12 kScripts + 7 QA **PASS** dans
+**306,2 $** (TTL=2) / **364,0 $** (TTL=6, +33,6 % vs taker). Le code : 12 kScripts + 10 QA **PASS** dans
 `scripts/studies/x501_openmarket/` (versions maker `_MK` = l'exécution de
 référence, fill 97,9 % à δ=2 ; l'audit d'exploitation kScript
 `x501_exploit_audit.py` ; **vagues 1-2 du plan d'exploitation ACTIVÉES le
