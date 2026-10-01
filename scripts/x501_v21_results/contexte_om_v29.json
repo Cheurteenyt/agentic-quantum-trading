@@ -1,0 +1,70 @@
+{
+ "ts": 1790834579.8442802,
+ "source": "om_v27.db",
+ "features": {
+  "funding_ann_pct": {
+   "SUIUSDT": 10.95,
+   "XRPUSDT": -2.304,
+   "SOLUSDT": 2.798,
+   "LINKUSDT": 2.586,
+   "BNBUSDT": 0.507,
+   "BTCUSDT": 8.428,
+   "ETHUSDT": 7.251,
+   "DOGEUSDT": 9.535,
+   "APTUSDT": 10.95,
+   "AVAXUSDT": 10.95,
+   "ADAUSDT": 10.583,
+   "1000PEPEUSDT": 10.95
+  },
+  "structure": {
+   "SUIUSDT": {
+    "pos90": 0.8196,
+    "comp": 0.9447
+   },
+   "XRPUSDT": {
+    "pos90": 0.7859,
+    "comp": 0.577
+   },
+   "SOLUSDT": {
+    "pos90": 0.9234,
+    "comp": 0.538
+   },
+   "LINKUSDT": {
+    "pos90": 0.9397,
+    "comp": 0.6016
+   },
+   "BNBUSDT": {
+    "pos90": 0.8401,
+    "comp": 0.503
+   },
+   "BTCUSDT": {
+    "pos90": 0.8927,
+    "comp": 0.4314
+   },
+   "ETHUSDT": {
+    "pos90": 0.9429,
+    "comp": 0.365
+   },
+   "DOGEUSDT": {
+    "pos90": 0.7376,
+    "comp": 0.7225
+   },
+   "APTUSDT": {
+    "pos90": 0.8712,
+    "comp": 1.0
+   },
+   "AVAXUSDT": {
+    "pos90": 0.9528,
+    "comp": 0.8383
+   },
+   "ADAUSDT": {
+    "pos90": 0.8867,
+    "comp": 0.6643
+   },
+   "1000PEPEUSDT": {
+    "pos90": 0.6729,
+    "comp": 0.6937
+   }
+  }
+ }
+}

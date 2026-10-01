@@ -4,6 +4,24 @@
 > Les données : `docs/26-openmarket-donnees.md`. Les livrables : `docs/reference/openmarket-x501/`.
 > Le code (9 kScripts + 4 QA + scanner) : `scripts/studies/x501_openmarket/`.
 
+## Statut 2026-10-01 — PR #2 (MC v20 officiel + signaux om_v29)
+
+Le reclassement officiel est en vigueur : MC v20 sans gate (12 000 trajectoires × 36
+mois, noyau v12 bit à bit) donne la bande de médianes 12 m — 215,66 $ (stress 8,2 bps),
+272,66 $ (taker réel 6,1 bps), 475,36 $ (maker δ=2), 496,13 $ (maker δ=5), 641,99 $
+(référence 0 bps) — avec la référence certifiée reproduite au centime et les audits
+T0/T2/T3 verts. L'écart maker/taker mesuré vaut +202,7 $ de médiane (+74 %) ; les
+entrées maker (limite ±2 bps, TTL 5 barres) sont instrumentées dans le kScript et la
+fragilité de fill reste ouverte jusqu'à la preuve live 90 j.
+
+La couche « outils gratuits » demandée est mesurée et intégrée : sur 210 912
+observations f24, S1 carry funding KILL (train +29,6 / test −8,6 bps), S3 structure
+KILL, S4 régime vol DIAG, et une seule survie — S2 impulsion OI × prix, ADVISORY
+(dispersion test 28,1 bps : flush +9,9 vs tendance_L −18,2). Aucun de ces signaux ne
+bloque : le pont d'armement logge le contexte om_v29 en A7 à chaque relevé (preuve
+temporelle 4×/j) et le collecteur `x501_observe_om_v29.ks` expose la couche sur le
+graphe sans abonnement. Détail complet : `reports/openmarket-x501-baseline-2026-10-01.md`.
+
 ## LA MISSION
 
 Partir de **100 $** sur openmarket.xyz et atteindre **50 100 $** en 12 mois
