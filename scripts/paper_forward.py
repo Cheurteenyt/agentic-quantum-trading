@@ -11,6 +11,7 @@ Ledger : klines.db:paper_trades. Rapport : reports/paper-forward-<date>.md
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import statistics
 import sys
@@ -31,6 +32,26 @@ from scripts import aster_indicators as ta  # noqa: E402
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
+
+# ——— LEVIER CASCADE MAJORS ASSERVI AU MAE (T8, pré-enregistré 01/10/2026,
+# reports/aster_machine_deep_regimes.md) ———
+# Règle gravée : levier ≤ 100/(MAE_pire_régime + 0,5) → 4x sur le cycle ;
+# 10x SEULEMENT si le moniteur MAE 6 majors (the_machine.py →
+# data/warehouse/mae_state.json) donne lev_safe >= 10. DÉFAUT SÛR = 4x :
+# état absent, illisible ou périmé (> 8 j sans tir de la machine nocturne).
+# Base inchangée (0.24) ; meme/survivor/vol_spike restent 1x.
+def _cascade_majors_lever(state_path: Path | None = None) -> float:
+    p = state_path if state_path is not None else (
+        ROOT / "data" / "warehouse" / "mae_state.json")
+    try:
+        st = json.loads(p.read_text(encoding="utf-8"))
+        age = (datetime.now(timezone.utc)
+               - datetime.fromisoformat(str(st["updated_at"])))
+        if age > timedelta(days=8):
+            return 4.0   # périmé : le défaut SÛR
+        return 10.0 if float(st["lev_safe"]) >= 10.0 else 4.0
+    except Exception:
+        return 4.0       # absent/illisible : le défaut SÛR
 
 # les 5 candidats de la campagne v5 : (signal, horizon_h, direction)
 CANDIDATES = [
@@ -82,6 +103,46 @@ def probe_fields(con: sqlite3.Connection, sym: str, t0_ms: float) -> tuple:
     except Exception as _e:
         print(f"[paper] sonde P3 ({sym}) : {_e}")
         return 0.0, 0.0, 0.0
+
+
+# ——— LE GATE fund7 (MÉCANISME P3 VALIDÉ — PRÉ-ENREGISTRÉ le 30/09/2026) ———
+# Sonde p2 (reports/aster_deep_regimes_p2.md, N=61, 29 fermés) : les shorts
+# cascade/sweep activés en funding POSITIF élevé gagnent (fund7 ≥ 0,5 bps/8h
+# → hit 50 %, ret méd +2,0 % ; manie > 1 bp → hit 100 % n=6) ; en funding
+# négatif ils perdent (hit 44 %, ret −0,7 % — la foule déjà short = pas de
+# carburant). UNITÉ VERIFIÉE sur les données : fund7_at retourne des % /8h
+# (rate décimal ×100) et COUNT(fund7 > 0,005) sur paper_trades = 32/61,
+# la reproduction exacte des « 32/61 à fund7 > 0,5 bps/8h » de p2 →
+# le seuil exact dans l'échelle stockée = 0,005 %/8h (= 0,5 bps).
+GATE_FUND7_MIN_PCT = 0.005   # 0,5 bps/8h
+# Familles gate-d : les shorts CASCADE/SWEEP de la sonde uniquement.
+# PAS machine_vol_spike_6h (fund7 méd −0,04 bps, pire famille — le gate
+# les tuerait à tort). machine_cascade_majors / machine_deep_fast /
+# cascade_funding_rank_low : hors sonde (aucun n=61) — non gate-d, le
+# verdict 90 j tranchera. Les trades déjà ouverts ne sont PAS touchés.
+GATE_FUND7_SIGNALS = frozenset({
+    "machine_cascade_meme",    # cascade memecoins (n=23, méd +0,80 bps)
+    "sweep_liquidite_short",   # sweep de liquidité (n=31, méd +0,66 bps)
+})
+GATE_STATS = {"checked": 0, "skipped": 0}
+
+
+def fund7_gate_pass(name: str, sym: str, fund7_pct: float) -> bool:
+    """True = le signal passe le gate fund7 (protocole pré-enregistré 30/09).
+
+    Skip si fund7 ≤ 0,5 bps/8h : pas de carburant de cascade. fund7 = 0.0
+    (données funding absentes) → skip : sans données on ne peut PAS
+    confirmer le carburant, le gate est mécanisme-dépendant.
+    """
+    if name not in GATE_FUND7_SIGNALS:
+        return True
+    GATE_STATS["checked"] += 1
+    if fund7_pct <= GATE_FUND7_MIN_PCT:
+        GATE_STATS["skipped"] += 1
+        print(f"[gate-fund7] {sym} fund7={fund7_pct:.4f} %/8h < 0,5 bps — "
+              "skip (mécanisme P3, pré-enregistré 30/09)")
+        return False
+    return True
 
 
 def load_env_funding_stats(con: sqlite3.Connection) -> dict[str, float]:
@@ -218,6 +279,8 @@ def main() -> int:
                     status = "open"
                     closed_n += 0
                 f7, v7, l24 = probe_fields(con, sym, sig_ts)   # sonde P3
+                if not fund7_gate_pass(name, sym, f7):
+                    continue   # gate fund7 : pas de carburant → pas de trade
                 con.execute(
                     "INSERT OR IGNORE INTO paper_trades (signal, symbol, "
                     "horizon_h, direction, signal_ts, entry_ts, entry_price, "
@@ -363,6 +426,8 @@ def main() -> int:
                     "AND signal_ts=?", (_sig, e["sym"], sig_ms)).fetchone():
                     continue
                 _f7, _v7, _l24 = probe_fields(con, e["sym"], sig_ms)
+                if not fund7_gate_pass(_sig, e["sym"], _f7):
+                    continue   # gate fund7 : pas de carburant → pas de trade
                 con.execute(
                     "INSERT OR IGNORE INTO paper_trades (signal, symbol, "
                     "horizon_h, direction, signal_ts, entry_ts, entry_price, "
@@ -412,7 +477,9 @@ def main() -> int:
                        "AVG(ret_pct) FROM paper_trades GROUP BY 1,2,3").fetchall()
     lines = [f"# Paper Forward — {datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC",
              "Les 5 candidats de la campagne v5 jugés sur les données fraîches.",
-             f"Cette exécution : {opened} ouvertures, {closed_n} clôtures.", "",
+             f"Cette exécution : {opened} ouvertures, {closed_n} clôtures.",
+             f"Gate fund7 (pré-enregistré 30/09) : {GATE_STATS['checked']} "
+             f"contrôles, {GATE_STATS['skipped']} skips.", "",
              "| Candidat | H | Statut | N | WR | Ret moyen |", "|---|---|---|---|---|---|"]
     for sig, h, status, n, avg in rows:
         wr = con.execute("SELECT AVG(ret_pct > 0) FROM paper_trades "
@@ -432,9 +499,11 @@ def main() -> int:
                          f"WR {r[1]*100:.0f} %, moyen {r[2]:+.2f} %, "
                          f"cumulé {r[3]:+.2f} %")
     # ——— LE PORTEFEUILLE MACHINE en forward (les tailles réelles) ———
-    _lev = {"machine_cascade_majors": 10, "machine_cascade_meme": 1,
-            "machine_survivor_long": 1, "machine_vol_spike_6h": 1,
-            "machine_deep_fast": 7.5}
+    # levier majors asservi au MAE (T8, 01/10/2026) : 4x défaut sûr,
+    # 10x si le moniteur MAE 6 majors donne lev_safe >= 10.
+    _lev = {"machine_cascade_majors": _cascade_majors_lever(),
+            "machine_cascade_meme": 1, "machine_survivor_long": 1,
+            "machine_vol_spike_6h": 1, "machine_deep_fast": 7.5}
     _base = {"machine_cascade_majors": 0.24, "machine_cascade_meme": 0.10,
              "machine_survivor_long": 0.10, "machine_vol_spike_6h": 0.10,
              "machine_deep_fast": 0.10}
@@ -481,6 +550,11 @@ def main() -> int:
     out = (REPORTS / f"paper-forward-{datetime.now(timezone.utc):%Y-%m-%d-%H%M}.md")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[paper] {opened} ouvertures, {closed_n} clôtures -> {out}")
+    _gs = GATE_STATS
+    _gpct = 100.0 * _gs["skipped"] / _gs["checked"] if _gs["checked"] else 0.0
+    print(f"[gate-fund7] run : {_gs['checked']} contrôles, "
+          f"{_gs['skipped']} skips ({_gpct:.0f} %) — le taux de skip = "
+          "la métrique du gate")
     con.close()
     return 0
 

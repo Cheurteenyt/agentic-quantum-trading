@@ -135,6 +135,10 @@ mécanique P ≥ 0,70.**
   (`docs/35`) avec son pré-enregistrement : le U joint NON ÉTABLI (4/4
   INCONCLU sous le gate 0,05), le côté bas de la purge CANDIDAT à L2160
   (premiers candidats marginaux du domaine)** ; le LSR 4 h (8 j de data).
+  real-time (websocket, autre mécanique) ; la forme en **U** de H_R1
+  (limite L8 : la dichotomie médiane ne capte que le monotone — une
+  extension exigerait un pré-enregistrement) ; le LSR 4 h (8 j de data).
+origin/main
 - Re-test interdit sans pré-enregistrement explicite d'une hypothèse
   nouvelle (règle `docs/26`).
 
