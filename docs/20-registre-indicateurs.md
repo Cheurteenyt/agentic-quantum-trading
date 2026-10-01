@@ -616,3 +616,13 @@ Rapports : reports/aster_orderflow_regimes.md (script : scripts/studies/aster_or
 | La corrélation au stack : −0,03/−0,24 avec les cascades (légèrement décorrelant MAIS un flux perdant décorrelé = une fuite, pas de la diversification) | le refus tient même décorrelé | **NUL** — confirmé |
 
 Rapports : reports/aster_carry_wallet.md (script : scripts/studies/aster_carry_wallet.py — le harnais run_stack importé tel quel, 999 trades bit-reproduits, l'économie correcte funding exact 8 h + short dénominé).
+
+## 01/10 — T23 : LA SIMULATION TP/SL PATH (212 trades réels v5+machine, bar-par-bar 1h) — le hold pur optimal, 0/30 configs
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| 0/30 configs TP/SL ne battent le hold pur en TRAIN ET en VAL — la leçon Q3 confirmée ET étendue au TP : le stop est un poison MONOTONE (tout SL ≤ 5 % perd −32 à −96 % ; SL 1 % touché par 62-84 % des trades), le TP rate les continuations | le hold pur : −51,8 % global (DD 95,3 %, WR 43,9 %) — la seule positive : tp=1/sl=inf +2,6 % (le TP SANS stop) ; en VAL le hold est le meilleur (+270,4 %, 0/30 le battent) | **NUL** — la sortie au plan du signal = le bon défaut |
+| `funding_prix_divergence_short` : −64,3 %, NÉGATIF sous TOUTE config TP/SL (le bleeder identifié — 1re ré-catégorisation v5 depuis l'étude) | le filtrage des bleeders v5 = la priorité réelle (le PnL vient de la sélection d'entrée, pas de la sortie) | **NUL → ré-catégoriser CONTEXTE** |
+| `machine_vol_spike_6h` + tp=1 % : le PnL conservé +23,5 % vs +24,7 %, DD 17,3 % → 7,0 % (n=43) — la seule piste vivante, FORWARD-ONLY (la multiplicité 30 configs déclarée — pas une promesse) | à surveiller sur ≥ 20 trades forward avant tout verdict | **À SURVEILLER** |
+
+Rapports : reports/aster_tpsl_path.md (script : scripts/studies/aster_tpsl_path.py — 212 trades closed cohérents, la règle d'ambiguïté SL-d'abord documentée, TRAIN/VAL, la multiplicité 30 configs déclarée).
