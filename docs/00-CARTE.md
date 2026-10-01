@@ -40,9 +40,10 @@ Programme **100 $ → 50 100 $** (DD ≤ 25 %, zéro intervention autonome).
 | `docs/27-pouvoirs-kscript.md` | Exploitation kScript (**40/53 = 75,5 %** canonique vague 3) |
 | `docs/28-protocole-ab-x501.md` | A/B pré-enregistré |
 | `docs/29-fill-maker-mesure.md` | Preuve fill maker (révision v21 en review) |
-| `docs/30` … `docs/36` | Bancs locaux (flux, absorption, refs, OI, U-shape, LSR) |
+| `docs/30` … `docs/37` | Bancs locaux (flux, absorption, refs, OI, U-shape, LSR) + **horizon de backtest « depuis le début de l'actif » (v29)** |
 
 **MC v20 (baseline officielle tant que review 29 non validée)** : maker δ=2 médiane ~468 $ vs taker ~273 $ — voir docs 25/29 pour nuances et candidat v21.
+**Horizon v29 (règle verrouillée)** : backtest depuis le début de l'actif — pool 12 = 3,42 ans, 6 ans sur 9/12, BTC 7,07 ans ; base deep 1 041 871 barres ; fenêtre 23 mois du MC v20 = pire cas du cycle 2019-2026 (docs 37).
 
 Code : `scripts/studies/x501_openmarket/` uniquement.  
 Reports : `reports/openmarket/`.  
