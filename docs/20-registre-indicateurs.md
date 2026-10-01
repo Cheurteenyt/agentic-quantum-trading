@@ -457,6 +457,20 @@ semaine de tirs continue.**
 **La lecture mécanique** : aucune famille ne surnage, aucun symbole ne surnage (max ≈ 0,528 isolé) ; le delta médian le plus flatteur (+44,4 bps) vient de la queue des distributions et non d'une séparation de rangs — un delta sans AUC n'est pas un plan (la leçon des fallbacks de docs/29 répétée). La QA (39 contrôles, 0 échec) prouve la plomberie VIVANTE : le détecteur voit une aimantation plantée (AUC 0,911) et une continuation plantée (AUC 0,929) ; le zéro look-ahead est prouvé par mutation des barres futures — y compris la tentation la plus subtile : le profil de la journée EN COURS n'entre jamais dans la décision, la veille seule ; re-exécution bit à bit (digest 6af839e09c6136e8…).
 
 **Statut : KILL de vwap et volume profile** (les deux hypothèses, les deux panels) — **la 7ᵉ falsification du domaine** (fz, flush OI, ML, hypothèse fill maker docs/29, flux/funding, absorption-proxy, vwap + volume profile). La famille analyse de docs/27 est CLOSE : `ltf()` et `minBid/minAskAmount` restent documentés SANS data locale équivalente, le langage et la visu restent de la dette de style. Re-test interdit sans pré-enregistrement explicite d'une hypothèse nouvelle.
+
+## 01/10 — openmarket x501 : le banc de l'OPEN INTEREST 1h ferme le capital affiché aux deux hypothèses de continuation (vague 8, docs/33, x501_oi_local.py)
+
+**Le pré-enregistrement AVANT la mesure** : l'OI 1h — la matière première désignée par docs/26 (« OI 1h en tête ») — testée en TÉMOIN DE CONTINUATION (l'hypothèse inverse du flush OI déjà tué) sur les 12 symboles om_v27, klines ET OI du MÊME exchange (Bybit v5, la sémantique d'exécution du domaine, zéro cross-exchange dans le panel). Grille PRÉ-DÉCLARÉE de 10 cellules : Étude A « capital brut » (score = ΔOI%_L = 100×(OI[t−1]/OI[t−1−L]−1), L ∈ {24, 72, 168} × H ∈ {24, 72}, dichotomie médiane) ; Étude B « mouvement financé » (score = signe(r_L) × ΔOI%_L, cible ALIGNÉE fwd × signe(r_L), L ∈ {24, 72} × H ∈ {24, 72}) ; pool P1 en CONTEXTE. Convention temps stricte transposée de la correction v27 : le snapshot hh:00 marque l'OUVERTURE de sa fenêtre, à l'open de T le dernier snapshot connu est (T−1):00 — le snapshot simultané n'est JAMAIS lu ; existence PILE exigée (0 fill-forward). Critère AUC du domaine inchangé (IC 95 % bootstrap 1 000 journées seed 501, réduction 50 k).
+
+| cellule (12 symboles × 749 j = 216 000 barres, 0 gap, 0 doublon, 0 snapshot absent) | AUC (min–max) | delta médian | verdict |
+|---|---|---|---|
+| A capital brut, L ∈ {24,72,168} × H ∈ {24,72} (6 cellules) | 0,4917 – 0,5006 | −19,7 à +5,7 bps | **KILL ×6** |
+| B mouvement financé, L ∈ {24,72} × H ∈ {24,72} (4 cellules) | 0,4936 – 0,5019 | −9,5 à +9,2 bps | **KILL ×4** |
+| pool P1 ΔOI% 24h (186/469 entrées, CONTEXTE in-sample + cross-exchange L2) | — | +0,281 R, P = 0,660 (IC [−1,02, +1,23]) | **INCONCLU** (< gate 0,70) |
+
+**La lecture mécanique** : le capital affiché ne prédit pas la direction — ni brut (H_OI1), ni conditionné au quadrant prix (H_OI2) ; les deltas descriptifs restent sous l'étalon 12,2 bps aller-retour taker (un delta sans AUC n'est pas un plan). C'est le même verdict que les trois autres familles de positionnement (flux taker, funding, absorption-proxy) : sur perps USDT 1h, les témoins de positionnement ne portent pas d'edge directionnel exploitable à nos horizons. La QA (47 contrôles, 0 échec) prouve la plomberie vivante : le détecteur (OI planté corrélé au forward → AUC 0,66 CANDIDAT), le cas nul (KILL), le zéro look-ahead par mutation multiplicative+additive des snapshots futurs (scores passés bit à bit), la re-exécution bit à bit de l'étude complète (digest b4b55400b05a69d1…), le pool 469/469 (entry = open×(1 + side×2 bps), convention vague 4).
+
+**Statut : KILL de l'OI 1h en signal continu et en quadrant** — **la 8ᵉ falsification du domaine** (fz, flush OI, ML, hypothèse fill maker docs/29, flux/funding, absorption-proxy, vwap + volume profile, OI 1h). **NON réfuté (hors périmètre du banc)** : l'OI en événement de liquidation real-time (flux websocket des liquidations — autre mécanique, autre data), l'OI 1 j pré-2024 en contexte de régime, le LSR 4 h (8 jours de data, statut « collecté pour plus tard »). Re-test interdit sans pré-enregistrement explicite d'une hypothèse nouvelle.
 ## 30/09 — L'ÉTUDE DEEP P2 (4 ans, 12 séries, équité corrigée) : ré-catégorisation des familles + le 1er gate mécanisme-validé
 
 | Verdict | Détail | Catégorie |
@@ -492,6 +506,7 @@ origin/main
 | L'orientation intraday | le forward intraday (les signaux 15m du tape) n'a AUCUNE base dans les 6 familles OHLCV — sa base est ailleurs : le carnet réel 1m (le depth engine), l'ordre-flow/CVD, le pont fomo | **DOCTRINE** — la quête intraday bascule du OHLCV vers l'ordre-flow |
 
 Rapports : reports/aster_15m_regimes.md (script : scripts/studies/aster_15m_regimes.py — configs REF T7, le harnais corrigé b825da9, DB ro).
+origin/main
 origin/main
 origin/main
 origin/main

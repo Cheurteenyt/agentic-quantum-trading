@@ -1,0 +1,325 @@
+{
+  "outils": "x501_oi_local.py — vague 8 : banc de test local de l'open interest 1h",
+  "grille_pre_declaree": {
+    "date": "2026-10-01",
+    "capital_lookbacks_barres": [
+      24,
+      72,
+      168
+    ],
+    "finance_lookbacks_barres": [
+      24,
+      72
+    ],
+    "horizons_barres": [
+      24,
+      72
+    ],
+    "hypothese_A": "expansion du capital -> hausse (H_OI1, AUC>0,5 attendu)",
+    "hypothese_B": "mouvement financé -> continuation (H_OI2, AUC>0,5 attendu)",
+    "criterion": "AUC IC95 exclut 0,5 et |AUC-0,5|>=0.05 = CANDIDAT ; IC contient 0,5 et |AUC-0,5|<0.02 = KILL ; sinon INCONCLU",
+    "panel": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT",
+      "BNBUSDT",
+      "XRPUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "AVAXUSDT",
+      "LINKUSDT",
+      "SUIUSDT",
+      "APTUSDT",
+      "1000PEPEUSDT"
+    ],
+    "pool_L": 24
+  },
+  "fenetre": {
+    "oi_dir": "data_oi_x501",
+    "n_symboles": 12,
+    "n_barres_1h": 216000,
+    "t0": 1726016400000,
+    "t1": 1790812800000,
+    "dup_klines": 0,
+    "dup_oi": 0,
+    "snap_absents": 0,
+    "decisions_invalidees_A": 288,
+    "oi_profondeur_min_ts": 1646816400000,
+    "cout_ar_taker_bps": 12.2
+  },
+  "audit_par_symbole": {
+    "BTCUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "ETHUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "SOLUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "BNBUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "XRPUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "DOGEUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "ADAUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "AVAXUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "LINKUSDT": {
+      "n_klines": 18000,
+      "n_oi": 40000,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "SUIUSDT": {
+      "n_klines": 18000,
+      "n_oi": 29915,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "APTUSDT": {
+      "n_klines": 18000,
+      "n_oi": 34631,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    },
+    "1000PEPEUSDT": {
+      "n_klines": 18000,
+      "n_oi": 29917,
+      "gaps_klines": 0,
+      "gaps_oi_in_win": 0,
+      "n_snap_absents": 0
+    }
+  },
+  "etude_A_capital_brut": {
+    "L24_H24": {
+      "n": 215412,
+      "n_haut": 107706,
+      "n_bas": 107706,
+      "mediane_score": 0.024551686094054226,
+      "auc": 0.4951897360923163,
+      "ic95": [
+        0.48253127581250477,
+        0.5036616154224379
+      ],
+      "fwd_bps_haut": -8.105370140309965,
+      "fwd_bps_bas": -1.4210349695254547,
+      "delta_bps": -6.684335170784511,
+      "hypothese": "continuation du capital (H_OI1)",
+      "verdict": "KILL"
+    },
+    "L24_H72": {
+      "n": 214836,
+      "n_haut": 107418,
+      "n_bas": 107418,
+      "mediane_score": 0.02699650655608732,
+      "auc": 0.4917025602968106,
+      "ic95": [
+        0.4812419004652931,
+        0.5054190530539041
+      ],
+      "fwd_bps_haut": -28.990478114800634,
+      "fwd_bps_bas": -9.267581049952362,
+      "delta_bps": -19.722897064848272,
+      "hypothese": "continuation du capital (H_OI1)",
+      "verdict": "KILL"
+    },
+    "L72_H24": {
+      "n": 214836,
+      "n_haut": 107418,
+      "n_bas": 107418,
+      "mediane_score": 0.14282718912285164,
+      "auc": 0.49210168079963623,
+      "ic95": [
+        0.47876779628994864,
+        0.5041266303667596
+      ],
+      "fwd_bps_haut": -8.188667104664574,
+      "fwd_bps_bas": -1.72309814322863,
+      "delta_bps": -6.465568961435944,
+      "hypothese": "continuation du capital (H_OI1)",
+      "verdict": "KILL"
+    },
+    "L72_H72": {
+      "n": 214260,
+      "n_haut": 107130,
+      "n_bas": 107130,
+      "mediane_score": 0.14802966411264773,
+      "auc": 0.5006057244744848,
+      "ic95": [
+        0.4848228735463771,
+        0.5143397494218052
+      ],
+      "fwd_bps_haut": -16.296707562417886,
+      "fwd_bps_bas": -22.002628153036635,
+      "delta_bps": 5.705920590618749,
+      "hypothese": "continuation du capital (H_OI1)",
+      "verdict": "KILL"
+    },
+    "L168_H24": {
+      "n": 213684,
+      "n_haut": 106842,
+      "n_bas": 106842,
+      "mediane_score": 0.5933363879397469,
+      "auc": 0.4932604174584719,
+      "ic95": [
+        0.47757042643423503,
+        0.5073705874159935
+      ],
+      "fwd_bps_haut": -9.111134016481584,
+      "fwd_bps_bas": -0.3916771299486308,
+      "delta_bps": -8.719456886532953,
+      "hypothese": "continuation du capital (H_OI1)",
+      "verdict": "KILL"
+    },
+    "L168_H72": {
+      "n": 213108,
+      "n_haut": 106554,
+      "n_bas": 106554,
+      "mediane_score": 0.6084962582163289,
+      "auc": 0.49899330621591165,
+      "ic95": [
+        0.488107395350758,
+        0.5196517803020689
+      ],
+      "fwd_bps_haut": -22.709370836899065,
+      "fwd_bps_bas": -16.63291745000189,
+      "delta_bps": -6.076453386897175,
+      "hypothese": "continuation du capital (H_OI1)",
+      "verdict": "KILL"
+    }
+  },
+  "etude_B_mouvement_finance": {
+    "L24_H24": {
+      "n": 215412,
+      "n_haut": 107706,
+      "n_bas": 107706,
+      "mediane_score": 0.3697005878529336,
+      "auc": 0.49597441557287,
+      "ic95": [
+        0.48471536317917197,
+        0.5032522662499542
+      ],
+      "fwd_bps_haut": -3.8559703651509913,
+      "fwd_bps_bas": 0.0,
+      "delta_bps": -3.8559703651509913,
+      "hypothese": "continuation financée (H_OI2)",
+      "verdict": "KILL"
+    },
+    "L24_H72": {
+      "n": 214836,
+      "n_haut": 107418,
+      "n_bas": 107418,
+      "mediane_score": 0.36805509503765044,
+      "auc": 0.49571513680244433,
+      "ic95": [
+        0.48392578527600255,
+        0.5059963879972798
+      ],
+      "fwd_bps_haut": -21.507698588596085,
+      "fwd_bps_bas": -12.002291347522268,
+      "delta_bps": -9.505407241073817,
+      "hypothese": "continuation financée (H_OI2)",
+      "verdict": "KILL"
+    },
+    "L72_H24": {
+      "n": 214836,
+      "n_haut": 107418,
+      "n_bas": 107418,
+      "mediane_score": 0.9148099615355509,
+      "auc": 0.49362696447688637,
+      "ic95": [
+        0.4831695910493097,
+        0.5049322933836877
+      ],
+      "fwd_bps_haut": -15.55360260076148,
+      "fwd_bps_bas": -11.930801823901856,
+      "delta_bps": -3.6228007768596235,
+      "hypothese": "continuation financée (H_OI2)",
+      "verdict": "KILL"
+    },
+    "L72_H72": {
+      "n": 214260,
+      "n_haut": 107130,
+      "n_bas": 107130,
+      "mediane_score": 0.909519938840031,
+      "auc": 0.5019095920497049,
+      "ic95": [
+        0.48897528123192985,
+        0.5145948735521885
+      ],
+      "fwd_bps_haut": -21.811052093539978,
+      "fwd_bps_bas": -31.01273542182374,
+      "delta_bps": 9.201683328283764,
+      "hypothese": "continuation financée (H_OI2)",
+      "verdict": "KILL"
+    }
+  },
+  "resume_verdicts_panel": {
+    "KILL": 10
+  },
+  "etude_C_pool_P1": {
+    "nom": "delta_oi_L24",
+    "n": 186,
+    "n_hors_panel": 283,
+    "mediane_split": -0.3639906714870522,
+    "n_haut": 93,
+    "n_bas": 93,
+    "R_med_haut": -0.0874662428699601,
+    "R_med_bas": -0.36840215136290955,
+    "R_moy_haut": 0.3426651634565934,
+    "R_moy_bas": 0.14307544316733714,
+    "WR_haut": 49.46236559139785,
+    "WR_bas": 48.38709677419355,
+    "delta_med_R": 0.28093590849294947,
+    "ic95_delta_med": [
+      -1.0179212482172404,
+      1.2302301464722543
+    ],
+    "P_delta_sup_0": 0.6601,
+    "statut": "CONTEXTE (in-sample du pool + cross-exchange L2, jamais promotion)"
+  },
+  "digest_sha256": "b4b55400b05a69d128ba2f99e92809570395ca35d14983fc364983c255cfc507"
+}
