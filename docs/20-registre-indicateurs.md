@@ -626,3 +626,13 @@ Rapports : reports/aster_carry_wallet.md (script : scripts/studies/aster_carry_w
 | `machine_vol_spike_6h` + tp=1 % : le PnL conservé +23,5 % vs +24,7 %, DD 17,3 % → 7,0 % (n=43) — la seule piste vivante, FORWARD-ONLY (la multiplicité 30 configs déclarée — pas une promesse) | à surveiller sur ≥ 20 trades forward avant tout verdict | **À SURVEILLER** |
 
 Rapports : reports/aster_tpsl_path.md (script : scripts/studies/aster_tpsl_path.py — 212 trades closed cohérents, la règle d'ambiguïté SL-d'abord documentée, TRAIN/VAL, la multiplicité 30 configs déclarée).
+
+## 01/10 — T25 : LE RE-SIZING DU STACK SURVIVANTS + LA COMBINAISON AVEC L'OFFICIEL — la cible DD ≤ 25 % ATTEINTE
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| Le RE-SIZING (le scan 9 points, w uniforme) : w* = 0.200 → **$257,08, +20,4 %/an, DD 24,6 %, VAL +14,0 %, 0 liq** — la cible DD ≤ 25 % ATTEINTE pour la 1re fois (T24 à w=0.25 : DD 30,2 %) ; la frontière monotone 6,4 DD à w=0.05 → 30,2 à 0.25 | le sizing optimal UN scan, courbe monotone — pas de fitting | **CANDIDAT tête de stack** |
+| LA COMBINAISON officiel + survivants : alpha* = 1.0 (100 % survivants) — l'officiel n'apporte NI NET (+7,6 vs +20,4 %/an) NI diversification de DD ; le 50/50 ($207,88, +15,5 %/an, DD 34,5 %) domine néanmoins l'officiel seul | la poche-officielle (alpha < 1) = une décision qui ne peut se re-juger qu'au forward, pas au backtest | **VERDICT** — le stack survivants re-sizé = le standard, l'officiel = le contexte |
+| La LEÇON T25 : le champ balance de run_stack suit l'ordre d'ENTRÉE (le lire en ordre de sortie déplace le DD officiel 32,5 → 49,6 %) — la datation du PnL (entrée vs sortie) change les ABSOLUS, les RELATIFS (l'ordre des stacks) tiennent dans les deux conventions (5/5 vérifiés) | le piège documenté pour les futurs études de combinaison | **LEÇON** |
+
+Rapports : reports/aster_combine_stacks.md (script : scripts/studies/aster_combine_stacks.py — les modules T24/V2/run_stack importés verbatim, DB ro, la table mensuelle 62 mois, les garde-fous composé 0.000 %).
