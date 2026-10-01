@@ -1,0 +1,326 @@
+{
+ "E3_par_annee_utc": {
+  "2023": 3283,
+  "2024": 12816,
+  "2025": 30358,
+  "2026": 28262
+ },
+ "counts_events": {
+  "LONG": {
+   "E1_attaque": 219266,
+   "E2_structure_sans_mur": 45180,
+   "E3_complet": 11022
+  },
+  "SHORT": {
+   "E1_attaque": 215650,
+   "E2_structure_sans_mur": 140856,
+   "E3_complet": 63697
+  }
+ },
+ "cout_ar_taker_bps": 12.2,
+ "date_pre_enregistrement": "2026-10-01",
+ "etude": "VAGUE 6 \u2014 banc d'\u00e9v\u00e9nements absorption (proxy klines)",
+ "etude_A_panel": {
+  "LONG_E1_attaque_H24": {
+   "auc": 0.5114451268524595,
+   "delta_med_bps": 10.860484544695497,
+   "ic95": [
+    0.500335244595015,
+    0.5225421222703688
+   ],
+   "med_event_bps": 0.0,
+   "med_nonevent_bps": -10.860484544695497,
+   "n_events": 219068,
+   "n_points": 2052055,
+   "part_zero_events": 0.18622071685504044,
+   "verdict": "INCONCLU"
+  },
+  "LONG_E1_attaque_H72": {
+   "auc": 0.5172483783422263,
+   "delta_med_bps": 34.05627438785146,
+   "ic95": [
+    0.5080746857828438,
+    0.5306255493863845
+   ],
+   "med_event_bps": 0.0,
+   "med_nonevent_bps": -34.05627438785146,
+   "n_events": 218649,
+   "n_points": 2048215,
+   "part_zero_events": 0.18451948099465354,
+   "verdict": "INCONCLU"
+  },
+  "LONG_E2_structure_sans_mur_H24": {
+   "auc": 0.5033425947064402,
+   "delta_med_bps": -11.135857461024509,
+   "ic95": [
+    0.4908845527256807,
+    0.5180324081351568
+   ],
+   "med_event_bps": -11.135857461024509,
+   "med_nonevent_bps": 0.0,
+   "n_events": 45155,
+   "n_points": 2052055,
+   "part_zero_events": 0.004074853283135865,
+   "verdict": "KILL"
+  },
+  "LONG_E2_structure_sans_mur_H72": {
+   "auc": 0.5051956381302273,
+   "delta_med_bps": -12.935636066336178,
+   "ic95": [
+    0.49266432626923556,
+    0.5197701428076417
+   ],
+   "med_event_bps": -28.67127729371446,
+   "med_nonevent_bps": -15.735641227378283,
+   "n_events": 45106,
+   "n_points": 2048215,
+   "part_zero_events": 0.002416529951669401,
+   "verdict": "KILL"
+  },
+  "LONG_E3_complet_H24": {
+   "auc": 0.49426341055789924,
+   "delta_med_bps": -26.382548485814457,
+   "ic95": [
+    0.47388109838280146,
+    0.5147880091279754
+   ],
+   "med_event_bps": -26.382548485814457,
+   "med_nonevent_bps": 0.0,
+   "n_events": 11018,
+   "n_points": 2052055,
+   "part_zero_events": 0.002813577781811581,
+   "verdict": "KILL"
+  },
+  "LONG_E3_complet_H72": {
+   "auc": 0.4957109196011371,
+   "delta_med_bps": -38.323992378762924,
+   "ic95": [
+    0.4762951240207432,
+    0.5171016188338945
+   ],
+   "med_event_bps": -54.168265805654194,
+   "med_nonevent_bps": -15.844273426891267,
+   "n_events": 11004,
+   "n_points": 2048215,
+   "part_zero_events": 0.0011813885859687386,
+   "verdict": "KILL"
+  },
+  "SHORT_E1_attaque_H24": {
+   "auc": 0.4886339933898398,
+   "delta_med_bps": -10.820152756865435,
+   "ic95": [
+    0.4758574551346663,
+    0.49815922250247224
+   ],
+   "med_event_bps": 0.0,
+   "med_nonevent_bps": 10.820152756865435,
+   "n_events": 215463,
+   "n_points": 2052055,
+   "part_zero_events": 0.1894756872409648,
+   "verdict": "CONTEXTE"
+  },
+  "SHORT_E1_attaque_H72": {
+   "auc": 0.4823163596398456,
+   "delta_med_bps": -34.02107111501375,
+   "ic95": [
+    0.4745546393368861,
+    0.4974463911523545
+   ],
+   "med_event_bps": 0.0,
+   "med_nonevent_bps": 34.02107111501375,
+   "n_events": 215041,
+   "n_points": 2048215,
+   "part_zero_events": 0.1875549313851777,
+   "verdict": "CONTEXTE"
+  },
+  "SHORT_E2_structure_sans_mur_H24": {
+   "auc": 0.4861067401894994,
+   "delta_med_bps": -10.750761512274591,
+   "ic95": [
+    0.4763335663787451,
+    0.49953172222271336
+   ],
+   "med_event_bps": 0.0,
+   "med_nonevent_bps": 10.750761512274591,
+   "n_events": 140716,
+   "n_points": 2052055,
+   "part_zero_events": 0.28799852184541913,
+   "verdict": "CONTEXTE"
+  },
+  "SHORT_E2_structure_sans_mur_H72": {
+   "auc": 0.478419930239476,
+   "delta_med_bps": -33.59462486002336,
+   "ic95": [
+    0.4672668133942497,
+    0.48953829889611583
+   ],
+   "med_event_bps": 0.0,
+   "med_nonevent_bps": 33.59462486002336,
+   "n_events": 140385,
+   "n_points": 2048215,
+   "part_zero_events": 0.2860846956583681,
+   "verdict": "CONTEXTE"
+  },
+  "SHORT_E3_complet_H24": {
+   "auc": 0.48432786002933453,
+   "delta_med_bps": -10.139416983523034,
+   "ic95": [
+    0.4635984869082322,
+    0.492083259742631
+   ],
+   "med_event_bps": 0.0,
+   "med_nonevent_bps": 10.139416983523034,
+   "n_events": 63586,
+   "n_points": 2052055,
+   "part_zero_events": 0.6266788286729783,
+   "verdict": "CONTEXTE"
+  },
+  "SHORT_E3_complet_H72": {
+   "auc": 0.47674813943614003,
+   "delta_med_bps": -31.908104658582957,
+   "ic95": [
+    0.4593216829128452,
+    0.49040324041646083
+   ],
+   "med_event_bps": 0.0,
+   "med_nonevent_bps": 31.908104658582957,
+   "n_events": 63369,
+   "n_points": 2048215,
+   "part_zero_events": 0.6252584071075763,
+   "verdict": "CONTEXTE"
+  }
+ },
+ "etude_B_prime_structure": {
+  "LONG_H24": {
+   "delta_bps": -26.382548485814457,
+   "ic95": [
+    -62.60068854251441,
+    10.857763300760052
+   ],
+   "med_E1_bps": 0.0,
+   "med_E3_bps": -26.382548485814457,
+   "n_E1": 219068,
+   "n_E3": 11018,
+   "non_interpretable": false,
+   "p_delta_sup0": 0.0685,
+   "part_zero_E1": 0.18611,
+   "part_zero_E3": 0.002813577781811581,
+   "verdict": "ABS_DEPRIORISE"
+  },
+  "LONG_H72": {
+   "delta_bps": -54.168265805654194,
+   "ic95": [
+    -123.26419179823081,
+    10.253481878115574
+   ],
+   "med_E1_bps": 0.0,
+   "med_E3_bps": -54.168265805654194,
+   "n_E1": 218649,
+   "n_E3": 11004,
+   "non_interpretable": false,
+   "p_delta_sup0": 0.0385,
+   "part_zero_E1": 0.1846,
+   "part_zero_E3": 0.0011813885859687386,
+   "verdict": "ABS_DEPRIORISE"
+  },
+  "SHORT_H24": {
+   "delta_bps": 0.0,
+   "ic95": [
+    0.0,
+    0.0
+   ],
+   "med_E1_bps": 0.0,
+   "med_E3_bps": 0.0,
+   "n_E1": 215463,
+   "n_E3": 63586,
+   "non_interpretable": true,
+   "p_delta_sup0": 0.0,
+   "part_zero_E1": 0.18951,
+   "part_zero_E3": 0.6266788286729783,
+   "verdict": "ABS_DEPRIORISE"
+  },
+  "SHORT_H72": {
+   "delta_bps": 0.0,
+   "ic95": [
+    0.0,
+    0.0
+   ],
+   "med_E1_bps": 0.0,
+   "med_E3_bps": 0.0,
+   "n_E1": 215041,
+   "n_E3": 63369,
+   "non_interpretable": true,
+   "p_delta_sup0": 0.0,
+   "part_zero_E1": 0.18758,
+   "part_zero_E3": 0.6252584071075763,
+   "verdict": "ABS_DEPRIORISE"
+  }
+ },
+ "etude_C_pool_P1": {
+  "delta_R": 0.1295615395746092,
+  "med_R_matches": -0.19161372572220736,
+  "med_R_reste": -0.32117526529681656,
+  "n_matches_E3": 12,
+  "n_pool": 469,
+  "p_boot_delta_sup0": 0.6521,
+  "statut": "CONTEXTE (in-sample de la s\u00e9lection)"
+ },
+ "focus_btc_eth": {
+  "BTCUSDT": {
+   "LONG": {
+    "E1_attaque": 2957,
+    "E2_structure_sans_mur": 1150,
+    "E3_complet": 278
+   },
+   "SHORT": {
+    "E1_attaque": 2974,
+    "E2_structure_sans_mur": 1580,
+    "E3_complet": 351
+   }
+  },
+  "ETHUSDT": {
+   "LONG": {
+    "E1_attaque": 2772,
+    "E2_structure_sans_mur": 903,
+    "E3_complet": 204
+   },
+   "SHORT": {
+    "E1_attaque": 2751,
+    "E2_structure_sans_mur": 1576,
+    "E3_complet": 334
+   }
+  }
+ },
+ "grille": {
+  "definitions": [
+   "E1_attaque",
+   "E2_structure_sans_mur",
+   "E3_complet"
+  ],
+  "directions": [
+   "LONG",
+   "SHORT"
+  ],
+  "horizons": [
+   24,
+   72
+  ],
+  "parametres": {
+   "ecrasement": 0.008,
+   "mult_attaque": 2.0,
+   "mult_mur": 3.0,
+   "span_reprise": 6
+  }
+ },
+ "synthese": {
+  "decision": "ABS_DEPRIORISE (derriere RI/MK6)",
+  "prime_structure_justifiee": "0/4 cellules",
+  "regle_predeclaree": "IC exclut 0 ET delta >= +6.0 bps ET n_E3 >= 12"
+ },
+ "univers": {
+  "barres": 2053975,
+  "symboles": 80,
+  "t_max_ms": 1790463600000.0,
+  "t_min_ms": 1696118400000.0
+ }
+}

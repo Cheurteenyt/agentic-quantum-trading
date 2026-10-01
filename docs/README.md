@@ -14,8 +14,10 @@ des collecteurs 24/7, et un registre qui dit tout. La lecture dans l'ordre :*
 | **28-protocole-ab-x501** | le protocole A/B PRÉ-ENREGISTRÉ : 8 runs, critères figés 01/10/2026, moteur déterministe | avant et après tout run A/B des vagues 1-2 et MK6 |
 | **29-fill-maker-mesure** | la chaîne de preuve maker : surface de fill δ×TTL, sélection adverse sur le pool P1, candidat v21, la boucle des compteurs `_MK` | avant de croire au fill 97,9 % ou de toucher au TTL |
 | **30-flux-funding-banc-local** | le banc de test des flux dormants : flux taker natif + funding au banc, 12/12 cellules KILL, plomberie prouvée vivante | avant de proposer un filtre de flux ou de funding |
+| **31-absorption-banc-evenements** | le banc d'événements de l'absorption (proxy klines) : prime de structure réfutée 0/4, la confirmation est TARDIVE, ABS_DEPRIORISE — la file de runs priorisée | avant de lancer les runs ABS ou de croire au pattern sans ordrebook |
 | **28-protocole-ab-x501** | le protocole A/B PRÉ-ENREGISTRÉ : 6 runs, critères figés 01/10/2026, moteur déterministe | avant et après tout run A/B des vagues 1-2 |
 | **27-pouvoirs-kscript** | le registre d'exploitation : 36/53 capacités (67,9 %), vagues 1-2 ACTIVÉES (régime institutionnel + absorption), backtests A/B à venir | avant d'écrire tout nouveau kScript |
+origin/main
 origin/main
 origin/main
 origin/main

@@ -87,3 +87,12 @@ fermées** — tout re-test exige un pré-enregistrement explicite d'une
 hypothèse nouvelle au registre (`docs/20`), pas un re-run de curiosité.
 La collecte continue : les fenêtres se rallongent, l'entrepôt reste la
 matière première des prochains bancs (OI 1h en tête).
+
+**Vague 6 (`docs/31`)** : la même série `taker_buy_quote_volume` a servi de
+matière première au banc d'ÉVÉNEMENTS de l'absorption (mur volume / attaque
+/ tenue / reprise en proxy klines) — prime de structure réfutée 0/4, la
+série reste **mesurée et fermée** aux deux niveaux (filtre continu ET
+structure événementielle klines). Le champ orderbook réel (`maxBidAmount`)
+n'est PAS couvert par ces bancs : son juge reste le run ABS du protocole
+A/B (`docs/28`), désormais en queue de file.
+origin/main

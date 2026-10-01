@@ -422,6 +422,24 @@ semaine de tirs continue.**
 **La plomberie est prouvée vivante** (le point qui fait la valeur du KILL) : le test d'altération de la QA — décaler le score d'une barre vers l'avant (look-ahead) fait DÉCOLLER l'AUC (BTC 0,5306 vs 0,5079 strict ; sur le rendement intrabar de la même barre : **BTC 0,6103 / ETH 0,6065**) — le flux taker contient de l'information, le harnais la voit, et le verdict strict ~0,5 est donc réel. AUC par symbole sur 8 liquides ≈ 0,5 (0,4978/0,5022/0,5009) : le pooling ne dilue rien. Re-exécution bit à bit.
 
 **Statut : KILL des filtres continus** (le niveau EMA du flux, la moyenne du funding — 5e falsification fermée du domaine après fz, flush OI, ML). **NON réfuté** : le pattern absorption ÉVÉNEMENTIEL de la vague 2 (mur/attaque/tenue/reprise à 4 conditions ordonnées — le champ orderbook n'a pas d'équivalent klines) — son juge reste le protocole A/B docs/28. Re-test interdit sans pré-enregistrement explicite d'une hypothèse nouvelle.
+
+## 01/10 — openmarket x501 : le banc d'ÉVÉNEMENTS de l'absorption réfute la prime de structure en proxy klines + priorise la file de runs (vague 6, docs/31, x501_abs_events_local.py)
+
+**Le pré-enregistrement AVANT la mesure** : le pattern absorption de la vague 2 (mur / attaque / tenue / reprise, 4 conditions ordonnées) transposé klines avec les invariants réels (tbqv ≤ qv, D ∈ [−1, 1]) — décision à l'OPEN de T (mur T−3 : volume ≥ 3× SMA200 ; attaque T−2 : vague taker directionnelle ≥ 2× SMA100 ; tenue T−1 : l'extrême tient à 0,8 % ; reprise T−1 : EMA(D, 6) bascule côté mur), 3 définitions IMBRIQUÉES pré-déclarées (E1 = attaque seule ; E2 = + tenue + reprise ; E3 = + mur), 3 × 2 directions × 2 horizons = 12 cellules au critère AUC du domaine (Mann-Whitney événement vs non-événement, IC 95 % bootstrap journées seed 501, seuils inchangés) + 4 cellules de PRIME DE STRUCTURE (delta médianes E3 − E1, bootstrap 10 000 ; JUSTIFIE : IC exclut 0 ET delta ≥ +6 bps ET n_E3 ≥ 12) + projection pool P1 (CONTEXTE) + règle de lecture de la masse d'ex-aequo pré-déclarée (médiane 0,0 avec ≥ 50 % de zéros = NON_INTERPRETABLE).
+
+| cellule (80 symboles × 2 053 975 barres 1h, 01/10/2023 → 27/10/2026, 0 gap) | n events | AUC / delta | verdict |
+|---|---|---|---|
+| LONG E1 attaque seule, H24 / H72 | 219 068 / 218 649 | AUC 0,5114 / 0,5172, Δ +10,9 / +34,1 bps | **INCONCLU ×2** (IC H72 exclut 0,5, séparation 0,0172 < 0,05) |
+| LONG E2 structure sans mur, H24 / H72 | 45 155 / 45 106 | AUC 0,5033 / 0,5052, Δ −11,1 / −12,9 bps | **KILL ×2** |
+| LONG E3 complet, H24 / H72 | 11 018 / 11 004 | AUC 0,4943 / 0,4957, Δ −26,4 / −38,3 bps | **KILL ×2** |
+| SHORT E1/E2/E3, H24/H72 (6 cellules) | 215k / 141k / 64k | AUC 0,4767 – 0,4886, Δ −10,1 à −34,0 bps | **CONTEXTE ×6** (anti-signal : le mur perd) |
+| PRIME de structure E3 − E1, LONG H24 / H72 | 11 018 | Δ −26,4 bps (P = 0,069) / −54,2 bps (P = 0,038) | **ABS_DEPRIORISE ×2** (la structure SOUSTRAIT) |
+| PRIME de structure, SHORT H24 / H72 | 63 586 / 63 369 | Δ +0,0 (IC [0, 0]) — 62,7 % de zéros exacts | **NON_INTERPRETABLE ×2** (médiane dans la masse des liens) → ABS_DEPRIORISE |
+| pool P1 (CONTEXTE in-sample) | 12/469 matchés | Δ +0,13 R, P = 0,652 | **INCONCLU** (< gate 0,70) |
+
+**La lecture mécanique** : l'AUC LONG descend en cascade E1 → E2 → E3 (0,5114 → 0,5033 → 0,4943 à H24) — **chaque condition de confirmation DÉGRADE le signal** : le rebond se joue DANS la barre de tenue, à l'open de décision l'absorption est déjà payée (la structure est TARDIVE, pas fausse). Côté SHORT, toutes les cellules < 0,5 : les attaques acheteuses « absorbées » précèdent la CONTINUATION haussière — la dynamique traverse le mur (l'asymétrie breakout du pool P1 et la leçon registre Aster confirmées). Le proxy klines du mur (volume ≥ 3× SMA200 sans contexte carnet) sélectionne la plaine illiquide : 62,7 % des E3 SHORT ont un rendement forward EXACTEMENT nul contre 18,9 % des E1. La QA (9 familles, 62 contrôles, 0 échec) teste le détecteur sur séries synthétiques (chaque condition violée isolément), le nesting E3 ⊆ E2 ⊆ E1 sur données réelles, le zéro look-ahead par mutation des barres futures, et la re-exécution bit à bit (7 535 octets). Les événements existent sur les symboles des runs (BTC 278 E3 LONG / 351 SHORT, ETH 204 / 334) : le run ABS ne sera pas DATA_ABSENTE.
+
+**Statut : KILL de l'ombre klines du pattern absorption** (la 6e falsification du domaine) + **DÉCISION de priorisation pré-déclarée : ABS_DEPRIORISE** — les runs 3-4 (ABS) du protocole docs/28 passent EN QUEUE de file (ordre recommandé : RI → MK6 → TRAIL → ABS). **NON réfuté** : le pattern ORDERBOOK réel (maxBidAmount) — son juge reste le protocole, renforcé par le contraste : un PROMOTION sur ABS là où l'ombre klines est morte prouverait la valeur UNIQUE du champ carnet. Les 3 définitions E1/E2/E3 sont closes en klines — aucune variante sans champ orderbook ne rentre dans un kScript.
 ## 30/09 — L'ÉTUDE DEEP P2 (4 ans, 12 séries, équité corrigée) : ré-catégorisation des familles + le 1er gate mécanisme-validé
 
 | Verdict | Détail | Catégorie |
@@ -457,4 +475,5 @@ origin/main
 | L'orientation intraday | le forward intraday (les signaux 15m du tape) n'a AUCUNE base dans les 6 familles OHLCV — sa base est ailleurs : le carnet réel 1m (le depth engine), l'ordre-flow/CVD, le pont fomo | **DOCTRINE** — la quête intraday bascule du OHLCV vers l'ordre-flow |
 
 Rapports : reports/aster_15m_regimes.md (script : scripts/studies/aster_15m_regimes.py — configs REF T7, le harnais corrigé b825da9, DB ro).
+origin/main
 origin/main

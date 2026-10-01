@@ -94,6 +94,15 @@ A/B (docs/28) reste son juge. La leçon du banc : un filtre « flux moyen » est
 mort ; seule la structure événementielle peut prétendre à un pouvoir —
 exactement la leçon du registre Aster (« la dynamique bat la moyenne »).
 
+**SUITE (vague 6, `docs/31`) — la structure événementielle a été passée au
+banc en proxy klines** : prime de structure E3 vs E1 réfutée 0/4 (la
+confirmation est TARDIVE — le rebond se joue dans la barre de tenue), le
+miroir SHORT est anti-signal (le mur perd), le proxy du mur sélectionne la
+plaine illiquide. Ce que cette fermeture NE couvre PAS : le pattern
+orderbook RÉEL (maxBidAmount), jugé par les runs 3-4 du protocole —
+désormais EN QUEUE de file (ABS_DEPRIORISE, derrière RI/MK6).
+
+origin/main
 **L'usage de la data** : `docs/26` re-qualifie les séries — le funding et le
 flux taker sont désormais **banc-testés** (collectés, mesurés, fermés au
 panel) et non plus simplement dormants. La collecte continue (l'entrepôt

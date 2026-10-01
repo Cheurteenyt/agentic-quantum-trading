@@ -7,6 +7,14 @@
 > `docs/20-registre-indicateurs.md`. Ce protocole évalue les vagues 1-2 du
 > plan d'exploitation (`docs/27-pouvoirs-kscript.md`) : le filtre de régime
 > institutionnel (RI) et le pattern absorption orderbook.
+> **Priorisation (vague 6, `docs/31`) : la file de runs recommandée est
+> RI (1-2) → MK6 (7-8) → TRAIL (5-6) → ABS (3-4)** — le banc d'événements
+> en proxy klines a réfuté la prime de structure de l'ombre klines du
+> pattern (0/4 cellules, la confirmation est tardive) : l'ABS reste au
+> protocole (le juge de l'ordrebook ne change pas) mais passe EN QUEUE —
+> avec un rôle renforcé : un verdict ABS positif là où l'ombre klines est
+> morte prouverait la valeur UNIQUE du champ carnet.
+origin/main
 
 ## LA RÈGLE (une phrase)
 
@@ -34,6 +42,17 @@ KILL ou INCONCLU laissent la référence intacte et le registre tranchera.
 > pré-enregistré**, mais la mesure historique ne peut pas dire si l'edge du
 > signal survit à 6 h d'attente (limite L6 de docs/29) : ces deux runs
 > répondent. Critères inchangés ; convention CSV `ab_x501_BTCUSDT_mk6_off/on.csv`.
+>
+> **Priorisation vague 6 (pré-enregistrée le 01/10/2026, source : docs/31)** :
+> le banc d'événements en proxy klines réfute la prime de structure de
+> l'ombre klines du pattern absorption (E3 vs E1 : −26,4/−54,2 bps LONG,
+> CONTEXTE SHORT, 0/4 cellules justifiées) — les runs 3-4 (ABS) restent au
+> protocole mais passent EN QUEUE de file. Ordre recommandé : **RI (1-2) →
+> MK6 (7-8) → TRAIL (5-6) → ABS (3-4)**. Le N_MIN = 12 de l'ABS est
+> inchangé, et son rôle est précisé : un PROMOTION sur ABS alors que le
+> proxy klines est mort = preuve par contraste que le champ orderbook porte
+> une information unique (à valider en papier v11 comme tout PROMOTION).
+origin/main
 
 **Discipline de run** : même fenêtre temporelle et mêmes inputs pour les
 deux jambes d'un même test (seul le filtre / le pattern change) ; les 8 flux
