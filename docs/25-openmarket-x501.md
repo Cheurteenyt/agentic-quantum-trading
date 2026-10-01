@@ -126,6 +126,7 @@ Trois portes candidates ont été testées et **fermées** indépendamment :
    (maxBidAmount) reste au protocole A/B — désormais EN QUEUE de file
    (ABS_DEPRIORISE, derrière RI/MK6).
 origin/main
+origin/main
 
 ## LE CRITÈRE DE PROMOTION (durci)
 
@@ -209,6 +210,19 @@ est re-éditée.
    par le protocole A/B, avec un contraste désormais mesurable (un verdict
    ABS positif là où l'ombre klines est morte prouverait la valeur unique
    du champ carnet).
+7. **Banc des références de liquidité — FAIT (01/10, `docs/32`)** — les
+   2 derniers pouvoirs d'analyse réels (vwap de session + volume profile
+   de la veille, les briques payantes de TradingView) passés au banc en
+   proxy klines, grille pré-déclarée de 28 cellules aux DEUX hypothèses
+   (mean-reversion ET continuation, litige tranché par la donnée) :
+   **55 KILL / 1 INCONCLU / 0 CANDIDAT** sur 56 cellules (2 048 055
+   décisions, 80 symboles, plomberie prouvée vivante par le détecteur
+   synthétique AUC 0,91/0,93, zéro look-ahead par mutation) — la 7ᵉ
+   falsification du domaine (fz, flush OI, ML, hypothèse fill maker,
+   flux/funding, absorption-proxy, et désormais vwap + volume profile). La famille analyse de `docs/27` est CLOSE :
+   chaque pouvoir est exploité, mesuré et fermé, refusé par design, sans
+   data locale, ou de la dette de style.
+origin/main
 origin/main
 
 ## LES RÈGLES NON NÉGOCIABLES

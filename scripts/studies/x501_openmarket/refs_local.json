@@ -1,0 +1,1836 @@
+{
+ "bilan_verdicts": {
+  "INCONCLU": 1,
+  "KILL": 55
+ },
+ "data_dir": "/home/z/my-project/scripts/data_x501",
+ "discipline": "pré-enregistrée dans l'en-tête du script AVANT toute mesure (grille, seuils, tie-breaks, verdicts) — seed 501, 1000 boot AUC / 10000 boot pool",
+ "duree_s": 287.9,
+ "etude": "x501_refs_local.py — VAGUE 7 : le banc des références de liquidité (vwap session + volume profile veille)",
+ "grille": {
+  "P1": "aimant vpoc de la veille",
+  "P2": "rejet value area (mean-reversion)",
+  "P3": "breakout value area (hypothèse opposée)",
+  "V1": "aimant vwap (mean-reversion) : flag LONG d<=−s / SHORT d>=+s, s ∈ (0.0, 0.005, 0.01)",
+  "V2": "cross vwap (continuation)",
+  "n_cellules": 28
+ },
+ "n_decisions": 2048055,
+ "n_symboles": 80,
+ "n_symboles_liquide8": 8,
+ "panel_liquide8": {
+  "P1 vpoc LONG H24": {
+   "auc": 0.5124650939822296,
+   "delta_bps": 21.880641163475403,
+   "famille": "P1",
+   "fwd_bps_comp": -7.984031936126865,
+   "fwd_bps_flag": 13.896609227348538,
+   "hypothese": "P1 vpoc LONG H24",
+   "ic95": [
+    0.49458210508334854,
+    0.5286406927191127
+   ],
+   "n": 208896,
+   "n_comp": 106773,
+   "n_flag": 102123,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0011750536118210393,
+   "verdict": "KILL"
+  },
+  "P1 vpoc LONG H72": {
+   "auc": 0.5070498557400983,
+   "delta_bps": 32.47779476677135,
+   "famille": "P1",
+   "fwd_bps_comp": -9.228219518627178,
+   "fwd_bps_flag": 23.24957524814418,
+   "hypothese": "P1 vpoc LONG H72",
+   "ic95": [
+    0.4856175304698836,
+    0.5242344834053703
+   ],
+   "n": 208896,
+   "n_comp": 106773,
+   "n_flag": 102123,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0006266952596378876,
+   "verdict": "KILL"
+  },
+  "P1 vpoc SHORT H24": {
+   "auc": 0.512451505786791,
+   "delta_bps": 21.87680649303889,
+   "famille": "P1",
+   "fwd_bps_comp": -13.893407801587726,
+   "fwd_bps_flag": 7.983398691451168,
+   "hypothese": "P1 vpoc SHORT H24",
+   "ic95": [
+    0.49458164090752504,
+    0.5285899840625342
+   ],
+   "n": 208896,
+   "n_comp": 102127,
+   "n_flag": 106769,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0011051897086232895,
+   "verdict": "KILL"
+  },
+  "P1 vpoc SHORT H72": {
+   "auc": 0.5070473908629634,
+   "delta_bps": 32.47779476677135,
+   "famille": "P1",
+   "fwd_bps_comp": -23.24957524814418,
+   "fwd_bps_flag": 9.228219518627178,
+   "hypothese": "P1 vpoc SHORT H72",
+   "ic95": [
+    0.4856567164346278,
+    0.5242379994301858
+   ],
+   "n": 208896,
+   "n_comp": 102127,
+   "n_flag": 106769,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0005151307963922112,
+   "verdict": "KILL"
+  },
+  "P2 va-rejet LONG H24": {
+   "auc": 0.5148985508161328,
+   "delta_bps": 22.91146196020536,
+   "famille": "P2",
+   "fwd_bps_comp": -3.3343076254496116,
+   "fwd_bps_flag": 19.57715433475575,
+   "hypothese": "P2 va-rejet LONG H24",
+   "ic95": [
+    0.49367470310003525,
+    0.5334587851773476
+   ],
+   "n": 208896,
+   "n_comp": 150541,
+   "n_flag": 58355,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.001148144974723674,
+   "verdict": "KILL"
+  },
+  "P2 va-rejet LONG H72": {
+   "auc": 0.5141871435862895,
+   "delta_bps": 42.64644678286231,
+   "famille": "P2",
+   "fwd_bps_comp": -4.706687775448788,
+   "fwd_bps_flag": 37.93975900741352,
+   "hypothese": "P2 va-rejet LONG H72",
+   "ic95": [
+    0.4893660079755141,
+    0.5347258582194364
+   ],
+   "n": 208896,
+   "n_comp": 150541,
+   "n_flag": 58355,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0007025961785622483,
+   "verdict": "KILL"
+  },
+  "P2 va-rejet SHORT H24": {
+   "auc": 0.5020250466545976,
+   "delta_bps": 13.135901311795028,
+   "famille": "P2",
+   "fwd_bps_comp": -6.362672322375639,
+   "fwd_bps_flag": 6.773228989419389,
+   "hypothese": "P2 va-rejet SHORT H24",
+   "ic95": [
+    0.4843188845780423,
+    0.5199208057111784
+   ],
+   "n": 208896,
+   "n_comp": 145867,
+   "n_flag": 63029,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0010312713195513178,
+   "verdict": "KILL"
+  },
+  "P2 va-rejet SHORT H72": {
+   "auc": 0.49789904679773866,
+   "delta_bps": 20.508337486332927,
+   "famille": "P2",
+   "fwd_bps_comp": -12.807143801312598,
+   "fwd_bps_flag": 7.70119368502033,
+   "hypothese": "P2 va-rejet SHORT H72",
+   "ic95": [
+    0.47694570033372397,
+    0.5183333111175574
+   ],
+   "n": 208896,
+   "n_comp": 145867,
+   "n_flag": 63029,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0003966428152120452,
+   "verdict": "KILL"
+  },
+  "P3 va-breakout LONG H24": {
+   "auc": 0.4979749533454024,
+   "delta_bps": -13.135901311795028,
+   "famille": "P3",
+   "fwd_bps_comp": 6.362672322375639,
+   "fwd_bps_flag": -6.773228989419389,
+   "hypothese": "P3 va-breakout LONG H24",
+   "ic95": [
+    0.4800791942888216,
+    0.5156811154219577
+   ],
+   "n": 208896,
+   "n_comp": 145867,
+   "n_flag": 63029,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0010312713195513178,
+   "verdict": "KILL"
+  },
+  "P3 va-breakout LONG H72": {
+   "auc": 0.5021009532022613,
+   "delta_bps": -20.508337486332927,
+   "famille": "P3",
+   "fwd_bps_comp": 12.807143801312598,
+   "fwd_bps_flag": -7.70119368502033,
+   "hypothese": "P3 va-breakout LONG H72",
+   "ic95": [
+    0.4816666888824426,
+    0.523054299666276
+   ],
+   "n": 208896,
+   "n_comp": 145867,
+   "n_flag": 63029,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0003966428152120452,
+   "verdict": "KILL"
+  },
+  "P3 va-breakout SHORT H24": {
+   "auc": 0.4851014491838672,
+   "delta_bps": -22.91146196020536,
+   "famille": "P3",
+   "fwd_bps_comp": 3.3343076254496116,
+   "fwd_bps_flag": -19.57715433475575,
+   "hypothese": "P3 va-breakout SHORT H24",
+   "ic95": [
+    0.4665412148226524,
+    0.5063252968999649
+   ],
+   "n": 208896,
+   "n_comp": 150541,
+   "n_flag": 58355,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.001148144974723674,
+   "verdict": "KILL"
+  },
+  "P3 va-breakout SHORT H72": {
+   "auc": 0.4858128564137106,
+   "delta_bps": -42.64644678286231,
+   "famille": "P3",
+   "fwd_bps_comp": 4.706687775448788,
+   "fwd_bps_flag": -37.93975900741352,
+   "hypothese": "P3 va-breakout SHORT H72",
+   "ic95": [
+    0.4652741417805636,
+    0.5106339920244858
+   ],
+   "n": 208896,
+   "n_comp": 150541,
+   "n_flag": 58355,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0007025961785622483,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.000 LONG H24": {
+   "auc": 0.5064960905450603,
+   "delta_bps": 11.627974674333727,
+   "famille": "V1",
+   "fwd_bps_comp": -3.056546102904513,
+   "fwd_bps_flag": 8.571428571429214,
+   "hypothese": "V1 aimant s=0.000 LONG H24",
+   "ic95": [
+    0.4920221823475631,
+    0.5178640604182418
+   ],
+   "n": 209072,
+   "n_comp": 106507,
+   "n_flag": 102565,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0011309901038365914,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.000 LONG H72": {
+   "auc": 0.5002007467952039,
+   "delta_bps": 7.985347439431417,
+   "famille": "V1",
+   "fwd_bps_comp": 3.2695765898314835,
+   "fwd_bps_flag": 11.2549240292629,
+   "hypothese": "V1 aimant s=0.000 LONG H72",
+   "ic95": [
+    0.4869486451931428,
+    0.5132729829010665
+   ],
+   "n": 209072,
+   "n_comp": 106507,
+   "n_flag": 102565,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0005167454784770633,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.000 SHORT H24": {
+   "auc": 0.5064960905450603,
+   "delta_bps": 11.627974674333727,
+   "famille": "V1",
+   "fwd_bps_comp": -8.571428571429214,
+   "fwd_bps_flag": 3.056546102904513,
+   "hypothese": "V1 aimant s=0.000 SHORT H24",
+   "ic95": [
+    0.4920221823475631,
+    0.5178640604182418
+   ],
+   "n": 209072,
+   "n_comp": 102565,
+   "n_flag": 106507,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0011454646173490945,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.000 SHORT H72": {
+   "auc": 0.5002007467952039,
+   "delta_bps": 7.985347439431417,
+   "famille": "V1",
+   "fwd_bps_comp": -11.2549240292629,
+   "fwd_bps_flag": -3.2695765898314835,
+   "hypothese": "V1 aimant s=0.000 SHORT H72",
+   "ic95": [
+    0.4869486451931428,
+    0.5132729829010665
+   ],
+   "n": 209072,
+   "n_comp": 102565,
+   "n_flag": 106507,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.000619677579877379,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.005 LONG H24": {
+   "auc": 0.5094192904477588,
+   "delta_bps": 14.236605457038623,
+   "famille": "V1",
+   "fwd_bps_comp": -0.4253830095316238,
+   "fwd_bps_flag": 13.811222447507,
+   "hypothese": "V1 aimant s=0.005 LONG H24",
+   "ic95": [
+    0.49021336104283836,
+    0.5217316011952808
+   ],
+   "n": 209072,
+   "n_comp": 154458,
+   "n_flag": 54614,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0008788955212949061,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.005 LONG H72": {
+   "auc": 0.506713538182988,
+   "delta_bps": 19.982983040983118,
+   "famille": "V1",
+   "fwd_bps_comp": 2.4378543360533014,
+   "fwd_bps_flag": 22.42083737703642,
+   "hypothese": "V1 aimant s=0.005 LONG H72",
+   "ic95": [
+    0.4890219011268008,
+    0.5198348099292098
+   ],
+   "n": 209072,
+   "n_comp": 154458,
+   "n_flag": 54614,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0004577580840077636,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.005 SHORT H24": {
+   "auc": 0.5047497038181784,
+   "delta_bps": 12.565812565811875,
+   "famille": "V1",
+   "fwd_bps_comp": -5.515719801433479,
+   "fwd_bps_flag": 7.050092764378395,
+   "hypothese": "V1 aimant s=0.005 SHORT H24",
+   "ic95": [
+    0.49463887138531354,
+    0.5247329588235777
+   ],
+   "n": 209072,
+   "n_comp": 153057,
+   "n_flag": 56015,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.000964027492635901,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.005 SHORT H72": {
+   "auc": 0.4993367463631871,
+   "delta_bps": 9.295278213587322,
+   "famille": "V1",
+   "fwd_bps_comp": -9.295278213587322,
+   "fwd_bps_flag": 0.0,
+   "hypothese": "V1 aimant s=0.005 SHORT H72",
+   "ic95": [
+    0.4850982962471982,
+    0.5157238039943248
+   ],
+   "n": 209072,
+   "n_comp": 153057,
+   "n_flag": 56015,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0004998661072926895,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.010 LONG H24": {
+   "auc": 0.5134038505296405,
+   "delta_bps": 18.072845086459836,
+   "famille": "V1",
+   "fwd_bps_comp": 0.5729552771421507,
+   "fwd_bps_flag": 18.645800363601985,
+   "hypothese": "V1 aimant s=0.010 LONG H24",
+   "ic95": [
+    0.49202744761212414,
+    0.5305906968855926
+   ],
+   "n": 209072,
+   "n_comp": 178284,
+   "n_flag": 30788,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0009744056125763284,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.010 LONG H72": {
+   "auc": 0.5140815594418817,
+   "delta_bps": 35.684195849177584,
+   "famille": "V1",
+   "fwd_bps_comp": 2.9258427608613182,
+   "fwd_bps_flag": 38.6100386100389,
+   "hypothese": "V1 aimant s=0.010 LONG H72",
+   "ic95": [
+    0.49063139044725446,
+    0.5319848354712555
+   ],
+   "n": 209072,
+   "n_comp": 178284,
+   "n_flag": 30788,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0004872028062881642,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.010 SHORT H24": {
+   "auc": 0.5026209062074667,
+   "delta_bps": 10.998481336928563,
+   "famille": "V1",
+   "fwd_bps_comp": -3.772610714296884,
+   "fwd_bps_flag": 7.22587062263168,
+   "hypothese": "V1 aimant s=0.010 SHORT H24",
+   "ic95": [
+    0.4857791118463099,
+    0.5234852934327956
+   ],
+   "n": 209072,
+   "n_comp": 177944,
+   "n_flag": 31128,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0009316371112824467,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.010 SHORT H72": {
+   "auc": 0.5011946111611549,
+   "delta_bps": 13.27459628394351,
+   "famille": "V1",
+   "fwd_bps_comp": -8.835190573715419,
+   "fwd_bps_flag": 4.43940571022809,
+   "hypothese": "V1 aimant s=0.010 SHORT H72",
+   "ic95": [
+    0.48214312812040616,
+    0.5203320299545682
+   ],
+   "n": 209072,
+   "n_comp": 177944,
+   "n_flag": 31128,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0005140066820868671,
+   "verdict": "KILL"
+  },
+  "V2 cross LONG H24": {
+   "auc": 0.49438898440934065,
+   "delta_bps": -5.983199696576076,
+   "famille": "V2",
+   "fwd_bps_comp": 3.087752948181329,
+   "fwd_bps_flag": -2.895446748394747,
+   "hypothese": "V2 cross LONG H24",
+   "ic95": [
+    0.4832010622494398,
+    0.5030196732494902
+   ],
+   "n": 209072,
+   "n_comp": 188018,
+   "n_flag": 21054,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0009024413413128146,
+   "verdict": "KILL"
+  },
+  "V2 cross LONG H72": {
+   "auc": 0.4952323495424201,
+   "delta_bps": -6.137940759380935,
+   "famille": "V2",
+   "fwd_bps_comp": 7.905444693135326,
+   "fwd_bps_flag": 1.7675039337543903,
+   "hypothese": "V2 cross LONG H72",
+   "ic95": [
+    0.4840386766685083,
+    0.5023968158037436
+   ],
+   "n": 209072,
+   "n_comp": 188018,
+   "n_flag": 21054,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0005699629524080935,
+   "verdict": "KILL"
+  },
+  "V2 cross SHORT H24": {
+   "auc": 0.5021577488723639,
+   "delta_bps": -0.11338188542805572,
+   "famille": "V2",
+   "fwd_bps_comp": -2.6196297589942588,
+   "fwd_bps_flag": -2.7330116444223145,
+   "hypothese": "V2 cross SHORT H24",
+   "ic95": [
+    0.4953405836011184,
+    0.5156028279203071
+   ],
+   "n": 209072,
+   "n_comp": 188011,
+   "n_flag": 21061,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.0012345092825601822,
+   "verdict": "KILL"
+  },
+  "V2 cross SHORT H72": {
+   "auc": 0.5055989151557045,
+   "delta_bps": 8.112932013629266,
+   "famille": "V2",
+   "fwd_bps_comp": -8.112932013629266,
+   "fwd_bps_flag": 0.0,
+   "hypothese": "V2 cross SHORT H72",
+   "ic95": [
+    0.4952624295249109,
+    0.5131878664831032
+   ],
+   "n": 209072,
+   "n_comp": 188011,
+   "n_flag": 21061,
+   "panel": "LIQUIDE8",
+   "part_zeros": 0.00042733013627083236,
+   "verdict": "KILL"
+  }
+ },
+ "panel_pool": {
+  "P1 vpoc LONG H24": {
+   "auc": 0.5086245890231073,
+   "delta_bps": 20.050125313283385,
+   "famille": "P1",
+   "fwd_bps_comp": -20.050125313283385,
+   "fwd_bps_flag": 0.0,
+   "hypothese": "P1 vpoc LONG H24",
+   "ic95": [
+    0.49514125888546684,
+    0.5240935734722136
+   ],
+   "n": 2006146,
+   "n_comp": 978201,
+   "n_flag": 1027945,
+   "panel": "POOL80",
+   "part_zeros": 0.00429984094479763,
+   "verdict": "KILL"
+  },
+  "P1 vpoc LONG H72": {
+   "auc": 0.5052803576524706,
+   "delta_bps": 19.86529035464628,
+   "famille": "P1",
+   "fwd_bps_comp": -41.51291512915014,
+   "fwd_bps_flag": -21.647624774503857,
+   "hypothese": "P1 vpoc LONG H72",
+   "ic95": [
+    0.4893266229197851,
+    0.5232666859663265
+   ],
+   "n": 2006146,
+   "n_comp": 978201,
+   "n_flag": 1027945,
+   "panel": "POOL80",
+   "part_zeros": 0.0025886598991191165,
+   "verdict": "KILL"
+  },
+  "P1 vpoc SHORT H24": {
+   "auc": 0.5086209142384989,
+   "delta_bps": 20.049008687904028,
+   "famille": "P1",
+   "fwd_bps_comp": 0.0,
+   "fwd_bps_flag": 20.049008687904028,
+   "hypothese": "P1 vpoc SHORT H24",
+   "ic95": [
+    0.4950562655576042,
+    0.5240574305625972
+   ],
+   "n": 2006146,
+   "n_comp": 1028027,
+   "n_flag": 978119,
+   "panel": "POOL80",
+   "part_zeros": 0.004285777088472875,
+   "verdict": "KILL"
+  },
+  "P1 vpoc SHORT H72": {
+   "auc": 0.5052780916423444,
+   "delta_bps": 19.869634286543196,
+   "famille": "P1",
+   "fwd_bps_comp": 21.645021645021885,
+   "fwd_bps_flag": 41.51465593156508,
+   "hypothese": "P1 vpoc SHORT H72",
+   "ic95": [
+    0.48926237835246394,
+    0.5230416187586711
+   ],
+   "n": 2006146,
+   "n_comp": 1028027,
+   "n_flag": 978119,
+   "panel": "POOL80",
+   "part_zeros": 0.0021868504752489215,
+   "verdict": "KILL"
+  },
+  "P2 va-rejet LONG H24": {
+   "auc": 0.5106200251929925,
+   "delta_bps": 20.269677381614322,
+   "famille": "P2",
+   "fwd_bps_comp": -16.75977653631307,
+   "fwd_bps_flag": 3.5099008453012535,
+   "hypothese": "P2 va-rejet LONG H24",
+   "ic95": [
+    0.497178544846796,
+    0.5304970116509125
+   ],
+   "n": 2006146,
+   "n_comp": 1396991,
+   "n_flag": 609155,
+   "panel": "POOL80",
+   "part_zeros": 0.004328947476422257,
+   "verdict": "KILL"
+  },
+  "P2 va-rejet LONG H72": {
+   "auc": 0.5135981508044444,
+   "delta_bps": 44.36775942814764,
+   "famille": "P2",
+   "fwd_bps_comp": -44.36775942814764,
+   "fwd_bps_flag": 0.0,
+   "hypothese": "P2 va-rejet LONG H72",
+   "ic95": [
+    0.492888461900603,
+    0.5316291185949287
+   ],
+   "n": 2006146,
+   "n_comp": 1396991,
+   "n_flag": 609155,
+   "panel": "POOL80",
+   "part_zeros": 0.0027349361000073872,
+   "verdict": "KILL"
+  },
+  "P2 va-rejet SHORT H24": {
+   "auc": 0.5024259324198973,
+   "delta_bps": 11.10054487763881,
+   "famille": "P2",
+   "fwd_bps_comp": 7.492039707811705,
+   "fwd_bps_flag": 18.592584585450517,
+   "hypothese": "P2 va-rejet SHORT H24",
+   "ic95": [
+    0.4892204386094042,
+    0.5191129743168428
+   ],
+   "n": 2006146,
+   "n_comp": 1427451,
+   "n_flag": 578695,
+   "panel": "POOL80",
+   "part_zeros": 0.004200831180500955,
+   "verdict": "KILL"
+  },
+  "P2 va-rejet SHORT H72": {
+   "auc": 0.4993124658190851,
+   "delta_bps": 4.040723242390772,
+   "famille": "P2",
+   "fwd_bps_comp": 30.03808399935659,
+   "fwd_bps_flag": 34.07880724174736,
+   "hypothese": "P2 va-rejet SHORT H72",
+   "ic95": [
+    0.48159280521183884,
+    0.51698043773034
+   ],
+   "n": 2006146,
+   "n_comp": 1427451,
+   "n_flag": 578695,
+   "panel": "POOL80",
+   "part_zeros": 0.0021755847207942007,
+   "verdict": "KILL"
+  },
+  "P3 va-breakout LONG H24": {
+   "auc": 0.49757406758010264,
+   "delta_bps": -11.10054487763881,
+   "famille": "P3",
+   "fwd_bps_comp": -7.492039707811705,
+   "fwd_bps_flag": -18.592584585450517,
+   "hypothese": "P3 va-breakout LONG H24",
+   "ic95": [
+    0.48088702568315733,
+    0.5107795613905959
+   ],
+   "n": 2006146,
+   "n_comp": 1427451,
+   "n_flag": 578695,
+   "panel": "POOL80",
+   "part_zeros": 0.004200831180500955,
+   "verdict": "KILL"
+  },
+  "P3 va-breakout LONG H72": {
+   "auc": 0.5006875341809149,
+   "delta_bps": -4.040723242390772,
+   "famille": "P3",
+   "fwd_bps_comp": -30.03808399935659,
+   "fwd_bps_flag": -34.07880724174736,
+   "hypothese": "P3 va-breakout LONG H72",
+   "ic95": [
+    0.48301956226966003,
+    0.5184071947881611
+   ],
+   "n": 2006146,
+   "n_comp": 1427451,
+   "n_flag": 578695,
+   "panel": "POOL80",
+   "part_zeros": 0.0021755847207942007,
+   "verdict": "KILL"
+  },
+  "P3 va-breakout SHORT H24": {
+   "auc": 0.48937997480700746,
+   "delta_bps": -20.269677381614322,
+   "famille": "P3",
+   "fwd_bps_comp": 16.75977653631307,
+   "fwd_bps_flag": -3.5099008453012535,
+   "hypothese": "P3 va-breakout SHORT H24",
+   "ic95": [
+    0.4695029883490875,
+    0.502821455153204
+   ],
+   "n": 2006146,
+   "n_comp": 1396991,
+   "n_flag": 609155,
+   "panel": "POOL80",
+   "part_zeros": 0.004328947476422257,
+   "verdict": "KILL"
+  },
+  "P3 va-breakout SHORT H72": {
+   "auc": 0.4864018491955556,
+   "delta_bps": -44.36775942814764,
+   "famille": "P3",
+   "fwd_bps_comp": 44.36775942814764,
+   "fwd_bps_flag": 0.0,
+   "hypothese": "P3 va-breakout SHORT H72",
+   "ic95": [
+    0.4683708814050713,
+    0.507111538099397
+   ],
+   "n": 2006146,
+   "n_comp": 1396991,
+   "n_flag": 609155,
+   "panel": "POOL80",
+   "part_zeros": 0.0027349361000073872,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.000 LONG H24": {
+   "auc": 0.508068991355005,
+   "delta_bps": 16.269901237427185,
+   "famille": "V1",
+   "fwd_bps_comp": -18.589010699394823,
+   "fwd_bps_flag": -2.3191094619676367,
+   "hypothese": "V1 aimant s=0.000 LONG H24",
+   "ic95": [
+    0.4966523619608946,
+    0.5213012150672758
+   ],
+   "n": 2007731,
+   "n_comp": 976776,
+   "n_flag": 1030955,
+   "panel": "POOL80",
+   "part_zeros": 0.004216478895781096,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.000 LONG H72": {
+   "auc": 0.5008868771363743,
+   "delta_bps": 1.291065874405838,
+   "famille": "V1",
+   "fwd_bps_comp": -32.33578827159789,
+   "fwd_bps_flag": -31.044722397192054,
+   "hypothese": "V1 aimant s=0.000 LONG H72",
+   "ic95": [
+    0.4865684923902994,
+    0.5108235860339854
+   ],
+   "n": 2007731,
+   "n_comp": 976776,
+   "n_flag": 1030955,
+   "panel": "POOL80",
+   "part_zeros": 0.002468584952786494,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.000 SHORT H24": {
+   "auc": 0.508068804319917,
+   "delta_bps": 16.2720889195555,
+   "famille": "V1",
+   "fwd_bps_comp": 2.3185718844380765,
+   "fwd_bps_flag": 18.590660803993575,
+   "hypothese": "V1 aimant s=0.000 SHORT H24",
+   "ic95": [
+    0.4966526552175759,
+    0.5213057181981258
+   ],
+   "n": 2007731,
+   "n_comp": 1030950,
+   "n_flag": 976781,
+   "panel": "POOL80",
+   "part_zeros": 0.0042803862892500984,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.000 SHORT H72": {
+   "auc": 0.5008861966201785,
+   "delta_bps": 1.2822067111350215,
+   "famille": "V1",
+   "fwd_bps_comp": 31.049290105202882,
+   "fwd_bps_flag": 32.3314968163379,
+   "hypothese": "V1 aimant s=0.000 SHORT H72",
+   "ic95": [
+    0.48656484674362893,
+    0.5108234004563535
+   ],
+   "n": 2007731,
+   "n_comp": 1030950,
+   "n_flag": 976781,
+   "panel": "POOL80",
+   "part_zeros": 0.00221544030852361,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.005 LONG H24": {
+   "auc": 0.5099730400588992,
+   "delta_bps": 15.964767409854067,
+   "famille": "V1",
+   "fwd_bps_comp": -15.964767409854067,
+   "fwd_bps_flag": 0.0,
+   "hypothese": "V1 aimant s=0.005 LONG H24",
+   "ic95": [
+    0.4980394217433156,
+    0.5238022760872156
+   ],
+   "n": 2007731,
+   "n_comp": 1335757,
+   "n_flag": 671974,
+   "panel": "POOL80",
+   "part_zeros": 0.004006107379154551,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.005 LONG H72": {
+   "auc": 0.5033395261708141,
+   "delta_bps": 4.9354177388193605,
+   "famille": "V1",
+   "fwd_bps_comp": -33.18400530944088,
+   "fwd_bps_flag": -28.248587570621517,
+   "hypothese": "V1 aimant s=0.005 LONG H72",
+   "ic95": [
+    0.4890964969056784,
+    0.5151454725229985
+   ],
+   "n": 2007731,
+   "n_comp": 1335757,
+   "n_flag": 671974,
+   "panel": "POOL80",
+   "part_zeros": 0.0024048549497450796,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.005 SHORT H24": {
+   "auc": 0.5085998056811308,
+   "delta_bps": 19.400336041133414,
+   "famille": "V1",
+   "fwd_bps_comp": 5.065856129685359,
+   "fwd_bps_flag": 24.466192170818772,
+   "hypothese": "V1 aimant s=0.005 SHORT H24",
+   "ic95": [
+    0.4930320427418361,
+    0.5206175569861501
+   ],
+   "n": 2007731,
+   "n_comp": 1389370,
+   "n_flag": 618361,
+   "panel": "POOL80",
+   "part_zeros": 0.004002516329458035,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.005 SHORT H72": {
+   "auc": 0.5006510629578376,
+   "delta_bps": 4.488284555843958,
+   "famille": "V1",
+   "fwd_bps_comp": 30.4438664585311,
+   "fwd_bps_flag": 34.93215101437506,
+   "hypothese": "V1 aimant s=0.005 SHORT H72",
+   "ic95": [
+    0.48529938026467506,
+    0.512269599393288
+   ],
+   "n": 2007731,
+   "n_comp": 1389370,
+   "n_flag": 618361,
+   "panel": "POOL80",
+   "part_zeros": 0.00215246433717521,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.010 LONG H24": {
+   "auc": 0.5131022064540712,
+   "delta_bps": 21.65511122175227,
+   "famille": "V1",
+   "fwd_bps_comp": -14.597948201287274,
+   "fwd_bps_flag": 7.057163020464996,
+   "hypothese": "V1 aimant s=0.010 LONG H24",
+   "ic95": [
+    0.500013474223315,
+    0.5296983925303282
+   ],
+   "n": 2007731,
+   "n_comp": 1569862,
+   "n_flag": 437869,
+   "panel": "POOL80",
+   "part_zeros": 0.0038481829040192387,
+   "verdict": "INCONCLU"
+  },
+  "V1 aimant s=0.010 LONG H72": {
+   "auc": 0.506189282049579,
+   "delta_bps": 10.921120760104046,
+   "famille": "V1",
+   "fwd_bps_comp": -33.793947841531335,
+   "fwd_bps_flag": -22.87282708142729,
+   "hypothese": "V1 aimant s=0.010 LONG H72",
+   "ic95": [
+    0.49096386761561245,
+    0.5198113498061201
+   ],
+   "n": 2007731,
+   "n_comp": 1569862,
+   "n_flag": 437869,
+   "panel": "POOL80",
+   "part_zeros": 0.00241168020572363,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.010 SHORT H24": {
+   "auc": 0.5096895476413693,
+   "delta_bps": 24.374993194837607,
+   "famille": "V1",
+   "fwd_bps_comp": 6.555227794165125,
+   "fwd_bps_flag": 30.930220989002734,
+   "hypothese": "V1 aimant s=0.010 SHORT H24",
+   "ic95": [
+    0.4934880855076829,
+    0.5243778622614785
+   ],
+   "n": 2007731,
+   "n_comp": 1615599,
+   "n_flag": 392132,
+   "panel": "POOL80",
+   "part_zeros": 0.003802291065253537,
+   "verdict": "KILL"
+  },
+  "V1 aimant s=0.010 SHORT H72": {
+   "auc": 0.5017882463104486,
+   "delta_bps": 11.240075724781427,
+   "famille": "V1",
+   "fwd_bps_comp": 29.87534768723551,
+   "fwd_bps_flag": 41.11542341201694,
+   "hypothese": "V1 aimant s=0.010 SHORT H72",
+   "ic95": [
+    0.48473541027287464,
+    0.5178917232747402
+   ],
+   "n": 2007731,
+   "n_comp": 1615599,
+   "n_flag": 392132,
+   "panel": "POOL80",
+   "part_zeros": 0.0020069772423571657,
+   "verdict": "KILL"
+  },
+  "V2 cross LONG H24": {
+   "auc": 0.4950067708662244,
+   "delta_bps": -8.045350867134495,
+   "famille": "V2",
+   "fwd_bps_comp": -9.811791990009226,
+   "fwd_bps_flag": -17.85714285714372,
+   "hypothese": "V2 cross LONG H24",
+   "ic95": [
+    0.48448449945844946,
+    0.5038773245004454
+   ],
+   "n": 2007731,
+   "n_comp": 1807592,
+   "n_flag": 200139,
+   "panel": "POOL80",
+   "part_zeros": 0.004436916343141517,
+   "verdict": "KILL"
+  },
+  "V2 cross LONG H72": {
+   "auc": 0.4963510867766145,
+   "delta_bps": -8.562283565067062,
+   "famille": "V2",
+   "fwd_bps_comp": -30.807795175090185,
+   "fwd_bps_flag": -39.37007874015725,
+   "hypothese": "V2 cross LONG H72",
+   "ic95": [
+    0.4851060833657179,
+    0.504492676916917
+   ],
+   "n": 2007731,
+   "n_comp": 1807592,
+   "n_flag": 200139,
+   "panel": "POOL80",
+   "part_zeros": 0.0024433019051759027,
+   "verdict": "KILL"
+  },
+  "V2 cross SHORT H24": {
+   "auc": 0.5015795474611163,
+   "delta_bps": 1.2339436184754309,
+   "famille": "V2",
+   "fwd_bps_comp": 10.507739356085136,
+   "fwd_bps_flag": 11.741682974560566,
+   "hypothese": "V2 cross SHORT H24",
+   "ic95": [
+    0.49457342788869335,
+    0.5162857893418661
+   ],
+   "n": 2007731,
+   "n_comp": 1807524,
+   "n_flag": 200207,
+   "panel": "POOL80",
+   "part_zeros": 0.004310538592556703,
+   "verdict": "KILL"
+  },
+  "V2 cross SHORT H72": {
+   "auc": 0.5043913218141194,
+   "delta_bps": 10.171955740490041,
+   "famille": "V2",
+   "fwd_bps_comp": 30.63457330415794,
+   "fwd_bps_flag": 40.80652904464798,
+   "hypothese": "V2 cross SHORT H72",
+   "ic95": [
+    0.49343599946525646,
+    0.5125483227378658
+   ],
+   "n": 2007731,
+   "n_comp": 1807524,
+   "n_flag": 200207,
+   "panel": "POOL80",
+   "part_zeros": 0.0023775392468794797,
+   "verdict": "KILL"
+  }
+ },
+ "pool_p1": {
+  "F1_mauvais_cote_vwap": {
+   "P_boot": 0.4246,
+   "R_med_comp": 0.25965205786190193,
+   "R_med_flag": -0.32117526529681656,
+   "delta_R": -0.5808273231587184,
+   "filtre": "F1 mauvais côté vwap session",
+   "n_comp": 126,
+   "n_flag": 343,
+   "verdict": "CONTEXTE"
+  },
+  "F2_hors_value_area": {
+   "P_boot": 0.5198,
+   "R_med_comp": -0.4658536329185778,
+   "R_med_flag": -0.31789294124733436,
+   "delta_R": 0.14796069167124343,
+   "filtre": "F2 hors value area veille",
+   "n_comp": 353,
+   "n_flag": 116,
+   "verdict": "CONTEXTE"
+  },
+  "n_pool": 469,
+  "refs_manquantes": 0,
+  "symboles_absents": 0,
+  "verif_opens": {
+   "ko": 0,
+   "ok": 469
+  }
+ },
+ "robustesse": {
+  "focus": {
+   "BTCUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.5025966892103427,
+    "fwd_bps_flag": 13.936339095638468,
+    "ic95": [
+     0.4761602451522694,
+     0.5275716127092613
+    ],
+    "n": 26112,
+    "n_flag": 6561,
+    "part_zeros": 0.00015241579027587258,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5041996198281975,
+    "fwd_bps_flag": 45.564438379732884,
+    "ic95": [
+     0.4744569016115946,
+     0.5328081412930158
+    ],
+    "n": 26112,
+    "n_flag": 6561,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.5039882088501654,
+    "fwd_bps_flag": -3.292208365211551,
+    "ic95": [
+     0.48060473292106665,
+     0.5264241420472217
+    ],
+    "n": 26112,
+    "n_flag": 8092,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.5018957076856988,
+    "fwd_bps_flag": -11.210550595217796,
+    "ic95": [
+     0.47602238152491116,
+     0.5272873488239381
+    ],
+    "n": 26112,
+    "n_flag": 8092,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.4960117911498346,
+    "fwd_bps_flag": 3.292208365211551,
+    "ic95": [
+     0.47357585795277835,
+     0.5193952670789334
+    ],
+    "n": 26112,
+    "n_flag": 8092,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.4981042923143012,
+    "fwd_bps_flag": 11.210550595217796,
+    "ic95": [
+     0.4727126511760618,
+     0.5239776184750888
+    ],
+    "n": 26112,
+    "n_flag": 8092,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.4974033107896573,
+    "fwd_bps_flag": -13.936339095638468,
+    "ic95": [
+     0.4724283872907386,
+     0.5238397548477305
+    ],
+    "n": 26112,
+    "n_flag": 6561,
+    "part_zeros": 0.00015241579027587258,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.49580038017180256,
+    "fwd_bps_flag": -45.564438379732884,
+    "ic95": [
+     0.46719185870698415,
+     0.5255430983884054
+    ],
+    "n": 26112,
+    "n_flag": 6561,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5088437957657843,
+    "fwd_bps_flag": 14.17601583981804,
+    "ic95": [
+     0.4937628186228281,
+     0.5247003220215005
+    ],
+    "n": 26134,
+    "n_flag": 12359,
+    "part_zeros": 0.00024273808560563152,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.49649387229509667,
+    "fwd_bps_flag": 28.252084812351534,
+    "ic95": [
+     0.4804394580938023,
+     0.5112072105800388
+    ],
+    "n": 26134,
+    "n_flag": 12359,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5088437957657843,
+    "fwd_bps_flag": -4.48715611022162,
+    "ic95": [
+     0.4937628186228281,
+     0.5247003220215005
+    ],
+    "n": 26134,
+    "n_flag": 13775,
+    "part_zeros": 7.259528130671507e-05,
+    "verdict": "KILL"
+   },
+   "BTCUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.49649387229509667,
+    "fwd_bps_flag": -28.203352664531838,
+    "ic95": [
+     0.4804394580938023,
+     0.5112072105800388
+    ],
+    "n": 26134,
+    "n_flag": 13775,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.5133470516319054,
+    "fwd_bps_flag": 24.054401955558163,
+    "ic95": [
+     0.4889016040397733,
+     0.5381400597743918
+    ],
+    "n": 26112,
+    "n_flag": 6597,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5121413855497093,
+    "fwd_bps_flag": 64.48127825320512,
+    "ic95": [
+     0.48330536095391563,
+     0.5425072245722563
+    ],
+    "n": 26112,
+    "n_flag": 6597,
+    "part_zeros": 0.00015158405335758679,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.5144324459855218,
+    "fwd_bps_flag": 10.577111737852109,
+    "ic95": [
+     0.4891111525436143,
+     0.539453541756461
+    ],
+    "n": 26112,
+    "n_flag": 8034,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.4982259268008078,
+    "fwd_bps_flag": -13.360798318388568,
+    "ic95": [
+     0.47114080565614125,
+     0.5261627302264148
+    ],
+    "n": 26112,
+    "n_flag": 8034,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.4855675540144782,
+    "fwd_bps_flag": -10.577111737852109,
+    "ic95": [
+     0.460546458243539,
+     0.5108888474563857
+    ],
+    "n": 26112,
+    "n_flag": 8034,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.5017740731991922,
+    "fwd_bps_flag": 13.360798318388568,
+    "ic95": [
+     0.47383726977358515,
+     0.5288591943438586
+    ],
+    "n": 26112,
+    "n_flag": 8034,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.48665294836809453,
+    "fwd_bps_flag": -24.054401955558163,
+    "ic95": [
+     0.46185994022560806,
+     0.5110983959602268
+    ],
+    "n": 26112,
+    "n_flag": 6597,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.4878586144502907,
+    "fwd_bps_flag": -64.48127825320512,
+    "ic95": [
+     0.4574927754277437,
+     0.5166946390460844
+    ],
+    "n": 26112,
+    "n_flag": 6597,
+    "part_zeros": 0.00015158405335758679,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5152285554204735,
+    "fwd_bps_flag": 19.827156930716384,
+    "ic95": [
+     0.4984780702390907,
+     0.5321384742748612
+    ],
+    "n": 26134,
+    "n_flag": 12542,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.5043769121742704,
+    "fwd_bps_flag": 36.873774115614225,
+    "ic95": [
+     0.4869101252379177,
+     0.5210606862416891
+    ],
+    "n": 26134,
+    "n_flag": 12542,
+    "part_zeros": 0.00015946420028703555,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5152285554204735,
+    "fwd_bps_flag": 1.4179113263198948,
+    "ic95": [
+     0.4984780702390907,
+     0.5321384742748612
+    ],
+    "n": 26134,
+    "n_flag": 13592,
+    "part_zeros": 0.0,
+    "verdict": "KILL"
+   },
+   "ETHUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.5043769121742704,
+    "fwd_bps_flag": -21.38053400520567,
+    "ic95": [
+     0.4869101252379177,
+     0.5210606862416891
+    ],
+    "n": 26134,
+    "n_flag": 13592,
+    "part_zeros": 7.357268981753973e-05,
+    "verdict": "KILL"
+   }
+  },
+  "par_symbole": {
+   "ADAUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.5209665919552088,
+    "n": 26112,
+    "n_flag": 7986
+   },
+   "ADAUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5038545193247401,
+    "n": 26112,
+    "n_flag": 7986
+   },
+   "ADAUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.4960599741575072,
+    "n": 26112,
+    "n_flag": 7480
+   },
+   "ADAUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.479318123698404,
+    "n": 26112,
+    "n_flag": 7480
+   },
+   "ADAUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.5039400258424929,
+    "n": 26112,
+    "n_flag": 7480
+   },
+   "ADAUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.520681876301596,
+    "n": 26112,
+    "n_flag": 7480
+   },
+   "ADAUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.47903340804479116,
+    "n": 26112,
+    "n_flag": 7986
+   },
+   "ADAUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.4961454806752598,
+    "n": 26112,
+    "n_flag": 7986
+   },
+   "ADAUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5107347236664203,
+    "n": 26134,
+    "n_flag": 13463
+   },
+   "ADAUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.4959231852211828,
+    "n": 26134,
+    "n_flag": 13463
+   },
+   "ADAUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5107347236664203,
+    "n": 26134,
+    "n_flag": 12671
+   },
+   "ADAUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.4959231852211828,
+    "n": 26134,
+    "n_flag": 12671
+   },
+   "BNBUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.518182720365509,
+    "n": 26112,
+    "n_flag": 6782
+   },
+   "BNBUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5185734758161306,
+    "n": 26112,
+    "n_flag": 6782
+   },
+   "BNBUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.5033885381789774,
+    "n": 26112,
+    "n_flag": 8386
+   },
+   "BNBUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.5122222274843883,
+    "n": 26112,
+    "n_flag": 8386
+   },
+   "BNBUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.4966114618210226,
+    "n": 26112,
+    "n_flag": 8386
+   },
+   "BNBUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.4877777725156118,
+    "n": 26112,
+    "n_flag": 8386
+   },
+   "BNBUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.48181727963449095,
+    "n": 26112,
+    "n_flag": 6782
+   },
+   "BNBUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.48142652418386944,
+    "n": 26112,
+    "n_flag": 6782
+   },
+   "BNBUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5069552872301448,
+    "n": 26134,
+    "n_flag": 12538
+   },
+   "BNBUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.5028572275322737,
+    "n": 26134,
+    "n_flag": 12538
+   },
+   "BNBUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5069552872301448,
+    "n": 26134,
+    "n_flag": 13596
+   },
+   "BNBUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.5028572275322737,
+    "n": 26134,
+    "n_flag": 13596
+   },
+   "BTCUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.5025966892103427,
+    "n": 26112,
+    "n_flag": 6561
+   },
+   "BTCUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5041996198281975,
+    "n": 26112,
+    "n_flag": 6561
+   },
+   "BTCUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.5039882088501654,
+    "n": 26112,
+    "n_flag": 8092
+   },
+   "BTCUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.5018957076856988,
+    "n": 26112,
+    "n_flag": 8092
+   },
+   "BTCUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.4960117911498346,
+    "n": 26112,
+    "n_flag": 8092
+   },
+   "BTCUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.4981042923143012,
+    "n": 26112,
+    "n_flag": 8092
+   },
+   "BTCUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.4974033107896573,
+    "n": 26112,
+    "n_flag": 6561
+   },
+   "BTCUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.49580038017180256,
+    "n": 26112,
+    "n_flag": 6561
+   },
+   "BTCUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5088437957657843,
+    "n": 26134,
+    "n_flag": 12359
+   },
+   "BTCUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.49649387229509667,
+    "n": 26134,
+    "n_flag": 12359
+   },
+   "BTCUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5088437957657843,
+    "n": 26134,
+    "n_flag": 13775
+   },
+   "BTCUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.49649387229509667,
+    "n": 26134,
+    "n_flag": 13775
+   },
+   "DOGEUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.5172892415176891,
+    "n": 26112,
+    "n_flag": 7597
+   },
+   "DOGEUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5118842695947428,
+    "n": 26112,
+    "n_flag": 7597
+   },
+   "DOGEUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.4901577785796177,
+    "n": 26112,
+    "n_flag": 7724
+   },
+   "DOGEUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.48858905220649723,
+    "n": 26112,
+    "n_flag": 7724
+   },
+   "DOGEUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.5098422214203824,
+    "n": 26112,
+    "n_flag": 7724
+   },
+   "DOGEUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.5114109477935028,
+    "n": 26112,
+    "n_flag": 7724
+   },
+   "DOGEUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.48271075848231093,
+    "n": 26112,
+    "n_flag": 7597
+   },
+   "DOGEUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.4881157304052572,
+    "n": 26112,
+    "n_flag": 7597
+   },
+   "DOGEUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5007754405494261,
+    "n": 26134,
+    "n_flag": 13085
+   },
+   "DOGEUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.49674514505201334,
+    "n": 26134,
+    "n_flag": 13085
+   },
+   "DOGEUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5007754405494261,
+    "n": 26134,
+    "n_flag": 13049
+   },
+   "DOGEUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.49674514505201334,
+    "n": 26134,
+    "n_flag": 13049
+   },
+   "ETHUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.5133470516319054,
+    "n": 26112,
+    "n_flag": 6597
+   },
+   "ETHUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5121413855497093,
+    "n": 26112,
+    "n_flag": 6597
+   },
+   "ETHUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.5144324459855218,
+    "n": 26112,
+    "n_flag": 8034
+   },
+   "ETHUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.4982259268008078,
+    "n": 26112,
+    "n_flag": 8034
+   },
+   "ETHUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.4855675540144782,
+    "n": 26112,
+    "n_flag": 8034
+   },
+   "ETHUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.5017740731991922,
+    "n": 26112,
+    "n_flag": 8034
+   },
+   "ETHUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.48665294836809453,
+    "n": 26112,
+    "n_flag": 6597
+   },
+   "ETHUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.4878586144502907,
+    "n": 26112,
+    "n_flag": 6597
+   },
+   "ETHUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5152285554204735,
+    "n": 26134,
+    "n_flag": 12542
+   },
+   "ETHUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.5043769121742704,
+    "n": 26134,
+    "n_flag": 12542
+   },
+   "ETHUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5152285554204735,
+    "n": 26134,
+    "n_flag": 13592
+   },
+   "ETHUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.5043769121742704,
+    "n": 26134,
+    "n_flag": 13592
+   },
+   "LINKUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.5238885808239291,
+    "n": 26112,
+    "n_flag": 7772
+   },
+   "LINKUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5282764134990074,
+    "n": 26112,
+    "n_flag": 7772
+   },
+   "LINKUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.5056649518327981,
+    "n": 26112,
+    "n_flag": 7912
+   },
+   "LINKUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.5044655426726964,
+    "n": 26112,
+    "n_flag": 7912
+   },
+   "LINKUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.49433504816720186,
+    "n": 26112,
+    "n_flag": 7912
+   },
+   "LINKUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.4955344573273036,
+    "n": 26112,
+    "n_flag": 7912
+   },
+   "LINKUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.4761114191760709,
+    "n": 26112,
+    "n_flag": 7772
+   },
+   "LINKUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.47172358650099255,
+    "n": 26112,
+    "n_flag": 7772
+   },
+   "LINKUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.505515481457274,
+    "n": 26134,
+    "n_flag": 13050
+   },
+   "LINKUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.5042198332964365,
+    "n": 26134,
+    "n_flag": 13050
+   },
+   "LINKUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.505515481457274,
+    "n": 26134,
+    "n_flag": 13084
+   },
+   "LINKUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.5042198332964365,
+    "n": 26134,
+    "n_flag": 13084
+   },
+   "SOLUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.505014484450888,
+    "n": 26112,
+    "n_flag": 7530
+   },
+   "SOLUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.523220335748814,
+    "n": 26112,
+    "n_flag": 7530
+   },
+   "SOLUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.49918484581068656,
+    "n": 26112,
+    "n_flag": 8255
+   },
+   "SOLUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.5016606524130206,
+    "n": 26112,
+    "n_flag": 8255
+   },
+   "SOLUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.5008151541893134,
+    "n": 26112,
+    "n_flag": 8255
+   },
+   "SOLUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.49833934758697934,
+    "n": 26112,
+    "n_flag": 8255
+   },
+   "SOLUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.49498551554911197,
+    "n": 26112,
+    "n_flag": 7530
+   },
+   "SOLUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.47677966425118595,
+    "n": 26112,
+    "n_flag": 7530
+   },
+   "SOLUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5014879311454247,
+    "n": 26134,
+    "n_flag": 12895
+   },
+   "SOLUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.5054438955532845,
+    "n": 26134,
+    "n_flag": 12895
+   },
+   "SOLUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5014879311454247,
+    "n": 26134,
+    "n_flag": 13239
+   },
+   "SOLUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.5054438955532845,
+    "n": 26134,
+    "n_flag": 13239
+   },
+   "XRPUSDT|P2 va-rejet LONG H24": {
+    "auc": 0.5214130240420302,
+    "n": 26112,
+    "n_flag": 7530
+   },
+   "XRPUSDT|P2 va-rejet LONG H72": {
+    "auc": 0.5217055110380421,
+    "n": 26112,
+    "n_flag": 7530
+   },
+   "XRPUSDT|P2 va-rejet SHORT H24": {
+    "auc": 0.510489892514361,
+    "n": 26112,
+    "n_flag": 7146
+   },
+   "XRPUSDT|P2 va-rejet SHORT H72": {
+    "auc": 0.5099826913445862,
+    "n": 26112,
+    "n_flag": 7146
+   },
+   "XRPUSDT|P3 va-breakout LONG H24": {
+    "auc": 0.48951010748563895,
+    "n": 26112,
+    "n_flag": 7146
+   },
+   "XRPUSDT|P3 va-breakout LONG H72": {
+    "auc": 0.4900173086554138,
+    "n": 26112,
+    "n_flag": 7146
+   },
+   "XRPUSDT|P3 va-breakout SHORT H24": {
+    "auc": 0.47858697595796984,
+    "n": 26112,
+    "n_flag": 7530
+   },
+   "XRPUSDT|P3 va-breakout SHORT H72": {
+    "auc": 0.4782944889619579,
+    "n": 26112,
+    "n_flag": 7530
+   },
+   "XRPUSDT|V1 aimant s=0.000 LONG H24": {
+    "auc": 0.5099649249795669,
+    "n": 26134,
+    "n_flag": 12633
+   },
+   "XRPUSDT|V1 aimant s=0.000 LONG H72": {
+    "auc": 0.5022746496644637,
+    "n": 26134,
+    "n_flag": 12633
+   },
+   "XRPUSDT|V1 aimant s=0.000 SHORT H24": {
+    "auc": 0.5099649249795669,
+    "n": 26134,
+    "n_flag": 13501
+   },
+   "XRPUSDT|V1 aimant s=0.000 SHORT H72": {
+    "auc": 0.5022746496644637,
+    "n": 26134,
+    "n_flag": 13501
+   }
+  }
+ }
+}
