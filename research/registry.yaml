@@ -1,0 +1,154 @@
+# ═══════════════════════════════════════════════════════════════════
+# REGISTRE DES STRATÉGIES — DOMAINE ASTER (quant core)
+# Source de vérité détaillée : docs/20-registre-indicateurs.md
+# Gouvernance : docs/38-gouvernance-recherche.md (audit 02/10/2026)
+# RÈGLE : toute expérience nouvelle DOIT vérifier ici AVANT de partir.
+# Même hypothèse ou variante de seuil seule = PARAMETER_MUTATION
+# (consomme le budget, ne repart jamais comme étude nouvelle).
+# FOMO / X / OpenMarket = domaines séparés, registres propres.
+# ═══════════════════════════════════════════════════════════════════
+version: 1
+generated: 2026-10-02
+protocol: harnais-v5 (baseline anti-dérive, horizons muraux, split chrono strict)
+execution_convention: signal=close(t) → entry=open(t+1) → exit=plan du signal, stop prioritaire intrabar
+cost_model: taker 0.18 % RT (murs), maker mesuré pour les variantes MK
+statuses: [EXPERIMENTAL, CANDIDATE, OOS_PASS, ROBUSTNESS_PASS, PAPER_FORWARD, ACTIVE, REJECTED, RETIRED]
+
+strategies:
+  # ── LA MACHINE (4 flux, portefeuille officiel paper) ──
+  - id: machine_cascade_majors
+    family: cascade
+    status: PAPER_FORWARD
+    timeframe: 1h
+    hypothesis: la cascade accélérée (3 bougies de baisse + accélération) porte un short edge structurel sur les majeures, gated AL p66
+    levier: 10x gated (MAE max 7.84 %), sizing vol-inverse base 0.24, corr-tilt ×2/×0.5
+    result_forward: fenêtre sept −5.5 % (WR 33 %) — régime T3, dérisqué ×0.75 par l'adaptateur 90 j
+    notes: le flux à plus longue histoire ; verdict continu au forward nocturne
+
+  - id: machine_cascade_meme
+    family: cascade
+    status: PAPER_FORWARD
+    timeframe: 1h
+    hypothesis: la cascade se transfère aux memecoins à 1x
+    result_forward: 0/9 significatif (p=0.0015) → DÉGRADÉ ; forward sept 5 joués/45 bloqués
+    decision_pending: user ×0 vs ×0.5 (28/09) — SANS_MEME mène le tracker des 3 wallets
+
+  - id: machine_survivor_long
+    family: survivor
+    status: PAPER_FORWARD
+    timeframe: 1h
+    hypothesis: le LONG 1x inliquidable capte la queue de rebond des memecoins
+    levier: 1x notional 20 %, gate ATR p90 intouchable
+    notes: TAIL = CONTEXTE (LABUSDT = 278 % de la contribution — jamais assouplir le gate)
+
+  - id: machine_vol_spike_6h
+    family: fade
+    status: PAPER_FORWARD
+    timeframe: 1h
+    hypothesis: le fade du range ≥ 4× médiane 14j porte une espérance positive décorrelée (corr cascade −0.22)
+    levier: 1x (MAE p99 49 % → plafond 1.05x), promotion après ~30 trades forward
+
+  # ── LES SURVIVANTS T21 (stack w*=0.200, DD 24.6 % — cible atteinte) ──
+  - id: survivors_breakout_don168
+    family: breakout
+    status: PAPER_FORWARD
+    timeframe: 1h
+    discovered: 2021-2023 (TRAIN), validé 2024-2026 (VAL)
+    forward: ledger aster_survivors_paper depuis 2026-10-01, verdict 90 j (janv. 2027)
+    note: CANDIDAT tail — jamais seul
+
+  - id: survivors_trend_long_ema50x200
+    family: trend
+    status: PAPER_FORWARD
+    note: CONTEXTE seul, armable derrière le détecteur de régime T9
+  - id: survivors_sma_regime_50d
+    family: regime-filter
+    status: PAPER_FORWARD
+    note: CONTEXTE seul, armable derrière le détecteur de régime T9
+  - id: survivors_momentum_bear_lb48
+    family: momentum
+    status: PAPER_FORWARD
+    note: SHORT — le seul à tenir son cap 0-liq seul (+32.6 %/an T24)
+
+  # ── CAMPAGNE v5 (les 5 candidats jugés au paper forward quotidien) ──
+  - id: cascade_funding_rank_low
+    family: cascade
+    status: PAPER_FORWARD
+    hypothesis: cascade × funding-rank bas (offre réelle, pas foule) — WR 81 % T24 n=21
+  - id: failed_ath_breakout_short
+    family: lifecycle
+    status: PAPER_FORWARD
+  - id: funding_extreme_contre_courant
+    family: funding
+    status: PAPER_FORWARD
+    result_forward: 23 fermés, WR 17 %, −1.84 %/trade — le forward juge
+  - id: sweep_liquidite_short
+    family: microstructure
+    status: PAPER_FORWARD
+  - id: vwap_extreme_reprise_short
+    family: lifecycle
+    status: PAPER_FORWARD
+
+  # ── REJETS GRAVÉS (ne JAMAIS re-tester sans contre-évidence + budget) ──
+  - id: cascade_fractalite_tf_court
+    family: cascade
+    status: REJECTED
+    rejected: 28/09 — 0 cellule vivante 15m/30m, mur des coûts 0.18 % RT
+  - id: cascade_funding_percentile
+    family: cascade
+    status: REJECTED
+    rejected: 25/09 — NUL même série profonde, l'inverse = anti-signal
+  - id: cascade_wallclock
+    family: cascade
+    status: REJECTED
+    rejected: 27/09 — gradient incohérent entre années, artefact régime 2025
+  - id: cascade_recascade
+    family: cascade
+    status: REJECTED
+    rejected: 27/09 — 2ᵉ feu ni continuation ni épuisement mesurable
+  - id: cascade_mechanism_rearm
+    family: cascade
+    status: REJECTED
+    rejected: 02/10 — chapitre FERMÉ (prior négatif : tout gate/sizing conditionnel a échoué au wallet)
+  - id: funding_carry_wallet
+    family: funding
+    status: REJECTED
+    rejected: 01/10 T22 — artefact triple (unités ×8, short inversé, biais survie)
+  - id: funding_hold_extension
+    family: funding
+    status: REJECTED
+    rejected: 27/09 — l'échelle fatale (carry p75 0.15 % vs bruit ±2-14 %)
+  - id: tpsl_toutes_configs
+    family: exit
+    status: REJECTED
+    rejected: 01/10 T23 — 0/30 configs battent le hold pur en TRAIN+VAL, stop = poison monotone
+  - id: fdiv_short
+    family: funding
+    status: REJECTED
+    rejected: 27/09 — NUL au forward (p=4.3e-05), la réhabilitation d'artefact morte
+  - id: machine_meme_gate
+    family: meme
+    status: REJECTED
+    rejected: 28/09 — 0/9 monotone, flux mort quoi qu'il arrive
+  - id: garde_drawdown_wallet
+    family: risk
+    status: REJECTED
+    rejected: 27/09 — NUL 12/12, coût de garde négatif (les trades taillés = les gagnants)
+  - id: sizing_conditionnel_regime
+    family: sizing
+    status: REJECTED
+    rejected: 27/09 — le mécanisme marche mais ROI −727 pts
+  - id: al_score_v2_composite
+    family: composite
+    status: REJECTED
+    rejected: 28/09 — les directions GATED s'inversent sur l'univers complet
+  - id: breadth_sizing_multiplier
+    family: regime
+    status: REJECTED
+    rejected: 28/09 — gradient descriptif réel, jamais un multiplicateur de sizing
+
+  # ── GELÉ (le tag freeze-2026-10-02 fait foi) ──
+  - id: qubo_poids_levier_joint
+    family: portfolio
+    status: RETIRED
+    reason: recherche-only (audit 02/10 §41) — la comparaison equal-weight/risk-parity/QUBO reste à faire sur les mêmes stratégies validées ; point officiel jamais déployé

@@ -5,6 +5,25 @@ description: La doctrine expérimentale du projet (backtests, verdicts, promotio
 
 # La doctrine quant (le pipeline obligatoire)
 
+## LE VERROU ANTI-BOUCLLE (gouvernance docs/38, tag freeze-2026-10-02)
+
+AVANT toute expérience :
+1. **Lire `research/registry.yaml`** + grep docs/20. Même hypothèse déjà
+   testée, ou seule une variation de seuil = **PARAMETER_MUTATION** :
+   consommer le budget, jamais repartir comme étude nouvelle.
+2. **Vérifier le budget** (`agent/policy.yaml`) : 20 expériences/semaine,
+   5/famille, 3/stratégie, 12 variantes de paramètres max. Épuisé = **STOP**.
+3. **UNE expérience = UNE variable principale** : baseline + une modification,
+   tout le reste (coûts, exécution, levier, périodes, protocole) INCHANGÉ.
+4. **Critères PASS/FAIL écrits AVANT** de voir le résultat.
+5. **Un FAIL se grave et s'arrête** : « FAIL — hypothèse réfutée », résultat au
+   registre, budget consommé. Interdit de le « réparer » par un petit filtre.
+6. **Le protocole ne se touche JAMAIS** (0 modification) ; s'il doit changer →
+   `protocol_v2` = nouvel univers expérimental, comparaisons interdites.
+7. **Priorités** : ROBUSTESSE > stabilité OOS > résilience aux coûts > régimes
+   > risque > retour maximum. Un +5 000 %/an n'est pas une preuve, c'est un
+   suspect.
+
 ## Le chemin d'une idée
 
 1. **One-shot** dans `scripts/studies/` (jamais à la racine — la racine = les

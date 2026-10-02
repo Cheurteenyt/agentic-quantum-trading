@@ -1,0 +1,45 @@
+# ═══════════════════════════════════════════════════════════════════
+# POLITIQUE AGENTIQUE — appliquée par l'orchestrateur, pas par le prompt seul
+# Source : audit & plan de restructuration (02/10/2026), sections 10-12, 58-59
+# ═══════════════════════════════════════════════════════════════════
+version: 1
+frozen_tag: freeze-2026-10-02
+
+weekly_budget:
+  total_experiments: 20
+  per_family: 5
+  per_strategy: 3
+  max_parameter_variants: 12
+  on_exhaustion: STOP          # jamais « une petite amélioration supplémentaire »
+
+agent_limits:
+  max_files_modified: 8
+  max_strategy_changes: 1
+  max_protocol_changes: 0      # zéro. Le protocole ne se touche JAMAIS.
+  max_parameter_sweeps: 2
+  max_experiments: 10
+  require_validation_after_each_change: true
+
+experiment_rules:
+  one_variable: true           # baseline + UNE modification principale, tout le reste inchangé
+  pass_fail_before_run: true   # critères écrits AVANT de voir le résultat
+  dedup_hashes: [hypothesis_hash, feature_hash, parameter_hash, protocol_hash]
+  on_duplicate: NO-OP
+  on_fail: enregistrer, consommer le budget, STOP — un FAIL ne se « répare » pas
+  locked_test: jamais un outil de tuning (un résultat → modif = nouvelle génération = nouveau test)
+  protocol_change: crée protocol_v2 = nouvel univers expérimental, comparaisons interdites
+
+forbidden:
+  - modifier le protocole pour améliorer un résultat
+  - réduire les coûts après avoir vu le résultat
+  - retuner après le test final
+  - répéter une hypothèse avec de minuscules variations
+  - nouvelle stratégie parce qu'une autre a échoué
+  - lever le levier pour rendre le CAGR spectaculaire
+  - filtres sans hypothèse falsifiable
+  - optimiser sur le locked test
+  - modifier simultanément plusieurs couches critiques
+  - promouvoir en production sans la pipeline complète
+  - mélanger des résultats de protocoles différents
+
+priorities: [ROBUSTESSE, OOS_STABILITY, COST_RESILIENCE, REGIME_STABILITY, RISK, RETURN]
