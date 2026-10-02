@@ -20,3 +20,4 @@
 {"date": "2026-10-01", "family": "aster-exit", "strategy": "t23_tpsl_hold_pur", "hypothesis": "TP/SL vs hold pur", "hypothesis_hash": "27af1f34a214dda1", "verdict": "FAIL"}
 {"date": "2026-10-01", "family": "aster-portfolio", "strategy": "t24_wallet_survivants", "hypothesis": "caps 0-liq sur les survivants", "hypothesis_hash": "4d4b043a9aa51ad4", "verdict": "FAIL"}
 {"date": "2026-10-01", "family": "aster-portfolio", "strategy": "t25_resizing_cible", "hypothesis": "re-sizing w*=0.200 vers DD <= 25%", "hypothesis_hash": "f1b6e9d2df918fbc", "verdict": "PASS"}
+{"date": "2026-10-02", "family": "aster-institutions", "strategy": "oi_quadrant_h4h5", "hypothesis": "re-tir H4/H5 avec juge durci (MAE max, overlap, sensibilité)", "hypothesis_hash": "50df35ce21cb70c0", "verdict": "SOUS_PUISSANT"}
