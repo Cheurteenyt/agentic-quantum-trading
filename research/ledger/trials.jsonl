@@ -1,0 +1,22 @@
+{"date": "2026-10-02", "family": "aster-cross-section", "strategy": "inv_a_majeure_deviante", "hypothesis": "z de ret24 vs médiane pack, |z|>=2, réversion relative 24-72h", "hypothesis_hash": "2d69b07dbf06c28e", "verdict": "FAIL"}
+{"date": "2026-10-02", "family": "aster-microstructure", "strategy": "concentration_rotation_herfindahl", "hypothesis": "pic Herfindahl volumes 24h → rotation vers les non-concentrées", "hypothesis_hash": "03865d70d4ab3a6b", "verdict": "FAIL"}
+{"date": "2026-10-02", "family": "aster-institutions", "strategy": "inv_i_trace_baleine", "hypothesis": "print individuel >= q99 classé AVALÉ/IMPACTANT prédit 4-24h", "hypothesis_hash": "0ddb0d2f4b9929ff", "verdict": "FAIL"}
+{"date": "2026-10-02", "family": "aster-cross-section", "strategy": "inv_d_asymetrie_vitesse", "hypothesis": "time-above-ratio 24h, capitulation par le temps → rebond", "hypothesis_hash": "59e086c62bb85435", "verdict": "FAIL"}
+{"date": "2026-10-02", "family": "aster-funding", "strategy": "inv_e_rythme_funding_runlength", "hypothesis": "run-length funding même signe → amplitude forward", "hypothesis_hash": "74b4f8778fb45037", "verdict": "FAIL"}
+{"date": "2026-10-02", "family": "aster-regime", "strategy": "inv_f_codeformation_regime_transition", "hypothesis": "doublement vol + traversée corr → transition de régime", "hypothesis_hash": "2fbbe8c46d22c888", "verdict": "SOUS_PUISSANT"}
+{"date": "2026-10-02", "family": "aster-microstructure", "strategy": "inv_g_densite_silence", "hypothesis": "densité heures mortes 72h → queues épaisses", "hypothesis_hash": "0bb3708442adda21", "verdict": "FAIL"}
+{"date": "2026-10-02", "family": "aster-execution", "strategy": "inv_h_superposition_regimes_hmm", "hypothesis": "HMM 3 états prédit la persistance du régime mieux que le naïf", "hypothesis_hash": "54c07a8b868d0867", "verdict": "FAIL"}
+{"date": "2026-10-02", "family": "aster-execution", "strategy": "inv_o_entree_quinzaine", "hypothesis": "entrée au close 15m vs open 1h améliore l'espérance", "hypothesis_hash": "b04e5b4e44ebe88f", "verdict": "FAIL"}
+{"date": "2026-09-28", "family": "openmarket", "strategy": "x501_vague5", "hypothesis": "flux taker natif + funding multi-années", "hypothesis_hash": "52347e75dbc1acdf", "verdict": "FAIL"}
+{"date": "2026-09-28", "family": "openmarket", "strategy": "x501_vague6", "hypothesis": "absorption ordrebook proxy klines", "hypothesis_hash": "84d3658b30f6451c", "verdict": "FAIL"}
+{"date": "2026-09-28", "family": "openmarket", "strategy": "x501_vague7", "hypothesis": "vwap session + volume profile veille", "hypothesis_hash": "aec4cacee86cb79f", "verdict": "FAIL"}
+{"date": "2026-09-28", "family": "openmarket", "strategy": "x501_vague8", "hypothesis": "OI 1h capital brut + mouvement financé", "hypothesis_hash": "ab4e6e4168bd25dc", "verdict": "FAIL"}
+{"date": "2026-09-28", "family": "openmarket", "strategy": "x501_vague9", "hypothesis": "OI z-score roulant en conditionneur", "hypothesis_hash": "596407fe68d426ba", "verdict": "FAIL"}
+{"date": "2026-09-28", "family": "openmarket", "strategy": "x501_vague10", "hypothesis": "U-shape OI (le côté bas CANDIDAT L2160)", "hypothesis_hash": "ad28e55ffa6b482a", "verdict": "FAIL"}
+{"date": "2026-09-28", "family": "openmarket", "strategy": "x501_vague11", "hypothesis": "LSR contrarian Bybit 4h/1d", "hypothesis_hash": "caca44f07fe8e011", "verdict": "FAIL"}
+{"date": "2026-10-02", "family": "aster-institutions", "strategy": "oi_quadrant_h4h5", "hypothesis": "dOI ex-ante 90min conditionne la qualité du short cascade suivant", "hypothesis_hash": "a807d7ac691abc84", "verdict": "SOUS_PUISSANT"}
+{"date": "2026-10-01", "family": "aster-cascade", "strategy": "t21_inversion_split", "hypothesis": "edges découverts 2021-23 validés 2024-26", "hypothesis_hash": "9d1ba85319e61878", "verdict": "PASS"}
+{"date": "2026-10-01", "family": "aster-cascade", "strategy": "t22_carry_refuse", "hypothesis": "carry de funding au wallet séquentiel", "hypothesis_hash": "5e1309aa4eb49908", "verdict": "FAIL"}
+{"date": "2026-10-01", "family": "aster-exit", "strategy": "t23_tpsl_hold_pur", "hypothesis": "TP/SL vs hold pur", "hypothesis_hash": "27af1f34a214dda1", "verdict": "FAIL"}
+{"date": "2026-10-01", "family": "aster-portfolio", "strategy": "t24_wallet_survivants", "hypothesis": "caps 0-liq sur les survivants", "hypothesis_hash": "4d4b043a9aa51ad4", "verdict": "FAIL"}
+{"date": "2026-10-01", "family": "aster-portfolio", "strategy": "t25_resizing_cible", "hypothesis": "re-sizing w*=0.200 vers DD <= 25%", "hypothesis_hash": "f1b6e9d2df918fbc", "verdict": "PASS"}
