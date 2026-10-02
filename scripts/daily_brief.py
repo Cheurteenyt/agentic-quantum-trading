@@ -58,7 +58,7 @@ try:
     con.close()
     try:
         con2 = sqlite3.connect(f"file:{ROOT / 'data' / 'warehouse' / 'depth.db'}?mode=ro", uri=True)
-        dd = con2.execute("SELECT ROUND((MAX(ts)-MIN(ts))/86400000.0,1) FROM depth_meta").fetchone()[0]
+        dd = con2.execute("SELECT ROUND((MAX(ts)-MIN(ts))/86400.0,1) FROM depth_meta").fetchone()[0]
         con2.close()
     except Exception as e2:
         dd = -1
