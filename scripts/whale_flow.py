@@ -22,7 +22,7 @@ DB = ROOT / "data" / "fomo" / "fomo.db"
 
 
 def main() -> int:
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=60)
     con.execute("""CREATE TABLE IF NOT EXISTS whale_flow (
         ticker TEXT NOT NULL, buy_skill_weighted REAL, sell_skill_weighted REAL,
         n_whales INTEGER, captured_at REAL NOT NULL,

@@ -67,7 +67,7 @@ SYMS = ["1000PEPEUSDT", "ADAUSDT", "APTUSDT", "AVAXUSDT", "BNBUSDT", "BTCUSDT",
 
 
 def load_tables():
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=60)
     k = pd.read_sql("SELECT symbol, ts, o, h, l, c, v FROM bb_kline_1h_400d", con)
     oi = pd.read_sql("SELECT symbol, ts, oi FROM bb_oi_1h_deep", con)
     fu = pd.read_sql("SELECT symbol, ts, rate FROM bn_funding_deep", con)

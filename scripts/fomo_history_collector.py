@@ -182,7 +182,7 @@ def main() -> int:
                     help="fichier avec un ticker par ligne (l'univers complet)")
     args = ap.parse_args()
 
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=60)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS fomo_tokens (
         ticker TEXT PRIMARY KEY, mint TEXT, pool TEXT, resolved_at REAL);

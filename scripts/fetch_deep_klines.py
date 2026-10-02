@@ -37,7 +37,7 @@ def main() -> int:
     ap.add_argument("--sleep", type=float, default=0.35)
     args = ap.parse_args()
 
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=60)
     if args.symbols:
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
     else:

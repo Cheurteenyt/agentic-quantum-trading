@@ -123,7 +123,7 @@ def fetch_symbol(symbol: str, con: sqlite3.Connection, now_ms: int) -> int:
     # import des historiques plus vieux déjà en base principale (lecture seule)
     if fetched_min is not None:
         try:
-            src = sqlite3.connect(f"file:{DB_MAIN}?mode=ro", uri=True)
+            src = sqlite3.connect(f"file:{DB_MAIN}?mode=ro", uri=True, timeout=60)
             old = src.execute(
                 "SELECT symbol, interval, open_time, open, high, low, close, volume,"
                 " close_time, snapshot_id, source, fetched_at, taker_buy_volume,"

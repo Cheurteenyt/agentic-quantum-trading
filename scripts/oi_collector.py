@@ -399,7 +399,7 @@ def main() -> int:
     ap.add_argument("--cross-syms", default=CROSS_DEFAULT)
     args = ap.parse_args()
 
-    con = sqlite3.connect(DB_PATH)
+    con = sqlite3.connect(DB_PATH, timeout=60)
     try:
         init_db(con)
         symbols = ([s.strip().upper() for s in args.symbols.split(",") if s.strip()]

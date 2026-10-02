@@ -56,7 +56,7 @@ LIQ_MOVE_PCT = 100 / LEV - MAINT_PCT   # le mouvement adverse qui liquide
 
 def btc_regime_series() -> pd.Series:
     """Le régime BTC (tendance EMA7j × volatilité) aligné sur l'index BTC."""
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     btc = load_df(con, "BTCUSDT")
     con.close()
     if btc is None or len(btc) < 500:
@@ -171,7 +171,7 @@ def main() -> int:
     args = ap.parse_args()
     fee_bps, slip_bps = (MAKER_BPS, 0) if args.maker else (FEE_BPS, SLIP_BPS)
 
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     funding_hourly: dict[str, float] = {}
     for s, r in con.execute("SELECT symbol, rate FROM funding_history"):
         try:

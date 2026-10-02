@@ -76,7 +76,7 @@ DAY_MS = 86_400_000
 
 def funding_hourly_ro() -> dict[str, float]:
     """funding_hourly_all en LECTURE SEULE (même formule)."""
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     acc: dict[str, list[float]] = {}
     for s, r in con.execute("SELECT symbol, rate FROM funding_history"):
         try:
@@ -256,7 +256,7 @@ def corr(a: dict[str, float], b: dict[str, float]) -> tuple[float, float, int]:
 def main() -> int:
     t0 = datetime.now(timezone.utc)
     fh = funding_hourly_ro()
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     print("[surv] build vol_spike (builder p5, gate ATR)…")
     spike_all = build_spike(con)
     con.close()

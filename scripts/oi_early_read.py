@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-con = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data" / "warehouse" / "klines.db"))
+con = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data" / "warehouse" / "klines.db"), timeout=60)
 
 print("=== GÉOGRAPHIE OI (top 10 par OI moyen) ===")
 for r in con.execute("""SELECT symbol, AVG(open_interest), COUNT(*) FROM oi_history

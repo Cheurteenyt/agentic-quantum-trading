@@ -95,7 +95,7 @@ def collect_conf_exact(con: sqlite3.Connection,
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     fh_raw = pd.read_sql_query(
         "SELECT symbol, funding_time, rate FROM funding_history", con)
     fh_hourly = funding_hourly_all()

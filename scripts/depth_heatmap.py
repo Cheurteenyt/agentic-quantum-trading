@@ -37,7 +37,7 @@ CMAP.set_bad("#F8FAFC")  # pas de carnet à ce prix/moment (gris très pâle)
 
 def load_grid(db_path: Path | str, symbol: str, hours: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, float] | None:
     """Retourne (times[], bin_prices[], Z[time x price], mid) ou None si vide."""
-    con = sqlite3.connect(db_path)
+    con = sqlite3.connect(db_path, timeout=60)
     try:
         cutoff = int(datetime.now(tz=timezone.utc).timestamp() - hours * 3600)
         meta = con.execute(

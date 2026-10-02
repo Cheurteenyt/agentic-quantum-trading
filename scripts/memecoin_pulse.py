@@ -69,7 +69,7 @@ def funding_row(symbol: str) -> tuple[float | None, float | None]:
 
 
 def liq_24h(symbol: str) -> tuple[int, float]:
-    con = sqlite3.connect(f"file:{KLINES_DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KLINES_DB}?mode=ro", uri=True, timeout=60)
     try:
         cutoff = time.time() - 86400
         rows = con.execute(
@@ -87,7 +87,7 @@ def liq_24h(symbol: str) -> tuple[int, float]:
 def calls_24h(symbol: str) -> int:
     base = symbol[:-4]
     try:
-        con = sqlite3.connect(f"file:{X_DB}?mode=ro", uri=True)
+        con = sqlite3.connect(f"file:{X_DB}?mode=ro", uri=True, timeout=60)
         cutoff = time.time() - 86400
         (n,) = con.execute(
             "SELECT COUNT(*) FROM x_calls c JOIN x_call_scores s ON s.call_id = c.call_id "
@@ -104,7 +104,7 @@ def calls_24h(symbol: str) -> int:
 def mentions_today(symbol: str) -> int | None:
     base = symbol[:-4]
     try:
-        con = sqlite3.connect(f"file:{X_DB}?mode=ro", uri=True)
+        con = sqlite3.connect(f"file:{X_DB}?mode=ro", uri=True, timeout=60)
         today = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
         (n,) = con.execute(
             "SELECT COALESCE(SUM(n), 0) FROM x_mentions WHERE symbol = ? AND day = ?",

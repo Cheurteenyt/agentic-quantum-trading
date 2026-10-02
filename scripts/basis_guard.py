@@ -59,7 +59,7 @@ def basis_pct(aster: float, binance: float) -> float:
 
 
 def init_db(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
-    con = sqlite3.connect(db_path)
+    con = sqlite3.connect(db_path, timeout=60)
     con.execute(BASIS_DDL)
     con.commit()
     return con

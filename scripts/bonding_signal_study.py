@@ -25,14 +25,14 @@ def ts_sec(v):
     if v > 1e11: return v / 1e3
     return v
 
-con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=60)
 cur = con.cursor()
 res = json.load(open(RES))["resolved"]
 
 snaps = {}
 # MIGRATION REST (29/09) : fomo_new_coins mort → snapshot REST bonding
 # (fomo_rest.db, endpoint='bonding_snapshot') ; upsert = 1 point/mint.
-rcur = sqlite3.connect(f"file:{ROOT}/data/fomo/fomo_rest.db?mode=ro", uri=True).cursor()
+rcur = sqlite3.connect(f"file:{ROOT}/data/fomo/fomo_rest.db?mode=ro", uri=True, timeout=60).cursor()
 for mint, raw, cap in rcur.execute(
         "SELECT entity_id, data, captured_at FROM fomo_rest_snapshots "
         "WHERE endpoint='bonding_snapshot'"):
@@ -217,7 +217,7 @@ for r in sorted(rules, key=lambda x: -(x[2] or 0)):
 
 # ------------------------------------------------ baleines
 print("\n== BALEINES ==")
-sw = sqlite3.connect(f"file:{SWAPS}?mode=ro", uri=True)
+sw = sqlite3.connect(f"file:{SWAPS}?mode=ro", uri=True, timeout=60)
 swc = sw.cursor()
 wh_hits = {}
 for tk, sl in snaps.items():

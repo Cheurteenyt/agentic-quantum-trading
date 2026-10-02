@@ -46,7 +46,7 @@ CATEGORIC = ["regime"]
 
 
 def funding_hourly_map() -> dict[str, float]:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     acc: dict[str, list[float]] = {}
     for s, r in con.execute("SELECT symbol, rate FROM funding_history"):
         try:
@@ -62,7 +62,7 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
 
     La sélection séquentielle du sim (premier dispo, skip des chevauche-
     ments) est répliquée pour que les labels correspondent au sim."""
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     if universe == "majors":
         symbols = list(MAJORS)
     else:

@@ -38,7 +38,7 @@ BUY, SELL, ENTRY = "#2F6B4F", "#8C3A3A", GREY
 
 
 def ro(path):
-    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=60)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA busy_timeout=30000")  # les backfills tiennent des
     # transactions d'écriture de plusieurs secondes (journal rollback)

@@ -182,7 +182,7 @@ def collect(con: sqlite3.Connection, fh: pd.DataFrame) -> dict[str, list[dict]]:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     fh_raw = pd.read_sql_query(
         "SELECT symbol, funding_time, rate FROM funding_history", con)
     fh = funding_hourly_all()
@@ -235,7 +235,7 @@ def main() -> int:
     casc = [e for e in cascade
             if not (np.isfinite(e.get("al_score", float("nan")))
                     and e["al_score"] >= q66)]
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     for e in sum(viable.values(), []):
         if e["strategy"] in ("funding_div_12h", "funding_extreme_168h",
                              "contagion_4h"):

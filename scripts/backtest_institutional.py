@@ -67,7 +67,7 @@ def walk(df, entry_i, direction, stop_pct, target_pct, max_bars):
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     majors = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
     ret_sigma = 2.5
 

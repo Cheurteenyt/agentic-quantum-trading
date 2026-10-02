@@ -406,7 +406,7 @@ def real_funding_stats(res: dict, events: list[dict],
 
 def main() -> int:
     t0 = datetime.now(timezone.utc)
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     fh = funding_hourly_all()
     syms = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'")]

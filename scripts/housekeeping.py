@@ -93,7 +93,7 @@ def prune(apply: bool) -> list[tuple[Path, str]]:
 
 def _count(db: Path, sql: str) -> str:
     try:
-        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=60)
         try:
             (n,) = con.execute(sql).fetchone()
             return f"{n:,}"

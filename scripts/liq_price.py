@@ -40,7 +40,7 @@ def main() -> int:
     if len(sys.argv) >= 5:
         symbol, entry, side, lev = (sys.argv[1], float(sys.argv[2]),
                                     sys.argv[3].lower(), float(sys.argv[4]))
-        con = sqlite3.connect(KDB)
+        con = sqlite3.connect(KDB, timeout=60)
         row = con.execute("SELECT maint_margin_pct, liq_fee, market_take_bound, "
                           "max_leverage FROM liq_params WHERE symbol=?",
                           (symbol,)).fetchone()
@@ -67,7 +67,7 @@ def main() -> int:
         ("PONSUSDT", 0.70695, "short", 3, "le failed_ATH short"),
         ("BTCUSDT", 112000, "short", 20, "le 20x sur BTC (maint 2,5 %)"),
     ]
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     for sym, entry, side, lev, note in cases:
         row = con.execute("SELECT maint_margin_pct, liq_fee, max_leverage FROM "
                           "liq_params WHERE symbol=?", (sym,)).fetchone()

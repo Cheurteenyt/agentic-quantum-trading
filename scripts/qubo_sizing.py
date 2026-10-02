@@ -70,7 +70,7 @@ CAPS = {"cascade_10x": 1.0, "cascade_meme": 1.0,
 # briques importées, aucun fichier machine édité.
 # ------------------------------------------------------------------
 def build_events() -> tuple[list[dict], dict, dict[str, float]]:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     fh = funding_hourly_all()
     fh_raw = pd.read_sql_query(
         "SELECT symbol, funding_time, rate FROM funding_history", con)

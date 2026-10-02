@@ -385,7 +385,7 @@ def fmt_bloc(m: dict, months_span: float) -> list[str]:
 def main() -> int:
     global FH
     t0 = datetime.now(timezone.utc)
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     FH = funding_hourly_all()
     print("[anat] construction du corpus annoté (mécanique p5, univers meme)…")
     events = build_corpus(con)

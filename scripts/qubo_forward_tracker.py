@@ -152,7 +152,7 @@ def main() -> int:
     args = ap.parse_args()
 
     uri = "file:" + urllib.parse.quote(str(KDB)) + "?mode=ro"
-    con = sqlite3.connect(uri, uri=True)
+    con = sqlite3.connect(uri, uri=True, timeout=60)
     trades, unknown = load_machine_trades(con)
     con.close()
 

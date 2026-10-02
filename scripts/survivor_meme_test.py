@@ -179,7 +179,7 @@ def monthly_table(res: dict) -> list[str]:
 
 def main() -> int:
     t0 = datetime.now(timezone.utc)
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     fh = funding_hourly_all()
     fh_raw = pd.read_sql_query(
         "SELECT symbol, funding_time, rate FROM funding_history", con)
@@ -336,7 +336,7 @@ def main() -> int:
 
     L += ["", "## L'AUDIT ZOMBIES (les memes morts-vivants — volume 0, "
               "spread infini)", ""]
-    z = zombie_block(sqlite3.connect(f"file:{KDB}?mode=ro", uri=True), raw)
+    z = zombie_block(sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60), raw)
     L += [
         f"- Events RAW avec ≥ 1 barre volume 0 dans la détention 72 h : "
         f"**{z['ev_vol0']} / {len(raw)} ({z['share']:.1f} %)**",

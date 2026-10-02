@@ -141,7 +141,7 @@ def cell_rows(sym, mids, q, horizon, drift, mae_long, mae_short, freq_cap,
 
 
 def main() -> int:
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=60)
     all_rows, mae_glob = [], []
     for sym in SYMBOLS:
         mids = load_symbol(con, sym)

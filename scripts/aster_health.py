@@ -40,7 +40,7 @@ CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / "aster_public_fund
 
 
 def ro(db):
-    return sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    return sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=60)
 
 
 def _norm_ms(v):

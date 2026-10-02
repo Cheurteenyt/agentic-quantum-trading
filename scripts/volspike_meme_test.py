@@ -176,7 +176,7 @@ def monthly_table(res: dict) -> list[str]:
 
 def main() -> int:
     t0 = datetime.now(timezone.utc)
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     fh = funding_hourly_all()
     print("[vsm] réplique flat de la machine (cascade majors/meme/survivor)…")
     mach = machine_streams_flat(con, fh)

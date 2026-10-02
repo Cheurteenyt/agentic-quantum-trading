@@ -67,7 +67,7 @@ def ts_to_ms(raw: int) -> int:
 
 
 def load_events() -> tuple[list[dict], dict]:
-    con = sqlite3.connect(f"file:{SWAPS_DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{SWAPS_DB}?mode=ro", uri=True, timeout=60)
     cur = con.cursor()
     rows = cur.execute(
         "SELECT user_id, user_handle, in_mint, out_mint, size_usd, ts, "
@@ -104,7 +104,7 @@ def load_events() -> tuple[list[dict], dict]:
 
 
 def load_ohlcv() -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    con = sqlite3.connect(f"file:{FOMO_DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{FOMO_DB}?mode=ro", uri=True, timeout=60)
     cur = con.cursor()
     out: dict[str, tuple[list, list]] = {}
     n_bars = 0

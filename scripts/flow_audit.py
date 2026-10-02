@@ -19,7 +19,7 @@ DB = ROOT / "data" / "warehouse" / "klines.db"
 
 def ro() -> sqlite3.Connection:
     """Connexion lecture-seule (mode=ro) — JAMAIS d'ecriture ici."""
-    return sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    return sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=60)
 
 
 def ts(epoch: float | None) -> str:

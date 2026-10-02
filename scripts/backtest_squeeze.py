@@ -95,7 +95,7 @@ def collect_squeeze(con: sqlite3.Connection) -> list[dict]:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     regime = btc_regime_series()
     fh = funding_hourly_all()
 
@@ -125,7 +125,7 @@ def main() -> int:
     blind_trim = float(np.mean(clean))
     con.close()
 
-    squeeze = collect_squeeze(sqlite3.connect(KDB))
+    squeeze = collect_squeeze(sqlite3.connect(KDB, timeout=60))
     con.close()
 
     cascade = collect_featured(regime, "majors")

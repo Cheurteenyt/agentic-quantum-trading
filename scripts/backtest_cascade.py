@@ -58,7 +58,7 @@ def walk(df, entry_i, direction):
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     majors = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
 
     pooled: dict[tuple[str, int], dict] = defaultdict(

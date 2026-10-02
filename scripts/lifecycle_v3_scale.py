@@ -92,7 +92,7 @@ def first_real_close(rows):
 def load_whale_notionals():
     """max(size_usd), somme size_usd et nb de swaps par mint (fomo_swaps.db ro).
     NB : swaps.ts en SECONDS — jamais join temporel avec ohlcv (ms)."""
-    conn = sqlite3.connect(f"file:{SWAPS_DB}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"file:{SWAPS_DB}?mode=ro", uri=True, timeout=60)
     try:
         agg = {}
         for mint, mx, tot, n in conn.execute(
@@ -203,7 +203,7 @@ def main():
     bt = []                       # resultats Partie B (1 dict par token testable)
     n_assets_seen = 0
 
-    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=60)
     try:
         tickers = dict(conn.execute("SELECT mint, ticker FROM fomo_tokens"))
         # --- stream par asset : periodes alphabetiques (15m, 1h, 1m) ---

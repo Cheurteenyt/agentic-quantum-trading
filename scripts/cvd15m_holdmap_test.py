@@ -72,7 +72,7 @@ def attach_buy_ratio_15m(events: list[dict]) -> dict[str, int]:
     PRÉCÉDANT l'entrée (entry_open − 60..−15 min ; l'entrée est à l'open
     de la barre suivante — zéro look-ahead). Retourne les causes
     d'exclusion : symboles sans 15m, events hors couverture 15m."""
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     cvd: dict[str, dict[int, tuple[float, float]]] = {}
     for s, ot, tb, v in con.execute(
             "SELECT symbol, open_time, taker_buy_volume, volume FROM klines "
@@ -353,7 +353,7 @@ def seg_stats(rows: list[dict], trades: list[dict]) -> dict:
 
 
 def part_b(L: list[str]) -> list[dict]:
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     fh = funding_hourly_all()
     base, per_sym = collect_fade_entries(con)
     con.close()

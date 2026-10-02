@@ -22,7 +22,7 @@ STOP_PCT = 1.2
 H = 8
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     majors = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
     results = defaultdict(lambda: {"n": 0, "w": 0, "s": 0.0})
     for sym in majors:

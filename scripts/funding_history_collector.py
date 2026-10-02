@@ -102,7 +102,7 @@ def main() -> int:
                     help="liste csv ; défaut = tous les symboles 1h + connus")
     args = ap.parse_args()
 
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     con.execute("""CREATE TABLE IF NOT EXISTS funding_history (
         symbol      TEXT    NOT NULL,
         funding_time INTEGER NOT NULL,

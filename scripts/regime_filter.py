@@ -39,7 +39,7 @@ H = 8
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval = '1h' "
         "AND symbol != 'BTCUSDT' ORDER BY symbol")]

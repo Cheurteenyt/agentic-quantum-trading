@@ -66,7 +66,7 @@ def fill_market_now(df: pd.DataFrame, signal_ts: pd.Timestamp,
 
 def demo_failed_ath(sym: str = "MEMEUSDT") -> int:
     """Le failed_ATH avec les 3 entrées côte à côte sur les derniers événements."""
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     df = load_df(con, sym)
     con.close()
     if df is None or len(df) < 500:

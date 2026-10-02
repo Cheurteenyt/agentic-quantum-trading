@@ -76,7 +76,7 @@ def vol7_series(con: sqlite3.Connection) -> pd.Series:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     lo, hi, n_liq = con.execute(
         "SELECT MIN(event_time), MAX(event_time), COUNT(*) "
         "FROM liq_events").fetchone()

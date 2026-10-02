@@ -105,7 +105,7 @@ def recompute_exit(con: sqlite3.Connection, events: list[dict],
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     regime = None
     from scripts.portfolio_sim import btc_regime_series
     regime = btc_regime_series()
@@ -183,7 +183,7 @@ def main() -> int:
     for label, evs in (("24h fixes", variants["24h fixes (référence)"]),
                        (best_label, variants[best_label])):
         fdiv_conf = []
-        con = sqlite3.connect(KDB)
+        con = sqlite3.connect(KDB, timeout=60)
         try:
             from scripts.stacked_portfolio import collect_funding_strategies
             fdiv, conf = collect_funding_strategies(con)

@@ -87,7 +87,7 @@ def symbol_lcs(df: pd.DataFrame, rate_s: pd.Series | None) -> pd.DataFrame:
 
 def main() -> int:
     ap = sys.argv[1] if len(sys.argv) > 1 else "--backtest"
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
     fh = pd.read_sql_query("SELECT symbol, funding_time, rate FROM funding_history", con)

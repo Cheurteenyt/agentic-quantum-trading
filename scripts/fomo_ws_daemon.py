@@ -130,7 +130,7 @@ def load_config():
     cfg = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
     if "user_uuid" not in cfg:
         raise RuntimeError("ws_config.json sans user_uuid — lancer --discover-uuid")
-    con = sqlite3.connect(DB_TICKS)
+    con = sqlite3.connect(DB_TICKS, timeout=60)
     mints = [r[0] for r in con.execute(
         "SELECT DISTINCT mint FROM fomo_tokens WHERE mint IS NOT NULL "
         "ORDER BY resolved_at DESC LIMIT ?", (SEED_MINTS,))]

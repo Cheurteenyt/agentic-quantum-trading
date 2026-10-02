@@ -68,7 +68,7 @@ T3_M = ("2026-07", "2026-08", "2026-09")       # le régime mort
 # ————————————————————————————— le flux —————————————————————————————
 def build_flows() -> tuple:
     """Réplique bit-à-bit de la collecte 4 flux de the_machine.main()."""
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     fh = funding_hourly_all()
     fh_raw = pd.read_sql_query(
         "SELECT symbol, funding_time, rate FROM funding_history", con)

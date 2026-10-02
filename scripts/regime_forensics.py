@@ -72,7 +72,7 @@ ADAPTER_DATES = {"p25 TRAIN": "2026-05-02", "0.30 % plat": "2026-08-26"}
 
 
 def load_1h() -> dict[str, pd.DataFrame]:
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=60)
     out = {}
     for s in MAJORS:
         rows = con.execute(
@@ -88,7 +88,7 @@ def load_1h() -> dict[str, pd.DataFrame]:
 
 def load_funding() -> pd.Series:
     """Funding moyen journalier (moyenne des 6 majeures), en % par 8h."""
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=60)
     rows = con.execute(
         "SELECT symbol, funding_time, rate FROM funding_history "
         f"WHERE symbol IN ({','.join('?' * len(MAJORS))}) ORDER BY funding_time",
@@ -243,7 +243,7 @@ def precursor_analysis(d: pd.DataFrame, contrast: pd.DataFrame) -> tuple[list[di
 def extension_4h() -> pd.DataFrame:
     """Honnêteté : ATR% et corr 7j en 4h pour BTC/ETH/SOL/DOGE, 2025-04 → 2026-09.
     Le T3-type s'est-il déjà vu en 2025 ?"""
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=60)
     four = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT"]
     closes, atrs = {}, {}
     for s in four:

@@ -174,7 +174,7 @@ def outcomes_fast(idx_ns, opens, closes, highs, entry_positions, direction,
 
 def main() -> int:
     reg = build_registry()
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     con.execute("""CREATE TABLE IF NOT EXISTS signal_events (
         signal TEXT NOT NULL, symbol TEXT NOT NULL, ts_ms INTEGER NOT NULL,
         direction INTEGER NOT NULL, sversion TEXT NOT NULL,

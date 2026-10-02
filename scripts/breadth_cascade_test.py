@@ -136,7 +136,7 @@ def grad_map(events: list[dict], key: str, label: str,
 
 def phase_a() -> int:
     from scripts.portfolio_sim import MAJORS, btc_regime_series
-    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"))
+    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=60)
     fh = funding_hourly_all()
     regime = btc_regime_series()
     events = collect_featured(regime, "majors")
@@ -263,7 +263,7 @@ def phase_b(factor_lo: float, factor_hi: float, factor_mid: float = 1.0,
     from scripts.portfolio_sim import MAJORS, btc_regime_series
     from scripts.the_machine import collect_meme
 
-    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"))
+    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=60)
     fh = funding_hourly_all()
     fh_raw = pd.read_sql_query(
         "SELECT symbol, funding_time, rate FROM funding_history", con)
@@ -348,7 +348,7 @@ def phase_b(factor_lo: float, factor_hi: float, factor_mid: float = 1.0,
         e["strategy"] = "survivor_long"
         e["lev"] = 1
         e["fee_rt_bps"] = TAKER_RT
-    con3 = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"))
+    con3 = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=60)
     spike = collect_vol_spike(con3, hold=6)
     con3.close()
     for e in spike:

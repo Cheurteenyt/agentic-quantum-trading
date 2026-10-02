@@ -54,7 +54,7 @@ MAX_HOLD = 24
 def build_gated() -> tuple[list[dict], sqlite3.Connection]:
     """La construction EXACTE de breadth_cascade_test.phase_a."""
     from scripts.portfolio_sim import btc_regime_series
-    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"))
+    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=60)
     regime = btc_regime_series()
     events = collect_featured(regime, "majors")
     for e in events:
@@ -268,7 +268,7 @@ def build_machine(cascade_events: list[dict], verbose: bool = False
     from scripts.portfolio_sim import MAJORS, monthly_rows
     from scripts.the_machine import collect_meme
 
-    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"))
+    con = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=60)
     fh = funding_hourly_all()
     fh_raw = pd.read_sql_query(
         "SELECT symbol, funding_time, rate FROM funding_history", con)
@@ -304,7 +304,7 @@ def build_machine(cascade_events: list[dict], verbose: bool = False
     med_meme = float(np.median([e["atr_pct"] for e in meme]))
     for e in meme:
         e["lev"] = 1
-    con2 = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"))
+    con2 = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=60)
     surv = collect_arsenal(con2, fh_raw).get("survivor_long_72h", [])
     con2.close()
     _p90 = float(np.nanquantile([e["atr_pct"] for e in surv], 0.90))
@@ -313,7 +313,7 @@ def build_machine(cascade_events: list[dict], verbose: bool = False
         e["strategy"] = "survivor_long"
         e["lev"] = 1
         e["fee_rt_bps"] = TAKER_RT
-    con3 = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"))
+    con3 = sqlite3.connect(str(ROOT / "data" / "warehouse" / "klines.db"), timeout=60)
     spike = collect_vol_spike(con3, hold=6)
     con3.close()
     for e in spike:

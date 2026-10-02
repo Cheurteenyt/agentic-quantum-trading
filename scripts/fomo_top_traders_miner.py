@@ -44,7 +44,7 @@ def knum(s):
 
 
 def ensure_db():
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=60)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS dom_profile_trades (
       trader TEXT, ticker TEXT, invested_usd REAL, hold TEXT, pnl_usd REAL,

@@ -80,7 +80,7 @@ def enrich(con: sqlite3.Connection, events: list[dict]) -> list[dict]:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     regime = btc_regime_series()
     events = collect_featured(regime, "majors")
     for e in events:

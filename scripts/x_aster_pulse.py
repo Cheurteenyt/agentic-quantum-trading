@@ -72,7 +72,7 @@ def main() -> int:
     today = (datetime.now(timezone.utc)).strftime("%Y-%m-%d")
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    con = sqlite3.connect(XDB)
+    con = sqlite3.connect(XDB, timeout=60)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     rows: list[dict] = []
     for ticker in uni:

@@ -289,7 +289,7 @@ def main() -> int:
     print("=" * 72)
     print("PROTOTYPE 4,3 j NON-MATURE — WALL DETECTOR (re-tir 14 j le 06-07/10)")
     print("=" * 72)
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=60)
     all_events: list[dict] = []
     global tick_cluster
     for sym in SYMBOLS:

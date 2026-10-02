@@ -92,7 +92,7 @@ def walk_stop_target(df: pd.DataFrame, entry_i: int, direction: int,
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     majors = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
     ret_sigma = 2.5  # les bougies de crash = ±2,5σ de la distribution horaire
     STOPS = (0.8, 1.2)

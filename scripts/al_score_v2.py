@@ -76,7 +76,7 @@ CANDIDATES = list(V1_UP) + list(V1_DOWN) + list(NEW_FEATS)
 
 
 def ro_con() -> sqlite3.Connection:
-    return sqlite3.connect(KDB_RO, uri=True)
+    return sqlite3.connect(KDB_RO, uri=True, timeout=60)
 
 
 # ------------------------------------------------------------- le pipeline --

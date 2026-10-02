@@ -39,7 +39,7 @@ def _fomo_new(days: int = 3) -> set[str]:
     """Coins récents de la couche découverte fomo (graduated + bonding)."""
     out: set[str] = set()
     try:
-        con = sqlite3.connect(FOMO_DB)
+        con = sqlite3.connect(FOMO_DB, timeout=60)
         cutoff = time.time() - days * 86400
         for (t,) in con.execute(
             "SELECT DISTINCT ticker FROM fomo_new_coins "
@@ -56,7 +56,7 @@ def _fomo_new(days: int = 3) -> set[str]:
 def _waves() -> set[str]:
     out: set[str] = set()
     try:
-        con = sqlite3.connect(FOMO_DB)
+        con = sqlite3.connect(FOMO_DB, timeout=60)
         for (t,) in con.execute("SELECT DISTINCT ticker FROM wave_flags"):
             out.add(t.upper())
         con.close()
@@ -79,7 +79,7 @@ def lot_du_jour(per_run: int = 4) -> list[str]:
 def top_calls_urls(n: int = 3) -> list[str]:
     """Les N calls les plus vus du registre — leurs citations mesurent
     l'amplification/critique de la foule (opérateur X url:)."""
-    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db")
+    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db", timeout=60)
     rows = con.execute("""
         SELECT p.status_url
         FROM x_calls c JOIN x_posts p ON p.post_id = c.post_id

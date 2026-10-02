@@ -78,7 +78,7 @@ def x20_signals(df: pd.DataFrame) -> list[tuple[str, int, pd.Series]]:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='15m'").fetchall()]
     pooled: dict[tuple[str, int], list[tuple[float, float]]] = defaultdict(list)
@@ -183,7 +183,7 @@ def main() -> int:
     lines += ["", "## Géométrie STOP/TARGET à 20x (marche 15m, max 32 barres)", "",
               "| Signal | Stop % | Target % | N | WR target | Espérance marge |", "|---|---|---|---|---|---|"]
     n_combos_st = 0
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     for sym in sorted(symbols):
         rows = con.execute(
             "SELECT open_time, open, high, low, close, volume FROM klines "

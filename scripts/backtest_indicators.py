@@ -273,7 +273,7 @@ def outcomes(df: pd.DataFrame, events, direction: int,
 
 def main() -> int:
     selftest()
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
 
@@ -335,7 +335,7 @@ def main() -> int:
     # slippage MESURÉ par symbole (notre carnet d'ordres) — repli 10 bps
     slip_by_sym: dict[str, float] = {}
     try:
-        scon = sqlite3.connect(KDB)
+        scon = sqlite3.connect(KDB, timeout=60)
         for s, b in scon.execute("SELECT symbol, slip_bps FROM slippage_measured"):
             slip_by_sym[s] = float(b)
         scon.close()

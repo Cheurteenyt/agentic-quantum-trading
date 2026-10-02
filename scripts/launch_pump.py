@@ -111,7 +111,7 @@ def main() -> int:
     args = ap.parse_args()
     direction = 1 if args.direction == "long" else -1
 
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     launch, blind = collect_launch(
         con, direction, args.hold,
         MAKER_RT if args.maker else TAKER_RT)

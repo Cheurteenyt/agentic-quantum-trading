@@ -95,7 +95,7 @@ def _atr(df: pd.DataFrame) -> np.ndarray:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     fh = funding_hourly_all()
     streams: dict[str, list[dict]] = {}
     for name in SIGNALS:

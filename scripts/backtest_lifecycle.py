@@ -37,7 +37,7 @@ def cell_label(age_d: float, dd: float) -> str:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
 
@@ -63,7 +63,7 @@ def main() -> int:
             grid[cell]["long"].append(rl)
             grid[cell]["short"].append(rs)
 
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     con.execute("""CREATE TABLE IF NOT EXISTS lifecycle_map (
         cell TEXT PRIMARY KEY, age_bucket TEXT, dd_bucket TEXT,
         n INTEGER, wr_long REAL, wr_short REAL,

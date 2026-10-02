@@ -93,7 +93,7 @@ def audit_signal(con: sqlite3.Connection, name: str, symbols: list[str],
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
 
     print("== CASCADE (3 clôtures baisse + accélération) ==")
     ok, bad = audit_cascade(con)

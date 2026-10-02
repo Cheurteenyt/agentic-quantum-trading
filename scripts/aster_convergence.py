@@ -28,7 +28,7 @@ REPORTS = ROOT / "reports"
 
 def _x_pressure() -> dict[str, dict]:
     try:
-        con = sqlite3.connect(XDB)
+        con = sqlite3.connect(XDB, timeout=60)
         rows = con.execute(
             "SELECT ticker, posts, velocity, longs, shorts FROM x_pressure"
         ).fetchall()
@@ -43,7 +43,7 @@ def _oi_velocity() -> dict[str, float]:
     """ΔOI % entre les deux derniers snapshots par symbole."""
     out: dict[str, float] = {}
     try:
-        con = sqlite3.connect(KDB)
+        con = sqlite3.connect(KDB, timeout=60)
         for (sym,) in con.execute("SELECT DISTINCT symbol FROM oi_history"):
             pts = con.execute(
                 "SELECT open_interest, captured_at_ms FROM oi_history "

@@ -175,11 +175,11 @@ def init_db(path: Path | str = DB_PATH) -> sqlite3.Connection:
     `:memory:` est accepte tel quel, ce qui rend les tests hermetiques.
     """
     if str(path) == ":memory:":
-        con = sqlite3.connect(":memory:")
+        con = sqlite3.connect(":memory:", timeout=60)
     else:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
-        con = sqlite3.connect(str(p))
+        con = sqlite3.connect(str(p), timeout=60)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA busy_timeout = 10000")
     # Les CHECK ne servent a rien si les contraintes ne sont pas appliquees.

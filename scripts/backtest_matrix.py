@@ -125,7 +125,7 @@ def trade_outcomes(df, entry_positions, direction, horizons_bars, liq_p,
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     lp = {r[0]: {"max_lev": r[1] or 0, "mm": r[2] or 0, "fee": r[3] or 0.025}
           for r in con.execute(
               "SELECT symbol, max_leverage, maint_margin_pct, liq_fee FROM liq_params")}

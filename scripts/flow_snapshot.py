@@ -62,7 +62,7 @@ def last_closed_delta_30m(symbol: str) -> float:
 def record(rows: list[dict], db_path: Path | str = DB_PATH) -> int:
     if not rows:
         return 0
-    con = sqlite3.connect(db_path)
+    con = sqlite3.connect(db_path, timeout=60)
     try:
         con.execute(FLOW_SNAP_DDL)
         cur = con.executemany(

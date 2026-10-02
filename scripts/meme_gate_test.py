@@ -296,14 +296,14 @@ def monthly_meme_table(res: dict, label: str) -> dict[str, dict]:
 
 def main() -> int:
     t0 = datetime.now(timezone.utc)
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     fh = funding_hourly_all()
 
     # ——— 0. baseline anti-dérive : la collecte = collect_meme bit-à-bit ———
     print("[mgate] collecte featured (mécanique collect_meme + features)…")
     events = collect_meme_featured(con)
     print("[mgate] vérification bit-à-bit vs the_machine.collect_meme…")
-    ref = collect_meme_machine(sqlite3.connect(f"file:{KDB}?mode=ro", uri=True))
+    ref = collect_meme_machine(sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60))
     ref_map = {(e["sym"], e["ts_ms"]): e for e in ref}
     mism = 0
     for e in events:

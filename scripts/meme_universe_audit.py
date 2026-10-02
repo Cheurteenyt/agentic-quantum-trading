@@ -123,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     # ——— 1. univers actuel ———
-    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
     current = {r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'")}
     meme_current = sorted(s for s in current if s not in MAJORS)
@@ -165,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
                 run_fetch_range(sym, "1h", args.target_bars, db_path=SIDE_DB)
             except Exception as exc:  # noqa: BLE001 — un symbole ne doit pas
                 print(f"  !! {sym} : {exc}")  # tuer l'audit
-    scon = sqlite3.connect(SIDE_DB)
+    scon = sqlite3.connect(SIDE_DB, timeout=60)
     side_syms = {r[0] for r in scon.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'")}
     new_events = collect_meme(scon) if side_syms else []
@@ -173,7 +173,7 @@ def main(argv: list[str] | None = None) -> int:
 
     per_sym: dict[str, dict] = {}
     for sym in sorted(side_syms | (set(cands) - side_syms)):
-        sc = sqlite3.connect(SIDE_DB)
+        sc = sqlite3.connect(SIDE_DB, timeout=60)
         days, nrows = coverage_days(sc, sym)
         sc.close()
         st = event_stats([e for e in new_events if e["sym"] == sym], days)

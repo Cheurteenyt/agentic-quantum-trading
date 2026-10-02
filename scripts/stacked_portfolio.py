@@ -51,7 +51,7 @@ MAKER_RT = (2 + 0) * 2
 
 
 def funding_hourly_all() -> dict[str, float]:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     acc: dict[str, list[float]] = {}
     for s, r in con.execute("SELECT symbol, rate FROM funding_history"):
         try:
@@ -246,7 +246,7 @@ def bloc(res: dict, label: str, capital: float) -> list[str]:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     regime = btc_regime_series()
     fh = funding_hourly_all()
 

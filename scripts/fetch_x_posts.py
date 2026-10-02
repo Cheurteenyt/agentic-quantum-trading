@@ -121,7 +121,7 @@ def _utc_now() -> str:
 
 def _connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(str(DB_PATH))
+    con = sqlite3.connect(str(DB_PATH), timeout=60)
     con.executescript(SCHEMA)
     # migrations douces (ALTER echoue proprement si la colonne existe deja)
     for col in ("tp_price", "sl_price"):

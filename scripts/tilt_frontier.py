@@ -56,7 +56,7 @@ DD_CAP = 28.0                      # le sommet cherché sous cette ligne
 
 def ro_con() -> sqlite3.Connection:
     """Lecture SEULE de klines.db (uri ro — aucun write de ce script)."""
-    return sqlite3.connect(f"file:{KDB}?mode=ro", uri=True)
+    return sqlite3.connect(f"file:{KDB}?mode=ro", uri=True, timeout=60)
 
 
 # ————————————————————————————— collection (UNE fois) ———————————————————————

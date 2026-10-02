@@ -21,7 +21,7 @@ REST = ROOT / "data" / "fomo" / "fomo_rest.db"
 
 
 def ro(db):
-    return sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    return sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=60)
 
 
 def max_age(db, table, col="captured_at"):

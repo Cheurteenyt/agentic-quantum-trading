@@ -29,7 +29,7 @@ def main() -> int:
     ap.add_argument("--max-snaps", type=int, default=300)
     args = ap.parse_args()
 
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=60)
     since = time.time() - args.hours * 3600
     mids = {(r[0], r[1]): r[2] for r in con.execute(
         "SELECT symbol, ts, mid FROM depth_meta WHERE ts > ?", (since,))}
@@ -68,7 +68,7 @@ def main() -> int:
             results[sym].append(slip * (1 if side_sign > 0 else 1))
 
     con.close()
-    con2 = sqlite3.connect(OUT)
+    con2 = sqlite3.connect(OUT, timeout=60)
     con2.execute("""CREATE TABLE IF NOT EXISTS slippage_measured (
         symbol TEXT NOT NULL, notional REAL NOT NULL, slip_bps REAL NOT NULL,
         n_snaps INTEGER, captured_at REAL NOT NULL,

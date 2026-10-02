@@ -208,7 +208,7 @@ def extract_profile_meta(page, handle: str) -> dict:
 
 def _db():
     import sqlite3
-    return sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db")
+    return sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db", timeout=60)
 
 
 def top_registry_handles(n: int = 15) -> list[str]:
@@ -368,7 +368,7 @@ def harvest_trends() -> int:
                         last_name = l
         ctx.close()
     import sqlite3
-    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db")
+    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db", timeout=60)
     con.execute("""CREATE TABLE IF NOT EXISTS x_trends (
         name TEXT NOT NULL, count TEXT, category TEXT,
         captured_at REAL NOT NULL, PRIMARY KEY (name, captured_at))""")
@@ -506,7 +506,7 @@ def discover_lists(query: str, limit: int = 12) -> int:
         rows = [r for r in rows if r.get("url")][:limit]
         ctx.close()
     import sqlite3
-    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db")
+    con = sqlite3.connect(ROOT / "data" / "warehouse" / "x_posts.db", timeout=60)
     con.execute("""CREATE TABLE IF NOT EXISTS x_lists_found (
         query TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL,
         members TEXT, subscribers TEXT, description TEXT,

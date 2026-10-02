@@ -56,7 +56,7 @@ def outcomes(df, entry_positions: list[int], direction: int,
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
     btc = load_df(con, "BTCUSDT")

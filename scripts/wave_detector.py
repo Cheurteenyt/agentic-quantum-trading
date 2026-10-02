@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS wave_flags (
 
 
 def whales_confluence() -> dict[str, dict]:
-    con = sqlite3.connect(f"file:{FOMO_DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{FOMO_DB}?mode=ro", uri=True, timeout=60)
     try:
         rows = con.execute("""
             SELECT handle, ticker, value_usd, dir FROM fomo_positions p
@@ -75,7 +75,7 @@ def whales_confluence() -> dict[str, dict]:
 
 def x_velocity(symbol: str, today: str) -> tuple[int, float | None]:
     """(mentions aujourd'hui, ratio vs hier)."""
-    con = sqlite3.connect(f"file:{X_DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{X_DB}?mode=ro", uri=True, timeout=60)
     try:
         (n_today,) = con.execute(
             "SELECT COALESCE(SUM(n), 0) FROM x_mentions WHERE symbol = ? AND day = ?",
@@ -92,7 +92,7 @@ def x_velocity(symbol: str, today: str) -> tuple[int, float | None]:
 
 
 def calls_24h(symbol: str) -> int:
-    con = sqlite3.connect(f"file:{X_DB}?mode=ro", uri=True)
+    con = sqlite3.connect(f"file:{X_DB}?mode=ro", uri=True, timeout=60)
     try:
         cutoff = time.time() - 86400
         (n,) = con.execute(
@@ -119,7 +119,7 @@ def aster_price(symbol: str) -> float | None:
 def aster_ret_since(symbol: str, since_ts: float, hours: float) -> float | None:
     """Rendement % depuis flagged_at jusqu'à flagged_at + hours (klines 1h)."""
     try:
-        con = sqlite3.connect(f"file:{KLINES_DB}?mode=ro", uri=True)
+        con = sqlite3.connect(f"file:{KLINES_DB}?mode=ro", uri=True, timeout=60)
         row = con.execute(
             "SELECT open_time, close FROM klines WHERE symbol = ? AND interval = '1h' "
             "AND open_time >= ? ORDER BY open_time LIMIT 1", (symbol, int(since_ts * 1000)),
@@ -138,7 +138,7 @@ def aster_ret_since(symbol: str, since_ts: float, hours: float) -> float | None:
 
 
 def main() -> int:
-    con = sqlite3.connect(FOMO_DB)
+    con = sqlite3.connect(FOMO_DB, timeout=60)
     con.executescript(WAVE_DDL)
     today = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
     by_ticker = whales_confluence()

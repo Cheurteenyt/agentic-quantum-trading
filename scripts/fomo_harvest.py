@@ -449,7 +449,7 @@ def _persist_token_intel(ticker: str, intel: dict) -> None:
         return
     import sqlite3
     db = ROOT / "data" / "fomo" / "fomo.db"
-    con = sqlite3.connect(db)
+    con = sqlite3.connect(db, timeout=60)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS fomo_token_intel (
         ticker TEXT NOT NULL, panel_kind TEXT, holder TEXT,
@@ -929,7 +929,7 @@ def _persist_events(events: list) -> None:
     MC d'entrée) = le signal temps réel, diff entre captures."""
     import sqlite3
     db = ROOT / "data" / "fomo" / "fomo.db"
-    con = sqlite3.connect(db)
+    con = sqlite3.connect(db, timeout=60)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS fomo_events (
         handle TEXT NOT NULL, badge TEXT NOT NULL, age TEXT,
@@ -1023,7 +1023,7 @@ def _persist_closed(handle: str, rows: list, cash: str | None) -> None:
     """Historique réalisé par baleine — base du win rate qui pondère le radar."""
     import sqlite3
     db = ROOT / "data" / "fomo" / "fomo.db"
-    con = sqlite3.connect(db)
+    con = sqlite3.connect(db, timeout=60)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS fomo_closed (
         handle TEXT NOT NULL, ticker TEXT NOT NULL,
@@ -1177,7 +1177,7 @@ def _persist_clans(clans: list) -> None:
     """Conviction COLLECTIVE : clans (PnL combiné) + holdings par token."""
     import sqlite3
     db = ROOT / "data" / "fomo" / "fomo.db"
-    con = sqlite3.connect(db)
+    con = sqlite3.connect(db, timeout=60)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS fomo_clans (
         name TEXT NOT NULL, uuid TEXT, members INTEGER, pnl TEXT,

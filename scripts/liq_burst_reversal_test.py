@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-con = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data" / "warehouse" / "klines.db"))
+con = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data" / "warehouse" / "klines.db"), timeout=60)
 
 bursts = con.execute("""SELECT symbol, MAX(event_time) as last_ts, COUNT(*), SUM(notional)
                         FROM liq_events WHERE side='SELL'

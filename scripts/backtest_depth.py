@@ -45,7 +45,7 @@ def main() -> int:
                     help="tourner même si la fenêtre < 14 j (aperçu)")
     args = ap.parse_args()
 
-    con = sqlite3.connect(DB)
+    con = sqlite3.connect(DB, timeout=60)
     mids = con.execute("SELECT ts, mid FROM depth_meta WHERE symbol = ? "
                        "ORDER BY ts", (args.symbol,)).fetchall()
     if len(mids) < 200:

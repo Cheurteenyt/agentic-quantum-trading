@@ -47,7 +47,7 @@ def _now_s() -> float:
 
 
 def _store(events: list[dict]) -> int:
-    con = sqlite3.connect(str(DB_PATH))
+    con = sqlite3.connect(str(DB_PATH), timeout=60)
     con.executescript(SCHEMA)
     n = 0
     for ev in events:
