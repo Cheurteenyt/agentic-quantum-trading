@@ -141,3 +141,6 @@ scripts/studies/x501_openmarket/results/
 *.db
 *.npz
 *.pkl
+
+# le coffre Obsidian généré par Ariad (dérivé, jamais source)
+.codebase-memory-vault/
