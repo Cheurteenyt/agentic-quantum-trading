@@ -6,7 +6,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
-      - run: pip install numpy pandas --quiet
-      - run: python scripts/run_tests.py --fast
-      - run: python scripts/audit_check.py --trades /dev/null || true
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt --quiet
+      - name: Run tests
+        run: python scripts/run_tests.py --fast
+      - name: Audit check (informatif)
+        run: python scripts/audit_check.py || true
