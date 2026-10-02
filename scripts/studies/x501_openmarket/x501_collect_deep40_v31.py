@@ -20,7 +20,7 @@ Usage : python3 x501_collect_deep40_v31.py [--bybit] [--vision] [--funding] [--q
 import io, json, os, sqlite3, sys, time, zipfile, urllib.request, urllib.error
 import urllib.parse, concurrent.futures as cf
 
-os.chdir("/home/z/my-project")
+os.chdir(os.environ.get("X501_EXT_ROOT", "/home/z/my-project"))
 DB = "scripts/x501_v21_results/om_v27.db"
 FLOOR = "scripts/x501_v21_results/floor_v29.json"
 LOG = "scripts/x501_v21_results/collect_deep40_v31.json"

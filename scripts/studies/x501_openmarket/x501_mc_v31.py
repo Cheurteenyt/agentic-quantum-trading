@@ -28,16 +28,17 @@ import pickle
 import sys
 import time
 
-sys.path.insert(0, "/home/z/my-project/scripts")
+EXT_ROOT = os.environ.get("X501_EXT_ROOT", "/home/z/my-project")
+sys.path.insert(0, f"{EXT_ROOT}/scripts")
 import x501_mc_v12 as v12                                             # noqa: E402
 import x501_mc_v10 as v10                                             # noqa: E402
 from x501_mc_v11 import G4, LEGS                                      # noqa: E402
 import numpy as np                                                    # noqa: E402
 import datetime as dtm                                                # noqa: E402
 
-OUT = "/home/z/my-project/scripts/x501_v21_results"
-POOL = "/home/z/my-project/scripts/x501_v8_results_deep_v31/pool_v8_deep.pkl"
-POOL_V8 = "/home/z/my-project/scripts/x501_v8_results/pool_v8_P1.pkl"
+OUT = f"{EXT_ROOT}/scripts/x501_v21_results"
+POOL = f"{EXT_ROOT}/scripts/x501_v8_results_deep_v31/pool_v8_deep.pkl"
+POOL_V8 = f"{EXT_ROOT}/scripts/x501_v8_results/pool_v8_P1.pkl"
 
 SCEN = [
     ("W0_reference_deep",      0.0),

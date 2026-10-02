@@ -15,13 +15,14 @@ n'est JAMAIS lue avant T+P + marge de collecte (2 périodes de refroidissement).
 8 passes, 8 min d'intervalle (~1 h), 2 symboles, 3 périodes (1h, 4h, 1d).
 """
 import json
+import os
 import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 BASE = "https://api.bybit.com"
-OUT = Path("/home/z/my-project/scripts/lsr_probe_v11.jsonl")
+OUT = Path(os.environ.get("X501_EXT_ROOT", "/home/z/my-project") + "/scripts/lsr_probe_v11.jsonl")
 SYMS = ["BTCUSDT", "ETHUSDT"]
 PERIODS = ["1h", "4h", "1d"]
 N_PASSES = 8

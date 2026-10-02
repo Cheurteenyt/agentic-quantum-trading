@@ -51,7 +51,8 @@ import pickle
 import sys
 import datetime as dtm
 
-sys.path.insert(0, "/home/z/my-project/scripts")
+EXT_ROOT = os.environ.get("X501_EXT_ROOT", "/home/z/my-project")
+sys.path.insert(0, f"{EXT_ROOT}/scripts")
 import x501_alpha_backtest as v4          # noqa: E402
 
 # ================= PORTAGE DEEP v31 (docs/37) ================================
@@ -60,7 +61,7 @@ import x501_alpha_backtest as v4          # noqa: E402
 # et le moteur (SymData patché v5, run_stream) sont inchangés bit à bit :
 # seul le segment de données change. Funding ts en SECONDES -> ms ici.
 import sqlite3
-_DB_DEEP = "/home/z/my-project/scripts/x501_v21_results/om_v27.db"
+_DB_DEEP = f"{EXT_ROOT}/scripts/x501_v21_results/om_v27.db"
 _DBC = sqlite3.connect(_DB_DEEP, timeout=120)
 
 
@@ -91,7 +92,7 @@ print("Chargement DEEP depuis", _DB_DEEP, flush=True)
 
 import x501_engine_v5 as v5               # noqa: E402  (patch SymData : e1z, atr1, vol1ma, adx1, atr1dpct)
 
-OUT = "/home/z/my-project/scripts/x501_v8_results_deep_v31"
+OUT = f"{EXT_ROOT}/scripts/x501_v8_results_deep_v31"
 os.makedirs(OUT, exist_ok=True)
 
 SYMS_V8 = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT",
