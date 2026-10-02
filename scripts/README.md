@@ -59,7 +59,7 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 |---|---|
 | `funding_history_collector.py` | funding profond (71 symboles, 2023→) |
 | `liq_collector.py` | liquidations forceOrder (service 24/7) |
-| `depth_collector.py` | carnet d'ordres (1 Go, 15 symboles) |
+| `depth_collector.py` | ~~carnet d'ordres~~ RETIRÉ le 30/09 — remplacé par `aster_depth_engine.py` (WS diff-depth, l'unique écrivain de depth.db) |
 | `refresh_aster_cache.py` | caches Aster (funding agrégés, tickers) |
 | `fetch_klines.py` / `fetch_deep_klines.py` | bougies 1h/15m (1 an+) |
 | `aster_health.py` | **watchdog ASTER (30/09, timer 5 min)** : 8 sondes — klines 1h > 25 h, OI/liq/blocks/premium/depth fraîcheur, CONTINUITÉ depth (0 trou > 15 min sur 24 h = la tolérance zéro du tir 06-07), cache funding > 25 h ; les tables d'ÉVÉNEMENTS se sondent au LastTriggerUSec du timer (un vieux MAX = un marché calme, pas un collecteur mort), état dans data/warehouse/aster_health_state.json |
