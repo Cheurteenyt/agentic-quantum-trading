@@ -187,7 +187,7 @@ def funding_extreme_events(fh_sym: pd.DataFrame) -> pd.DatetimeIndex:
 
 
 def main() -> int:
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     con.executescript("""
     CREATE TABLE IF NOT EXISTS paper_trades (
         signal TEXT NOT NULL, symbol TEXT NOT NULL, horizon_h INTEGER NOT NULL,
