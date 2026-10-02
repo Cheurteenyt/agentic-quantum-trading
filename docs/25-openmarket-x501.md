@@ -36,6 +36,16 @@ Doctrine = même que le registre Aster : pré-enregistrer avant de croire.
 
 ## LES CHIFFRES OFFICIELS (MC v20 — 12 000 trajectoires, SANS haircut gate)
 
+> ⚠ **NON REPRODUCTIBLE (02/10, audit Sonnet)** : le noyau `simulate_ratchet` (v12)
+> n'est PAS versionné dans git — il vit dans le sandbox `/home/z/my-project/scripts/`.
+> Les médianes v20/v30/v31 dépendent toutes de ce noyau absent. Selon la loi gravée
+> (« tout chiffre non reproductible par le code committé = mort »), les chiffres
+> ci-dessous sont **des instantanés, pas des résultats auditables** — tant que le
+> noyau n'est pas committé ou que v31 n'est pas re-écrit avec un noyau self-contained.
+> De plus, le maxDD des MC v20/v30/v31 sature mécaniquement au plancher du
+> simulateur (25 % par construction, médiane mesurée 24,9975 %) : « DD ≤ 25 % inviolé »
+> est une **propriété du simulateur**, pas une mesure.
+
 | Scénario | Coût/côté | Médiane 12 m | P(≥ 250 $) | x501 @ 36 m |
 |---|---|---|---|---|
 | S0 référence | 0,0 bps | 642,0 $ | 80,1 % | 35,7 % |
