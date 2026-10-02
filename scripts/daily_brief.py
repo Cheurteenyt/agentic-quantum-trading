@@ -37,6 +37,33 @@ try:
         add(f"   {r[0]:<28} {n:3d} trades | WR {w/n*100:.0f} % | ret cum {tot:+.1f} %")
     n_open = con.execute("SELECT COUNT(*) FROM paper_trades WHERE status='open' AND signal LIKE 'machine%'").fetchone()[0]
     add(f"   ouverts : {n_open}")
+
+    # 2bis. CE QUE LES 24 H ONT APPRIS (le learn du jour — exigence user 02/10)
+    cut24 = (now.timestamp() - 24 * 3600) * 1000
+    add("◆ LEARN 24 h (les trades clos des dernières 24 h — indicatif horizons, le wallet juge) :")
+    for r in con.execute("""SELECT signal, COUNT(*), SUM(CASE WHEN ret_pct>0 THEN 1 ELSE 0 END),
+                            ROUND(AVG(ret_pct),2) FROM paper_trades
+                            WHERE status='closed' AND exit_ts > ? AND signal LIKE 'machine%'
+                            GROUP BY signal ORDER BY 4 DESC""", (cut24,)).fetchall():
+        n, w, avg = r[1], r[2] or 0, r[3]
+        flag = "  <<<" if abs(avg) >= 2.0 and n >= 5 else ""
+        add(f"   {r[0]:<32} {n:3d} clos | WR {w/n*100:.0f} % | moy {avg:+.2f} %{flag}")
+    sv = con.execute("SELECT COUNT(*), ROUND(AVG(ret_pct),2) FROM aster_survivors_paper WHERE status='closed'").fetchone()
+    sv_open = con.execute("SELECT COUNT(*) FROM aster_survivors_paper WHERE status='open'").fetchone()[0]
+    add(f"   survivants (verdict 90 j) : {sv_open} ouverts | {sv[0]} clos, ret moy {sv[1] or 0:+.2f} %")
+
+    # 2ter. LES COMPTEURS DE MATURITÉ (quand chaque invention débloque — calendrier Ariad id 18)
+    liq_n = con.execute("SELECT COUNT(*) FROM liq_events").fetchone()[0]
+    oi_days = con.execute("SELECT ROUND((MAX(captured_at_ms)-MIN(captured_at_ms))/86400000.0,1) FROM oi_history").fetchone()[0]
+    con.close()
+    try:
+        con2 = sqlite3.connect(f"file:{ROOT / 'data' / 'warehouse' / 'depth.db'}?mode=ro", uri=True)
+        dd = con2.execute("SELECT ROUND((MAX(ts)-MIN(ts))/86400000.0,1) FROM depth_meta").fetchone()[0]
+        con2.close()
+    except Exception as e2:
+        dd = -1
+    maturite = f"liq {liq_n} evts (seuil gelable ~22/10) | OI {oi_days} j (tir H4/H5 06-07) | depth {dd} j (tir murs 13/10) | premium/OI-bulk ~28-30/10"
+    add("◆ MATURITÉ : " + maturite)
 except Exception as e:
     add(f"◆ FORWARD Aster : indispo ({e})")
 
