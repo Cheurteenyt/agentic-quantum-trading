@@ -22,7 +22,7 @@ def _load():
     return [json.loads(l) for l in LEDGER.read_text().splitlines() if l.strip()]
 
 def _budget_used(entries, week_start):
-    return sum(1 for e in entries if e.get("date", "") >= week_start and e.get("verdict") in ("PASS", "FAIL"))
+    return sum(1 for e in entries if e.get("date", "") >= week_start and e.get("verdict") in ("PASS", "FAIL") and not e.get("backfill"))
 
 def cmd_check(a):
     entries = _load()
