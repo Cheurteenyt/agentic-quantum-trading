@@ -572,3 +572,4 @@ strategies:
     confondue avec un empilement) ; (3) sensibilité du seuil 0,5 % rapportée à 0,3/0,7/1
     % (reporting only, aucun re-tuning — le primaire reste gelé). Source : /tmp/hikari_h45_rt.txt
     (35 lignes, tronqué à la faille 3/5 — les 2 fatales sont livrées).'
+# PRE-MORTEM CONFIRMÉ (02/10 soir) : le MAE max Q1 = 17,95 % vs médiane 0,66 % (3,3×) — le short squeeze que le red-team Bonsai a prédit est VISIBLE dans les données. Le re-tir reste SOUS_PUISSANT (0 nouvel event cascade depuis le 01/10 03:00 — le flux est silencieux en T3). Le verdict final attend ~2 sem de plus de cascade events.
