@@ -636,3 +636,11 @@ Rapports : reports/aster_tpsl_path.md (script : scripts/studies/aster_tpsl_path.
 | La LEÇON T25 : le champ balance de run_stack suit l'ordre d'ENTRÉE (le lire en ordre de sortie déplace le DD officiel 32,5 → 49,6 %) — la datation du PnL (entrée vs sortie) change les ABSOLUS, les RELATIFS (l'ordre des stacks) tiennent dans les deux conventions (5/5 vérifiés) | le piège documenté pour les futurs études de combinaison | **LEÇON** |
 
 Rapports : reports/aster_combine_stacks.md (script : scripts/studies/aster_combine_stacks.py — les modules T24/V2/run_stack importés verbatim, DB ro, la table mensuelle 62 mois, les garde-fous composé 0.000 %).
+
+## 02/10 — INV-D : L'ASYMÉTRIE DE VITESSE (capitulation PAR LE TEMPS) — FAIL, réfutée
+
+| Verdict | Détail | Catégorie |
+|---|---|---|
+| A_t = fraction des 24 closes passés au-dessus du close courant (statistique de TEMPS, sans magnitude, jamais testée avant — anti-doublon vs H2bis capitulation-PRIX vérifié). Événement A_t ≤ q10 TRAIN (0.0417, un seul seuil), split 60/40 global (2024-09-19), LONG 1x, 18 bps RT. Hypothèse pré-enregistrée : rebond 24-72h | **FAIL — hypothèse réfutée (triple)** : bloc 24-72 net TRAIN +4.8 bps (brut +22.8 mangé par coûts) vs VAL −1.4 bps ; contrôle continuation NON battu en TRAIN (h24 long −19.3 < short −16.7) ; gradient déciles inversé (d1 = PIRE décile −0.174 %, 6 inversions). Val h72 meurt (+30.4 → −7.0). Miroir q90 mort aussi (−13.3/−10.6 bps). n 11 903/12 526 (puissant) ; wallet 3 598 trades, WR 43.9 %, cumul −279.35 %, 34/61 mois négatifs, 0 liq | **NUL** (REJECTED au registre) — le chemin temporel ne encode pas la direction ; les 2 queues de A_t perdent net ; budget consommé, STOP, tout re-test = nouveau pré-enregistrement |
+
+Rapports : reports/aster/inv-d-asymetrie-vitesse-2026-10.md (pré-enregistrement scellé sha256 b73bc5d3…, script : scripts/studies/inv_d_asymetrie_vitesse.py — klines.db ro, 160 030 points, re-run déterministe identique).

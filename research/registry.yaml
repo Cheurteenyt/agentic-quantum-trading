@@ -171,3 +171,13 @@ strategies:
     rejected: "02/10 — FAIL réfuté : net 48h TRAIN +3.5 bps (n=1129, WR 49.4 %, brut ~+40 bps mangé par 36 bps RT) vs VAL -39.5 bps (n=895, WR 38.0 %) ; gradient terciles |z| inversé en TRAIN (T3 -8.8 < T1 +9.4) et non monotone en VAL ; contrôle inverse battu en TRAIN (+3.5 vs -75.5) mais PAS en VAL (continuation -32.5 > réversion -39.5 = artefact) ; VAL négatif aux 3 horizons (24h -39.0 / 48h -39.5 / 72h -42.7) ; robustesse |z| >= 2.2 TRAIN -6.9 bps, gradient encore plus inversé"
     report: reports/aster/inv-a-majeure-deviante-2026-10.md
     notes: la déviante-bas rebondit en TRAIN (+43.9 bps, n=454) mais s'effondre en VAL (-52.1 bps, n=297) — mirage de régime, pas un edge ; budget 1 expérience consommée, STOP, aucun 2e seuil ni fenêtre ; 0 liq (1x relatif), 0 heure multi-déviantes (2034 evts / 2034 heures)
+
+  # ── PRÉ-ENREGISTRÉ 02/10 (INV-D, docs/38 freeze-2026-10-02) ──
+  - id: inv_d_asymetrie_vitesse
+    family: temps-structure
+    status: REJECTED
+    pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-d-asymetrie-vitesse-2026-10.md, seal sha256 b73bc5d30da139963620645888e632c84a65c152b4decc0cdc847c36f6f11898)
+    hypothesis: la capitulation PAR LE TEMPS (A_t = fraction des 24 closes passés au-dessus du close courant, événement A_t <= q10 TRAIN = 0.0417, un seul seuil) est suivie d'un REBOND — espérance nette 24-72h positive, contrôle continuation battu, gradient déciles monotone
+    rejected: "02/10 — FAIL réfutation TRIPLE : (1) bloc 24-72 net TRAIN +4.8 bps (brut +22.8 mangé par 18 bps RT) vs VAL -1.4 bps (h72 meurt +30.4 -> -7.0 = mirage de régime) ; (2) contrôle inverse NON battu en TRAIN (h24 long -19.3 < short -16.7 bps = la continuation gagne à 24h) ; (3) gradient déciles NON monotone (TRAIN 6 inversions, d1 = PIRE décile -0.174 % — sens inversé ; VAL 4 inversions, tous déciles négatifs) ; n=11903 TRAIN / 12526 VAL (puissant, pas sous-puissant) ; miroir A>=q90 aussi mort (bloc net -13.3 / -10.6 bps) ; wallet premier-arrivé 3598 trades WR 43.9 %, cumul -279.35 % notionnel fixe, ROI/an -55.1 %, DD 512 %, 34/61 mois négatifs, 0 liq (1x)"
+    report: reports/aster/inv-d-asymetrie-vitesse-2026-10.md
+    notes: la statistique de CHEMIN temporel (sans magnitude) ne encode pas la direction des majeures 1h — les DEUX queues de A_t perdent net aux deux splits ; A_t discret (multiples de 1/24), atome à 1/24 => taux d'événements ~15 % (déclaré honnête, seuil pré-enregistré appliqué tel quel) ; BNB/XRP/DOGE 100 % VAL (panel 5 ans vs 1 an, split global 2024-09-19) ; budget 1 expérience consommée, STOP, aucun 2e quantile ni fenêtre ni filtre
