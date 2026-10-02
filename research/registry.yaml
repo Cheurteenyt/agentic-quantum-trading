@@ -16,7 +16,7 @@ statuses:
 strategies:
 - id: machine_cascade_majors
   family: cascade
-  status: PAPER_FORWARD
+  status: SHADOW
   timeframe: 1h
   hypothesis: la cascade accélérée (3 bougies de baisse + accélération) porte un short
     edge structurel sur les majeures, gated AL p66
@@ -26,7 +26,7 @@ strategies:
   notes: le flux à plus longue histoire ; verdict continu au forward nocturne
 - id: machine_cascade_meme
   family: cascade
-  status: PAPER_FORWARD
+  status: SHADOW
   timeframe: 1h
   hypothesis: la cascade se transfère aux memecoins à 1x
   result_forward: 0/9 significatif (p=0.0015) → DÉGRADÉ ; forward sept 5 joués/45
@@ -34,7 +34,7 @@ strategies:
   decision_pending: user ×0 vs ×0.5 (28/09) — SANS_MEME mène le tracker des 3 wallets
 - id: machine_survivor_long
   family: survivor
-  status: PAPER_FORWARD
+  status: SHADOW
   timeframe: 1h
   hypothesis: le LONG 1x inliquidable capte la queue de rebond des memecoins
   levier: 1x notional 20 %, gate ATR p90 intouchable
@@ -42,7 +42,7 @@ strategies:
     gate)
 - id: machine_vol_spike_6h
   family: fade
-  status: PAPER_FORWARD
+  status: SHADOW
   timeframe: 1h
   hypothesis: le fade du range ≥ 4× médiane 14j porte une espérance positive décorrelée
     (corr cascade −0.22)
