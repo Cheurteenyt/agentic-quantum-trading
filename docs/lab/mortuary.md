@@ -29,3 +29,27 @@ Format d’une ligne :
 Toute nouvelle étude dont le titre ou le mécanisme tombe dans une famille ci-dessus **sans** clause `sauf-si` satisfaite → refus avant run.
 
 Mettre à jour ce fichier **le même jour** qu’un verdict NUL de famille nouvelle.
+
+## OpenMarket — les familles tuées (vagues 5-11, 27-28/09)
+
+| Famille | Verdict | Date | Preuve |
+|---|---|---|---|
+| **Flux taker natif + funding multi-années** | 12/12 KILL (AUC) | 27/09 | docs/30, vague 5 |
+| **Absorption ordrebook proxy klines** | E3 vs E1 réfuté 0/4, ABS_DEPRIORISÉ | 27/09 | docs/31, vague 6 |
+| **VWAP session + volume profile veille** | 55 KILL / 1 INCONCLU / 0 CANDIDAT | 27/09 | docs/32, vague 7 |
+| **OI 1h — capital brut + mouvement financé** | 10/10 KILL (AUC 0,49-0,50) | 27/09 | docs/33, vague 8 |
+| **OI z-score roulant (contexte régime)** | H_R1 refusée, direction 4/4 KILL | 27/09 | docs/34, vague 9 |
+| **OI U-shape (le côté bas CANDIDAT L2160)** | U joint non établi, miroir 4/4 KILL | 27/09 | docs/35, vague 10 |
+| **LSR contrarian Bybit 4h/1d** | 4/4 + réplication 4/4 KILL | 28/09 | docs/36, vague 11 |
+
+## OpenMarket — les familles tuées (vagues 5-11, 27-28/09)
+
+| Famille | Verdict | Preuve |
+|---|---|---|
+| Flux taker natif + funding multi-années | 12/12 KILL (AUC) | docs/30 vague 5 |
+| Absorption ordrebook proxy klines | E3 vs E1 réfuté 0/4 | docs/31 vague 6 |
+| VWAP session + volume profile veille | 55 KILL / 0 CANDIDAT | docs/32 vague 7 |
+| OI 1h capital brut + mouvement financé | 10/10 KILL | docs/33 vague 8 |
+| OI z-score roulant (contexte régime) | H_R1 refusée, 4/4 KILL | docs/34 vague 9 |
+| OI U-shape (côté bas CANDIDAT L2160) | U non établi, miroir KILL | docs/35 vague 10 |
+| LSR contrarian Bybit 4h/1d | 4/4 + réplication KILL | docs/36 vague 11 |

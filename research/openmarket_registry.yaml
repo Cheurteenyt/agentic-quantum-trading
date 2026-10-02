@@ -1,0 +1,20 @@
+schemaVersion: 1
+pool_v8:
+  symbols: 40
+  trades: 868
+  E_R: 0.093
+  IC95_blocks: [-0.027, 0.223]
+  edge_established: false
+  note: "Sans top 5% : E[R] = -0,065. Holdout propre = HOLDOUT-X."
+mc_versions:
+  v20: {status: "OFFICIEL archive", trades: 31, median: "642$", kernel: "NON_REPRODUCTIBLE"}
+  v30: {status: "deep re-chiffrement", trades: 570, median: "117$", kernel: "NON_REPRODUCTIBLE"}
+  v31: {status: "harnais v8 porte PR#18", trades: 868, kernel: "NON_REPRODUCTIBLE"}
+vagues:
+  vague5: KILL_12_12
+  vague6: KILL_ABS_DEPRIORISE
+  vague7: KILL_55_56
+  vague8: KILL_10_10
+  vague9: KILL_H_R1_REFUSEE
+  vague10: KILL_U_NON_ETABLIT
+  vague11: KILL_10_12
