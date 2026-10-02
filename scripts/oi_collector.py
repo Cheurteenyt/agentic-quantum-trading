@@ -14,24 +14,32 @@ a timestamps casses, a ete DROPpee) :
 Passe BULK (P6, 30/09) — l'API INTERNE de l'UI (docs/24) :
 bapi/future/v1/public/future/aster/ticker/pair = ~642 symboles en 1 appel
 (curl_cffi chrome131, pas d'auth, pas de Cloudflare). UNITE VERIFIEE 30/09
-sur BTC/ETH/SOL : l'OI bulk est un NOTIONAL USDT x2 (double face), PAS les
-unites base de fapi (ratio bulk/(fapi_oi x px) = 2,0000) → table dediee
++ re-mesure 02/10 : ratio bulk/(fapi_oi x px) = 2,0000 → table dediee
 oi_history_bulk (jamais mixee avec oi_history) + validation croisee logguee
 a chaque passe (ratio attendu ~2, une derive = changement de convention bapi).
 Le header de poids est ABSENT sur bapi : note_weight l'avale (None) — bapi ne
 semble pas compter sur le budget fapi 2 400/min.
 
+Perf fapi (bench 02/10, 30 symboles, sandbox) :
+  sequential + sleep 0.3 s : 14.26 s
+  parallel 8 workers       :  0.51 s  (x27.8, OI bit-identique vs seq)
+  bulk bapi univers        :  0.66 s  (645 symboles)
+Defaut : --workers 8 si >1 symbole ; --workers 1 = ancien chemin exact
+(seq + sleep). Garde poids : si X-MBX-USED-WEIGHT-1M >= 1500 → pause fin
+de minute (meme pattern que aster_blocktrades).
+
 Discipline :
   - INSERT OR IGNORE : un re-run dans la meme ms ne duplique pas ;
   - busy_timeout + commit explicite par passe (un lot = une transaction) ;
-  - sleep entre appels, cooldown 65s sur HTTP 429 ;
+  - cooldown 65s sur HTTP 429 ;
   - un seul ecrivain klines.db a la fois (pas de backfill en parallele).
 
 Usage :
-  .venv/bin/python scripts/oi_collector.py               # 1 passe, tous les symboles 1h
+  .venv/bin/python scripts/oi_collector.py               # fapi parallel + bulk
+  .venv/bin/python scripts/oi_collector.py --workers 1   # ancien seq+sleep
   .venv/bin/python scripts/oi_collector.py --symbols BTCUSDT,ETHUSDT
-  .venv/bin/python scripts/oi_collector.py --loop 4 --every 900   # 4 passes / 15 min
-  .venv/bin/python scripts/oi_collector.py --bulk-only   # passe bulk bapi seule (~642 syms)
+  .venv/bin/python scripts/oi_collector.py --loop 4 --every 900
+  .venv/bin/python scripts/oi_collector.py --bulk-only   # bulk bapi seule
 """
 from __future__ import annotations
 
@@ -42,6 +50,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import aster_rate  # le compteur X-MBX-USED-WEIGHT-1M (audit docs/24)
 from pathlib import Path
@@ -57,7 +66,8 @@ BAPI_TICKER_URL = ("https://www.asterdex.com"
 SLEEP_S = 0.3
 COOLDOWN_429_S = 65.0
 MAX_RETRIES_429 = 3
-USER_AGENT = "trading-agent-oi-collector/1.0 (stdlib urllib)"
+WEIGHT_PAUSE = 1500  # >= 1500/2400 -> pause fin de minute (fenetre 1M)
+USER_AGENT = "trading-agent-oi-collector/1.1 (stdlib urllib)"
 CROSS_DEFAULT = "BTCUSDT,ETHUSDT,SOLUSDT"
 
 CREATE_SQL = """
@@ -81,13 +91,16 @@ CREATE TABLE IF NOT EXISTS oi_history_bulk (
 """
 
 
-def http_get(path: str, timeout: float = 15.0) -> object:
+def http_get(path: str, timeout: float = 15.0) -> tuple[object, int | None]:
+    """Retourne (payload, poids X-MBX-USED-WEIGHT-1M ou None)."""
     req = urllib.request.Request(
         BASE + path, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            aster_rate.note_weight(getattr(resp, "headers", None), "oi_collector")
-            return json.loads(resp.read().decode("utf-8", errors="replace"))
+            weight = aster_rate.note_weight(
+                getattr(resp, "headers", None), "oi_collector")
+            body = json.loads(resp.read().decode("utf-8", errors="replace"))
+            return body, weight
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"HTTP {exc.code} sur {path}") from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
@@ -96,10 +109,20 @@ def http_get(path: str, timeout: float = 15.0) -> object:
         raise RuntimeError(f"reponse non-JSON sur {path}") from exc
 
 
+def _maybe_weight_pause(weight: int | None) -> None:
+    if weight is not None and weight >= WEIGHT_PAUSE:
+        pause = 60.0 - (time.time() % 60.0) + 0.5
+        print(f"  ! poids={weight}>={WEIGHT_PAUSE} — pause {pause:.0f}s "
+              f"(fin de minute)", flush=True)
+        time.sleep(pause)
+
+
 def http_get_retry(path: str, timeout: float = 15.0) -> object:
     for attempt in range(MAX_RETRIES_429):
         try:
-            return http_get(path, timeout=timeout)
+            body, weight = http_get(path, timeout=timeout)
+            _maybe_weight_pause(weight)
+            return body
         except RuntimeError as exc:
             if "HTTP 429" in str(exc) and attempt < MAX_RETRIES_429 - 1:
                 print(f"  ! 429 {path} — cooldown {COOLDOWN_429_S:.0f}s", flush=True)
@@ -154,7 +177,7 @@ def bapi_get(url: str, timeout: float = 15.0) -> object:
 def cross_check(bulk_map: dict, cross_syms: list[str], timeout: float) -> list:
     """Validation croisee independante : pour les majors communes, comparer
     l'OI bulk (notional x2) au produit fapi OI (unites base) x prix bulk.
-    Ratio ~2,000 attendu (verifie 30/09 sur BTC/ETH/SOL) — une derive signale
+    Ratio ~2,000 attendu (verifie 30/09 + 02/10) — une derive signale
     un changement de convention cote bapi avant que les donnees soient mixees."""
     out = []
     for sym in cross_syms:
@@ -216,10 +239,27 @@ def bulk_pass(con: sqlite3.Connection, timeout: float,
             "skipped": skipped, "cross": cross}
 
 
+def _fetch_one_oi(sym: str, prices: dict[str, float], now_ms: int,
+                  timeout: float) -> tuple:
+    """Un symbole fapi — leve RuntimeError en echec (isole par le caller)."""
+    payload = http_get_retry(
+        f"/fapi/v1/openInterest?symbol={sym}", timeout=timeout)
+    oi = float(payload["openInterest"])
+    if oi < 0:
+        raise RuntimeError(f"OI negatif ({oi})")
+    cap_ms = int(payload.get("time") or now_ms)
+    return (sym, oi, prices.get(sym), cap_ms)
+
+
 def snapshot_pass(
     con: sqlite3.Connection, symbols: list[str], timeout: float,
+    workers: int = 1,
 ) -> dict:
-    """1 passe = 1 snapshot OI + prix par symbole, 1 commit."""
+    """1 passe = 1 snapshot OI + prix par symbole, 1 commit.
+
+    workers=1 : chemin historique (seq + sleep 0.3 s entre symboles).
+    workers>1 : ThreadPoolExecutor, meme schema de lignes, 1 commit.
+    """
     now_ms = int(time.time() * 1000)
     prices: dict[str, float] = {}
     try:
@@ -233,23 +273,30 @@ def snapshot_pass(
 
     inserted, failed = 0, []
     rows: list[tuple] = []
-    for i, sym in enumerate(symbols):
-        if i:
-            time.sleep(SLEEP_S)
-        try:
-            payload = http_get_retry(
-                f"/fapi/v1/openInterest?symbol={sym}", timeout=timeout)
-            oi = float(payload["openInterest"])
-            cap_ms = int(payload.get("time") or now_ms)
-        except (RuntimeError, KeyError, TypeError, ValueError) as exc:
-            failed.append(sym)
-            print(f"  ! {sym} : {str(exc)[:80]}", file=sys.stderr, flush=True)
-            continue
-        if oi < 0:
-            failed.append(sym)
-            print(f"  ! {sym} : OI negatif ({oi})", file=sys.stderr, flush=True)
-            continue
-        rows.append((sym, oi, prices.get(sym), cap_ms))
+
+    if workers <= 1:
+        for i, sym in enumerate(symbols):
+            if i:
+                time.sleep(SLEEP_S)
+            try:
+                rows.append(_fetch_one_oi(sym, prices, now_ms, timeout))
+            except (RuntimeError, KeyError, TypeError, ValueError) as exc:
+                failed.append(sym)
+                print(f"  ! {sym} : {str(exc)[:80]}", file=sys.stderr, flush=True)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futs = {
+                pool.submit(_fetch_one_oi, sym, prices, now_ms, timeout): sym
+                for sym in symbols
+            }
+            for fut in as_completed(futs):
+                sym = futs[fut]
+                try:
+                    rows.append(fut.result())
+                except (RuntimeError, KeyError, TypeError, ValueError) as exc:
+                    failed.append(sym)
+                    print(f"  ! {sym} : {str(exc)[:80]}", file=sys.stderr,
+                          flush=True)
 
     if rows:
         cur = con.executemany(
@@ -259,7 +306,8 @@ def snapshot_pass(
         con.commit()  # un lot = une transaction, commit explicite
         inserted = max(0, cur.rowcount)
     return {"captured": len(rows), "inserted": inserted, "failed": failed,
-            "ts_max": max((r[3] for r in rows), default=0)}
+            "ts_max": max((r[3] for r in rows), default=0),
+            "workers": workers}
 
 
 def sim_symbols_1h(con: sqlite3.Connection) -> list[str]:
@@ -270,13 +318,17 @@ def sim_symbols_1h(con: sqlite3.Connection) -> list[str]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Snapshot OI Aster -> klines.db:oi_history (+ bulk bapi -> oi_history_bulk)")
+    ap = argparse.ArgumentParser(
+        description="Snapshot OI Aster -> klines.db:oi_history (+ bulk bapi -> oi_history_bulk)")
     ap.add_argument("--symbols", default="", help="CSV (defaut : univers 1h du sim).")
     ap.add_argument("--loop", type=int, default=1,
                     help="Nombre de passes (0 = infini, Ctrl-C pour stopper).")
     ap.add_argument("--every", type=int, default=900,
                     help="Secondes entre passes en mode --loop (defaut 900 = 15 min).")
     ap.add_argument("--timeout", type=float, default=15.0)
+    ap.add_argument("--workers", type=int, default=8,
+                    help="Threads fapi openInterest (1 = ancien seq+sleep 0.3s ; "
+                         "defaut 8). Plafonne a len(symbols).")
     ap.add_argument("--skip-bulk", action="store_true",
                     help="Ne pas faire la passe bulk bapi (oi_history_bulk).")
     ap.add_argument("--bulk-only", action="store_true",
@@ -296,7 +348,11 @@ def main() -> int:
         if not symbols and not args.bulk_only:
             print("aucun symbole (klines.db 1h vide ?)", file=sys.stderr)
             return 1
-        print(f"=== OI collector — {len(symbols)} symbole(s) fapi, "
+        workers = max(1, int(args.workers))
+        if symbols:
+            workers = min(workers, len(symbols))
+        print(f"=== OI collector — {len(symbols)} symbole(s) fapi "
+              f"workers={workers}, "
               f"bulk={'off' if args.skip_bulk else ('seul' if args.bulk_only else 'on')}, "
               f"loop={args.loop or 'infini'}, every={args.every}s ===", flush=True)
 
@@ -306,7 +362,7 @@ def main() -> int:
             t0 = time.time()
             res = {"captured": 0, "failed": []}
             if not args.bulk_only:
-                res = snapshot_pass(con, symbols, args.timeout)
+                res = snapshot_pass(con, symbols, args.timeout, workers=workers)
                 total = con.execute("SELECT COUNT(*) FROM oi_history").fetchone()[0]
                 syms_h = con.execute("SELECT COUNT(DISTINCT symbol) FROM oi_history"
                                      ).fetchone()[0]
@@ -314,7 +370,8 @@ def main() -> int:
                       f"echecs={len(res['failed'])} "
                       f"{', '.join(res['failed'][:5]) if res['failed'] else '-'} | "
                       f"table: {total} snapshots, {syms_h} symboles "
-                      f"({time.time() - t0:.1f}s)", flush=True)
+                      f"({time.time() - t0:.1f}s, workers={res.get('workers', workers)})",
+                      flush=True)
                 for sym, oi, px, ms in con.execute(
                         "SELECT symbol, open_interest, price, MAX(captured_at_ms) "
                         "FROM oi_history GROUP BY symbol "
