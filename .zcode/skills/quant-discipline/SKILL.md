@@ -11,7 +11,7 @@ AVANT toute expérience :
 1. **Lire `research/registry.yaml`** + grep docs/20. Même hypothèse déjà
    testée, ou seule une variation de seuil = **PARAMETER_MUTATION** :
    consommer le budget, jamais repartir comme étude nouvelle.
-2. **Vérifier le budget** (`agent/policy.yaml`) : 20 expériences/semaine,
+2. **Vérifier le budget** : `python3 scripts/lab_ledger.py check --family F --strategy S --hypothesis "…"` — 20 expériences/semaine,
    5/famille, 3/stratégie, 12 variantes de paramètres max. Épuisé = **STOP**.
 3. **UNE expérience = UNE variable principale** : baseline + une modification,
    tout le reste (coûts, exécution, levier, périodes, protocole) INCHANGÉ.
@@ -55,7 +55,7 @@ AVANT toute expérience :
   (derek → vitesse, bonding → âge, fade → structure). La décorrélation
   (corr < 0,3 au wallet) vaut un edge en plus.
 - **WR et ROI = deux colonnes JAMAIS fusionnées.**
-- La cible user : 60-70 %/mois **stables**, gros WR, DD contrôlé.
+- Le critère de réussite = la robustesse mesurée (IC95 blocs-mois > 0, coûts ×1,5, hors top 5 %) — pas un chiffre de rendement cible.
 - **La règle 0-liquidation** : `lev ≤ 100/(maxMAE + 0,5)`. MAE par flux :
   majors 7,66 % → plafond 12x ; vol_spike 94 % → 1x ; le survivor (LONG 1x)
   est inliquidable par construction.
