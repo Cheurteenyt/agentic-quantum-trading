@@ -109,7 +109,7 @@ strategies:
   - id: cascade_mechanism_rearm
     family: cascade
     status: REJECTED
-    rejected: 02/10 — chapitre FERMÉ (prior négatif : tout gate/sizing conditionnel a échoué au wallet)
+    rejected: "02/10 — chapitre FERMÉ (prior négatif : tout gate/sizing conditionnel a échoué au wallet)"
   - id: funding_carry_wallet
     family: funding
     status: REJECTED
@@ -152,3 +152,22 @@ strategies:
     family: portfolio
     status: RETIRED
     reason: recherche-only (audit 02/10 §41) — la comparaison equal-weight/risk-parity/QUBO reste à faire sur les mêmes stratégies validées ; point officiel jamais déployé
+
+  # ── PRÉ-ENREGISTRÉ 02/10 (INV-B, docs/38 freeze-2026-10-02) ──
+  - id: concentration_rotation_herfindahl
+    family: regime
+    status: REJECTED
+    pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-b-concentration-rotation-2026-10.md)
+    hypothesis: après un pic de concentration du volume 24h (H_t Herfindahl des 6 majeures >= q95 TRAIN), rotation sur 24-72h — les 5 non-concentrées surperforment la concentrée
+    rejected: "02/10 — FAIL réfutation unilatérale : 268 evts TRAIN (tous BTC concentrée) REL_gross mean -1.26 % (la concentrée CONTINUE de gagner, l'inverse du signal), net -1.62 %, WR_net 24.6 %, gradient terciles inversé, 4/4 mois négatifs, cumul -433.84 % ; VAL 0 événement (H_val max 0.522 < q95 0.622 — régime oct-nov 2025 sans récurrence). Budget consommé, STOP, pas de 2e quantile ni fenêtre"
+    notes: observation NON exploitable en l'état — la continuation de la concentrée est directionnellement positive en brut sur TRAIN mais portée par le seul régime oct-nov 2025 et invérifiable en VAL au seuil pré-déclaré ; toute réutilisation = nouveau pré-enregistrement + budget
+
+  # ── PRÉ-ENREGISTRÉ 02/10 (INV-A, docs/38 freeze-2026-10-02) ──
+  - id: inv_a_majeure_deviante
+    family: deviance-pack
+    status: REJECTED
+    pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-a-majeure-deviante-2026-10.md, seal sha256 0a59f1651e169c110c6198cc085a3dbd843cdc43b077f41bdcfe19421b0c21bc)
+    hypothesis: la majeure à |z| >= 2 sur ret24 vs médiane du pack des 6 (BTC/ETH/SOL/BNB/XRP/DOGE) décrote (z haut) ou rebondit (z bas) vs le pack en 24-72h (réversion relative)
+    rejected: "02/10 — FAIL réfuté : net 48h TRAIN +3.5 bps (n=1129, WR 49.4 %, brut ~+40 bps mangé par 36 bps RT) vs VAL -39.5 bps (n=895, WR 38.0 %) ; gradient terciles |z| inversé en TRAIN (T3 -8.8 < T1 +9.4) et non monotone en VAL ; contrôle inverse battu en TRAIN (+3.5 vs -75.5) mais PAS en VAL (continuation -32.5 > réversion -39.5 = artefact) ; VAL négatif aux 3 horizons (24h -39.0 / 48h -39.5 / 72h -42.7) ; robustesse |z| >= 2.2 TRAIN -6.9 bps, gradient encore plus inversé"
+    report: reports/aster/inv-a-majeure-deviante-2026-10.md
+    notes: la déviante-bas rebondit en TRAIN (+43.9 bps, n=454) mais s'effondre en VAL (-52.1 bps, n=297) — mirage de régime, pas un edge ; budget 1 expérience consommée, STOP, aucun 2e seuil ni fenêtre ; 0 liq (1x relatif), 0 heure multi-déviantes (2034 evts / 2034 heures)
