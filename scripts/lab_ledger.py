@@ -43,7 +43,7 @@ def cmd_check(a):
 def cmd_log(a):
     entries = _load()
     h = _hash(f"{a.family}:{a.strategy}:{a.hypothesis}")
-    entry = {"date": a.date or datetime.now().strftime("%Y-%m-%d"),
+    entry = {"date": a.date or datetime.datetime.now().strftime("%Y-%m-%d"),
              "family": a.family, "strategy": a.strategy,
              "hypothesis": a.hypothesis, "hypothesis_hash": h,
              "verdict": a.verdict,

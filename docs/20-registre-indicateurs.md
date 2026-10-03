@@ -673,3 +673,20 @@ Budget de la vague : 4/20 (INV-D inclus). Coût total : ~35 min d'agent. Leçon 
 Budget total de l'invention : **12/20**. La loi d'exécution est dorénavant validée à deux granularités ; la recherche backtestable attend le calendrier de maturité (note Ariad id 16), le pipeline forward-only (INV-C/J/N) juge automatiquement.
 
 Rapports : reports/aster/inv-a-majeure-deviante-2026-10.md · inv-b-concentration-rotation-2026-10.md · inv-e-rythme-funding-2026-10.md · inv-c-echo-liquidation-preenregistrement-2026-10.md · inv-f-codeformation-2026-10.md · inv-g-densite-silence-2026-10.md — registre : research/registry.yaml (6 entrées REJECTED/SOUS-PUISSENT ; one-shots archivés scripts/archive_studies/).
+
+## 03/10 — premium fade : LE CLAIM ORPHELIN « 87 % WR / +21 %/an » RÉFUTÉ PAR L'AUDIT DE REPRODUCTIBILITÉ (premium_fade_full_remeasure.py)
+
+**Le contexte** : le chiffre « 6 351 trades, WR 87 %, +3,4 bps/trade net, MaxDD 0,9 %, +21 %/an @ 3,33x » (BTC+ETH+SOL, 15m, fenêtre z 20 barres hors barre courante) n'existait dans AUCUN code committé — loi du registre : non reproductible = mort. Le dataset 15m complet (367 symboles × 5,1 ans, 11,18 M barres, pagination backward) permet l'audit définitif. Budget 24/20 (dépassement tracé, passe d'audit autorisée « allons y »).
+
+**La grille pré-déclarée** (3 cellules, 8 bps RT, split temporel 70/30 à 2025-03-24, contrôle inverse, non-overlap) :
+| Cellule | n train/val | WR | Espérance nette | Verdict |
+|---|---|---|---|---|
+| **universe** (327 syms, W=96, H=1h) | 63 170 / 264 237 | 17,5 % / 46,7 % | −4,39 / +3,85 bps | FAIL P1 (5/44 mois pos train) |
+| **replica H=1h** (majors, W=20, z hors barre) | 17 431 / 11 639 | 4,5 % / 1,3 % | −6,95 / −7,35 bps | FAIL — **0/64 mois positifs** |
+| **replica H=24h** | 3 157 / 1 962 | 7,3 % / 1,7 % | −6,47 / −7,18 bps | FAIL — 0/20 mois pos VAL |
+
+**La cause racine, inscrite dans la mémoire du claim lui-même** : le backtest source tournait « coûts 0 bps car premium = le spread lui-même ». Le fade brut existe (contrôle inverse : le signal bat le chase de ~1,3 bps, le mécanisme MM est réel) mais ~1 bp brut << 8 bps RT réels — WR 87 % à coûts nuls devient WR 1-5 % à coûts réels. La version naked perp est morte aussi (−9,6 à −11 bps, WR ~30 %). **La conclusion « PAS tradeable » du 02/10 était la bonne ; sa rétraction du 03/10 matin reposait sur un backtest sans coûts.**
+
+**Les découvertes collatérales de l'audit** : (1) le fade premium est ère-dépendant — négatif 2021-2024 (le premium TEND), positif 2026 ; (2) **l'effet-LISTING** : les pièces < 90 j depuis leur listing font +8,5 (2025) et +8,8 bps net (2026), n = 77 569, WR ~58 % — les matures sont ≤ +3,2 bps — hint PRÉ-ENREGISTRÉ comme hypothèse séparée (premium-fade-listing) pour la réouverture du budget (lun 06/10) ; (3) `lab_ledger.py log` était cassé depuis sa création (`datetime.now()` sur le module — aucun des 27 essais antérieurs n'était passé par la commande ; corrigé).
+
+| **premium fade (hedged ET naked, toutes cellules)** | L'audité : le claim 87 % WR = artefact coûts-zéro ; l'espérance brute ~+1 bp est réelle mais sous les 8 bps RT ; naked −9,6 bps | **NUL** (REJECTED) — la famille premium-fade directionnelle est close ; subsiste le hint listing |
