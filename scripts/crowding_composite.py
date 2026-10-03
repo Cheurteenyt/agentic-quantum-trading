@@ -83,9 +83,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DB = ROOT / "data" / "warehouse" / "klines.db"
 HYP = ROOT / "docs" / "lab" / "hypotheses" / "crowding-composite.md"
+AMEND = ROOT / "docs" / "lab" / "hypotheses" / "crowding-composite.amendments.md"
 OUT_DIR = ROOT / "reports" / "aster"
 
 EXPECTED_SEAL = "8df0b11b994b3bd68aea58164abed4b908142fcb1aca70d4fb4cefab8ab17d8c"
+EXPECTED_AMEND_SEAL = "0a874ec867f6b68714e1837d6c16958da9d1c6350ffe6bba6827bc1763c1d762"  # amendements pre-test du 02/10 (4b31e96), fichier separe
 TEST_LOCK = date(2026, 10, 30)          # date de test verrouillee (OI bulk 30 j)
 
 # ── parametres FIGES (voir docstring — ne JAMAIS toucher sans nouveau
@@ -135,16 +137,20 @@ def connect_ro() -> sqlite3.Connection:
 
 
 def check_seal() -> None:
-    """Verifie que l'hypothese pre-enregistree n'a pas bouge depuis le sceau."""
-    if not HYP.exists():
-        print(f"[seal] !! ABSENT : {HYP} — pre-enregistrement introuvable")
-        sys.exit(2)
-    digest = hashlib.sha256(HYP.read_bytes()).hexdigest()
-    if digest != EXPECTED_SEAL:
-        print(f"[seal] !! ROMPU : sha256(hypothese)={digest} != sceau grave "
-              f"{EXPECTED_SEAL} — hypothese modifiee APRES pre-enregistrement")
-        sys.exit(2)
-    print(f"[seal] OK {digest[:16]}… (docs/lab/hypotheses/crowding-composite.md)")
+    """Verifie que l'hypothese pre-enregistree ET ses amendements pre-test n'ont pas bouge depuis leurs sceaux.
+
+    On AMENDE PAR AJOUT (fichier separe, scelle a part) : editer le fichier scelle romprait le sceau.
+    """
+    for path, expected in ((HYP, EXPECTED_SEAL), (AMEND, EXPECTED_AMEND_SEAL)):
+        if not path.exists():
+            print(f"[seal] !! ABSENT : {path} — pre-enregistrement introuvable")
+            sys.exit(2)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != expected:
+            print(f"[seal] !! ROMPU : sha256({path.name})={digest} != sceau grave {expected} — "
+                  f"fichier modifie APRES pre-enregistrement")
+            sys.exit(2)
+        print(f"[seal] OK {digest[:16]}… (docs/lab/hypotheses/{path.name})")
 
 
 def check_units(con: sqlite3.Connection) -> None:

@@ -19,7 +19,7 @@ RAPPORT = Path(__file__).resolve().parents[1] / "reports" / "edge-regime-monitor
 
 def main() -> int:
     con = sqlite3.connect(str(Path(__file__).resolve().parents[1] /
-                              "data" / "warehouse" / "klines.db"))
+                              "data" / "warehouse" / "klines.db"), timeout=60)
     fh = funding_hourly_all()
     regime = btc_regime_series()
     events = collect_featured(regime, "majors")

@@ -111,6 +111,11 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 `registre_board.py` · `save_aster_key.py` · `telegram_notify.py` ·
 `security/validate_tailscale_acl.py`
 
+`lab_ledger.py` : registre d'essais cumulatif (`research/ledger/trials.jsonl`) + gate de budget (`agent/policy.yaml`) —
+`check` AVANT toute expérience, `log` APRÈS (FAIL compris), `status`, `sync-state`, `selftest` ·
+`bonsai_verify.py` : ancre les affirmations du modèle local (extrait verbatim vérifié) — `chunks`, `verify`, `judge`, `score` ·
+`audit_check.py` : revérifie sur le checkout courant les constats de `docs/39` (`--fail-on` = CI bloquante).
+
 ## 6. LA SESSION DU 27-28/09 — les nouveaux scripts (verdicts dans docs/20)
 
 > **28/09** : les one-shots closes de cette session sont archivés dans
