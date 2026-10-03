@@ -14,4 +14,4 @@ jobs:
       - name: Run tests
         run: python scripts/run_tests.py --fast
       - name: Audit check (informatif)
-        run: python scripts/audit_check.py || true
+        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F3,F4,F5

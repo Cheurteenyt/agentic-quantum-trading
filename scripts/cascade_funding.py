@@ -96,7 +96,7 @@ def main() -> int:
     add_funding_percentiles(events)
 
     # le funding hourly pour le sim (reçu par le short)
-    con = sqlite3.connect(KDB)
+    con = sqlite3.connect(KDB, timeout=60)
     acc: dict[str, list[float]] = {}
     for s, r in con.execute("SELECT symbol, rate FROM funding_history"):
         try:

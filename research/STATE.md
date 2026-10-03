@@ -1,38 +1,30 @@
-# STATE — l'état de la recherche en ≤ 2 Ko (mis à jour après chaque verdict)
+# STATE — l'état de la recherche (≤ 2 Ko) · à lire EN PREMIER
 
-**Dernière mise à jour : 2026-10-02**
+MAJ manuelle : 2026-10-03 · HEAD 42b6728. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/lab_ledger.py sync-state`
+(audit_check F5 échoue s'il est périmé). Tout chiffre ici doit avoir sa commande de reproduction.
 
-## Les verdicts cumulés
-- Total : 22 essais | PASS 2 | FAIL 18 | SOUS_PUISSANT 2 | PREREG 0
+## Ledger & budget
+<!-- LEDGER:BEGIN (généré par lab_ledger.py sync-state — ne pas éditer à la main) -->
+- Ledger : **28** entrées (28 essais, dont 12 backfill hors budget) — PASS 2 · FAIL 22 · NUL 1 · SOUS_PUISSANT 3
+- Budget semaine 2026-W40 (effet policy : 2026-10-02) : **16/20** consommés, reste 4
+- Familles au plafond : aster-institutions 5/5
+- Seuil de preuve du prochain essai : |t| ≥ 3.13 (Bonferroni, N=29)
+<!-- LEDGER:END -->
 
-## Les familles actives
-- openmarket: 7
-- aster-cross-section: 2
-- aster-microstructure: 2
-- aster-institutions: 2
-- aster-execution: 2
-- aster-cascade: 2
-- aster-portfolio: 2
-- aster-funding: 1
+## Verdicts qui comptent
+- Pool OpenMarket v8 : E[R] +0,093 R, IC95 blocs-mois [−0,027 ; +0,223] ; aucun test ne survit à Bonferroni
+  (N=362, t ≥ 3,64) → edge NON établi. Repro : `python3 scripts/studies/x501_openmarket/x501_multiplicity_adapter.py`
+- premium-fade directionnel : CLOS (naked −9,6 bps ; le « 87 % WR » = backtest à coûts 0 bps, non reproductible).
+- « +24 %/26 j @ DD 3,4 % » (survivants, docs/20 l.291) : 26 jours = aucune information sur le DD → verdict forward 90 j.
+- Aster 13 mois : rétrospectif ≈ 0 essai « payable » → FORWARD-ONLY. Base deep 7 ans : rétrospectif possible sous ledger.
+- « Edge détectable ≥ 0,25 R » = illustration sur le pool OpenMarket (26 trades/fenêtre), PAS une mesure Aster.
 
-## Les expériences en attente (forward-only, pré-enregistrées)
-- INV-C écho de liquidation (verdict ~mi-nov, n>=30)
-- INV-J appétit du mur (depth, ~2 sem)
-- INV-N torsion premium (~28/10)
-- H-CROWD-1 crowding composite (tir 30/10)
-- H4/H5 re-tir (07-08/10)
+## En attente (pré-enregistré)
+H4/H5 re-tir 07-08/10 · INV-N ~28/10 · H-CROWD-1 30/10 (double scellé : hypothèse + amendements) · INV-C ~mi-nov ·
+INV-J (depth) · premium-fade-listing lun 06/10 : d'abord mesurer, SANS rendements, la part de trades que le filtre
+|Δindex_15m| ≤ 0,5 % écarte (KILL > 15 % : prévisible sur des listings volatils).
 
-## Budget
-- Semaine du 02/10 : 13/20 consommés (12 INV + 1 H4/H5)
-- Reste : 7 (réserver pour les tirages pré-enregistrés, pas pour de nouvelles inventions)
-
-## Ce qui marche (à ne pas casser)
-- Le livre anti-régime : +24%/26j @ DD 3,4%
-- Le forward survivants : démarré 02/10, verdict 90j
-- La gouvernance : budget + ledger + anti-boucle
-
-## Le plafond statistique (audit Sonnet)
-- Pool v8 : E[R] +0,093 R, IC95 blocs-mois [-0,027;+0,223] → edge NON établi
-- Sans les top 5% : E[R] -0,065
-- Edge détectable sur Aster 13 mois : >= 0,25 R (le pool est à 0,093)
-- → Aster 13 mois = FORWARD-ONLY. Le grind rétrospectif se fait sur la base deep 7 ans (SR >= 1,5 = 692 essais payables).
+## Règles (modèle local Bonsai : docs/39 §4)
+AVANT : `lab_ledger.py check …` (3 = doublon, 4 = STOP → file B) · APRÈS : `lab_ledger.py log …` puis `sync-state`.
+Bonsai : appels sans état, ≤ 2-3 k jetons, affirmations CITÉES, vérifiées par `bonsai_verify.py verify` ; jamais un chiffre,
+jamais un verdict. Aucun ordre autonome · protocole, coûts, symboles intouchables en session.

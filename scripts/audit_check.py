@@ -58,6 +58,7 @@ def grep(path, pat):
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--trades", default="scripts/studies/x501_openmarket/trades_v8_deep.csv")
+ap.add_argument("--fail-on", default="", help="ids séparés par des virgules : le code de sortie ne compte QUE ces contrôles (CI bloquante)")
 args = ap.parse_args()
 tracked = [f for f in sh("git", "ls-files").split("\n") if f]
 
@@ -84,6 +85,8 @@ add(bool(kernel) and bool(sim), "B1", "Noyau Monte-Carlo (simulate_ratchet v12) 
 
 bad = []
 for f in sh("git", "grep", "-l", "/home/z/", "--", "*.py").split():
+    if f.endswith("scripts/audit_check.py"):
+        continue  # le motif de recherche lui-même contient la chaîne
     L = lines(f)
     for i, l in enumerate(L):
         if "/home/z/" in l and not any(("environ" in x or "EXT_ROOT" in x) for x in L[max(0, i - 3):i + 1]):
@@ -132,17 +135,73 @@ add(bool(refs), "E1", "agent/policy.yaml lue par du code (« appliquée par l'or
 svc = "\n".join(lines("configs/systemd-user/trading-agent-nightly.service"))
 scripts = sorted(set(re.findall(r"scripts/([A-Za-z0-9_]+\.py)", svc)))
 tot = nobad = 0
-for s in scripts:
-    L = lines("scripts/" + s)
-    for l in L:
+e2_bad = []
+for s_ in scripts:
+    L = lines("scripts/" + s_)
+    for i, l in enumerate(L):
         if "sqlite3.connect(" in l:
             tot += 1
-            nobad += "timeout" not in l
+            if not any("timeout" in x for x in L[i:i + 3]):
+                nobad += 1
+                e2_bad.append(f"{s_}:{i + 1}")
 add(nobad == 0, "E2", "Scripts du nocturne : sqlite3.connect() sans timeout (cause du crash « database is locked » du 02/10)",
-    f"{nobad}/{tot} appels directs sans timeout dans {len(scripts)} scripts ; journal_mode=WAL imposé par fetch_klines.init_db (création de klines.db): "
-    f"{'oui' if grep('scripts/fetch_klines.py', r'journal_mode *= *WAL') else 'non (WAL = état runtime du fichier, pas du code)'}")
+    f"{nobad}/{tot} appels directs sans timeout dans {len(scripts)} scripts : {', '.join(e2_bad[:6]) or 'aucun'}")
 info("E3", "protocol_v2 ratifié (tag protocol-v2-ratified)",
      "oui" if sh("git", "tag", "-l", "protocol-v2-ratified").strip() else "non — reste une PROPOSITION (décision utilisateur)")
+
+# ---- F. Le gate du ledger, les scellés, l'adaptateur, STATE.md (vérifie les « fix » annoncés) ------
+LL = ROOT / "scripts/lab_ledger.py"
+if LL.exists():
+    r = subprocess.run([sys.executable, str(LL), "selftest"], capture_output=True)
+    out = (r.stdout + r.stderr).decode("utf-8", "replace").strip().splitlines()
+    add(r.returncode == 0, "F1", "lab_ledger.py passe son selftest (doublon reformulé, plafonds famille/stratégie/total, NUL/SOUS_PUISSANT, ISO week, backfill)",
+        (out[-1] if out else "")[:150] or f"rc={r.returncode}")
+    r = subprocess.run([sys.executable, str(LL), "status"], capture_output=True)
+    m = re.search(r"(\d+)/(\d+) (?:consomm|expérience)", (r.stdout).decode("utf-8", "replace"))
+    if not m:
+        m = re.search(r"Budget cette semaine : (\d+)/(\d+)", (r.stdout).decode("utf-8", "replace"))
+    if m:
+        used, cap = int(m.group(1)), int(m.group(2))
+        add(used <= cap, "F2", "Budget hebdomadaire du ledger cohérent (un gate toujours rouge apprend à l'agent à l'ignorer)",
+            f"{used}/{cap}")
+else:
+    add(False, "F1", "scripts/lab_ledger.py présent", "absent")
+
+seal_bad = []
+seal_n = 0
+for script in [f for f in tracked if f.startswith("scripts/") and f.endswith(".py")]:
+    txt = "\n".join(lines(script))
+    seals = dict(re.findall(r'^(EXPECTED\w*SEAL)\s*=\s*"([0-9a-f]{64})"', txt, re.M))
+    if not seals:
+        continue
+    for hyp in [f for f in tracked if re.match(r"(docs/lab|research)/hypotheses/.*\.md$", f)]:
+        if Path(hyp).name in txt:
+            h = __import__("hashlib").sha256((ROOT / hyp).read_bytes()).hexdigest()
+            seal_n += 1
+            if h not in seals.values():
+                seal_bad.append(f"{hyp} (script {Path(script).name})")
+add(not seal_bad, "F3", "Pré-enregistrements scellés : le sha256 de chaque fichier cité par un script scellé correspond (sinon le script refuse de tourner)",
+    f"{seal_n} fichier(s) vérifié(s) ; rompus: {seal_bad or 'aucun'}")
+
+ADP = ROOT / "scripts/studies/x501_openmarket/x501_multiplicity_adapter.py"
+if ADP.exists():
+    r = subprocess.run([sys.executable, str(ADP)], capture_output=True, cwd=ROOT)
+    tail = (r.stdout + r.stderr).decode("utf-8", "replace").strip().splitlines()
+    add(r.returncode == 0, "F4", "L'adaptateur de multiplicité x501 s'exécute (il plantait à l'import)", (tail[-1] if tail else "")[:150])
+else:
+    add(False, "F4", "Adaptateur de multiplicité x501 présent", "absent")
+
+st_p = ROOT / "research/STATE.md"
+if st_p.exists() and LL.exists():
+    r = subprocess.run([sys.executable, str(LL), "status", "--md"], capture_output=True)
+    gen = r.stdout.decode("utf-8", "replace").strip()
+    add(bool(gen) and gen in st_p.read_text(encoding="utf-8"), "F5",
+        "research/STATE.md contient le bloc LEDGER à jour (python3 scripts/lab_ledger.py sync-state)",
+        "bloc absent ou périmé" if gen not in st_p.read_text(encoding="utf-8") else "à jour")
+bz = grep(".zcode/agents/bonsai.md", r"^injectAgentsMd:\s*true")
+az = (ROOT / "AGENTS.md").stat().st_size if (ROOT / "AGENTS.md").exists() else 0
+info("F6", "Agent local Bonsai : AGENTS.md injecté dans son contexte" if bz else "Agent local Bonsai : AGENTS.md non injecté",
+     f"AGENTS.md = {az} octets ≈ {int(az / 3.6)} jetons rajoutés à CHAQUE appel du modèle local" if bz else "contexte minimal")
 
 # ---- D. Statistique (le tableau de bord) ------------------------------------------------
 tp = ROOT / args.trades
@@ -210,7 +269,9 @@ print(f"AUDIT CHECK — HEAD {sh('git', 'log', '-1', '--format=%h %ad', '--date=
 tags = {"OK": "[OK]      ", "PROBLÈME": "[PROBLÈME]", "INFO": "[info]    "}
 for status, cid, title, det in RES:
     print(f"{tags[status]} {cid:<4} {title}" + (f"\n             ↳ {det}" if det else ""))
-n_bad = sum(1 for r in RES if r[0] == "PROBLÈME")
+FAIL_ON = {x.strip() for x in args.fail_on.split(",") if x.strip()}
+n_bad = sum(1 for r in RES if r[0] == "PROBLÈME" and (not FAIL_ON or r[1] in FAIL_ON))
 n_all = sum(1 for r in RES if r[0] != "INFO")
-print(f"\n{n_bad} problème(s) sur {n_all} contrôles")
+print(f"\n{sum(1 for r in RES if r[0] == 'PROBLÈME')} problème(s) sur {n_all} contrôles"
+      + (f" — bloquants ({len(FAIL_ON)} suivis) : {n_bad}" if FAIL_ON else ""))
 sys.exit(min(n_bad, 125))
