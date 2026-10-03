@@ -1,3 +1,4 @@
+# ARCHIVÉ (03/10) — verdict NUL rendu au registre docs/20 ; le test listing de lundi est un one-shot nouveau (research/hypotheses/premium-fade-listing.md)
 # Re-mesure DÉFINITIVE du premium fade sur le dataset 15m complet (367 symboles × 5 ans).
 # Contexte : le chiffre orphelin « 87 % WR, +21 %/an @ 3,33x » n'existe dans AUCUN code
 # committé — loi du registre : non reproductible = mort. Ce script EST la reproductibilité.
