@@ -1,0 +1,54 @@
+# PROTOCOLE PRÉ-ENREGISTRÉ — le coût d'exécution humaine (scellé le 03/10, AVANT toute mesure de kill)
+
+Origine : le flag du tournoi Bonsai du 03/10 (« sans mesure réelle du coût d'exécution,
+aucun backtest n'est valide ») — vérifié exact : `slippage_measured` = 6 lignes orphelines.
+Conception : Bonsai (métriques + seuils, dérivés de la théorie, PAS de nos données) ;
+mesures et vérifications : l'agent. Sondage source : `scripts/studies/execution_slippage_probe.py`.
+
+## L'état des données (constaté 03/10)
+
+- `aster_tape` = **BTCUSDT + ETHUSDT uniquement** (11,6 M prints) → le slippage des flux
+  meme/survivor/listing est **inmesurable** aujourd'hui.
+- `depth.db` couvre 15/36 symboles des paper trades (half-spread = le plancher taker, proxy).
+- Les champs signal_ts/entry_ts du ledger sont **pollués** (2 conventions : 0 s et exactement
+  3600 s, n=59) → la latence humaine n'est PAS mesurable depuis le ledger ; ne jamais s'en servir.
+
+## Les métriques (gelées)
+
+1. **Pire-30s** (FAIT FOI) : S = max sur [entry_ts, entry_ts+30 s] de dir×(P_t/open − 1), en bps.
+   La fenêtre absorbe la latence humaine (1-5 s) et le micro-drift post-open.
+2. Taker-immédiat : dir×(premier_print/open − 1) — le plancher.
+3. VWAP-60s : dir×(vwap_60s/open − 1) — le diagnostic de passivité.
+
+## Les seuils KILL (pré-enregistrés, théorie adversariale — invalidation du flux si dépassés)
+
+| Flux | Edge net/trade | Seuil pire-30s | Notional de référence |
+|---|---|---|---|
+| Cascade majors 12x | 10-20 bps | **15 bps** | 50 $ |
+| Meme fade 1x | 5-10 bps | **8 bps** | 20 $ |
+| Vol_spike 1x | ~10 bps | **10 bps** | 30 $ |
+| Survivor LONG 1x | ~9 bps | **7 bps** | 25 $ |
+| Listing-fade (si validé lun 05/10) | ~9 bps | **9 bps** | 10 $ |
+
+Règle : slippage_moyen/edge_net > 1 sur 20 trades → backtests du flux INVALIDÉS à ce notional.
+
+## Les bornes (ce que la tape ne peut pas dire)
+
+- Position dans la file : bornée au premier print après entry_ts (hypothèse conservatrice).
+- Fills partiels : assumés 100 % à la métrique (le notional 10-50 $ est sous le size médian des prints majors).
+- Latence humaine : absorbée par la fenêtre pire-30s ; jamais estimée depuis le ledger (pollué).
+
+## Les premières mesures (03/10, descriptives — PAS des kills)
+
+Majors, n=30 trades sur tape réelle : taker-immédiat ≈ 0 bps (médiane), pire-30s médiane
++1,8 / p90 **+7,5** / max +19,1 bps → **PASS vs le seuil 15 bps**. L'hypothèse open = fill
+tient sur le profond ; la queue à 19 bps justifie le seuil (un trade sur ~30 le touche).
+
+## La suite (hors budget, décision utilisateur)
+
+1. Étendre le collecteur tape aux symboles des flux meme/vol_spike/survivor (~40 symboles)
+   — LE prérequis pour mesurer les flux à risque ; proposition pour lun 05/10.
+2. En attendant : le half-spread depth (15/36 syms) = plancher taker par trade, mesurable
+   par la même sonde (mode --depth à écrire si la décision passe).
+3. Re-mesure : avec la revue hebdo du paper forward ; la table `slippage_measured` v2
+   (symbol, ts, flux, notional, taker_bps, worst30_bps, vwap60_bps, n_prints, captured_at).
