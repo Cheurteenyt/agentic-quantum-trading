@@ -1,4 +1,4 @@
-# HYPOTHÈSE PRÉ-ENREGISTRÉE — premium-fade-listing (armée lun 06/10, budget réouvert)
+# HYPOTHÈSE PRÉ-ENREGISTRÉE — premium-fade-listing (armée lun 05/10, budget réouvert)
 
 **Pré-enregistrée le 03/10** (budget épuisé 24/20 — ce fichier ne consomme RIEN, il fige
 les critères AVANT le backtest). Source des critères discriminateurs : simulation

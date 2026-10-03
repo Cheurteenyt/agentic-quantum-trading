@@ -62,9 +62,9 @@ def main() -> int:
                 break
             for k in page:
                 con.execute(
-                    "INSERT OR IGNORE INTO klines VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT OR IGNORE INTO klines VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (sym, args.interval, int(k[0]), k[1], k[2], k[3], k[4],
-                     k[5], int(k[6]), snap, "aster", now))
+                     k[5], int(k[6]), snap, "aster", now, k[9], k[7]))
                 added += 1
             last_close = int(page[-1][6])
             total += len(page)
