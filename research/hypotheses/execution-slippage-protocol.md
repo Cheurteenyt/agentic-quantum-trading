@@ -52,3 +52,31 @@ tient sur le profond ; la queue à 19 bps justifie le seuil (un trade sur ~30 le
    par la même sonde (mode --depth à écrire si la décision passe).
 3. Re-mesure : avec la revue hebdo du paper forward ; la table `slippage_measured` v2
    (symbol, ts, flux, notional, taker_bps, worst30_bps, vwap60_bps, n_prints, captured_at).
+
+## LA MESURE DE PLANCHER (03/10 nuit, execution_depth_floor.py — la section qui change la semaine)
+
+Le spread du carnet RÉEL aux moments d'entry (depth.db, 102 M bins, un scan joint, n=301) :
+
+| Classe | Spread médian | p90 | Verdict vs seuil/2 du protocole |
+|---|---|---|---|
+| Majors (BTC/ETH/ASTER) | 0-2 bps | 2 bps | intenable ? NON — le plancher tient |
+| WIF/PNUT/TURBO/TRUMP/PONS (13-20 bps méd) | 16 bps | ~26 | **au-dessus de meme 8/2 = 4 bps** |
+| BOME/DOGS/FARTCOIN/MOODENG/NEIRO (16-24 bps) | 18 bps | ~30 | idem |
+| CATEUSDT / MEMEUSDT | **152 / 200 bps** | 388 / 390 | hors d'atteinte |
+
+**L'IMPLICATION (descriptive, le kill formel passe par la règle des 20 trades)** : les flux
+meme/vol_spike assument 8 bps RT — le plancher de spread réel de LEUR univers est 12-24 bps
+médian (taker = traverser le spread). Le coût d'exécution réel est 2-3× l'hypothèse sur les
+meilleurs symboles du flux, 25× sur CATE/MEME. La décision lundi : re-coster les flux meme
+avec le spread réel par symbole (1 créneau du budget — la mutation de coût est pré-enregistrée
+ICI avant le run) et étendre le collecteur tape. Les flux majors/survivor (0-2 bps) ne sont
+pas concernés.
+
+## Les propositions novembre de Bonsai (03/10 nuit — le filtre de l'agent)
+
+1. « Léchérie de la liquidation » → **REJET** : duplique INV-C (déjà armée, verdict mi-nov)
+   et split « janv-déc 2022 » = des données qui n'existent pas (liq WS depuis sept 2026).
+2. « Cascades de listings » → **REJET** : « acheter la volatilité » = pas d'instrument
+   (pas d'options sur Aster) ; l'observation est trivialement connue, pas un edge.
+Bonsai 0/2 — mode d'échec constant : mécanisme plausible, données fabriquées, action non
+exécutable. L'archive : reports/aster/bonsai-novembre-propositions-2026-10-03.md.
