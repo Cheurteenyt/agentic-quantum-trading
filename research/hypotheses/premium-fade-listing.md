@@ -52,3 +52,16 @@ La coupure < 90 j a été trouvée en DÉCOMPOSANT les données qui ont produit 
 le risque = sur-interprétation causale d'un artefact de sélection. Seuls garde-fous :
 le split temporel (VAL jamais vue pour la décision), la réplication 2025/2026 (déjà faite),
 et le discriminateur théorique (seuils venant de la théorie adversariale, pas de nos données).
+
+## Red-team de l'évaluateur (03/10 soir, Bonsai — vérifié par l'agent, AVANT tout run)
+
+L'évaluateur `scripts/studies/premium_fade_listing_test.py` (smoke OK sur synthétique) a été
+attaqué avant exécution. Résultats vérifiés : (1) unités premium = fractions décimales
+(BTC 0,000889 = 8,9 bps) — la conversion ×10⁴ est juste ; (2) alignement premium↔perp aux
+open_time identiques : 10 000/10 000 sur BTC (reindex + skip des NaN, les manquants sont
+comptés non-évaluables) ; (3) non-overlap PAR symbole (le `last` reset dans le groupby) ;
+(4) âge négatif impossible par construction (les ts sont des barres premium du même symbole).
+L'amendement Δindex EXACT (index = perp/(1+prem)) est confirmé par le red-team : erreur du
+premier ordre ≈ 0,017 % aux magnitudes extrêmes — négligeable vs le seuil 0,5 %, le premier
+ordre reste en colonne de sensibilité. Aucun bug réel trouvé. L'évaluateur est verrouillé ;
+toute modification APRÈS le run de lundi = interdite.
