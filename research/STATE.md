@@ -5,10 +5,10 @@ MAJ manuelle : 2026-10-05. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/l
 
 ## Ledger & budget
 <!-- LEDGER:BEGIN (généré par lab_ledger.py sync-state — ne pas éditer à la main) -->
-- Ledger : **31** entrées (31 essais, dont 12 backfill hors budget) — PASS 3 · FAIL 24 · NUL 1 · SOUS_PUISSANT 3
-- Budget semaine 2026-W40 (effet policy : 2026-10-02) : **19/20** consommés, reste 1
-- Familles au plafond : aster-institutions 5/5
-- Seuil de preuve du prochain essai : |t| ≥ 3.16 (Bonferroni, N=32)
+- Ledger : **34** entrées (34 essais, dont 12 backfill hors budget) — PASS 3 · FAIL 27 · NUL 1 · SOUS_PUISSANT 3
+- Budget semaine 2026-W40 (effet policy : 2026-10-02) : **22/20** consommés, reste 0
+- Familles au plafond : aster-institutions 5/5, premium 5/5
+- Seuil de preuve du prochain essai : |t| ≥ 3.19 (Bonferroni, N=35)
 <!-- LEDGER:END -->
 
 ## Verdicts qui comptent
