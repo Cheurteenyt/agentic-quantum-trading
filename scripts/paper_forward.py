@@ -163,10 +163,13 @@ def funding_div_mask(df: pd.DataFrame, fh_sym: pd.DataFrame) -> pd.Series:
     """funding_prix_divergence_short : funding qui accélère + prix -3 %/24h."""
     rate = fh_sym.set_index("funding_time")["rate"].astype(float).sort_index()
     rate.index = pd.to_datetime(rate.index, unit="ms")
-    aligned = rate.reindex(df.index, method="ffill", limit=8)
-    accel = aligned.diff(3)
+    # FIX audit v3 (C16) : l'accélération = diff(3) sur les ÉVÉNEMENTS de
+    # funding (3 prints) — l'ancien diff(3) sur la série horaire alignée
+    # mesurait 3 HEURES, une signification différente par contrat (1h/4h/8h).
+    accel_ev = rate.diff(3)
+    aligned = accel_ev.reindex(df.index, method="ffill", limit=8)
     pchg = df["close"].pct_change(24)
-    return ((accel > 0) & (pchg < -0.03)).fillna(False)
+    return ((aligned > 0) & (pchg < -0.03)).fillna(False)
 
 
 def funding_extreme_events(fh_sym: pd.DataFrame) -> pd.DatetimeIndex:

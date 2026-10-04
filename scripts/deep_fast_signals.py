@@ -83,7 +83,11 @@ def collect_deep_fast(con: sqlite3.Connection, fresh_h: int = FRESH_H,
             if ts_ms - last_emit < overlap_ms:
                 continue                          # non-recouvrant 24 h
             last_emit = ts_ms
-            out.append({"sym": sym, "ts_ms": int(idx_ns[t]),
+            # FIX audit v3 (C14) : l'entrée = la CLOSE de la bougie du signal
+            # (convention documentée) — le timestamp doit donc être l'INSTANT
+            # de cette close, pas l'open de la même bougie (couple inexécutable
+            # open(t) + close(t) avant).
+            out.append({"sym": sym, "ts_ms": int(idx_ns[t]) + 3_600 * 10**9,
                         "entry": float(df["close"].iloc[t]),
                         "direction": DIRECTION, "hold_h": HOLD_H,
                         "depth_pct": round(float(

@@ -49,6 +49,11 @@ def _atr_pct(df: pd.DataFrame) -> np.ndarray:
     return atr / c * 100
 
 
+# ⚠️ FIX audit v3 (C11) — caveat documenté : la sélection des flux viables
+# est FULL-SAMPLE (les gagnants historiques) — le portefeuille combiné
+# n'est PAS un résultat OOS. Générateur d'hypothèses, jamais une preuve
+# de robustesse. Au runtime (forward), la sélection est causale.
+
 def collect(con: sqlite3.Connection, fh: pd.DataFrame) -> dict[str, list[dict]]:
     streams: dict[str, list[dict]] = {}
     symbols = [r[0] for r in con.execute(
@@ -99,7 +104,7 @@ def collect(con: sqlite3.Connection, fh: pd.DataFrame) -> dict[str, list[dict]]:
                 if opens[ei] <= 0:
                     continue
                 push("funding_div_12h", sym, idx_ns, ei, opens[ei],
-                     ei + hold - 1, -1, highs, lows, closes, hold, False, float(atr_pct[ei]))
+                     ei + hold - 1, -1, highs, lows, closes, hold, False, float(atr_pct[t]))
 
         # 2. crash_accel_short +24h (majeures : 2 bougies ≤ -2σ)
         if sym in MAJORS:
@@ -111,7 +116,7 @@ def collect(con: sqlite3.Connection, fh: pd.DataFrame) -> dict[str, list[dict]]:
                 if opens[ei] <= 0:
                     continue
                 push("crash_accel_24h", sym, idx_ns, ei, opens[ei],
-                     ei + hold - 1, -1, highs, lows, closes, hold, True, float(atr_pct[ei]))
+                     ei + hold - 1, -1, highs, lows, closes, hold, True, float(atr_pct[t]))
 
         # 3. survivor_momentum_long +72h (âge > 90j, prix > prix-90j)
         if sym not in MAJORS:
@@ -125,14 +130,18 @@ def collect(con: sqlite3.Connection, fh: pd.DataFrame) -> dict[str, list[dict]]:
                 if opens[ei] <= 0:
                     continue
                 push("survivor_long_72h", sym, idx_ns, ei, opens[ei],
-                     ei + hold - 1, +1, highs, lows, closes, hold, False, float(atr_pct[ei]))
+                     ei + hold - 1, +1, highs, lows, closes, hold, False, float(atr_pct[t]))
 
         # 4. contagion +4h (BTC ±2 %/1h → alt même sens ; hors BTC)
         if sym not in MAJORS:
-            btc_r = pd.Series(
-                np.interp(idx_ns, btc_ns,
-                          btc["close"].pct_change().values * 100),
-                index=df.index)
+            # FIX audit v3 (C7) : join as-of — le dernier rendement BTC CONNU
+            # à l'instant t ; np.interp mélangeait le rendement FUTUR.
+            _btc_pct = btc["close"].pct_change().values * 100
+            _pos_b = np.searchsorted(btc_ns, idx_ns, side="right") - 1
+            _val = np.where(
+                _pos_b >= 0,
+                _btc_pct[np.clip(_pos_b, 0, len(_btc_pct) - 1)], np.nan)
+            btc_r = pd.Series(_val, index=df.index)
             up = (btc_r >= 2)
             dn = (btc_r <= -2)
             for t in np.where(up | dn)[0]:
@@ -143,7 +152,7 @@ def collect(con: sqlite3.Connection, fh: pd.DataFrame) -> dict[str, list[dict]]:
                     continue
                 d = 1 if up.iloc[t] else -1
                 push("contagion_4h", sym, idx_ns, ei, opens[ei],
-                     ei + hold - 1, d, highs, lows, closes, hold, False, float(atr_pct[ei]))
+                     ei + hold - 1, d, highs, lows, closes, hold, False, float(atr_pct[t]))
 
     # 5. funding_extreme_contre_courant +168h (rate > p90 expanding)
     for sym in symbols:

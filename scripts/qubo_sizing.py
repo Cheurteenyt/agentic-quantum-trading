@@ -102,8 +102,14 @@ def build_events() -> tuple[list[dict], dict, dict[str, float]]:
 
     # flux 3 : survivor long 72h 1x + filtre ATR p90
     surv = collect_arsenal(con, fh_raw).get("survivor_long_72h", [])
-    _p90 = float(np.nanquantile([e["atr_pct"] for e in surv], 0.90))
-    surv = [e for e in surv if e["atr_pct"] <= _p90]
+    # FIX audit v3 (C10) : le décile est EXPANDING — au moment du signal, le
+    # quantile ne voit que les events passés (warmup 50). L'ancien p90
+    # full-sample donnait à un trade ancien la distribution de vol future.
+    surv.sort(key=lambda e: e["ts_ms"])
+    _atrs = [e["atr_pct"] for e in surv]
+    surv = [e for i, e in enumerate(surv)
+            if e["atr_pct"] <= (float(np.nanquantile(_atrs[:i], 0.90))
+                                if i >= 50 else float("inf"))]
     for e in surv:
         e["strategy"] = "survivor_long"
         e["lev"] = 1

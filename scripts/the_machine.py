@@ -35,6 +35,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from scripts.aster_indicators import atr as _true_atr  # noqa: E402
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.full_arsenal_2 import collect as collect_arsenal  # noqa: E402
@@ -87,13 +88,14 @@ def collect_meme(con: sqlite3.Connection) -> list[dict]:
         ra = r1.abs()
         cas = ((r1 < 0) & (r1.shift(1) < 0) & (r1.shift(2) < 0)
                & (ra > ra.shift(1)) & (ra.shift(1) > ra.shift(2))).fillna(False)
-        atr = (close_s.diff().abs().rolling(24).mean() / close_s * 100).values
+        # FIX audit v3 (C8) : un VRAI ATR (True Range + Wilder).
+        atr = (_true_atr(df, n=24) / close_s * 100).values
         for t in np.where(cas)[0]:
             ei = t + 1
             if ei + 24 >= len(idx_ns) or t < 200:
                 continue
             entry = opens[ei]
-            if entry <= 0 or not np.isfinite(atr[ei]):
+            if entry <= 0 or not np.isfinite(atr[t]):
                 continue
             x = closes[ei + 23]
             meme.append({"sym": sym, "ts_ms": int(idx_ns[ei]),
@@ -103,7 +105,7 @@ def collect_meme(con: sqlite3.Connection) -> list[dict]:
                          "price_ret_short": (entry - x) / entry * 100,
                          "fund_sign": 1,
                          "mae_adverse": (highs[ei:ei + 24].max() - entry)
-                         / entry * 100, "atr_pct": float(atr[ei])})
+                         / entry * 100, "atr_pct": float(atr[t])})
     meme.sort(key=lambda e: e["ts_ms"])
     return meme
 
@@ -163,14 +165,17 @@ def main() -> int:
 
     # ——— flux 2 : cascade memecoins 1x (levier mécanique) ———
     meme = collect_meme(con)
-    if not meme:
-        print("[machine] cascade meme vide ce soir — rapport abstenu")
-        return 0
-    mae_meme = max(e["mae_adverse"] for e in meme)
-    lev_meme = max(1, int(100 / (mae_meme + 0.5)))
-    med_meme = float(np.median([e["atr_pct"] for e in meme]))
-    for e in meme:
-        e["lev"] = lev_meme
+    # FIX audit v3 (C12) : un flux secondaire vide = zéro trade sur CE flux,
+    # pas l'abandon du rapport — les autres flux restent exploitables.
+    mae_meme = 0.0
+    lev_meme = 1
+    med_meme = float("nan")
+    if meme:
+        mae_meme = max(e["mae_adverse"] for e in meme)
+        lev_meme = max(1, int(100 / (mae_meme + 0.5)))
+        med_meme = float(np.median([e["atr_pct"] for e in meme]))
+        for e in meme:
+            e["lev"] = lev_meme
 
     def size_meme(e, st=None):
         return min(max(0.10 * (e["atr_pct"] / med_meme), 0.02), 0.30)
@@ -179,12 +184,15 @@ def main() -> int:
     # + le FILTRE ATR extrême : le décile supérieur (les LAB — les ×520 qui
     # crashent -64 %) est écarté ; c'est lui qui portait le max-DD (26/09)
     surv = collect_arsenal(con, fh_raw).get("survivor_long_72h", [])
-    if not surv:
-        print("[machine] survivor long vide ce soir — rapport abstenu")
-        return 0
-    _p90 = float(np.nanquantile([e["atr_pct"] for e in surv], 0.90))
+    # FIX audit v3 (C12) : flux vide = zéro trade, le rapport continue.
+    # FIX audit v3 (C10) : le décile est EXPANDING (warmup 50) — le seuil
+    # d'un trade ne voit que les events passés, même au runtime.
+    surv.sort(key=lambda e: e["ts_ms"])
+    _atrs = [e["atr_pct"] for e in surv]
     _n_extreme = len(surv)
-    surv = [e for e in surv if e["atr_pct"] <= _p90]
+    surv = [e for i, e in enumerate(surv)
+            if e["atr_pct"] <= (float(np.nanquantile(_atrs[:i], 0.90))
+                                if i >= 50 else float("inf"))]
     _n_extreme -= len(surv)
     for e in surv:
         e["strategy"] = "survivor_long"
