@@ -1,0 +1,57 @@
+**(1) LE DICTIONNAIRE**
+
+*   **x_posts** : Ligne = 1 post. Unités : `metrics` (JSON int), `fetched_at` (s). Freshness : H+1. Reliability : **A**. Source primaire.
+*   **x_accounts** : Ligne = 1 handle. Unités : `followers` (int). Freshness : Nocturne. Reliability : **B**. Index static, à re-syncer.
+*   **x_calls** : Ligne = 1 signal. Unités : `confidence` (0-1 float), `entry_price` (USD), `horizon` (enum). Freshness : H+1. Reliability : **C**. Parseur non validé.
+*   **x_call_scores** : Ligne = 1 score. Unités : `ret_*` (bps float). Freshness : D+1/D+7. Reliability : **B**. Dépend de `x_posts.price_resolved`.
+*   **x_call_verdicts** : Ligne = 1 verdict. Unités : `resolved_ts` (s). Freshness : D+7. Reliability : **B**. Derivé de `x_call_scores`.
+*   **x_mentions** : Ligne = 1 (symbol, day). Unités : `n` (int). Freshness : D+1. Reliability : **A**. Agrégation simple.
+*   **x_positioning** : Ligne = 1 (day, symbol). Unités : `pct_long` (%). Freshness : D+1. Reliability : **A**. Dérivé de `x_mentions`.
+*   **x_pressure** : Ligne = 1 (ticker, capture). Unités : `velocity` (ΔH24/H24), `funding_pct` (%). Freshness : H+1. Reliability : **B**. Source externe (funding) non auditée.
+*   **x_profiles** : Ligne = 1 handle. Unités : `joined` (date). Freshness : S3. Reliability : **C**. Échantillon biaisé (20/49).
+*   **x_trends** : Ligne = 1 tag. Unités : `count` (int). Freshness : H+1. Reliability : **C**. Volatilité haute, bruit sémantique.
+*   **x_lists_found** : Ligne = 1 liste. Unités : `subscribers` (int). Freshness : H+1. Reliability : **B**.
+*   **x_signal_history** : Ligne = 1 (day, ticker). Unités : `velocity` (ratio). Freshness : D+1. Reliability : **A**.
+
+**(2) L'AUDIT DE SCHÉMA**
+
+*   **Redondance Mortelle** : `x_trends` vs `x_mentions`. `x_trends` (33) est un sous-ensemble volatil de `x_mentions` (835). **Verdict** : Déprécier `x_trends`. Le signal est dans `x_mentions.symbol`. `x_trends` est du bruit sémantique sans valeur prédictive.
+*   **Duplication Cadence** : `x_pressure` (H+1) vs `x_signal_history` (D+1). Même contenu (velocity, calls_long/short) à 2 granularités. **Verdict** : `x_pressure` est le "live", `x_signal_history` est l'archive. Ne pas fusionner, mais `x_pressure` doit être la source de vérité pour le trading intraday, `x_signal_history` pour la backtest.
+*   **Champs Morts-Nés** :
+    *   `x_call_scores.ret_1h` (VIDE) : **MORT**. Supprimer ou remplier par `ret_24h` si le horizon est 24h.
+    *   `x_call_scores.ret_7d` : **C** (à valider). Souvent NULL si `resolved_ts` < D+7.
+    *   `x_calls.horizon` (443 'none') : **MORT**. Ces 443 appels sont inauditable. À filtrer.
+    *   `x_profiles.pinned` : **MORT** sans valeur statistique.
+*   **Fusion** : `x_call_verdicts` + `x_call_scores` -> `x_call_outcome` (1 table, 1 verdict final). Évite la dédrédundance logique.
+
+**(3) LE CONTRAT DE COLLECTE**
+
+*   **x_harvest** : Déclencheur : Nocturne 03:21. Cadence : 1x/24h. Budget : 500 posts/night. Risque Ban : **Haute** (Playwright). Rétention : 90j. Règle Unité : `posted_at_raw` (ISO) -> `fetched_at` (s).
+*   **x_aster_pulse** : Déclencheur : H+1 (04:00). Cadence : 1x/6h. Budget : 20 tickers. Risque Ban : **Moyenne** (API). Rétention : 365j. Règle Unité : `captured_at` (s).
+*   **x_rotation** : Déclencheur : Nocturne. Cadence : 1x/24h (4 tickers/nuit). Budget : 4*500=2000 posts. Risque Ban : **Haute**. Rétention : 30j (rolling).
+*   **Profil Browser** : Clé du royaume. **RÈGLE** : 1 profil = 1 IP = 1 User-Agent. Chaque +10% de volume => +1 IP proxy. Ban = RST.
+
+**(4) LE PROTOCOLE DE VALIDATION DU PARSEUR**
+
+*   **Échantillon** : 100 calls mensuels (stratifiée par `horizon`).
+*   **Checks** :
+    1.  `symbol` existe dans `universe` ? (100%)
+    2.  `direction` in [long, short] ? (100%)
+    3.  `entry_price` != NULL et > 0 ? (Seuil : 80% acceptable)
+    4.  `horizon` != 'none' ? (Seuil : 50% acceptable)
+    5.  Cohérence `ret_1h` vs `price_resolved` (delta < 2bps).
+*   **Taux de NULL acceptable** :
+    *   `entry_price` : < 20%
+    *   `horizon` : < 50%
+    *   `confidence` : 0%
+*   **Trancher le WR 44%** :
+    *   Calculer WR sur les 20% de calls avec `entry_price` NULL -> si WR < 30% => **Bruit de parsing**.
+    *   Calculer WR sur les 80% valides -> si WR > 50% => **Phénomène**.
+    *   *Hypothèse actuelle* : BRUIT (44% global masque l'incohérence).
+
+**(5) LA CAPTURE LONGITUDINALE**
+
+*   **Snapshot Nocturne Obligatoire** :
+    1.  **`x_profile_state`** : 49 handles, `followers`, `bio_hash`, `joined`. Clé Anti-Doublon : `handle + captured_at`. Table : `x_profile_state`.
+    2.  **`x_engagement_delta`** : `likes`/`replies` par `x_posts` (diff H+1). Clé : `post_id + captured_at`. Table : `x_engagement_delta`.
+    3.  **`x_universe_snap`** : Liste des 49 tickers actifs. Clé : `day + ticker`. Table : `x_un
