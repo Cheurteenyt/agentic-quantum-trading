@@ -39,12 +39,19 @@ def _critical_budget() -> bool:
     return _scored_today["count"] <= CRIT_MAX_PER_DAY
 
 
-async def _by_category_guild(guild: discord.Guild, name: str) -> discord.TextChannel | None:
+async def _resolve_channel(guild: discord.Guild, name: str) -> discord.TextChannel | None:
+    """LA RÈGLE ANTI-DUPLICATION (leçon #stats 05/10) : le bot INTÈGRE la structure
+    existante, il ne crée jamais de salon parallèle. Ordre : le registre (/setchannel),
+    puis le salon existant par nom, puis #logs, sinon None (le rapport est abstenu)."""
+    reg_id = store.reg_channel(guild.id, name)
+    if reg_id:
+        ch = guild.get_channel(reg_id)
+        if isinstance(ch, discord.TextChannel):
+            return ch
     ch = discord.utils.get(guild.text_channels, name=name)
-    if ch is None:
-        overwrites = {guild.default_role: discord.PermissionOverwrite(send_messages=False)}
-        ch = await guild.create_text_channel(name, overwrites=overwrites)
-    return ch
+    if isinstance(ch, discord.TextChannel):
+        return ch
+    return discord.utils.get(guild.text_channels, name="logs")
 
 
 class ReviewView(discord.ui.View):
@@ -142,7 +149,9 @@ class Semantic(commands.Cog):
         # le reste = rapport quotidien (les lignes sont comptées par le rapporteur)
 
     async def _queue_review(self, message: discord.Message, verdict: dict) -> None:
-        ch = await _by_category_guild(message.guild, "revue-secu")
+        ch = await _resolve_channel(message.guild, "revue-secu")
+        if ch is None:
+            return
         e = discord.Embed(title=f"🤖 REVUE — score {verdict.get('toxicity')} "
                                 f"conf {verdict.get('confidence')}", color=0xFEE75C,
                           timestamp=dt.datetime.now(dt.UTC))
@@ -174,7 +183,10 @@ class Semantic(commands.Cog):
                                     (dt.datetime.now(dt.UTC).timestamp() - 86400,)).fetchone()[0]
             finally:
                 con.close()
-            ch = await _by_category_guild(guild, "stats")
+            ch = await _resolve_channel(guild, "stats")
+            if ch is None:
+                print("[semantic] pas de salon de destination — rapport 24 h abstenu")
+                return
             e = discord.Embed(title="📊 Le rapport 24 h du bot", color=0x5865F2)
             e.add_field(name="messages capturés", value=f"{msgs:,}")
             e.add_field(name="médias", value=f"{media:,}")
