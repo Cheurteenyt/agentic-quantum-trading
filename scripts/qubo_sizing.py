@@ -145,15 +145,57 @@ def build_events() -> tuple[list[dict], dict, dict[str, float]]:
             ranks.append(ft[1][pos])
         e["fund_rank"] = (float(np.mean(np.array(ranks) <= own))
                           if ranks and np.isfinite(own) else np.nan)
-    con.close()
 
     all_ev = sorted(gated + meme + surv + spike, key=lambda e: e["ts_ms"])
+    _attach_marks(con, all_ev)
+    con.close()
     ctx = {"med_majors": med_majors, "med_meme": med_meme,
            "med_spike": med_spike, "q66": q66}
     counts = defaultdict(int)
     for e in all_ev:
         counts[e["strategy"]] += 1
     return all_ev, ctx, fh, dict(counts)
+
+
+def _attach_marks(con: sqlite3.Connection, events: list[dict]) -> None:
+    """FIX lot3 (F8) : le chemin horaire de chaque trade — côté position, en %
+    (même convention que price_ret_short) — pour le DD mark-to-market de
+    run_stack (equity = réalisé + non réalisé). Le mark à dt=k est la close
+    de la bougie ouverte à entrée+k-1h, convention de sortie du repo."""
+    closes: dict[str, tuple] = {}
+    for e in events:
+        entry = float(e.get("entry") or 0.0)
+        if entry <= 0:
+            continue
+        sym = e["sym"]
+        if sym not in closes:
+            rows = con.execute(
+                "SELECT ts, close FROM klines WHERE symbol=? AND interval='1h' "
+                "ORDER BY ts", (sym,)).fetchall()
+            if rows:
+                ts_ns = np.array(
+                    [r[0] * 10**6 if r[0] > 10**11 else r[0] * 10**9
+                     for r in rows], dtype=np.int64)
+                cl = np.array([float(r[1]) for r in rows], dtype=np.float64)
+            else:
+                ts_ns = np.array([], dtype=np.int64)
+                cl = np.array([], dtype=np.float64)
+            closes[sym] = (ts_ns, cl)
+        ts_arr, cl_arr = closes[sym]
+        if not len(ts_arr):
+            continue
+        side = 1.0 if e["strategy"] == "survivor_long" else -1.0
+        entry_ns = int(e["ts_ms"])
+        marks = []
+        for k in range(1, int(e["hold_h"]) + 1):
+            due = entry_ns + k * 3600 * 10**9
+            pos = int(np.searchsorted(ts_arr, due, side="left")) - 1
+            if pos < 0:
+                break          # pas de kline avant ce mark : les suivants non plus
+            marks.append((float(k),
+                          side * (float(cl_arr[pos]) / entry - 1.0) * 100.0))
+        if marks:
+            e["marks"] = marks
 
 
 def base_sizer(ctx: dict):

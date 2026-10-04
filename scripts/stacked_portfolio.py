@@ -27,6 +27,7 @@ ORACLE (les trades voués à la liquidation ne sont pas pris).
 """
 from __future__ import annotations
 
+import heapq
 import sqlite3
 import sys
 from collections import defaultdict
@@ -146,22 +147,61 @@ def _size_fn_arity(fn) -> int:
 
 def run_stack(events: list[dict], capital: float, size_fn,
               funding_hourly: dict[str, float], oracle: bool = False) -> dict:
-    """Le wallet multi-stratégies. size_fn(e) -> taille marge (0-1)."""
+    """Le wallet multi-stratégies. size_fn(e) -> taille marge (0-1).
+
+    FIX lot3 (F8) : le PnL d'un trade sain est booké À SA SORTIE (l'ancien
+    bookage à l'entrée figeait le futur dans le chemin d'équité), et les
+    marks horaires de l'event (e["marks"] = [(dt_h, ret_pct côté position)])
+    dessinent le chemin latent : max_dd voit désormais le drawdown
+    intratrade. Sans marks sur l'event, le DD = le chemin des sorties
+    réalisées. Le sizing reste sur le réalisé (convention inchangée).
+    """
     if size_fn is None:
         # FIX lot1 (F13) : le fallback None faisait `sz = size` — un
         # NameError latent au milieu de la boucle. On refuse tôt.
         raise ValueError("size_fn requis : passe un sizer (e) -> taille marge 0-1")
-    balance = capital
-    peak = trough = balance
+    balance = capital                    # le cash RÉALISÉ
+    peak = trough = balance              # chemin réalisé (sorties + sizing)
+    peak_lat = trough_lat = balance      # chemin latent (marks intratrade)
     max_dd = 0.0
     busy: dict[str, int] = {}
     trades: list[dict] = []
     n = n_liq = n_wins = 0
     fees_tot = fund_tot = 0.0
+    exits_due: list[tuple[int, int, float, dict]] = []
+    marks_due: list[tuple[int, int, float, float]] = []
+    _seq = 0
+
+    def _drain(limit_ns: int) -> None:
+        """Bookage chronologique strict : à timestamp égal, la sortie
+        (réalisation) précède le mark (latent)."""
+        nonlocal balance, peak, trough, peak_lat, trough_lat, max_dd
+        while exits_due or marks_due:
+            t_e = exits_due[0][0] if exits_due else limit_ns + 1
+            t_m = marks_due[0][0] if marks_due else limit_ns + 1
+            if min(t_e, t_m) > limit_ns:
+                break
+            if t_e <= t_m:
+                _, _, pnl, tr = heapq.heappop(exits_due)
+                balance += pnl
+                tr["balance"] = balance
+                trades.append(tr)
+                peak = max(peak, balance)
+                dd = (peak - balance) / peak * 100 if peak > 0 else 0.0
+                max_dd = max(max_dd, dd)
+                trough = min(trough, balance)
+            else:
+                _, _, m_notional, m_ret = heapq.heappop(marks_due)
+                eq = balance + m_notional * m_ret / 100.0
+                peak_lat = max(peak_lat, eq)
+                dd = (peak_lat - eq) / peak_lat * 100 if peak_lat > 0 else 0.0
+                max_dd = max(max_dd, dd)
+                trough_lat = min(trough_lat, eq)
 
     for e in events:                       # events triés par ts
         if balance <= 1:
             break
+        _drain(e["ts_ms"])                 # sorties et latent dus AVANT cet event
         if busy.get(e["strategy"], 0) > e["ts_ms"]:
             continue                       # la stratégie est déjà en position
         liq_move = 100.0 / e["lev"] - 0.5
@@ -199,31 +239,42 @@ def run_stack(events: list[dict], capital: float, size_fn,
         if liq:
             pnl = -margin
             n_liq += 1
-        balance += pnl
         fees_tot += fees
         fund_tot += fund
         n += 1
         n_wins += pnl > 0
-        busy[e["strategy"]] = e["ts_ms"] + e["hold_h"] * 3600 * 10**9  # ts_ms = NS
-
-        peak = max(peak, balance)
-        dd = (peak - balance) / peak * 100 if peak > 0 else 0
-        max_dd = max(max_dd, dd)
-        trough = min(trough, balance)
-        exit_ms = e["ts_ms"] + e["hold_h"] * 3600 * 10**9  # ts_ms = NS
+        exit_ns = e["ts_ms"] + e["hold_h"] * 3600 * 10**9  # ts_ms = NS
+        busy[e["strategy"]] = exit_ns
         liq_ts_dt = None
         if liq and e.get("liq_ts_ms"):
             liq_ts_dt = datetime.fromtimestamp(e["liq_ts_ms"] / 10**9,
                                                tz=timezone.utc)
-        trades.append({"sym": e["sym"], "strategy": e["strategy"],
-                       "entry_ts": datetime.fromtimestamp(
-                           e["ts_ms"] / 10**9, tz=timezone.utc),
-                       "exit_ts": datetime.fromtimestamp(exit_ms / 10**9,
-                                                         tz=timezone.utc),
-                       "pnl": pnl, "balance": balance, "liq": liq,
-                       "entry": e.get("entry"), "margin": margin,
-                       "liq_price": e.get("liq_price") if liq else None,
-                       "liq_ts": liq_ts_dt})
+        tr = {"sym": e["sym"], "strategy": e["strategy"],
+              "entry_ts": datetime.fromtimestamp(
+                  e["ts_ms"] / 10**9, tz=timezone.utc),
+              "exit_ts": datetime.fromtimestamp(exit_ns / 10**9,
+                                                tz=timezone.utc),
+              "pnl": pnl, "balance": balance, "liq": liq,
+              "entry": e.get("entry"), "margin": margin,
+              "liq_price": e.get("liq_price") if liq else None,
+              "liq_ts": liq_ts_dt}
+        if liq:
+            # le sort est scellé à l'entrée (MAE connu) : booké immédiatement
+            balance += pnl
+            tr["balance"] = balance
+            trades.append(tr)
+            peak = max(peak, balance)
+            dd = (peak - balance) / peak * 100 if peak > 0 else 0.0
+            max_dd = max(max_dd, dd)
+            trough = min(trough, balance)
+        else:
+            heapq.heappush(exits_due, (exit_ns, _seq, pnl, tr))
+            for dt_h, ret_pct in e.get("marks", ()):
+                heapq.heappush(marks_due, (
+                    e["ts_ms"] + int(float(dt_h) * 3600 * 10**9),
+                    _seq, notional, float(ret_pct)))
+            _seq += 1
+    _drain(10**30)                         # la fin : tout ce qui reste est dû
     return {"balance": balance, "max_dd": max_dd, "trough": trough,
             "trades": trades, "n": n, "n_liq": n_liq, "n_wins": n_wins,
             "fees": fees_tot, "funding": fund_tot}

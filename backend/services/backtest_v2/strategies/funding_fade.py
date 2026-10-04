@@ -250,6 +250,7 @@ class Trade:
     reason: str  # 'stop' | 'flat' | 'reverse' | 'eod'
     funding_return: float = 0.0  # funding encaisse (>0) ou paye (<0), en fraction
     worst_adverse_pct: float = 0.0  # FIX lot2 (F6) : le MAE reellement observe
+    slip_frac: float = 0.0  # FIX lot3 (F2) : slippage en fraction du notionnel
 
     @property
     def price_return(self) -> float:
@@ -261,7 +262,9 @@ class Trade:
 
     @property
     def net_return(self) -> float:
-        return self.gross_return - FEE_FRACTION_ROUND_TRIP
+        # FIX lot3 (F2) : le slippage entre dans le net — même comptabilité
+        # que la courbe (le funding y est déjà via funding_return).
+        return self.gross_return + self.slip_frac - FEE_FRACTION_ROUND_TRIP
 
     @property
     def holding_bars(self) -> int:
@@ -428,14 +431,20 @@ def _build_costs(
     params: dict,
     symbol: str,
     flags: dict[str, Any],
-) -> CostBreakdown:
-    """Agrege les 4 postes sur l'ensemble des trades. Jamais de None implicite."""
+) -> tuple[CostBreakdown, list[float]]:
+    """Agrege les 4 postes sur l'ensemble des trades. Jamais de None implicite.
+
+    FIX lot3 (F2) : renvoie aussi le slippage PAR TRADE en fraction du
+    notionnel — l'evaluate le book dans la courbe et dans les nets (le
+    funding de la courbe vient de la série synthétique du trade lui-même).
+    """
     cb = CostBreakdown()
     fees = 0.0
     slip = 0.0
     funding = 0.0
     all_safe = True
     hours_per_bar = _bar_hours(bars)
+    per_trade_slip: list[float] = []
 
     rate = None
     if flags.get("funding_available"):
@@ -450,7 +459,9 @@ def _build_costs(
         fees += round_trip_fees_usd(BOOK_NOTIONAL_USD, symbol, DEFAULT_EXECUTION_MODEL)
 
         book = _synthetic_book(t.entry_price, BOOK_NOTIONAL_USD)
-        slip += slippage_usd(BOOK_NOTIONAL_USD, book, t.entry_price)
+        slip_usd = slippage_usd(BOOK_NOTIONAL_USD, book, t.entry_price)
+        slip += slip_usd
+        per_trade_slip.append(slip_usd / BOOK_NOTIONAL_USD)
 
         side = "long" if t.side == 1 else "short"
         if rate is not None:
@@ -477,7 +488,7 @@ def _build_costs(
     if not flags.get("funding_available"):
         cb.warnings.append("funding indisponible: 0.0 explicite (voir blob)")
     cb.warnings.append(FUNDING_SERIES_NOTE)
-    return cb
+    return cb, per_trade_slip
 
 
 # ------------------------------------------------------------------ contrat
@@ -503,12 +514,17 @@ def evaluate(params: dict, bars: Sequence[Bar]) -> StrategyEval:
 
     trades, bar_ret = simulate(bars, params, series)
 
-    trade_returns = [t.net_return for t in trades]
     avg_hold = (
         round(sum(t.holding_bars for t in trades) / len(trades)) if trades else 0
     )
 
-    costs = _build_costs(trades, bars, params, symbol, flags)
+    costs, per_trade_slip = _build_costs(trades, bars, params, symbol, flags)
+    # FIX lot3 (F2) : UNE comptabilité — le slippage entre dans la courbe ET
+    # dans les nets, dérivé du même calcul que le CostBreakdown.
+    for t, slip_frac in zip(trades, per_trade_slip):
+        t.slip_frac = slip_frac
+        bar_ret[t.exit_index] += slip_frac
+    trade_returns = [t.net_return for t in trades]
 
     equity = [1.0]
     for r in bar_ret:
