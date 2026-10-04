@@ -64,6 +64,9 @@ class Capture(commands.Cog):
         if message.guild and not admin:
             gid, cid = message.guild.id, message.channel.id
             content = message.content or ""
+            # FIX review : je ne supprime que si J'AI le droit dans CE salon
+            if not message.channel.permissions_for(message.guild.me).manage_messages:
+                return
             if store.reg_rule(gid, cid, "commands_only") and content:
                 await message.delete()
                 return

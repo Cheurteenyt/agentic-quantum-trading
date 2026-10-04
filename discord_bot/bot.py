@@ -51,6 +51,16 @@ class HermesBot(commands.Bot):
     async def on_ready(self) -> None:
         user = self.user
         print(f"[discord] connecté : {user} (id {user.id if user else '?'})")
+        # le ménage one-shot : le #stats en doublon (la leçon anti-duplication 05/10)
+        for guild in self.guilds:
+            stats = discord.utils.get(guild.text_channels, name="stats")
+            me = guild.me
+            if stats and me.guild_permissions.manage_channels:
+                try:
+                    await stats.delete(reason="le doublon #stats — le rapport va dans #logs")
+                    print(f"[discord] #stats supprimé (doublon de #logs)")
+                except discord.Forbidden:
+                    pass
         guild = discord.utils.get(self.guilds, id=int(config.DISCORD_GUILD_ID)) \
             if config.DISCORD_GUILD_ID else None
         if guild:
