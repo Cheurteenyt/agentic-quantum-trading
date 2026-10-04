@@ -30,6 +30,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from starlette.requests import Request
 
+from discord_bot import stats
 from discord_bot.config import DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_GUILD_ID, ROOT
 
 PORT = 8606
@@ -355,22 +356,14 @@ def moi(request: Request):
         roles.append(f'<span class=chip style="background:#{color}">'
                      f'{r["name"] if r else rid[:8]}</span>')
     con = _ddb()
-    if _calls_tables_ready():
-        try:
-            n_msg = con.execute("SELECT COUNT(*) FROM d_messages WHERE author_id=?",
-                                (uid,)).fetchone()[0]
-            calls = con.execute("SELECT symbol, direction, entry, posted_at, scored, ret_pct, verdict "
-                                "FROM d_calls WHERE author_id=? ORDER BY posted_at DESC LIMIT 12",
-                                (uid,)).fetchall()
-            agg = con.execute("SELECT COUNT(*) n, AVG(CASE WHEN ret_pct>0 THEN 1.0 ELSE 0 END) wr, "
-                              "SUM(ret_pct) tot FROM d_calls WHERE author_id=? AND scored=1",
-                              (uid,)).fetchone()
-        finally:
-            con.close()
-    else:
-        n_msg = 0
-        calls = []
-        agg = {"n": 0, "wr": None, "tot": None}
+    try:
+        n_msg = con.execute("SELECT COUNT(*) FROM d_messages WHERE author_id=?",
+                            (uid,)).fetchone()[0]
+    finally:
+        con.close()
+    st = stats.user_stats(uid)
+    calls = st["calls"]
+    agg = {"n": st["n_scored"], "wr": st["wr"], "tot": st["tot_ret"]}
     joined = member.get("joined_at", "?")[:10]
     wr = f"{agg['wr'] * 100:.0f} %" if agg["n"] else "—"
     tot = f"{agg['tot']:+.1f} %" if agg["tot"] is not None else "—"
@@ -394,18 +387,7 @@ def moi(request: Request):
 
 @app.get("/classement", response_class=HTMLResponse)
 def classement():
-    rows = []
-    if _calls_tables_ready():
-        con = _ddb()
-        try:
-            rows = con.execute("""SELECT author_id, author_name, COUNT(*) n,
-                                  AVG(CASE WHEN ret_pct>0 THEN 1.0 ELSE 0 END) wr,
-                                  SUM(ret_pct) tot
-                                  FROM d_calls WHERE scored=1
-                                  GROUP BY author_id HAVING n>=3
-                                  ORDER BY tot DESC LIMIT 20""").fetchall()
-        finally:
-            con.close()
+    rows = stats.classement(limit=20)
     lignes = ""
     for i, r in enumerate(rows, 1):
         med = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"{i}")
@@ -422,24 +404,14 @@ def classement():
 
 @app.get("/serveur", response_class=HTMLResponse)
 def serveur():
-    con = _ddb()
-    try:
-        n_membres = con.execute("SELECT COUNT(*) FROM d_members WHERE bot=0").fetchone()[0]
-        n_bots = con.execute("SELECT COUNT(*) FROM d_members WHERE bot=1").fetchone()[0]
-        n_roles = con.execute("SELECT COUNT(*) FROM d_roles").fetchone()[0]
-        m24 = con.execute("SELECT COUNT(*) FROM d_messages WHERE fetched_at > ?",
-                          (time.time() - 86400,)).fetchone()[0]
-        m7 = con.execute("SELECT COUNT(*) FROM d_messages WHERE fetched_at > ?",
-                         (time.time() - 7 * 86400,)).fetchone()[0]
-        top = con.execute("""SELECT channel_name, COUNT(*) n FROM d_messages
-                             WHERE fetched_at > ? AND channel_name IS NOT NULL
-                             GROUP BY channel_name ORDER BY n DESC LIMIT 5""",
-                          (time.time() - 7 * 86400,)).fetchall()
-        frais = con.execute("""SELECT user_name, joined_at FROM d_members
-                               WHERE bot=0 AND joined_at IS NOT NULL
-                               ORDER BY joined_at DESC LIMIT 5""").fetchall()
-    finally:
-        con.close()
+    s = stats.server_stats()
+    n_membres, n_bots, n_roles = s["n_members"], s["n_bots"], s["n_roles"]
+    m24, m7 = s["m24"], s["m7"]
+    top = s["top_channels"]
+    frais = s["newcomers"]
+    topl = "".join(f"<tr><td>#{r['channel_name']}</td><td>{r['n']}</td></tr>" for r in top)
+    fraisl = "".join(f"<tr><td>{r['user_name']}</td><td class=muted>{(r['joined_at'] or '?')[:10]}</td></tr>"
+                     for r in frais)
     topl = "".join(f"<tr><td>#{r['channel_name']}</td><td>{r['n']}</td></tr>" for r in top)
     fraisl = "".join(f"<tr><td>{r['user_name']}</td><td class=muted>{(r['joined_at'] or '?')[:10]}</td></tr>"
                      for r in frais)

@@ -192,5 +192,83 @@ class TestTicketsHelpers(unittest.TestCase):
         self.assertEqual(self.t.next_counter("pourri"), 1)
 
 
+class TestStats(unittest.TestCase):
+    """Le module partagé des stats — la même source pour le site et le panneau."""
+
+    @classmethod
+    def setUpClass(cls):
+        import sqlite3
+        from discord_bot import stats
+        cls.stats = stats
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.db = Path(cls._tmp.name) / "stats.db"
+        con = sqlite3.connect(cls.db)
+        con.executescript("""
+        CREATE TABLE d_messages (message_id TEXT PRIMARY KEY, channel_id TEXT,
+            channel_name TEXT, author_id TEXT, author_name TEXT, created_at TEXT,
+            content TEXT, attachment_count INTEGER, attachment_types TEXT,
+            attachment_urls TEXT, link_urls TEXT, fetched_at REAL);
+        CREATE TABLE d_calls (call_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id TEXT UNIQUE, author_id TEXT, author_name TEXT, symbol TEXT,
+            direction TEXT, entry REAL, posted_at TEXT, channel_name TEXT,
+            scored INTEGER DEFAULT 0, ret_pct REAL, verdict TEXT);
+        CREATE TABLE d_members (user_id TEXT PRIMARY KEY, user_name TEXT,
+            display_name TEXT, bot INTEGER, joined_at TEXT, account_created TEXT,
+            roles TEXT, last_seen TEXT);
+        CREATE TABLE d_roles (role_id TEXT PRIMARY KEY, name TEXT, position INTEGER,
+            color TEXT, permissions TEXT, member_count INTEGER, updated_at REAL);
+        CREATE TABLE d_registry (guild_id TEXT NOT NULL, kind TEXT NOT NULL,
+            target TEXT NOT NULL, value TEXT, updated_at REAL,
+            UNIQUE(guild_id, kind, target));
+        """)
+        now = time.time()
+        for i in range(5):
+            con.execute("INSERT INTO d_messages VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (f"m{i}", "c1", "commandes", "111" if i < 3 else "222",
+                         "auteur", "2026-10-01", "txt", 0, "[]", "[]", "[]", now))
+        # auteur 111 : 4 calls scorés (3 win 1 lose) → WR 75, Σ +5 ; auteur 222 : 1 call
+        calls = [("111", "BTC", 2.0), ("111", "ETH", 1.0), ("111", "SOL", 4.0),
+                 ("111", "BNB", -2.0), ("222", "XRP", 9.0)]
+        for j, (aid, sym, ret) in enumerate(calls):
+            con.execute("INSERT INTO d_calls (message_id, author_id, author_name, "
+                        "symbol, direction, posted_at, scored, ret_pct) VALUES "
+                        "(?,?,?,?,?,?,?,?)", (f"c{j}", aid, f"auteur{aid}", sym,
+                                              "long", "2026-10-01", 1, ret))
+        con.execute("INSERT INTO d_members VALUES ('111','nom','disp',0,"
+                    "'2026-02-14',NULL,'[]',NULL)")
+        con.execute("INSERT INTO d_registry VALUES ('1','gate_pending','999',"
+                    "'2026-10-04T00:00:00+00:00', 0)")
+        con.commit()
+        con.close()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_classement_min_calls(self):
+        rows = self.stats.classement(self.db)
+        self.assertEqual([r["author_id"] for r in rows], ["111"])  # 222 = 1 call < 3
+        r = rows[0]
+        self.assertEqual(r["n"], 4)
+        self.assertAlmostEqual(r["wr"], 0.75)
+        self.assertAlmostEqual(r["tot"], 5.0)
+
+    def test_user_stats(self):
+        st = self.stats.user_stats("111", self.db)
+        self.assertEqual(st["n_messages"], 3)
+        self.assertEqual(st["n_scored"], 4)
+        self.assertAlmostEqual(st["wr"], 0.75)
+        self.assertEqual(len(st["calls"]), 4)
+        self.assertEqual(self.stats.user_stats("inconnu", self.db)["n_messages"], 0)
+
+    def test_server_stats(self):
+        s = self.stats.server_stats(self.db)
+        self.assertEqual(s["n_members"], 1)
+        self.assertEqual(s["n_bots"], 0)
+        self.assertEqual(s["m24"], 5)  # seeded à maintenant
+        self.assertEqual(s["n_gate_pending"], 1)
+        self.assertTrue(any(c["channel_name"] == "commandes" for c in s["top_channels"]))
+
+
 if __name__ == "__main__":
     unittest.main()
