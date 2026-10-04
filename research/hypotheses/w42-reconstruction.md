@@ -37,3 +37,19 @@ Jugé sous : protocol_v1 · Exécution : semaine W41 (budget W40 épuisé 22/20 
 Baseline anti-dérive : les wallets solo du grand audit (survivor $155/DD 7,4 % ;
   vol_spike $122/DD 13,4 %, w=1) doivent se REPRODUIRE au run — si reproduction
   ≠, STOP, le sol a bougé.
+
+## AMENDEMENT du 05/10 (avant le run — le sol a bougé, la loi s'applique)
+Entre le gel (12465ab) et le run, le MOTEUR a été corrigé (l'audit GPT 5.6,
+14/14 findings, PRs #100/#101/#102) : funding as-of (la moyenne full-sample
+est morte), DD mark-to-market (bookage du pnl à la sortie + marks horaires
+par event), Sharpe re-annualisé, réconciliation coûts↔courbe. Conséquences :
+1. Les chiffres du grand audit ($155/DD 7,4 % ; $122/DD 13,4 %) sont des
+   ABSOLUS pré-fix — morts selon la loi. La baseline anti-dérive devient :
+   les solos RE-MESURÉS avec le moteur fixé (mêmes events, mêmes gates,
+   même split) = la nouvelle référence ; leur reproduction exacte n'est
+   PAS attendue (DD plus hauts car le latent est visible, funding différent).
+2. Les critères PASS/FAIL restent INCHANGÉS (relatifs : joint vs solos).
+3. Le cap de marge 1 % s'applique aux solos ET au joint — comparaison
+   appariée sur la construction seule.
+4. Exécution : semaine W41 (le verrou lab_ledger a dit STOP le 04/10 sur
+   W40 22/20) — un seul run, loggé au ledger, verdict au registre (APPEND).
