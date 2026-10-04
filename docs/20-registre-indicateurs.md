@@ -726,3 +726,26 @@ COUCHES DE SIZING (le corr-tilt conditionnel est PASSÉ et vivant) ; 1 balayage 
 rapport reports/backtest-campagne-v2-2026-10-04.md, audit de multiplicité inclus ; le harnais
 a été réparé de 3 crashs pd.NA au passage) ; le tournoi
 de calibration Bonsai est scoré (P5 FAIL 70 % = HIT, 1/1 — grille du 05/10 : 1/18 après filtre).
+
+## 05/10 — x-calls-fade : LE PREMIER VERDICT DU DOMAINE X — le chase est toxique, le fade ne paie pas les coûts
+
+Le reframe ingénieux (calls = événements de liquidité, le follower = l'exit liquidity forcée) testé
+sur les 585 calls parsés, deux cellules pré-déclarées (1h et 15m T+15→T+60 sur les syms backfillés),
+28 bps RT, contrôle inverse inhérent (chase et fade sur les MÊMES trades) :
+
+| Cellule | CHASE (suivre le call) | FADE (l'inverse) |
+|---|---|---|
+| 1h, n=525 | WR 29,8/33,6 % · **−51,7/−17,4 bps** | WR 36,7/28,3 % · −4,3/−38,6 bps |
+| 15m, n=370 | WR 21,2/22,6 % · **−58,0/−37,2 bps** | WR 32,6/23,1 % · **+2,0/−18,8 bps** |
+
+- **P2 (fade > chase) PASS 4/4** — l'asymétrie directionnelle est RÉELLE : le call X est un appât,
+  le chase est le mauvais côté. Mais le fade seul ne paie pas les 28 bps en VAL (−18,8 bps) : la
+  moyenne |move| dans la fenêtre T+15→T+60 ≈ le coût. Le decay du pump existe mais est sous le mur.
+- **Le finding utilisateur** : suivre les calls X = **−37 à −58 bps par trade systématiques** —
+  le parser appelle ça un call, les données appellent ça une contre-indication.
+- **VERDICT** : KILL (P1/P3 FAIL en VAL) — **la famille x-calls-fade est close ; le domaine X
+  reste collecteur passif (assumé)**. Les trackers gratuits (délétions par diff nocturne, snapshot
+  d'engagement T+15) restent disponibles SI un jour un nouveau mécanisme forcé les réclame —
+  pas d'infrastructure sans hypothèse vivante.
+
+| **x-calls-fade (chase ET fade, 1h + 15m)** | le chase est TOXIQUE (−37/−58 bps), le fade domine mais sous les coûts ; 44 % WR brut du parseur = bruit de parsing | **NUL/KILL** (REJECTED) — X = collecteur passif assumé |
