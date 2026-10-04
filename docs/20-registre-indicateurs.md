@@ -696,3 +696,33 @@ Rapports : reports/aster/inv-a-majeure-deviante-2026-10.md · inv-b-concentratio
 Le test pré-enregistré (discriminateur adversarial Δindex, seuils de théorie pas de nos données, évaluateur verrouillé après red-team) a tourné dès que le gate v2 l'a permis (16/20 W40). **22,2 % des 80 770 trades listing <90 j sont TOXIQUES** — le premium s'emballe POUR un pump (Δindex > 0,5 %/15m), au-dessus de la ligne de kill à 15 %, concordant premier ordre/exact. Le mécanisme directionnel existe (contrôle inverse −20,61 vs +4,61 bps ; gradient d'âge parfaitement monotone 0-7j +9,4 → 7-30j +6,0 → 30-90j +3,8 ; 62 % de mois positifs VAL) MAIS **plus d'1 signal sur 5 = l'éponge du pump** — exactement le risque que le desk adversarial de Bonsai avait modélisé. Interdit de « réparer » par le filtre après coup : la règle écrite avant tue, le P4/P2 sont gravés comme CONTEXTE de réouverture théorique future.
 
 | **premium-fade-listing (discriminateur Δindex)** | 80 770 trades, 22,2 % toxiques > 15 % ex ante ; VAL +4,61 bps, inverse −20,61, gradient 9,4/6,0/3,8 | **NUL/KILL** (REJECTED) — la famille premium-fade entière est close ; première calibration Bonsai : P5 FAIL à 70 % = HIT |
+
+## 04-05/10 — la dé-limitation : re-cost PASS, maker mesuré, la chasse aux bugs
+
+**Le re-cost du flux meme au spread réel (PASS, ledger 30e)** : la mutation de coût pré-enregistrée
+(`volspike_recost_spread.py`) — le flux vol_spike_meme FROZEN tient au spread réel par symbole :
+espérance +0,0138 → **+0,0161 $/trade**, 897 trades séquentiels, 0 liq. Correction de référentiel
+scellée avant le run : le coût machine = TAKER_RT **28 bps** (4 frais + 10 slippage × 2), pas les
+8 bps du backtest premium-fade — l'hypothèse couvrait la médiane mesurée (plancher meme 12-24 bps
++ 8 frais = 20-32 RT). La surestimation « 2-25× » ne subsiste que sur la queue fine (CATE 160,
+MEME 208 RT réels ; 2,3 % des events, absorbés).
+
+**Le fill-rate maker mesuré** (`maker_fillrate_tape.py`) : 100 % de fill à 1 min sur BTC/ETH,
+sélection adverse 1-2 bps seulement — mais spread majors ≈ 0 : rien à économiser. **Le prize
+maker (12-24 bps) est sur les memes**, mesurable dès l'extension du collecteur tape (décision user).
+
+**La chasse aux bugs parallèle** (3 agents lecture seule, `reports/aster/bug-hunt-0510/SYNTHESE.md`) :
+1 critique — **corr_months zero-fillait les mois absents** (corr réelle +1,00 lue +0,42) — corrigé
+(intersection des mois communs) et re-mesuré : vol_spike×majors −0,055, ×meme −0,650 → les verdicts
+de décorrélation tiennent. Le forward flagship **blanchi** (92/92 : pas de look-ahead, stop
+intrabar prioritaire, watermark, idempotence). Correction d'unité : premium_history en POURCENT
+(le piège inversé vs la mémoire ; INV-N immunisé). 10 mineurs + 3 suspects en file priorisée —
+dont le collecteur legacy qui écrit des primes 0.0 lues par crowding_composite : garde à poser
+avant le tir H-CROWD-1 du 30/10.
+
+**La gouvernance de la dé-limitation** (carte Ariad 04/10) : les familles closes rouvertes COMME
+COUCHES DE SIZING (le corr-tilt conditionnel est PASSÉ et vivant) ; 1 balayage systématique/semaine
+(la passe W41 est TERMINÉE : 30 645 combinaisons, 356 cellules, 32 CONFIRMÉES train→val —
+rapport reports/backtest-campagne-v2-2026-10-04.md, audit de multiplicité inclus ; le harnais
+a été réparé de 3 crashs pd.NA au passage) ; le tournoi
+de calibration Bonsai est scoré (P5 FAIL 70 % = HIT, 1/1 — grille du 05/10 : 1/18 après filtre).
