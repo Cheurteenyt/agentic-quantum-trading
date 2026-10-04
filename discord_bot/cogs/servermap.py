@@ -163,6 +163,34 @@ class ServerMap(commands.Cog):
     async def on_guild_role_delete(self, role: discord.Role) -> None:
         await self._structure_changed(role.guild, f"rôle supprimé : **{role.name}**")
 
+    @app_commands.command(name="acces",
+                          description="La matrice des accès d'un salon (rôles, overwrites, mes droits)")
+    async def acces(self, inter: discord.Interaction, channel: discord.TextChannel) -> None:
+        if not is_admin(inter):
+            await inter.response.send_message("réservé aux admins", ephemeral=True)
+            return
+        me = inter.guild.me
+        mine = channel.permissions_for(me)
+        mes_droits = [n for n, ok in (("voir", mine.view_channel),
+                                      ("écrire", mine.send_messages),
+                                      ("historique", mine.read_message_history),
+                                      ("gérer le salon", mine.manage_channels),
+                                      ("purger", mine.manage_messages))
+                      if ok]
+        lines = [f"**🔐 Les accès de #{channel.name}**",
+                 f"• mes droits : {', '.join(mes_droits) or 'AUCUN'}"]
+        for target, ow in sorted(channel.overwrites.items(), key=lambda kv: str(kv[0])):
+            if target.is_default():
+                name = "@everyone"
+            else:
+                name = f"@{target.name}"
+            allow = [perm for perm, val in ow if val is True]
+            deny = [perm for perm, val in ow if val is False]
+            if allow or deny:
+                lines.append(f"• {name} : ✅ {', '.join(allow) or '—'} | "
+                             f"❌ {', '.join(deny) or '—'}")
+        await inter.response.send_message("\n".join(lines)[:1900], ephemeral=True)
+
 
 def _by_category(guild: discord.Guild) -> list[tuple[str, list[discord.TextChannel]]]:
     out: dict[str, list[discord.TextChannel]] = {}
