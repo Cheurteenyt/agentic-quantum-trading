@@ -130,19 +130,30 @@ def _fee_fraction(fees_bps_round_trip: float) -> float:
     return fees_bps_round_trip / 10_000.0
 
 
+def compounded_total_return(returns: Sequence[float]) -> float:
+    """L'unique algebre de rendement du projet : equity = prod(1 + r) - 1.
+
+    FIX lot2 (F14) : le moteur comparait sum(trade_returns) (cote strategie)
+    a ce compose (cote benchmarks) — deux conventions pour le meme gate.
+    SOMMER des pourcentages surestime les series gagnantes.
+    """
+    equity = 1.0
+    for r in returns:
+        equity *= 1.0 + r
+    return equity - 1.0
+
+
 def _build_result(
     name: str, trades: list[BaselineTrade]
 ) -> BaselineResult:
     """Agrege des trades en resultat. Le total capitalise les rendements nets :
     sommer des pourcentages surestime les series gagnantes."""
     nets = [t.net_return for t in trades]
-    equity = 1.0
-    for r in nets:
-        equity *= 1.0 + r
+    total = compounded_total_return(nets)
     wins = sum(1 for r in nets if r > 0)
     return BaselineResult(
         name=name,
-        total_return=equity - 1.0,
+        total_return=total,
         trades=trades,
         n_trades=len(trades),
         win_rate=(wins / len(nets)) if nets else None,
