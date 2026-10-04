@@ -147,6 +147,12 @@ def reg_set(guild_id: int | str, kind: str, target: str, value: str = "") -> Non
     con = connect()
     try:
         _reg_init(con)
+        if kind.startswith(("channel_", "role_")):
+            # un canal/rôle enregistré REMPLACE l'ancien — le UNIQUE(guild, kind,
+            # target) ne le fait pas seul (target différent = 2e ligne, l'ancien
+            # traîne). Les rule_* gardent le multi-cibles.
+            con.execute("DELETE FROM d_registry WHERE guild_id=? AND kind=?",
+                        (str(guild_id), kind))
         con.execute("INSERT OR REPLACE INTO d_registry VALUES (?,?,?,?,?)",
                     (str(guild_id), kind, target, value, time.time()))
         con.commit()
