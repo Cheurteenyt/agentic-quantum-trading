@@ -166,7 +166,7 @@ class Semantic(commands.Cog):
 
     # ——— le rapport quotidien ———
 
-    @tasks.loop(hours=24)
+    @tasks.loop(hours=168)
     async def report_loop(self) -> None:
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
@@ -187,7 +187,7 @@ class Semantic(commands.Cog):
             if ch is None:
                 print("[semantic] pas de salon de destination — rapport 24 h abstenu")
                 return
-            e = discord.Embed(title="📊 Le rapport 24 h du bot", color=0x5865F2)
+            e = discord.Embed(title="📊 Le rapport HEBDOMADAIRE du bot", color=0x5865F2)
             e.add_field(name="messages capturés", value=f"{msgs:,}")
             e.add_field(name="médias", value=f"{media:,}")
             e.add_field(name="actions mod", value=f"{actions}")
