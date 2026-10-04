@@ -238,3 +238,20 @@ les dispatcher en Agent parallèles (UN SEUL message, plusieurs appels Agent).
   `# ARCHIVÉ (date)` — on ne supprime jamais, on re-catégorise.
 - Condition d'archivage : verdict rendu ET aucun fichier vivant ne l'importe
   (grep avant de déplacer). Carte racine : `scripts/README.md`.
+
+
+# ⚡ RESEARCH FIREWALL (depuis le 05/10 — audit GPT v3 §26-27)
+
+Le modèle est libre de penser, proposer et expérimenter — il n'est JAMAIS
+l'autorité de vérité. La vérité = hypothèse → code → exécution → résultat →
+vérification → evidence → ledger → STATE.
+
+- **Ledger de preuves** : `research/evidence/facts.jsonl` (35 faits seedés)
+  — schéma et règles dans `research/evidence/README.md`.
+- **Le vérificateur** : `python scripts/claim_verify.py --all` (exit 1 si un
+  fait est CONTRADICTED/UNVERIFIED). Un fait contredit se corrige via PR.
+- **Le brief d'entrée de session** : `python scripts/context_manifest.py` —
+  HEAD + STATE + les faits + le budget + les derniers verdicts. LIRE CELA
+  AVANT docs/20 (127 Ko) ou toute relecture massive.
+- **La règle** : toute affirmation porte son id de fait (F-XXX) ou sa
+  commande de reproduction. UNVERIFIED n'entre jamais dans STATE.md.
