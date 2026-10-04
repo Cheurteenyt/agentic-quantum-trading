@@ -40,7 +40,8 @@ discord_bot/
 ├── README.md       # ce guide
 └── cogs/
     ├── status.py   # /ping, /etat, /membres (lecture seule DB)
-    └── capture.py  # LA CAPTURE : chaque message (texte/médias/liens) → discord.db + backfill
+    ├── capture.py   # LA CAPTURE : chaque message (texte/médias/liens) → discord.db + backfill
+    └── moderation.py # LA MODÉRATION : kick/ban/timeout/warn/clear/lock/roles + auto-mod (spam, mentions, invites) + log #logs
 ```
 Les prochains cogs prévus (l'agent discord-bot du repo) : les rapports quotidiens (stats machine,
 alertes de graduation fomo, trades forward, verdicts) postés dans DISCORD_HOME_CHANNEL.
