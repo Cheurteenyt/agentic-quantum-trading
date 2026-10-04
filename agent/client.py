@@ -1,9 +1,12 @@
 """GLM 5.1 API client for trading agent."""
 import os
 import json
+import logging
 import requests
 from typing import Optional, Dict, Any
 from agent.state_manager import StateManager
+
+logger = logging.getLogger(__name__)
 
 class GLMClient:
     """Client for Zhipu GLM 5.1 API with multimodal support."""
@@ -70,8 +73,8 @@ class GLMClient:
                 }
             return None
             
-        except Exception as e:
-            self.state.log_error(f"GLM API error: {str(e)}")
+        except Exception:
+            logger.exception("GLM API error")
             return None
     
     def call_vision(self, messages: list, image_url: str = None,
