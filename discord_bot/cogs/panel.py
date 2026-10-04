@@ -14,6 +14,7 @@ import discord
 from discord.ext import commands, tasks
 
 from discord_bot import stats, store
+from discord_bot.cogs.brain import BrainModal
 
 MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
 
@@ -77,6 +78,11 @@ def main_embed(guild: discord.Guild) -> discord.Embed:
                       color=discord.Color.blurple())
     e.description = ("**Les boutons ci-dessous = ton interface.** "
                      "Rien à taper, tout se clique.")
+    snap = stats.market_snapshot()
+    if snap:
+        majors_line, _ = stats.market_lines(snap)
+        e.add_field(name="📈 Le marché (24 h, prix réels)", value=majors_line,
+                    inline=False)
     e.add_field(name="👥 Le serveur", value=f"{s['n_members']} membres · "
                 f"{s['n_roles']} rôles", inline=True)
     e.add_field(name="📨 La capture", value=f"{s['m24']} msg / 24 h · "
@@ -95,6 +101,17 @@ def main_embed(guild: discord.Guild) -> discord.Embed:
                                      for c in s["top_channels"][:4]),
                     inline=False)
     e.set_footer(text="Actualisé toutes les 10 min · les données = la warehouse du bot")
+    return e
+
+
+def marche_embed(snap: dict) -> discord.Embed:
+    majors_line, movers = stats.market_lines(snap)
+    e = discord.Embed(title="📈 Le marché (24 h, klines 1h)",
+                      description=majors_line, color=discord.Color.green())
+    up, down = movers.split("\n")
+    e.add_field(name="Les fortes hausses", value=up, inline=False)
+    e.add_field(name="Les fortes baisses", value=down, inline=False)
+    e.set_footer(text=f"{snap['n_symbols']} symboles suivis · la warehouse locale")
     return e
 
 
@@ -128,6 +145,24 @@ class PanelView(discord.ui.View):
         st = stats.user_stats(str(interaction.user.id))
         await interaction.response.send_message(
             embed=profil_embed(interaction.user, st), ephemeral=True)
+
+    @discord.ui.button(label="Marché", style=discord.ButtonStyle.success,
+                       emoji="📈", custom_id="ce_panel_marche")
+    async def marche(self, interaction: discord.Interaction,
+                     button: discord.ui.Button) -> None:
+        snap = stats.market_snapshot()
+        if snap is None:
+            await interaction.response.send_message(
+                "📈 la warehouse dort (pas de klines récentes) — réessaie plus tard.",
+                ephemeral=True)
+            return
+        await interaction.response.send_message(embed=marche_embed(snap), ephemeral=True)
+
+    @discord.ui.button(label="Demander", style=discord.ButtonStyle.primary,
+                       emoji="🧠", custom_id="ce_panel_demander")
+    async def demander(self, interaction: discord.Interaction,
+                       button: discord.ui.Button) -> None:
+        await interaction.response.send_modal(BrainModal())
 
 
 # ——— le cog ———
@@ -198,7 +233,8 @@ class Panel(commands.Cog):
             if ch is None or not hasattr(ch, "get_partial_message"):
                 continue
             try:
-                await ch.get_partial_message(msg_id).edit(embed=main_embed(guild))
+                await ch.get_partial_message(msg_id).edit(embed=main_embed(guild),
+                                            view=PanelView())
             except discord.NotFound:
                 await self.install(guild, force=True)  # supprimé → réinstallé
             except discord.Forbidden:

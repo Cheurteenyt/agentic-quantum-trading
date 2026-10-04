@@ -47,6 +47,39 @@ def _ensure_server(max_wait_s: int = 60) -> bool:
     return False
 
 
+ASK_SYSTEM = (
+    "Tu es Core Equity, l'assistant d'un serveur crypto. Réponds en français, "
+    "concis (max 120 mots), direct. Les données de marché entre crochets sont "
+    "RÉELLES (notre warehouse) — cite-les telles quelles et n'invente JAMAIS un "
+    "prix ou un chiffre absent du contexte. Si tu ne sais pas, dis-le. Quand on "
+    "te demande d'acheter/vendre, réponds sur les faits et rappelle en une "
+    "phrase que ce n'est pas un conseil financier."
+)
+
+
+def ask(question: str, context: str = "") -> str | None:
+    """La réponse du cerveau au monde — None si Bonsai est indisponible."""
+    if not _ensure_server():
+        return None
+    content = f"[Données réelles de la warehouse]\n{context}\n\n[Question]\n{question[:600]}"
+    body = {
+        "messages": [{"role": "system", "content": ASK_SYSTEM},
+                     {"role": "user", "content": content}],
+        "max_tokens": 400,
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+    req = urllib.request.Request(LLAMA + "/v1/chat/completions",
+                                 data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with _LLM_LOCK, urllib.request.urlopen(req, timeout=90) as r:
+            text = json.loads(r.read().decode())["choices"][0]["message"].get("content") or ""
+    except Exception:
+        return None
+    text = text.strip()
+    return text[:1900] or None
+
+
 def classify(message: str, age_days: float, channel: str) -> dict | None:
     """Le verdict sémantique — None si le juge est indisponible ou illisible."""
     if not _ensure_server():
