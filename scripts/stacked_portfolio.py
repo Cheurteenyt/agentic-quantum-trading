@@ -147,6 +147,10 @@ def _size_fn_arity(fn) -> int:
 def run_stack(events: list[dict], capital: float, size_fn,
               funding_hourly: dict[str, float], oracle: bool = False) -> dict:
     """Le wallet multi-stratégies. size_fn(e) -> taille marge (0-1)."""
+    if size_fn is None:
+        # FIX lot1 (F13) : le fallback None faisait `sz = size` — un
+        # NameError latent au milieu de la boucle. On refuse tôt.
+        raise ValueError("size_fn requis : passe un sizer (e) -> taille marge 0-1")
     balance = capital
     peak = trough = balance
     max_dd = 0.0
@@ -167,12 +171,10 @@ def run_stack(events: list[dict], capital: float, size_fn,
         # dispatch par introspection — un except TypeError masquerait les
         # vraies erreurs internes du sizing
         dd_now = (peak - balance) / peak * 100 if peak > 0 else 0.0
-        if size_fn is not None and _size_fn_arity(size_fn) >= 2:
+        if _size_fn_arity(size_fn) >= 2:
             sz = size_fn(e, {"balance": balance, "dd": dd_now, "peak": peak})
-        elif size_fn is not None:
-            sz = size_fn(e)
         else:
-            sz = size
+            sz = size_fn(e)
         if sz <= 0:
             continue
         margin = balance * sz
