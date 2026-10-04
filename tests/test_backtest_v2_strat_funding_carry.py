@@ -69,15 +69,23 @@ def _wiggle(n=400, level=100.0):
     return _bars_from_closes(closes)
 
 
-def _make_rate(avg, symbol="BTCUSDT"):
-    """FundingRate frais (cached_at = maintenant) -> jamais perime dans un test."""
-    return FundingRate(
-        symbol=symbol,
-        avg_bps_per_8h=avg,
-        sample_count=50,
-        last_funding_time_ms=0,
-        cached_at=time.time(),
-    )
+class _ConstSeries:
+    """Série funding à taux constant (même signe que l'ancienne moyenne) —
+    le contrat as-of : rate_asof(ts) et sum_pct_between(t0, t1)."""
+
+    def __init__(self, avg_pct):
+        self.avg = avg_pct
+
+    def rate_asof(self, ts_ms):
+        return self.avg
+
+    def sum_pct_between(self, t0_ms, t1_ms):
+        return self.avg * max(0.0, (t1_ms - t0_ms) / 3_600_000.0)
+
+
+def _make_series(avg, symbol="BTCUSDT"):
+    """Stub du loader : un taux constant du signe voulu."""
+    return _ConstSeries(avg)
 
 
 def _params(**over):
@@ -118,49 +126,44 @@ class TestParamSpace(unittest.TestCase):
 class TestSideSelection(unittest.TestCase):
     def test_positive_funding_gives_short(self):
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
             ev = fc.evaluate(_params(), bars)
-        self.assertEqual(ev.blob["side"], "short")
         self.assertGreater(ev.closed_trades, 0)
         self.assertTrue(all(s == -1 for _, s in ev.blob["entries"]))
 
     def test_negative_funding_gives_long(self):
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(-0.30)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(-0.30)):
             ev = fc.evaluate(_params(), bars)
-        self.assertEqual(ev.blob["side"], "long")
         self.assertGreater(ev.closed_trades, 0)
         self.assertTrue(all(s == 1 for _, s in ev.blob["entries"]))
 
     def test_zero_funding_is_flat(self):
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(0.0)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(0.0)):
             ev = fc.evaluate(_params(), bars)
-        self.assertIsNone(ev.blob["side"])
         self.assertEqual(ev.closed_trades, 0)
 
     def test_allow_short_false_blocks_short_side(self):
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
             ev = fc.evaluate(_params(allow_short=False), bars)
         # funding positif -> short collecteur ; shorts interdits -> plat.
-        self.assertIsNone(ev.blob["side"])
         self.assertEqual(ev.closed_trades, 0)
 
     def test_unavailable_funding_is_flat(self):
         bars = _wiggle()
         with patch.object(
-            fc, "load_funding_rate",
+            fc, "load_funding_series",
             lambda symbol, cache_path=None: (_ for _ in ()).throw(
                 CostDataUnavailable("cache perime")
             ),
         ):
             ev = fc.evaluate(_params(), bars)
-        self.assertIsNone(ev.blob["side"])
         self.assertEqual(ev.closed_trades, 0)
         self.assertFalse(ev.blob["funding_available"])
         self.assertEqual(ev.costs.funding_usd, 0.0)
@@ -170,8 +173,8 @@ class TestSideSelection(unittest.TestCase):
 class TestNoLookAhead(unittest.TestCase):
     def test_mutate_last_bar_changes_no_past_entry(self):
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
             ev_a = fc.evaluate(_params(hold_max_bars=168), bars)
             # mute UNIQUEMENT la derniere barre.
             muted = list(bars[:-1]) + [
@@ -187,9 +190,9 @@ class TestNoLookAhead(unittest.TestCase):
 
     def test_execution_at_next_open_not_current_close(self):
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
-            trades, _ = fc.simulate(bars, _params(), "short", 168)
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
+            trades, _ = fc.simulate(bars, _params(), lambda ts: "short", 168)
         for t in trades:
             self.assertGreaterEqual(t.entry_index, 1)
             self.assertAlmostEqual(t.entry_price, bars[t.entry_index].open, places=9)
@@ -198,8 +201,8 @@ class TestNoLookAhead(unittest.TestCase):
 class TestCosts(unittest.TestCase):
     def setUp(self):
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
             self.bars = bars
             self.ev = fc.evaluate(_params(), bars)
 
@@ -248,7 +251,7 @@ class TestContract(unittest.TestCase):
     def test_zero_return_when_out_of_position(self):
         bars = _wiggle()
         with patch.object(
-            fc, "load_funding_rate",
+            fc, "load_funding_series",
             lambda symbol, cache_path=None: (_ for _ in ()).throw(
                 CostDataUnavailable("cache perime")
             ),
@@ -259,8 +262,8 @@ class TestContract(unittest.TestCase):
 
     def test_deterministic(self):
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
             a = fc.evaluate(_params(), bars)
             b = fc.evaluate(_params(), bars)
         self.assertEqual(list(a.bar_returns_per_bar), list(b.bar_returns_per_bar))
@@ -273,17 +276,17 @@ class TestContract(unittest.TestCase):
     def test_holding_bars_within_cap(self):
         bars = _wiggle()
         cap = 168
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
-            trades, _ = fc.simulate(bars, _params(hold_max_bars=cap), "short", cap)
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
+            trades, _ = fc.simulate(bars, _params(hold_max_bars=cap), lambda ts: "short", cap)
         self.assertTrue(trades)
         for t in trades:
             self.assertLessEqual(t.holding_bars, cap)
 
     def test_rolling_produces_multiple_trades(self):
         bars = _wiggle(400)
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
             ev = fc.evaluate(_params(hold_max_bars=168), bars)
         # 400 barres / 168 => au moins 2 roulements.
         self.assertGreater(ev.closed_trades, 1)
@@ -295,8 +298,8 @@ class TestGridRuns(unittest.TestCase):
         import itertools
 
         bars = _wiggle()
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
             keys = list(fc.PARAM_SPACE)
             for combo in itertools.product(*(fc.PARAM_SPACE[k] for k in keys)):
                 params = dict(zip(keys, combo))
@@ -308,8 +311,8 @@ class TestGridRuns(unittest.TestCase):
 class TestEngineIntegration(unittest.TestCase):
     def test_evaluate_one_produces_lane_metrics(self):
         bars = _wiggle(500)
-        with patch.object(fc, "load_funding_rate",
-                          lambda symbol, cache_path=None: _make_rate(+0.46)):
+        with patch.object(fc, "load_funding_series",
+                          lambda symbol, cache_path=None: _make_series(+0.46)):
             ev = fc.evaluate(_params(), bars)
         identity = LaneIdentity(
             symbol="BTCUSDT", interval="1h", side="both",

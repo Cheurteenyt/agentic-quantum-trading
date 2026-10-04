@@ -149,11 +149,11 @@ def run_walkforward(returns: Sequence[float], cfg: WalkForwardConfig,
                     periods_per_year: int = 365) -> WalkForwardResult:
     """Execute le walk-forward sur une serie de rendements par barre.
 
-    Le Sharpe IS et le Sharpe OOS sont calcules sur la CONCATENATION des
-    segments, pas sur une moyenne de Sharpe par fold : moyenner des Sharpe
-    surponderait les folds courts et lisserait justement l'instabilite qu'on
-    cherche a detecter. La dispersion par fold est rendue separement via
-    degradation_std.
+    Le Sharpe OOS est calcule sur la concatenation des segments de test
+    (disjoints par construction). Le Sharpe IS est la MEDIANE des Sharpes
+    par fold : FIX audit v3 (C5) — en rolling, les trains se chevauchent
+    (B compte dans le fold 1 ET le fold 2, mesure x1,85 sur 5000 barres),
+    la concatenation surponderait donc les barres les plus recentes.
 
     periods_per_year : la frequence REELLE des barres (1h -> 8760, 4h ->
     2190, 1d -> 365). Le defaut 365 est la convention journaliere — le
@@ -169,7 +169,11 @@ def run_walkforward(returns: Sequence[float], cfg: WalkForwardConfig,
     all_train = [r for seg in train_returns for r in seg]
     all_test = [r for seg in test_returns for r in seg]
 
-    sharpe_is = sharpe(all_train, periods_per_year)
+    fold_sharpes_is = [sharpe(seg, periods_per_year) for seg in train_returns]
+    measured_is = [s for s in fold_sharpes_is if s is not None]
+    sharpe_is = (statistics.median(measured_is)
+                 if len(measured_is) >= 2 else
+                 (measured_is[0] if measured_is else None))
     sharpe_oos = sharpe(all_test, periods_per_year)
 
     # None ou IS <= 0 : le ratio n'a pas de sens, on ne l'invente pas.

@@ -261,7 +261,9 @@ def outcomes(df: pd.DataFrame, events, direction: int,
             j = entry_i + h - 1
             if j >= len(idx):
                 continue
-            hold_h = (idx[j] - idx[entry_i]).total_seconds() / 3600
+            # FIX audit v3 (C15) : la durée d'exposition va de l'OPEN d'entrée
+            # à la CLOSE de sortie — h=1 = 1 h réelle, plus jamais 0.
+            hold_h = ((idx[j] - idx[entry_i]).total_seconds() / 3600) + 1.0
             ret = ((closes[j] - entry) / entry * 100 * direction
                    - cost_pct - direction * funding_per_hour * hold_h)
             if direction > 0:

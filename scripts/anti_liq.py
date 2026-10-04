@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.backtest_indicators import load_df  # noqa: E402
+from scripts.aster_indicators import atr as _true_atr  # noqa: E402
 from scripts.funding_series import FundingSeries, funding_series_all  # noqa: E402,F401
 from scripts.portfolio_sim import (  # noqa: E402
     KDB, MAJORS, HOLD_H, LIQ_MOVE_PCT, btc_regime_series, run_sim)
@@ -111,7 +112,9 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
                & (ra > ra.shift(1)) & (ra.shift(1) > ra.shift(2))).fillna(False)
 
         # --- features, TOUTES calculées au signal t (≤ t, zéro look-ahead) ---
-        atr = close.diff().abs().rolling(24).mean()
+        # FIX audit v3 (C8) : un VRAI ATR (True Range + Wilder) — l'ancienne
+        # moyenne des |Δclose| ignorait mèches et gaps.
+        atr = _true_atr(df, n=24)
         atr_pct = (atr / close * 100).values
         vol24 = r1.rolling(24).std().values
         depth3 = (r1 + r1.shift(1) + r1.shift(2))
@@ -145,8 +148,14 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
             mae = (highs[ei:exit_j + 1].max() - entry) / entry * 100
             # le label du sim : mae ≥ seuil OU pnl ≤ -marge (indépendant de la balance)
             fees_pct = (FEE_BPS + SLIP_BPS) * 2 * 20 / 100
-            fund_h = (np.interp(idx_ns[ei], ft[0], ft[1]) if ft is not None
-                      and len(ft[0]) else 0.0)
+            # FIX audit v3 (C6) : as-of STRICT — le dernier taux CONNU à
+            # l'entrée ; np.interp mélangeait le print FUTUR dans la feature
+            # funding_last (qui alimente l'AL score).
+            fund_h = 0.0
+            if ft is not None and len(ft[0]):
+                _k = int(np.searchsorted(ft[0], idx_ns[ei], side="right")) - 1
+                if _k >= 0:
+                    fund_h = float(ft[1][_k])
             fund_pct = fund_h * HOLD_H * 20 / 100
             pnl_pct = ret * 20 + fund_pct - fees_pct
             liq = mae >= LIQ_MOVE_PCT or pnl_pct <= -100

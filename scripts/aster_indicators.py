@@ -18,12 +18,29 @@ def ema(s: pd.Series, n: int) -> pd.Series:
 
 
 def rsi(close: pd.Series, n: int = 14) -> pd.Series:
-    """RSI de Wilder (lissage ewm alpha=1/n)."""
+    """RSI de Wilder STRICT (FIX audit v3, C17).
+
+    Seed = SMA des n premiers deltas (le classique de Wilder 1978), puis le
+    lissage moyenne-alpha. Pertes nulles → RS infini → RSI 100 (et non NaN) ;
+    gains nuls → RSI 0. Les n premiers points sont NaN (pas de seed inventé).
+    """
     delta = close.diff()
-    up = delta.clip(lower=0).ewm(alpha=1 / n, adjust=False).mean()
-    dn = (-delta.clip(upper=0)).ewm(alpha=1 / n, adjust=False).mean()
-    rs = up / dn.replace(0, pd.NA)
-    return 100 - 100 / (1 + rs)
+    gain = delta.clip(lower=0)
+    loss = (-delta.clip(upper=0))
+    avg_gain = gain.copy() * float("nan")
+    avg_loss = loss.copy() * float("nan")
+    if len(delta) > n:
+        avg_gain.iloc[n] = gain.iloc[1:n + 1].mean()
+        avg_loss.iloc[n] = loss.iloc[1:n + 1].mean()
+        for i in range(n + 1, len(delta)):
+            avg_gain.iloc[i] = (avg_gain.iloc[i - 1] * (n - 1)
+                                + gain.iloc[i]) / n
+            avg_loss.iloc[i] = (avg_loss.iloc[i - 1] * (n - 1)
+                                + loss.iloc[i]) / n
+    rs = avg_gain / avg_loss.replace(0.0, float("nan"))
+    rsi_v = 100 - 100 / (1 + rs)
+    return rsi_v.where(~((avg_loss == 0) & (avg_gain > 0)), 100.0).where(
+        ~((avg_gain == 0) & (avg_loss == 0)), 50.0)
 
 
 def macd(close: pd.Series, fast: int = 12, slow: int = 26,

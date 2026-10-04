@@ -23,8 +23,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.services.backtest_v2.baselines import Bar  # noqa: E402
-from backend.services.backtest_v2.costs import (  # noqa: E402
-    CostDataUnavailable, FundingRate)
+from backend.services.backtest_v2.costs import CostDataUnavailable  # noqa: E402
+from scripts.funding_series import FundingSeries  # noqa: E402
+
+H_MS = 3_600_000.0
 
 
 def _load(name, rel):
@@ -52,16 +54,16 @@ def _flat_bars():
     return [_bar(i, 100, 100.01, 99.99, 100) for i in range(4)]
 
 
-def _fake_rate():
-    return FundingRate(symbol="BTCUSDT", avg_bps_per_8h=1.0, sample_count=10,
-                       last_funding_time_ms=0, cached_at=time.time(),
-                       interval_hours=8.0)
+def _fake_series():
+    """Deux prints de 0,01 % DANS la fenêtre du trade — l'entrée est à h1,
+    la sortie à h3 (2 barres) : le long paie Σ = 0,02 %, le short l'encaisse."""
+    return FundingSeries.from_rows([(2 * H_MS, 0.0001), (3 * H_MS, 0.0001)])
 
 
 class TestReconciliation(unittest.TestCase):
     def setUp(self):
-        # cache funding stubbé : 1 bp/8h — un long de 2 barres paie
-        mom.load_funding_rate = lambda symbol, cache_path=None: _fake_rate()
+        # série funding stubbée : le long de 2 barres paie Σ = 0,02 %
+        mom.load_funding_series = lambda symbol, db_path=None: _fake_series()
 
     def test_la_courbe_porte_le_funding_et_le_slippage(self):
         mom.compute_signals = lambda b, p: [1, 1, 0, 0]
@@ -111,9 +113,9 @@ class TestReconciliation(unittest.TestCase):
         self.assertAlmostEqual(ev.equity_curve[-1], expected, places=12)
 
     def test_sans_cache_funding_le_zero_est_explicite(self):
-        def _no_cache(symbol, cache_path=None):
+        def _no_cache(symbol, db_path=None):
             raise CostDataUnavailable("pas de cache")
-        mom.load_funding_rate = _no_cache
+        mom.load_funding_series = _no_cache
         mom.compute_signals = lambda b, p: [1, 1, 0, 0]
         ev = mom.evaluate(dict(PARAMS), _flat_bars())
         self.assertEqual(ev.costs.funding_usd, 0.0)   # 0.0 EXPLICITE

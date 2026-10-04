@@ -47,6 +47,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.portfolio_sim import monthly_rows  # noqa: E402
+from scripts.aster_indicators import atr as _true_atr  # noqa: E402
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, MAKER_RT, TAKER_RT, funding_hourly_all, run_stack)
 from scripts.the_machine import collect_meme  # noqa: E402
@@ -169,13 +170,14 @@ def collect_vol_spike(con: sqlite3.Connection, hold: int = 6,
         med = rng.rolling(win, min_periods=100).median()
         sig = ((rng >= k_rng * med) & (rng >= abs_min)).fillna(False)
         body_up = (df["close"] >= df["open"]).values
-        atr = (close_s.diff().abs().rolling(24).mean() / close_s * 100).values
+        # FIX audit v3 (C8) : un VRAI ATR (True Range + Wilder).
+        atr = (_true_atr(df, n=24) / close_s * 100).values
         for t in np.where(sig)[0]:
             ei = t + 1
             if ei + hold >= len(idx_ns) or t < win:
                 continue
             entry = opens[ei]
-            if entry <= 0 or not np.isfinite(atr[ei]):
+            if entry <= 0 or not np.isfinite(atr[t]):
                 continue
             exit_j = ei + hold - 1
             exit_px = df["close"].values[exit_j]
@@ -192,11 +194,17 @@ def collect_vol_spike(con: sqlite3.Connection, hold: int = 6,
                            "fee_rt_bps": TAKER_RT, "entry": float(entry),
                            "exit": float(exit_px), "price_ret_short": ret,
                            "mae_adverse": float(max(mae, 0.0)),
-                           "fund_sign": sign, "atr_pct": float(atr[ei]),
+                           "fund_sign": sign, "atr_pct": float(atr[t]),
                            "side": "short" if sign == 1 else "long"})
     if atr_gate and events:
-        p90 = float(np.nanquantile([e["atr_pct"] for e in events], 0.90))
-        events = [e for e in events if e["atr_pct"] <= p90]
+        # FIX audit v3 (C10) : le seuil est EXPANDING — au moment du signal,
+        # le quantile ne voit que les events PASSÉS (warmup 50). L'ancien
+        # p90 full-sample donnait à un trade ancien la vol future.
+        events.sort(key=lambda e: e["ts_ms"])
+        _atrs = [e["atr_pct"] for e in events]
+        events = [e for i, e in enumerate(events)
+                  if e["atr_pct"] <= (float(np.nanquantile(_atrs[:i], 0.90))
+                                      if i >= 50 else float("inf"))]
     events.sort(key=lambda e: e["ts_ms"])
     return events
 
@@ -221,7 +229,8 @@ def collect_dd_cross(con: sqlite3.Connection, hold: int = 24,
         opens, highs = df["open"].values, df["high"].values
         close_s = df["close"]
         dd = (1 - close_s / close_s.cummax()) * 100
-        atr = (close_s.diff().abs().rolling(24).mean() / close_s * 100).values
+        # FIX audit v3 (C8) : un VRAI ATR (True Range + Wilder).
+        atr = (_true_atr(df, n=24) / close_s * 100).values
         for lvl in (20.0, 50.0):
             cross = ((dd >= lvl) & (dd.shift(1) < lvl)).fillna(False)
             for t in np.where(cross)[0]:
@@ -229,7 +238,7 @@ def collect_dd_cross(con: sqlite3.Connection, hold: int = 24,
                 if ei + hold >= len(idx_ns) or t < 24:
                     continue
                 entry = opens[ei]
-                if entry <= 0 or not np.isfinite(atr[ei]):
+                if entry <= 0 or not np.isfinite(atr[t]):
                     continue
                 exit_j = ei + hold - 1
                 exit_px = df["close"].values[exit_j]
@@ -242,10 +251,16 @@ def collect_dd_cross(con: sqlite3.Connection, hold: int = 24,
                     "mae_adverse": float(max(
                         (highs[ei:exit_j + 1].max() - entry) / entry * 100, 0)),
                     "fund_sign": 1, "side": "short",
-                    "atr_pct": float(atr[ei]), "level": lvl})
+                    "atr_pct": float(atr[t]), "level": lvl})
     if atr_gate and events:
-        p90 = float(np.nanquantile([e["atr_pct"] for e in events], 0.90))
-        events = [e for e in events if e["atr_pct"] <= p90]
+        # FIX audit v3 (C10) : le seuil est EXPANDING — au moment du signal,
+        # le quantile ne voit que les events PASSÉS (warmup 50). L'ancien
+        # p90 full-sample donnait à un trade ancien la vol future.
+        events.sort(key=lambda e: e["ts_ms"])
+        _atrs = [e["atr_pct"] for e in events]
+        events = [e for i, e in enumerate(events)
+                  if e["atr_pct"] <= (float(np.nanquantile(_atrs[:i], 0.90))
+                                      if i >= 50 else float("inf"))]
     events.sort(key=lambda e: e["ts_ms"])
     return events
 

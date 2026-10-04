@@ -46,7 +46,7 @@ from backend.services.backtest_v2.costs import (
     CostDataUnavailable,
     check_liquidation,
     funding_cost_usd,
-    load_funding_rate,
+    load_funding_series,
     round_trip_fees_usd,
     slippage_usd,
 )
@@ -113,9 +113,12 @@ class Trade:
     fee_usd: float
     slippage_usd: float
 
+    fund_usd: float = 0.0  # FIX audit v3 (C3) : le funding entre dans le net
+
     @property
     def net_return(self) -> float:
-        return self.gross_return + (self.fee_usd + self.slippage_usd) / BOOK_NOTIONAL_USD
+        return self.gross_return + (self.fee_usd + self.slippage_usd
+                                    + self.fund_usd) / BOOK_NOTIONAL_USD
 
     @property
     def holding_bars(self) -> int:
@@ -202,27 +205,29 @@ def _build_costs(
     hours_per_bar = _bar_hours(bars)
     worst_adverse = _worst_adverse_pct(bars)
 
-    rate = None
+    # FIX audit v3 (C1+C3) : funding as-of par barre ET booké dans la courbe.
+    fser = None
     try:
-        rate = load_funding_rate(symbol)
+        fser = load_funding_series(symbol)
         flags["funding_available"] = True
     except CostDataUnavailable as exc:
         flags["funding_available"] = False
         flags["funding_reason"] = str(exc)
-        funding = 0.0  # explicite, jamais None
 
     for t in trades:
         fees += t.fee_usd
         slip += t.slippage_usd
 
-        # Le book est neutre en direction : la jambe longue paie/encaisse le
-        # funding sur sa duree de detention (1 barre), la jambe short l'inverse.
-        # On facture la jambe longue (conservateur : on ne credite jamais).
-        if rate is not None:
+        # Le book est neutre en direction : on facture la jambe longue
+        # (conservateur : on ne credite jamais) sur sa durée (1 barre).
+        if fser is not None:
             holding_hours = t.holding_bars * hours_per_bar
-            funding += funding_cost_usd(
-                BOOK_NOTIONAL_USD, holding_hours, "long", rate
-            )
+            entry_ms = bars[t.bar_index].ts
+            raw = (BOOK_NOTIONAL_USD * fser.sum_pct_between(
+                entry_ms, entry_ms + holding_hours * 3_600_000.0) / 100.0)
+            fund_usd = -raw
+            funding += fund_usd
+            t.fund_usd = fund_usd
 
         chk = check_liquidation(
             entry_price=bars[t.bar_index].open,
@@ -252,10 +257,15 @@ def evaluate(params: dict, bars: Sequence[Bar]) -> StrategyEval:
     symbol = str(params.get("symbol", DEFAULT_SYMBOL))
     trades, bar_ret = simulate(bars, params)
 
-    trade_returns = [t.net_return for t in trades]
     avg_hold = 1 if trades else 0
 
     costs, flags = _build_costs(trades, bars, params, symbol)
+    # FIX audit v3 (C3) : la courbe est reconstruite APRÈS la comptabilité —
+    # le funding booké entre dans l'equity (réconciliation complète).
+    bar_ret = [0.0] * len(bars)
+    for t in trades:
+        bar_ret[t.bar_index] = t.net_return
+    trade_returns = [t.net_return for t in trades]
 
     equity = [1.0]
     for r in bar_ret:

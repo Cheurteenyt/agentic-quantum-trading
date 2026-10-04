@@ -62,11 +62,19 @@ class TestSharpeFrequency(unittest.TestCase):
                                wf_day.sharpe_is * math.sqrt(24), places=8)
 
     def test_walkforward_recalcule_ses_sharpes_a_la_frequence_passee(self):
+        # FIX audit v3 (C5) : le Sharpe IS = la médiane des Sharpes PAR FOLD
+        # (les trains rolling se chevauchent — la concaténation surpondérait).
         wf = run_walkforward(RETURNS, WalkForwardConfig(anchored=False),
                              periods_per_year=8760)
-        all_train = [r for seg in wf.train_returns for r in seg]
-        self.assertAlmostEqual(wf.sharpe_is, sharpe(all_train, 8760),
-                               places=10)
+        fold_sharpes = sorted(
+            sharpe(seg, 8760) for seg in wf.train_returns
+            if sharpe(seg, 8760) is not None)
+        self.assertAlmostEqual(
+            wf.sharpe_is,
+            fold_sharpes[len(fold_sharpes) // 2] if len(fold_sharpes) % 2
+            else 0.5 * (fold_sharpes[len(fold_sharpes) // 2 - 1]
+                        + fold_sharpes[len(fold_sharpes) // 2]),
+            places=10)
 
 
 if __name__ == "__main__":
