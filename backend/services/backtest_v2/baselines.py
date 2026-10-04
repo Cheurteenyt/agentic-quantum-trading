@@ -301,14 +301,21 @@ def _random_trades(
     if last_entry < 1:
         return trades
 
+    # FIX audit v3 (C4) : le benchmark respecte le MEME modele d'occupation
+    # mono-position que les strategies — sans quoi strategy > random compare
+    # deux capacites de capital differentes.
+    last_exit = 0
     for _ in range(n_trades):
         entry_index = rng.randint(1, last_entry)
+        if entry_index <= last_exit:
+            continue
         # Duree geometrique de moyenne avg_holding_bars : meme frequence et
         # meme duree moyenne de detention que la strategie testee.
         hold = 1 + int(rng.expovariate(1.0 / max(1, avg_holding_bars)))
         exit_index = min(entry_index + hold, n - 1)
         if exit_index <= entry_index:
             continue
+        last_exit = exit_index
 
         side = "long"
         if allow_short and rng.random() < 0.5:

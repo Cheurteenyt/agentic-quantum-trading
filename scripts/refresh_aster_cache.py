@@ -403,6 +403,11 @@ def refresh_funding(
             failed.append(sym)
             print(f"  ! {sym} : {exc}")
             continue
+        # FIX audit v3 (C13) : le cache est un SNAPSHOT live (diagnostic de
+        # fraicheur) — JAMAIS l'historique de comptabilite : celle-ci lit
+        # klines.db funding_history (append-only) via funding_series. Le
+        # merged remplace le bloc du symbole : une moyenne de diagnostics,
+        # pas une donnee historique.
         merged[sym] = {"cached_at": time.time(), "data": data}
         ok += 1
         print(f"  · {sym} : {data.get('funding_count', 0)} points, "
