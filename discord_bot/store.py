@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS d_media (
     filename TEXT, size INTEGER, captured_at REAL NOT NULL,
     UNIQUE(message_id, url)
 );
+CREATE TABLE IF NOT EXISTS d_mod_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
+    action TEXT NOT NULL, guild_id TEXT, moderator_id TEXT,
+    target_id TEXT, reason TEXT, detail TEXT
+);
+CREATE TABLE IF NOT EXISTS d_cases (
+    case_id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
+    guild_id TEXT, user_id TEXT, user_name TEXT, ctype TEXT, reason TEXT
+);
 """
 
 
