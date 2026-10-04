@@ -89,7 +89,7 @@ class Security(commands.Cog):
         if len(dq) < DESTRUCTIVE_MAX or user.id in self._alerted:
             return
         self._alerted.add(user.id)
-        role = _quarantine_role(guild)
+        role = await _quarantine_role(guild)
         kept = [r.name for r in user.roles if r.is_default()]
         try:
             await user.edit(roles=[r for r in [role] if role], reason="anti-nuke : "
@@ -97,6 +97,8 @@ class Security(commands.Cog):
                             f"{DESTRUCTIVE_WINDOW_S} s")
         except discord.Forbidden:
             pass
+        except discord.HTTPException:
+            pass  # l'alerte part quand même — ne jamais mourir ici
         log_ch = discord.utils.get(guild.text_channels, name="logs")
         if log_ch:
             e = discord.Embed(title="🚨 ANTI-NUKE — STAFF EN QUARANTAINE",
@@ -114,7 +116,9 @@ class Security(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
-        role = _probation_role(member.guild)
+        # le rôle marquant — le GATE fonctionnel (le silence + la sortie à 48 h)
+        # vit dans cogs/gatekeeper.py ; ici on pose juste l'étiquette
+        role = await _probation_role(member.guild)
         if role:
             try:
                 await member.add_roles(role, reason="la probation des nouveaux membres")

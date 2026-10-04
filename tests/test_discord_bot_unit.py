@@ -129,5 +129,68 @@ class TestStoreRegistry(unittest.TestCase):
         self.assertEqual(s.reg_channel(20, "log"), 222)  # la guilde 20 intacte
 
 
+class _Row:
+    """Un substitut de sqlite3.Row (target/value) pour les tests du registre."""
+
+    def __init__(self, target, value):
+        self._d = {"target": target, "value": value}
+
+    def __getitem__(self, k):
+        return self._d[k]
+
+
+class TestGatekeeperHelpers(unittest.TestCase):
+    """La math du portier : 48 h, les rows pourris sautent, le guard anti-0."""
+
+    @classmethod
+    def setUpClass(cls):
+        from discord_bot.cogs import gatekeeper as g
+        cls.g = g
+
+    def test_release_at(self):
+        from datetime import datetime, timezone
+        joined = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
+        base = joined.timestamp()
+        self.assertEqual(self.g.release_at(joined.isoformat()), base + 48 * 3600)
+        self.assertEqual(self.g.release_at(None), 0.0)
+        self.assertEqual(self.g.release_at("pas-une-date"), 0.0)
+
+    def test_pending_of(self):
+        from datetime import datetime, timezone
+        ok = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc).isoformat()
+        rows = [_Row("111", ok), _Row("abc", ok), _Row("222", None), _Row("333", "x")]
+        out = self.g.pending_of(rows)
+        # l'id non-numérique saute ; les timestamps pourris restent (is_due les
+        # libérera — fail-open)
+        self.assertEqual([uid for uid, _ in out], [111, 222, 333])
+
+    def test_is_due(self):
+        now = 1000.0
+        self.assertTrue(self.g.is_due(999.0, now))
+        self.assertTrue(self.g.is_due(1000.0, now))
+        self.assertFalse(self.g.is_due(1001.0, now))
+        self.assertTrue(self.g.is_due(0.0, now))  # fail-open : jamais piégé
+
+
+class TestTicketsHelpers(unittest.TestCase):
+    """Le nommage des tickets et le compteur."""
+
+    @classmethod
+    def setUpClass(cls):
+        from discord_bot.cogs import tickets as t
+        cls.t = t
+
+    def test_slugify(self):
+        self.assertEqual(self.t.slugify("Cheurteen YT!"), "cheurteen-yt")
+        self.assertEqual(self.t.slugify("  "), "membre")
+        self.assertEqual(self.t.slugify("ÉèÀ"), "membre")  # les accents → vide → fallback
+        self.assertEqual(self.t.slugify("x" * 200), "x" * 80)
+
+    def test_next_counter(self):
+        self.assertEqual(self.t.next_counter("7"), 8)
+        self.assertEqual(self.t.next_counter(None), 1)
+        self.assertEqual(self.t.next_counter("pourri"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
