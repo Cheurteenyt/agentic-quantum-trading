@@ -359,9 +359,12 @@ def monthly_series(mrows: list[dict]) -> dict[str, float]:
 
 
 def corr_months(a: dict[str, float], b: dict[str, float]) -> tuple[float, float]:
-    keys = sorted(set(a) | set(b))
-    x = np.array([a.get(k, 0.0) for k in keys])
-    y = np.array([b.get(k, 0.0) for k in keys])
+    # FIX 05/10 (bug-hunt) : intersecter les mois COMMUNS au lieu de zero-fill l'union —
+    # le fill 0.0 des mois absents écrasait artificiellement la corrélation vers 0
+    # (corr réelle +1,00 lue +0,42 sur des fenêtres disjointes).
+    keys = sorted(set(a) & set(b))
+    x = np.array([a[k] for k in keys])
+    y = np.array([b[k] for k in keys])
     if len(keys) < 3 or np.std(x) == 0 or np.std(y) == 0:
         return float("nan"), float("nan")
     pear = float(np.corrcoef(x, y)[0, 1])
