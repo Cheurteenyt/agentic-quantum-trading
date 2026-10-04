@@ -12,27 +12,21 @@ MAJ manuelle : 2026-10-05. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/l
 <!-- LEDGER:END -->
 
 ## Verdicts qui comptent
-- Pool OpenMarket v8 : E[R] +0,093 R, IC95 blocs-mois [−0,027 ; +0,223] ; aucun test ne survit à Bonferroni
-  (N=362, t ≥ 3,64) → edge NON établi. Repro : `python3 scripts/studies/x501_openmarket/x501_multiplicity_adapter.py`
+- Pool OpenMarket v8 : E[R] +0,093 R, IC95 [−0,027 ; +0,223] ; rien ne survit à Bonferroni (N=362) → edge NON établi.
+  Repro : `python3 scripts/studies/x501_openmarket/x501_multiplicity_adapter.py`
 - premium-fade directionnel : CLOS (naked −9,6 bps ; le « 87 % WR » = backtest à coûts 0 bps, non reproductible).
-- premium-fade-listing : **KILL ex ante 04/10** (22,2 % des 80 770 trades toxiques > seuil 15 %, discriminateur Δindex
-  concordant FO/exact) — mécanisme directionnel gravé CONTEXTE (inverse −20,61 vs +4,61 bps ; gradient d'âge 9,4/6,0/3,8).
-- vol_spike_meme re-costé au spread RÉEL : **PASS 04/10** (esp +0,0138 → +0,0161 $/trade, 0 liq ; TAKER_RT 28 bps couvrait
-  la médiane mesurée). Correction de référentiel : le coût machine = 28 bps RT, PAS les 8 du backtest premium-fade.
-- corr_months zero-fill CORRIGÉ le 05/10 (corr +1,00 lue +0,42) — re-mesure : vol_spike×majors −0,055, ×meme −0,650 :
-  les verdicts de décorrélation tiennent. File des 10 mineurs + 3 suspects : reports/aster/bug-hunt-0510/SYNTHESE.md.
-- « +24 %/26 j @ DD 3,4 % » (survivants, docs/20 l.291) : 26 jours = aucune information sur le DD → verdict forward 90 j.
-- Aster 13 mois : rétrospectif ≈ 0 essai « payable » → FORWARD-ONLY. Base deep 7 ans : rétrospectif possible sous ledger.
-- « Edge détectable ≥ 0,25 R » = illustration sur le pool OpenMarket (26 trades/fenêtre), PAS une mesure Aster.
+- premium-fade-listing : KILL ex ante 04/10 (22,2 % de 80 770 trades toxiques > seuil 15 %) — mécanisme gravé CONTEXTE (docs/20).
+- vol_spike_meme re-costé au spread réel : PASS 04/10 (+0,0161 $/trade, 0 liq) — le coût machine = TAKER_RT 28 bps.
+- corr_months zero-fill corrigé 05/10 — re-mesure : les verdicts de décorrélation tiennent (−0,055 / −0,650).
+- « +24 %/26 j » survivants : 26 j = aucune info DD → verdict forward 90 j. Aster 13 mois : FORWARD-ONLY.
+- File bugs : reports/aster/bug-hunt-0510/SYNTHESE.md (10 mineurs + 3 suspects).
 
 ## En attente (pré-enregistré)
-H4/H5 re-tir 07-08/10 · INV-N ~28/10 · H-CROWD-1 30/10 (double scellé : hypothèse + amendements) · INV-C ~mi-nov ·
-INV-J (depth) · whaleflow + P3 le 08/10 · le balayage hebdo W41 en vol (harnais 21 cellules × 586 syms, backtest_indicators
-réparé de 3 crashs pd.NA). DÉCIDÉ par le user (la dé-limitation, carte Ariad 04/10) : 1 balayage systématique/semaine,
-les familles closes rouvertes COMME COUCHES DE SIZING. La question maker : fill 100 %/sélection adverse 1-2 bps mesurés
-sur majors — le prize (12-24 bps meme) attend l'extension du collecteur tape (décision user).
+Murs + depth 06-07/10 · OI quadrant H4/H5 07-08/10 · whaleflow + P3 08/10 · INV-N ~28/10 · H-CROWD-1 30/10
+(double scellé) · INV-C ~mi-nov. Balayage hebdo = règle permanente (carte Ariad 04/10) ; le prize maker
+(12-24 bps meme) attend l'extension du collecteur tape (décision user).
 
 ## Règles (modèle local Bonsai : docs/39 §4)
-AVANT : `lab_ledger.py check …` (3 = doublon, 4 = STOP → file B) · APRÈS : `lab_ledger.py log …` puis `sync-state`.
-Bonsai : appels sans état, ≤ 2-3 k jetons, affirmations CITÉES, vérifiées par `bonsai_verify.py verify` ; jamais un chiffre,
-jamais un verdict. Aucun ordre autonome · protocole, coûts, symboles intouchables en session.
+AVANT : `lab_ledger.py check …` (3 = doublon, 4 = STOP → file B) · APRÈS : `log …` puis `sync-state`.
+Bonsai : affirmations CITÉES vérifiées par `bonsai_verify.py verify` ; jamais un chiffre, jamais un verdict.
+Aucun ordre autonome · protocole, coûts, symboles intouchables en session.
