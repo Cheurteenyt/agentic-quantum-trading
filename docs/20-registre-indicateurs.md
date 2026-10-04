@@ -765,3 +765,28 @@ correspond pas à l'engine courant (ret_1h = champ mort, engine_version a bougé
 Les tables X restent utiles pour les MENTIONS/POSITIONING — pas pour la direction
 des calls. Le WR relatif survit aux bugs d'unité ; ici les ABSOLUS ont bougé
 (44 % → 35 %), la conclusion (feed faible) tient.
+
+## 2026-10-05 — QUBO × PREMIUM : le levier majors conditionnel au régime funding (scripts/studies/qubo_premium_regime.py)
+
+**VERDICT : FAIL — critères pré-enregistrés non atteints.** L'UNE variable
+(budget W40 : 20/20, semaine épuisée) : la cellule jointe codifiée
+w=[0.857/0.857/2.0/0.857] lev=[11/1/1/1] figée, seul le levier majors devient
+conditionnel au régime premium ex ante (médiane funding des majeures couvertes,
+quorum 4, la dernière stamp ≤ ts, seuil p50 TRAIN = 2.5e-05). Fenêtre = la
+couverture funding RÉELLE (depuis le 27/10/2025 pour les majeures — le backfill
+« 2023→ » n'a jamais couvert les majeures), split 70/30 → 2026-06-11, majors
+T/V = 136/58 (LIMITE : le verdict porte ce poids). TRAIN : les 3 candidats
+(L_hot 4/6/8) tous 0 liq, choisi L_hot=8 (balance max). VAL : ret/DD 0,2 vs
+−0,0 baseline (mieux) MAIS **1 liquidation en VAL** = cellule MORTE par la
+règle de la carte hold×levier. Le contrôle inverse (L_hot=12) n'est pas
+monté au jugement (le candidat principal est mort avant).
+
+**LA TROUVAILLE DE CÔTÉ (la vraie alarme) : la cellule codifiée 11x majors est
+elle-même MORTE sur la fenêtre récente** — baseline VAL : $100 (DD 39,5 %,
+**1 liq**). Le levier 11x valait pour son train (2021-2026) ; dans le régime
+2026 la marge MAE a mangé sa tête (l'avertissement « 9 % de tête en
+surveillance » du 27/09 s'est matérialisé). Conséquence : le levier majors
+doit être RE-VALIDÉ sur la fenêtre récente avant tout forward — c'est une
+question de la carte hold×levier, pas de cette étude. Les compléments :
+hot VAL = 79 % des events (23 889/30 158) — le régime chaud domine la période
+récente, la compression L_hot=8 n'a pas suffi à sauver la cellule.
