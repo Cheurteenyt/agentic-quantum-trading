@@ -146,7 +146,7 @@ def _fc_stop_scenario():
     closes = [200.0 + i * 0.8 for i in range(80)]
     bars = _bars_from_closes(closes)
     trades, br = fc.simulate(bars, dict(stop_bps=200, hold_max_bars=30),
-                             "short", 30)
+                             lambda ts: "short", 30)
     return trades, br, bars, None
 
 
