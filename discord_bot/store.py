@@ -5,6 +5,7 @@ de SON serveur vit ici, jamais mélangé aux autres bases.
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import sqlite3
 import time
@@ -38,6 +39,15 @@ CREATE TABLE IF NOT EXISTS d_mod_actions (
 CREATE TABLE IF NOT EXISTS d_cases (
     case_id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
     guild_id TEXT, user_id TEXT, user_name TEXT, ctype TEXT, reason TEXT
+);
+CREATE TABLE IF NOT EXISTS d_members (
+    user_id TEXT PRIMARY KEY, user_name TEXT, display_name TEXT,
+    bot INTEGER, joined_at TEXT, account_created TEXT,
+    roles TEXT, last_seen TEXT
+);
+CREATE TABLE IF NOT EXISTS d_roles (
+    role_id TEXT PRIMARY KEY, name TEXT, position INTEGER,
+    color TEXT, permissions TEXT, member_count INTEGER, updated_at REAL
 );
 """
 
@@ -172,3 +182,40 @@ def reg_rule(guild_id: int | str, channel_id: int | str, rule: str) -> bool:
     """La règle d'un salon est-elle active ? (les règles par défaut : aucune)"""
     rows = reg_get(guild_id, f"rule_{rule}")
     return str(channel_id) in {r["target"] for r in rows}
+
+
+def member_upsert(user_id: str, user_name: str, display_name: str, bot: bool,
+                  joined_at: str | None, account_created: str | None,
+                  roles: list[str]) -> None:
+    con = connect()
+    try:
+        con.execute("""INSERT INTO d_members
+            (user_id, user_name, display_name, bot, joined_at, account_created,
+             roles, last_seen) VALUES (?,?,?,?,?,?,?,?)
+            ON CONFLICT(user_id) DO UPDATE SET user_name=excluded.user_name,
+            display_name=excluded.display_name, bot=excluded.bot,
+            joined_at=excluded.joined_at, account_created=excluded.account_created,
+            roles=excluded.roles, last_seen=excluded.last_seen""",
+            (user_id, user_name, display_name, int(bot), joined_at, account_created,
+             json.dumps(roles, ensure_ascii=False),
+             dt.datetime.now(dt.UTC).isoformat()))
+        con.commit()
+    finally:
+        con.close()
+
+
+def role_upsert(role_id: str, name: str, position: int, color: str,
+                permissions: str, member_count: int) -> None:
+    con = connect()
+    try:
+        con.execute("""INSERT INTO d_roles
+            (role_id, name, position, color, permissions, member_count, updated_at)
+            VALUES (?,?,?,?,?,?,?)
+            ON CONFLICT(role_id) DO UPDATE SET name=excluded.name,
+            position=excluded.position, color=excluded.color,
+            permissions=excluded.permissions, member_count=excluded.member_count,
+            updated_at=excluded.updated_at""",
+            (role_id, name, position, color, permissions, member_count, time.time()))
+        con.commit()
+    finally:
+        con.close()
