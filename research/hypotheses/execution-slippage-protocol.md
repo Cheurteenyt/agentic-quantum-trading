@@ -80,3 +80,20 @@ pas concernés.
    (pas d'options sur Aster) ; l'observation est trivialement connue, pas un edge.
 Bonsai 0/2 — mode d'échec constant : mécanisme plausible, données fabriquées, action non
 exécutable. L'archive : reports/aster/bonsai-novembre-propositions-2026-10-03.md.
+
+## CORRECTION DE RÉFÉRENTIEL + LE VERDICT DU RE-COST (04/10)
+
+**La correction** (avant le run, exigence d'honnêteté) : le RT assumé de la MACHINE est
+TAKER_RT = **28 bps** ((4 frais + 10 slippage) × 2) — le « 8 bps » de la section ci-dessus
+était le coût du backtest premium-fade, PAS l'hypothèse du flux meme. Le plancher de spread
+mesuré (12-24 bps médian) s'additionne aux frais : RT réel ≈ spread + 8 = 20-32 bps —
+**l'hypothèse des 28 couvrait le spread médian mesuré**. La section précédente surestimait
+le risque d'un facteur 2-3 sur la médiane ; il ne subsiste vrai que pour la queue fine
+(CATE 160, MEME 208, NEIRO-tail RT réels).
+
+**Le verdict du re-cost** (volspike_recost_spread.py, ledger PASS — la mutation de coût
+pré-enregistrée) : le flux vol_spike_meme FROZEN **tient au coût réel par symbole** —
+espérance +0,0138 → +0,0161 $/trade (Δ +17,2 %, le réel est légèrement PLUS favorable :
+le fallback 24 bps < 28 assumés sur la médiane), 897 trades séquentiels, 0 liq. Seuls
+2,3 % des events (NEIRO/BOME/DOGS/CATE/MEME) dépassent l'hypothèse — absorbés. La question
+maker (récupérer le spread si fill) reste ouverte mais n'est plus urgente : le taker tient.
