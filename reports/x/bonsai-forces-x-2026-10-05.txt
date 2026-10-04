@@ -1,0 +1,64 @@
+**1. LES 3 MÉCANISMES FORCÉS**
+
+**A. Le Callers (Liquidité d’Entrée Contrainte)**
+*   **Qui est forcé :** L'influenceur (Caller).
+*   **Horloge exacte :** T+0 à T+15 min (post-publication).
+*   **Signal mesurable :** Le *Delta de Volume* sur le 1h candle juste après le timestamp du call.
+*   **Pourquoi inoffensive :** Le caller a une position *avant* le tweet. Son tweet n'est pas une prédiction, c'est un **appât**. Le flux forcé est celui de ses followers qui achètent *après* lui. Si le prix ne monte pas dans les 15 min, le caller a perdu son premium d'entrée (slipage). Le marché ne peut pas effacer le fait que le call a été publié ; l'horloge expirante du "pump initial" est mécanique.
+*   *Nuance :* Ce n'est pas le prix qui est forcé, c'est le **volume** du caller qui est contraint par sa propre position.
+
+**B. Le Followers (Exit Liquidity Contrainte)**
+*   **Who est forcé :** Le suiveur (Follower).
+*   **Horloge exacte :** T+15 min à T+60 min (le pic d'engagement).
+*   **Signal mesurable :** Le *Ratio d'Engagement/Volatility* (Likes/Retweets / Range de prix).
+*   **Pourquoi inoffensive :** Le follower est en retard (retail). Il est l'exit liquidity du caller. Quand le follower achète, il vend au caller. Le marché ne peut pas effacer le fait que le follower a payé plus cher que le caller. Si le prix continue de monter après T+60 min, c'est que le follower est toujours en train d'acheter (chase). Si le prix stagne, c'est que le follower est en train de vendre (fade).
+*   *Nuance :* Le follower est forcé de **réagir** à l'engagement. Sa décision est émotionnelle, mais son horloge est la vitesse de propagation du tweet.
+
+**C. La Suppression (Signal de Réputation Inversée)**
+*   **Qui est forcé :** L'influenceur (supprime son tweet).
+*   **Horloge exacte :** T+1h à T+24h (fenêtre de délation).
+*   **Signal mesurable :** Le *Delta de Mention* (mentions avant suppression vs. après).
+*   **Pourquoi inoffensive :** Un influenceur qui supprime un tweet perdant a "effacé" sa réputation. Le marché ne peut pas effacer le fait que le tweet a existé (capture nocturne). La suppression est un signal de **désengagement forcé**. Si le prix a monté pendant que le tweet était visible, et qu'il chute après suppression, c'est que le "narratif" est mort.
+*   *Nuance :* Ce n'est pas le prix qui est forcé, c'est la **réputation** de l'influenceur qui est contrainte par le fait qu'il a menti (ou qu'il a perdu).
+
+**2. LE DESIGN DU PLUS INGÉNIEUX : "LA FADE DU FOLLOWER"**
+
+*   **Construction :**
+    1.  **Trigger :** Un call X est publié.
+    2.  **Fenêtre :** Attendre T+15 min (fin du pump initial du caller).
+    3.  **Condition :** Le ratio d'engagement (likes/rets) est > 5x la moyenne du caller.
+    4.  **Action :** SHORT le call à T+15 min.
+    5.  **Exit :** T+60 min OU si le prix revient à l'entrée (breakeven).
+    6.  **Kill Switch :** Si le ratio d'engagement < 2x la moyenne, **PAS DE TRADE** (le follower n'est pas forcé, le signal est faux).
+*   **Horizon :** 45 minutes.
+*   **Critères PASS/FAIL (chiffrés avant) :**
+    *   **PASS :** Le prix chute de > 2% dans les 45 min.
+    *   **FAIL :** Le prix monte de > 1% dans les 45 min.
+*   **Contrôle inverse :**
+    *   Mesurer le *Delta de Volume* à T+15 min. Si le volume est > 3x la moyenne, le follower est forcé. Si < 1x, le follower n'est pas forcé (signal faible).
+*   **Kill ex ante :**
+    *   Si le WR sur les 592 calls passés est < 40% sur ce sous-ensemble (engagement > 5x), **KILL**.
+    *   Si la variance du delta de volume est > 20%, **KILL** (bruit).
+
+**3. LA PRÉDICTION CHIFFRÉE**
+
+*   **WR attendu :** 55-60% (sur le sous-ensemble "engagement > 5x").
+*   **Espérance attendue :** +1.5% par trade (en considérant un stop de 2% et un take-profit de 4%).
+*   **Ce qui tuera le signal en premier :**
+    1.  **Le Pump Silencieux :** Si le prix monte SANS engagement (ratio < 2x), le signal est faux. Le marché ne peut pas effacer le fait que le prix a monté sans followers. C'est le "move silencieux".
+    2.  **La Suppression Tardive :** Si l'influenceur supprime le tweet après T+60 min, le signal est invalide (réputation inversée).
+    3.  **Le Delta de Volume Faible :** Si le volume est < 1x la moyenne, le follower n'est pas forcé. Le signal est du bruit.
+
+**RELECTURE DU NIVEAU "MM REBALANCE SON DELTA"**
+
+*   **Le Caller** est forcé de **vendre** à T+15 min s'il veut préserver son delta. Le marché ne peut pas effacer le fait qu'il a un delta à élarger.
+*   **Le Follower** est forcé de **acheter** à T+15 min s'il veut suivre l'engagement. Le marché ne peut pas effacer le fait qu'il a un delta à élargir.
+*   **La Suppression** est forcée de **revenir** à T+60 min s'il veut préserver sa réputation. Le marché ne peut pas effacer le fait qu'il a un delta de réputation à élargir.
+
+**LE Miroir du Fade Premium :**
+Le fade du follower (short à T+15 min) est le **miroir** du fade premium (short à T+0 min).
+*   **Fade Premium :** Short à T+0 min (le caller est forcé de vendre à T+15 min).
+*   **Fade Follower :** Short à T+15 min (le follower est forcé de vendre à T+60 min).
+
+**LE Miroir du Join Premium :**
+Le
