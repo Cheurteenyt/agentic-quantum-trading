@@ -20,6 +20,7 @@ ET confirmé en VAL(30 %). Audit de multiplicité annoncé.
 """
 from __future__ import annotations
 
+import numpy as np
 import sqlite3
 import sys
 from collections import defaultdict
@@ -154,7 +155,7 @@ def price_signals(df: pd.DataFrame, btc_close: pd.Series | None = None) -> list[
     if btc_close is not None:
         sym_r = close.pct_change(4)
         btc_r = btc_close.pct_change(4).reindex(close.index).ffill()
-        beta = sym_r.rolling(168).cov(btc_r) / btc_r.rolling(168).var().replace(0, pd.NA)
+        beta = sym_r.rolling(168).cov(btc_r) / btc_r.rolling(168).var().replace(0, np.nan)
         disloc = sym_r - beta * btc_r
         out.append(("beta_dislocation_achat", +1,
                     (btc_r <= -0.02) & (disloc <= -0.02)))
@@ -173,7 +174,7 @@ def price_signals(df: pd.DataFrame, btc_close: pd.Series | None = None) -> list[
     # 4. DÉVIATION VWAP 7 JOURS : prix à ±3σ de son vwap roulant → retour
     tp = (df["high"] + df["low"] + df["close"]) / 3
     vwap = ((tp * df["volume"]).rolling(168).sum()
-            / df["volume"].rolling(168).sum().replace(0, pd.NA))
+            / df["volume"].rolling(168).sum().replace(0, np.nan))
     dev = ((close - vwap) / vwap).astype(float)
     dev_sd = dev.rolling(168).std()
     out.append(("vwap_extreme_reprise_long", +1, dev < -3 * dev_sd))
@@ -191,7 +192,7 @@ def price_signals(df: pd.DataFrame, btc_close: pd.Series | None = None) -> list[
     #    le quart BAS de la bougie → le jet d'épuisement
     rng = df["high"] - df["low"]
     at_high = close > df["high"].rolling(48).max().shift(1)
-    close_pos = (close - df["low"]) / rng.replace(0, pd.NA)
+    close_pos = (close - df["low"]) / rng.replace(0, np.nan)
     out.append(("climax_top_short", -1,
                 (rng > 4 * atr14.shift(1, fill_value=0))
                 & at_high & (close_pos < 0.25).fillna(False)))
@@ -207,8 +208,8 @@ def funding_signals(fh: pd.DataFrame, btc_close: pd.Series) -> list[dict]:
     out: list[dict] = []
     fh = fh.sort_values("funding_time").reset_index(drop=True)
     for sym, g in fh.groupby("symbol"):
-        rate = g["rate"].astype(float)
-        ts = g["funding_time"].astype(float)
+        rate = pd.to_numeric(g["rate"], errors="coerce")
+        ts = pd.to_numeric(g["funding_time"], errors="coerce")
         # percentiles EXPANDING : à l'instant t on ne voit que le passé
         # (un p90 « de l'année » contient le futur = look-ahead)
         p90 = rate.expanding(min_periods=30).quantile(0.9)
@@ -387,7 +388,8 @@ def main() -> int:
         # DIVERGENCE FUNDING/PRIX (ingénieux) : la foule empile des longs
         # (funding qui accélère) pendant que le prix chute ≥ 3 %/24h →
         # short ; miroir → long
-        g = fh[fh.symbol == sym].set_index("funding_time")["rate"].astype(float)
+        g = fh[fh.symbol == sym].set_index("funding_time")["rate"]
+        g = pd.to_numeric(g, errors="coerce").dropna()
         rate_h = g.sort_index()
         rate_h.index = pd.to_datetime(rate_h.index, unit="ms")
         rate_aligned = rate_h.reindex(df.index, method="ffill", limit=8)
@@ -396,7 +398,7 @@ def main() -> int:
         # déviation VWAP 7j (pour les combos d'épuisement)
         tp = (df["high"] + df["low"] + df["close"]) / 3
         vwap = ((tp * df["volume"]).rolling(168).sum()
-                / df["volume"].rolling(168).sum().replace(0, pd.NA))
+                / df["volume"].rolling(168).sum().replace(0, np.nan))
         dev = ((df["close"] - vwap) / vwap).astype(float)
         dev_sd = dev.rolling(168).std()
         vwap_haut = dev > 3 * dev_sd
