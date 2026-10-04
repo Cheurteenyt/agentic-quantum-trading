@@ -1,5 +1,5 @@
 # Campagne backtest v2 — prix + funding, régimes, robustesse
-04/10/2026 01:00 UTC — 30645 combinaisons signal×symbole, 5 horizons, coûts 8 bps.
+04/10/2026 01:00 UTC — 30645 combinaisons signal×symbole, 5 horizons, coûts = 8 bps de frais + slippage mesuré ×2 ≈ 28 bps RT (la convention machine ; l'étiquette « 8 bps » initiale était trompeuse).
 Règle CONFIRMÉ (pré-enregistrée) : pooled N≥10 & WR≥55 % en TRAIN(70 %) puis confirmé en VAL(30 %). Audit de multiplicité en fin de rapport.
 
 ## Résultats poolés (tous symboles)
