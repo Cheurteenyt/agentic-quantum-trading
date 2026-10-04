@@ -9,6 +9,7 @@ ET dans d_mod_actions (l'audit permanent).
 """
 from __future__ import annotations
 
+import asyncio
 import collections
 import datetime as dt
 import re
@@ -153,9 +154,23 @@ class Moderation(commands.Cog):
         store.mod_db("warn", str(inter.guild.id), str(inter.user.id),
                      str(member.id), reason)
         n = len(store.warns_of(str(inter.guild.id), str(member.id)))
+        escalation = ""
+        # L'ÉCHELLE : 2 = mute 1 h · 3 = mute 24 h · 4 = kick · 5 = ban (l'auto-punition)
+        if n == 2:
+            await member.timeout(dt.datetime.now(dt.UTC) + dt.timedelta(hours=1), reason="échelle 2 warns")
+            escalation = " → mute 1 h (échelle)"
+        elif n == 3:
+            await member.timeout(dt.datetime.now(dt.UTC) + dt.timedelta(hours=24), reason="échelle 3 warns")
+            escalation = " → mute 24 h (échelle)"
+        elif n == 4:
+            await member.kick(reason="échelle 4 warns")
+            escalation = " → KICK (échelle)"
+        elif n >= 5:
+            await member.ban(reason="échelle 5 warns")
+            escalation = " → BAN (échelle)"
         await _log(inter.guild, _embed("WARN", inter.user, str(member), reason,
-                                       f"total {n} warn(s)"))
-        await inter.response.send_message(f"⚠️ {member.mention} averti ({n} warn(s)) — {reason}")
+                                       f"total {n} warn(s){escalation}"))
+        await inter.response.send_message(f"⚠️ {member.mention} averti ({n} warn(s)) — {reason}{escalation}")
 
     @app_commands.command(name="warns", description="Les warns d'un membre")
     async def warns(self, inter: discord.Interaction, member: discord.Member) -> None:

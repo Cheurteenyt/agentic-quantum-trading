@@ -41,7 +41,8 @@ discord_bot/
 └── cogs/
     ├── status.py   # /ping, /etat, /membres (lecture seule DB)
     ├── capture.py   # LA CAPTURE : chaque message (texte/médias/liens) → discord.db + backfill
-    └── moderation.py # LA MODÉRATION : kick/ban/timeout/warn/clear/lock/roles + auto-mod (spam, mentions, invites) + log #logs
+    ├── moderation.py # LA MODÉRATION : kick/ban/timeout/warn/clear/lock/roles + log #logs + l'échelle d'escalade des warns
+    └── protection.py # LA PROTECTION AVANCÉE : bouclier anti-scam (patterns + âge de compte), détection de raid, impersonations, cases /case /cases, le log des éditions et suppressions
 ```
 Les prochains cogs prévus (l'agent discord-bot du repo) : les rapports quotidiens (stats machine,
 alertes de graduation fomo, trades forward, verdicts) postés dans DISCORD_HOME_CHANNEL.
