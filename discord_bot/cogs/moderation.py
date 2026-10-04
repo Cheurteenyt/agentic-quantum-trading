@@ -293,13 +293,49 @@ class Moderation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
+        # LE BIENVENUE RICHE (le remplacement de la carte DraftBot) : l'âge du compte
+        # Discord — la donnée du bouclier — l'embed bat la carte dragon.
         arrival = discord.utils.get(member.guild.text_channels, name="🔔-salon-arrivée") \
             or discord.utils.get(member.guild.text_channels, name="général")
         if arrival:
-            await arrival.send(f"👋 Bienvenue {member.mention} sur **{member.guild.name}** — "
-                               f"lis #⚖️-règles et présente-toi. Membre n°{member.guild.member_count}.")
+            age = (dt.datetime.now(dt.UTC) - member.created_at).total_seconds() / 86400
+            e = discord.Embed(
+                title=f"👋 Bienvenue {member.display_name}",
+                description=(
+                    f"**Membre n°{member.guild.member_count}** de **Core Equity**\n\n"
+                    f"📡 lis **#⚖️-règles** — la règle d'or : AUCUN admin ne t'écrit en MP "
+                    f"en premier, personne ne demande jamais ta seed phrase.\n"
+                    f"📞 poste tes calls dans **#💪-vos-trades** — ils sont scorés contre "
+                    f"les prix réels, et le **/leaderboard** classe les meilleurs.\n"
+                    f"🛡 un MP d'arnaque ? `/report` le neutralise."),
+                color=0x5865F2, timestamp=dt.datetime.now(dt.UTC))
+            e.set_thumbnail(url=member.display_avatar.url)
+            e.add_field(name="âge du compte Discord",
+                        value=f"{age:.0f} j" + (" ⚠ compte neuf — vigilance accrue"
+                                                if age < 7 else ""),
+                        inline=True)
+            e.set_footer(text="le bot gère le serveur — en cas de doute, /report")
+            await arrival.send(embed=e)
         await _log(member.guild, _embed("JOIN", self.bot.user or "auto-mod",
                                         str(member), f"membre n°{member.guild.member_count}"))
+
+    @app_commands.command(name="prendre-arrivee",
+                          description="Coupe la parole à DraftBot dans le salon d'arrivée")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def prendre_arrivee(self, inter: discord.Interaction) -> None:
+        arrival = discord.utils.get(inter.guild.text_channels, name="🔔-salon-arrivée")
+        draftbot = inter.guild.get_member(318312854816161792)
+        if arrival is None or draftbot is None:
+            await inter.response.send_message("salon d'arrivée ou DraftBot introuvable",
+                                              ephemeral=True)
+            return
+        await arrival.set_permissions(draftbot, send_messages=False,
+                                      reason="le bienvenue est géré par Core Equity")
+        await _log(inter.guild, _embed("PRISE DE L'ARRIVÉE", inter.user,
+                                       "DraftBot", "send_messages refusé dans #🔔-salon-arrivée"))
+        await inter.response.send_message(
+            "✅ DraftBot est silencieux dans #🔔-salon-arrivée — le bienvenue est à nous",
+            ephemeral=True)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member) -> None:
