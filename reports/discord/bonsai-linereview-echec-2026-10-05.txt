@@ -1,8 +1,6 @@
-"""Le store Discord — data/warehouse/discord.db (WAL, timeout 60, lecture séparée du reste).
+REVIEW LIGNE PAR LIGNE — sévère. Ce code Discord tourne en production (8 membres, cible 10 000). Trouve : les CORRUPTIONS (les writes concurrents, les races, les transactions partielles), les BLOCAGES de l'event loop restants, les FUITES (les connects sans close sur exception, les tâches zombies), les CAS LIMITES (le message édité pendant le catch-up, le JSON LLM partiel, l'URL expirée), ce qui casse à 10k. NOTE sur 100 + LE TOP 10 des défauts (fichier · défaut · fix en 1 phrase).
 
-La séparation des domaines du repo : ASTER ≠ FOMO ≠ X ≠ DISCORD. Ce que le bot capture
-de SON serveur vit ici, jamais mélangé aux autres bases.
-"""
+== store.py ==
 from __future__ import annotations
 
 import datetime as dt
@@ -23,7 +21,7 @@ CREATE TABLE IF NOT EXISTS d_messages (
     attachment_count INTEGER,
     attachment_types TEXT,              -- JSON ["image/png", "video/mp4", ...]
     attachment_urls  TEXT,              -- JSON
-    link_urls        TEXT,              -- JSON (les liens extraits du texte)
+    link_urls       TEXT,              -- JSON (les liens extraits du texte)
     fetched_at      REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS d_media (
@@ -49,23 +47,6 @@ CREATE TABLE IF NOT EXISTS d_roles (
     role_id TEXT PRIMARY KEY, name TEXT, position INTEGER,
     color TEXT, permissions TEXT, member_count INTEGER, updated_at REAL
 );
-"""
-
-
-def connect() -> sqlite3.Connection:
-    con = sqlite3.connect(DB, timeout=60)
-    con.row_factory = sqlite3.Row
-    con.execute("PRAGMA journal_mode=WAL")       # la leçon 75dd088 : WAL + timeout partout
-    con.execute("PRAGMA synchronous=NORMAL")
-    con.executescript(SCHEMA)
-    return con
-
-
-def save_message(msg_row: dict, media_rows: list[dict]) -> None:
-    con = connect()
-    try:
-        con.execute(
-            """INSERT OR REPLACE INTO d_messages
                (message_id, guild_id, channel_id, channel_name, author_id, author_name,
                 created_at, content, attachment_count, attachment_types,
                 attachment_urls, link_urls, fetched_at)
@@ -85,9 +66,7 @@ def save_message(msg_row: dict, media_rows: list[dict]) -> None:
     finally:
         con.close()
 
-
 def last_message_id(channel_id: str) -> str | None:
-    """Le dernier message_id capturé d'un salon — le point de reprise du catch-up."""
     con = connect()
     try:
         row = con.execute(
@@ -97,7 +76,6 @@ def last_message_id(channel_id: str) -> str | None:
     finally:
         con.close()
 
-
 def count_messages() -> int:
     con = connect()
     try:
@@ -105,12 +83,14 @@ def count_messages() -> int:
     finally:
         con.close()
 
-
 def mod_db(action: str, guild_id: str, moderator_id: str, target_id: str,
            reason: str, detail: str = "") -> None:
-    """Chaque action de modération est tracée — « absolument tout » est auditable."""
     con = connect()
     try:
+        con.execute("""CREATE TABLE IF NOT EXISTS d_mod_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
+            action TEXT NOT NULL, guild_id TEXT, moderator_id TEXT,
+            target_id TEXT, reason TEXT, detail TEXT)""")
         con.execute("INSERT INTO d_mod_actions (ts, action, guild_id, moderator_id, "
                     "target_id, reason, detail) VALUES (?,?,?,?,?,?,?)",
                     (time.time(), action, guild_id, moderator_id, target_id,
@@ -119,25 +99,24 @@ def mod_db(action: str, guild_id: str, moderator_id: str, target_id: str,
     finally:
         con.close()
 
-
 def warns_of(guild_id: str, target_id: str) -> list[tuple]:
     con = connect()
     try:
+        con.execute("""CREATE TABLE IF NOT EXISTS d_mod_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
+            action TEXT NOT NULL, guild_id TEXT, moderator_id TEXT,
+            target_id TEXT, reason TEXT, detail TEXT)""")
         return con.execute(
             "SELECT ts, reason FROM d_mod_actions WHERE action='warn' AND guild_id=? "
             "AND target_id=? ORDER BY ts", (guild_id, target_id)).fetchall()
     finally:
         con.close()
 
-
-# ——— le registre du serveur : les salons/rôles/règles déclarés par le user ———
-
 def _reg_init(con: sqlite3.Connection) -> None:
     con.execute("""CREATE TABLE IF NOT EXISTS d_registry (
         guild_id TEXT NOT NULL, kind TEXT NOT NULL, target TEXT NOT NULL,
         value TEXT, updated_at REAL NOT NULL,
         UNIQUE(guild_id, kind, target))""")
-
 
 def reg_set(guild_id: int | str, kind: str, target: str, value: str = "") -> None:
     con = connect()
@@ -149,7 +128,6 @@ def reg_set(guild_id: int | str, kind: str, target: str, value: str = "") -> Non
     finally:
         con.close()
 
-
 def reg_del(guild_id: int | str, kind: str, target: str) -> None:
     con = connect()
     try:
@@ -160,9 +138,7 @@ def reg_del(guild_id: int | str, kind: str, target: str) -> None:
     finally:
         con.close()
 
-
 def reg_get(guild_id: int | str, kind: str) -> list[sqlite3.Row]:
-    """Toutes les entrées d'un kind — ex : reg_get(g, 'role_mod') → les rôles modérateurs."""
     con = connect()
     try:
         _reg_init(con)
@@ -171,57 +147,17 @@ def reg_get(guild_id: int | str, kind: str) -> list[sqlite3.Row]:
     finally:
         con.close()
 
-
 def reg_channel(guild_id: int | str, kind: str):
-    """L'id du salon déclaré pour un rôle fonctionnel (log, bienvenue, commandes...)."""
     rows = reg_get(guild_id, f"channel_{kind}")
     return int(rows[0]["target"]) if rows else None
 
-
 def reg_has_role(member_roles: list[int], guild_id: int | str, kind: str) -> bool:
-    """Le membre porte-t-il un rôle enregistré pour ce kind ?"""
     wanted = {int(r["target"]) for r in reg_get(guild_id, f"role_{kind}")}
     return bool(wanted & set(member_roles))
 
-
 def reg_rule(guild_id: int | str, channel_id: int | str, rule: str) -> bool:
-    """La règle d'un salon est-elle active ? (les règles par défaut : aucune)"""
     rows = reg_get(guild_id, f"rule_{rule}")
     return str(channel_id) in {r["target"] for r in rows}
 
-
 def member_upsert(user_id: str, user_name: str, display_name: str, bot: bool,
                   joined_at: str | None, account_created: str | None,
-                  roles: list[str]) -> None:
-    con = connect()
-    try:
-        con.execute("""INSERT INTO d_members
-            (user_id, user_name, display_name, bot, joined_at, account_created,
-             roles, last_seen) VALUES (?,?,?,?,?,?,?,?)
-            ON CONFLICT(user_id) DO UPDATE SET user_name=excluded.user_name,
-            display_name=excluded.display_name, bot=excluded.bot,
-            joined_at=excluded.joined_at, account_created=excluded.account_created,
-            roles=excluded.roles, last_seen=excluded.last_seen""",
-            (user_id, user_name, display_name, int(bot), joined_at, account_created,
-             json.dumps(roles, ensure_ascii=False),
-             dt.datetime.now(dt.UTC).isoformat()))
-        con.commit()
-    finally:
-        con.close()
-
-
-def role_upsert(role_id: str, name: str, position: int, color: str,
-                permissions: str, member_count: int) -> None:
-    con = connect()
-    try:
-        con.execute("""INSERT INTO d_roles
-            (role_id, name, position, color, permissions, member_count, updated_at)
-            VALUES (?,?,?,?,?,?,?)
-            ON CONFLICT(role_id) DO UPDATE SET name=excluded.name,
-            position=excluded.position, color=excluded.color,
-            permissions=excluded.permissions, member_count=excluded.member_count,
-            updated_at=excluded.updated_at""",
-            (role_id, name, position, color, permissions, member_count, time.time()))
-        con.commit()
-    finally:
-        con.close()
