@@ -324,6 +324,16 @@ def parse_funding_rows(symbol: str, rows: Any) -> dict:
     rates = [r for _, r in parsed]
     avg_rate = sum(rates) / len(rates)
     latest_rate = rates[-1]
+    # FIX lot2 (F12) : l'intervalle de funding est MESURÉ (médiane des gaps) —
+    # les intervalles Aster ne sont pas universellement 8h.
+    gaps = [b[0] - a[0] for a, b in zip(parsed, parsed[1:]) if b[0] > a[0]]
+    if gaps:
+        sg = sorted(gaps)
+        mid = len(sg) // 2
+        median_gap_ms = sg[mid] if len(sg) % 2 else 0.5 * (sg[mid - 1] + sg[mid])
+        interval_h = median_gap_ms / 3_600_000.0
+    else:
+        interval_h = 8.0
 
     return {
         "symbol": symbol,
@@ -331,6 +341,7 @@ def parse_funding_rows(symbol: str, rows: Any) -> dict:
         "source": FUNDING_SOURCE,
         "cache_status": "miss",
         "funding_count": len(parsed),
+        "funding_interval_hours": interval_h,
         "first_funding_time": parsed[0][0],
         "last_funding_time": parsed[-1][0],
         "avg_funding_rate": avg_rate,

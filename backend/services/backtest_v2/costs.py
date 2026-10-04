@@ -90,6 +90,7 @@ class FundingRate:
     sample_count: int
     last_funding_time_ms: int
     cached_at: float
+    interval_hours: float = 8.0  # FIX lot2 (F12) : mesuré par le cache, 8h si absent
 
     @property
     def age_days(self) -> float:
@@ -135,6 +136,7 @@ def load_funding_rate(
         sample_count=int(count),
         last_funding_time_ms=int(data.get("last_funding_time") or 0),
         cached_at=float(entry.get("cached_at") or 0.0),
+        interval_hours=float(data.get("funding_interval_hours") or 8.0),
     )
     if rate.is_stale:
         raise CostDataUnavailable(
@@ -162,7 +164,10 @@ def funding_cost_usd(
     if holding_hours < 0:
         raise ValueError(f"duree invalide: {holding_hours}")
 
-    periods = holding_hours / 8.0
+    # FIX lot2 (F12) : l'intervalle vient du cache (mesuré par
+    # refresh_aster_cache), pas d'un 8h supposé — les intervalles Aster
+    # ne sont pas universellement 8h.
+    periods = holding_hours / rate.interval_hours
     cost = notional_usd * (rate.avg_bps_per_8h / 10_000.0) * periods
 
     s = (side or "").strip().lower()
