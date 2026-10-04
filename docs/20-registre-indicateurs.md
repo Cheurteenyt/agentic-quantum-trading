@@ -790,3 +790,28 @@ doit être RE-VALIDÉ sur la fenêtre récente avant tout forward — c'est une
 question de la carte hold×levier, pas de cette étude. Les compléments :
 hot VAL = 79 % des events (23 889/30 158) — le régime chaud domine la période
 récente, la compression L_hot=8 n'a pas suffi à sauver la cellule.
+
+## 2026-10-05 (bis) — QUBO × PREMIUM v2 : tous les actifs + reverse (scripts/studies/qubo_premium_allassets_reverse.py)
+
+**VERDICTS : FAIL × 2** (l'ordre explicite du propriétaire « tester sur tous les
+actifs et en reverse » — W40 épuisé, dépassement autorisé par le propriétaire,
+consommé en ouverture de W41). Chaque variante vit dans SA fenêtre de couverture
+(les alts commencent 2023, les majeures 2025-10-27), split 70/30 propre.
+
+- **A (régime médian de TOUS les actifs, quorum 20/71)** : le seuil p50 TRAIN
+  (5.0e-05) ne se franchit **JAMAIS en VAL (0/29 851)** — le funding des alts
+  s'est effondré relativement aux majeures dans la période récente (la médiane
+  majors dit « chaud » à 79 %, la médiane tous-actifs dit « froid ») → le tilt
+  ne s'active pas → la run = la baseline 11x → la même liq → MORTE. Divergence
+  majeures/alts = un fait de régime intéressant, pas un levier.
+- **B (reverse : lever à 12x dans le chaud majors)** : **2 liquidations** en VAL
+  (pire que la baseline) → MORTE. Le « la foule continue » est MORT au niveau du
+  levier — la direction de compression était la bonne, juste insuffisante.
+
+**LA CONCLUSION CONSOLIDÉE (v1 + v2) : la famille premium-tilt du levier majors
+est FERMÉE.** Le tilt ne sauve pas la cellule 11x (l'event SOL MAE 13,08 %
+liquide jusqu'à 8x ; il aurait fallu ≤ 7x) et le reverse aggrave. **LA seule
+route = re-valider le levier majors à la baisse sur la fenêtre récente**
+(≈ 7x pour un 0-liq sur le MAE max observé, ou un gate event-level) — c'est
+l'expérience n°1 de W41. Le bug hunt de v1 est passé (run_stack recalcule
+MAE ≥ 100/lev − 0,5 ; le levier natif 10x des events est bien remplacé).
