@@ -43,3 +43,13 @@ discord_bot/
 ```
 Les prochains cogs prévus (l'agent discord-bot du repo) : les rapports quotidiens (stats machine,
 alertes de graduation fomo, trades forward, verdicts) postés dans DISCORD_HOME_CHANNEL.
+
+## 6. Le service systemd (le bot démarre au boot, se relance si crash)
+L'unité : `~/.config/systemd/user/hermes-discord.service` (ExecStart quoté — le chemin du
+repo contient un espace ; `PYTHONUNBUFFERED=1` pour que les logs arrivent au journal).
+```
+systemctl --user status hermes-discord    # l'état
+journalctl --user -u hermes-discord -f    # les logs en direct
+```
+Les commandes live : `/ping` · `/etat` (l'état du projet) · `/membres` (les ids des membres —
+la détection des identifiants, intents members actifs).
