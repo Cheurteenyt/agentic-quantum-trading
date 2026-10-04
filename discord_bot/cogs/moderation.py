@@ -262,6 +262,12 @@ class Moderation(commands.Cog):
         dq.append(now)
         while dq and dq[0] < now - SPAM_WINDOW_S:
             dq.popleft()
+        # la fuite mémoire (review 05/10) : les auteurs inactifs sortent du dictionnaire
+        if len(self._msg_times) > 500:
+            morts = [k for k, q in self._msg_times.items()
+                     if not q or q[-1] < now - 600]
+            for k in morts:
+                del self._msg_times[k]
         # anti-invite : les liens discord.gg se suppriment (hors admins/mods)
         if INVITE_RE.search(message.content or ""):
             await message.delete()
