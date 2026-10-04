@@ -82,7 +82,24 @@ class Protection(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
-        if message.author.bot or not isinstance(message.author, discord.Member) \
+        if message.author.bot:
+            return
+        # LES MP AU BOT : capturés + scannés (les MP entre membres sont INVISIBLES pour
+        # tout bot — limite de Discord ; la défense contre les arnaqueurs passe par /report)
+        if message.guild is None:
+            from .. import store as _s
+            row = {"message_id": str(message.id), "guild_id": "dm", "channel_id": "dm",
+                   "channel_name": "dm", "author_id": str(message.author.id),
+                   "author_name": str(message.author),
+                   "created_at": message.created_at.isoformat(),
+                   "content": (message.content or "")[:4000], "attachment_count": 0,
+                   "attachment_types": [], "attachment_urls": [], "link_urls": []}
+            _s.save_message(row, [])
+            if SCAM_RE.search(content := (message.content or "")):
+                _log(None, "SCAM EN MP AU BOT",
+                     f"{message.author.mention} : `{content[:300]}`", discord.Color.Red())
+            return
+        if not isinstance(message.author, discord.Member) \
                 or message.author.guild_permissions.administrator:
             return
         content = message.content or ""
@@ -114,8 +131,63 @@ class Protection(commands.Cog):
 
     # ——— le portier : joins, raids, impersonations ———
 
+    @app_commands.command(name="report",
+                          description="Signaler un MP d'arnaque reçu (le MP entre membres est invisible du bot — tu le transfères)")
+    @app_commands.describe(suspect="l'auteur présumé du MP",
+                           capture="copie/colle le contenu du MP (ou décris-le)",
+                           screenshot="le screenshot du MP (image, optionnel)")
+    async def report(self, inter: discord.Interaction, suspect: discord.User,
+                     capture: str, screenshot: discord.Attachment | None = None) -> None:
+        case = _case(inter.guild, suspect, "REPORT-MP",
+                     f"signalé par {inter.user} : {capture[:300]}")
+        # le screenshot du MP : l'URL est conservée dans la case
+        detail = capture[:300]
+        if screenshot:
+            store.mod_db("report-media", str(inter.guild.id), str(inter.user.id),
+                         str(suspect.id), f"case #{case}", screenshot.url)
+            detail += f"\n📎 pièce : {screenshot.url}"
+        store.mod_db("report", str(inter.guild.id), str(inter.user.id),
+                     str(suspect.id), f"case #{case}", capture[:200])
+        member = inter.guild.get_member(suspect.id)
+        sanction = ""
+        if member is not None:
+            reports = len([1 for r in self._reports_of(inter.guild_id or inter.guild.id,
+                                                       suspect.id)
+                           if r != inter.user.id])
+            if reports + 1 >= 2:   # 2 signalements indépendants = mute 24 h
+                await member.timeout(dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
+                                     reason=f"{reports+1} signalements de MP d'arnaque")
+                sanction = " → **muté 24 h** (signalements multiples)"
+            else:
+                sanction = " → sous surveillance (1er signalement)"
+        else:
+            sanction = " → pas membre du serveur (case conservée pour le réseau)"
+        _log(inter.guild, f"CASE #{case} — REPORT-MP",
+             f"{inter.user.mention} signale {suspect.mention} : {detail}{sanction}",
+             discord.Color.Red())
+        await inter.response.send_message(
+            f"🛡 case #{case} ouverte contre {suspect.mention}{sanction}", ephemeral=True)
+
+    def _reports_of(self, guild_id: int, suspect_id: int) -> list[str]:
+        con = store.connect()
+        try:
+            return [r["moderator_id"] for r in con.execute(
+                "SELECT moderator_id FROM d_mod_actions WHERE action='report' AND target_id=?",
+                (str(suspect_id),))]
+        finally:
+            con.close()
+
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
+        # le MP de protection : les patterns d'arnaque à connaître, une seule fois
+        try:
+            await member.send(
+                "🛡 **Bienvenue sur Core Equity — la règle d'or** : AUCUN admin/modérateur ne "
+                "t'écrit jamais en MP en premier, et personne ne te demandera jamais ta seed "
+                "phrase. Tout MP qui parle d'airdrop, de giveaway ou de « support » = arnaque. "
+                "Transfère-le au bot ici avec `/report` — le signalement protège tout le monde.")
+        except (discord.Forbidden, discord.HTTPException):
+            pass  # les MP fermés — pas grave, la règle est dans #règles
         now = dt.datetime.now(dt.UTC).timestamp()
         self._joins.append(now)
         while self._joins and self._joins[0] < now - JOIN_WINDOW_S:
