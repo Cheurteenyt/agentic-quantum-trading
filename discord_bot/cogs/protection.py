@@ -58,7 +58,9 @@ def _case(guild: discord.Guild, user: discord.abc.User, ctype: str, reason: str)
 
 def _log(guild: discord.Guild | None, title: str, description: str,
          color: discord.Color = 0xFEE75C) -> None:
-    ch = discord.utils.get(guild.text_channels, name="logs") if guild else None
+    reg_id = store.reg_channel(guild.id, "log") if guild else None
+    ch = (guild.get_channel(reg_id)
+          if reg_id else discord.utils.get(guild.text_channels, name="logs")) if guild else None
     if ch:
         e = discord.Embed(title=f"🛡 {title}", description=description[:2000],
                           color=color, timestamp=dt.datetime.now(dt.UTC))

@@ -103,3 +103,63 @@ def warns_of(guild_id: str, target_id: str) -> list[tuple]:
             "AND target_id=? ORDER BY ts", (guild_id, target_id)).fetchall()
     finally:
         con.close()
+
+
+# ——— le registre du serveur : les salons/rôles/règles déclarés par le user ———
+
+def _reg_init(con: sqlite3.Connection) -> None:
+    con.execute("""CREATE TABLE IF NOT EXISTS d_registry (
+        guild_id TEXT NOT NULL, kind TEXT NOT NULL, target TEXT NOT NULL,
+        value TEXT, updated_at REAL NOT NULL,
+        UNIQUE(guild_id, kind, target))""")
+
+
+def reg_set(guild_id: int | str, kind: str, target: str, value: str = "") -> None:
+    con = connect()
+    try:
+        _reg_init(con)
+        con.execute("INSERT OR REPLACE INTO d_registry VALUES (?,?,?,?,?)",
+                    (str(guild_id), kind, target, value, time.time()))
+        con.commit()
+    finally:
+        con.close()
+
+
+def reg_del(guild_id: int | str, kind: str, target: str) -> None:
+    con = connect()
+    try:
+        _reg_init(con)
+        con.execute("DELETE FROM d_registry WHERE guild_id=? AND kind=? AND target=?",
+                    (str(guild_id), kind, target))
+        con.commit()
+    finally:
+        con.close()
+
+
+def reg_get(guild_id: int | str, kind: str) -> list[sqlite3.Row]:
+    """Toutes les entrées d'un kind — ex : reg_get(g, 'role_mod') → les rôles modérateurs."""
+    con = connect()
+    try:
+        _reg_init(con)
+        return con.execute("SELECT target, value FROM d_registry WHERE guild_id=? AND kind=?",
+                           (str(guild_id), kind)).fetchall()
+    finally:
+        con.close()
+
+
+def reg_channel(guild_id: int | str, kind: str):
+    """L'id du salon déclaré pour un rôle fonctionnel (log, bienvenue, commandes...)."""
+    rows = reg_get(guild_id, f"channel_{kind}")
+    return int(rows[0]["target"]) if rows else None
+
+
+def reg_has_role(member_roles: list[int], guild_id: int | str, kind: str) -> bool:
+    """Le membre porte-t-il un rôle enregistré pour ce kind ?"""
+    wanted = {int(r["target"]) for r in reg_get(guild_id, f"role_{kind}")}
+    return bool(wanted & set(member_roles))
+
+
+def reg_rule(guild_id: int | str, channel_id: int | str, rule: str) -> bool:
+    """La règle d'un salon est-elle active ? (les règles par défaut : aucune)"""
+    rows = reg_get(guild_id, f"rule_{rule}")
+    return str(channel_id) in {r["target"] for r in rows}

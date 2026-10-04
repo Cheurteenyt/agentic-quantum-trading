@@ -35,7 +35,9 @@ def _mod_log_guild(guild: discord.Guild) -> discord.TextChannel | None:
 
 async def _log(guild: discord.Guild | None, embed: discord.Embed) -> None:
     if guild:
-        ch = _mod_log_guild(guild)
+        # le registre d'abord (le salon déclaré via /setchannel log), sinon le nom logs
+        reg_id = store.reg_channel(guild.id, "log")
+        ch = guild.get_channel(reg_id) if reg_id else _mod_log_guild(guild)
         if ch:
             try:
                 await ch.send(embed=embed)
@@ -60,9 +62,12 @@ def _embed(action: str, mod: discord.Member, target: str, reason: str,
 
 def _check_mod(inter: discord.Interaction, target: discord.Member | None = None) -> str | None:
     """Le garde-fou : le modérateur a le droit, et il ne modère pas au-dessus de lui."""
-    if not isinstance(inter.user, discord.Member) or \
-            not inter.user.guild_permissions.manage_messages:
-        return "il faut la permission Gérer les messages pour modérer"
+    if not isinstance(inter.user, discord.Member):
+        return "commande de serveur uniquement"
+    if not (inter.user.guild_permissions.manage_messages
+            or store.reg_has_role([r.id for r in inter.user.roles],
+                                  inter.guild_id or 0, "mod")):
+        return "il faut être modérateur (permission native ou rôle enregistré via /setrole)"
     if target is not None and not inter.user.guild_permissions.administrator:
         if target.guild_permissions.administrator or \
                 target.top_role >= inter.user.top_role:
