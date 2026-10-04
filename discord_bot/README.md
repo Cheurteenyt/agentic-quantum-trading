@@ -39,7 +39,8 @@ discord_bot/
 ├── config.py       # lit .env (le token JAMAIS dans git), valide, expose les chemins DB
 ├── README.md       # ce guide
 └── cogs/
-    └── status.py   # /ping, /etat (le ledger, la machine, le domaine X — lecture seule DB)
+    ├── status.py   # /ping, /etat, /membres (lecture seule DB)
+    └── capture.py  # LA CAPTURE : chaque message (texte/médias/liens) → discord.db + backfill
 ```
 Les prochains cogs prévus (l'agent discord-bot du repo) : les rapports quotidiens (stats machine,
 alertes de graduation fomo, trades forward, verdicts) postés dans DISCORD_HOME_CHANNEL.

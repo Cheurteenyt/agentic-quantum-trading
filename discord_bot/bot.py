@@ -15,6 +15,7 @@ import importlib
 import pkgutil
 
 import discord
+from discord.ext import commands
 
 from . import config
 
@@ -29,10 +30,10 @@ def _intents() -> discord.Intents:
     return intents
 
 
-class HermesBot(discord.Client):
+class HermesBot(commands.Bot):
     def __init__(self) -> None:
-        super().__init__(intents=_intents())
-        self.tree = discord.app_commands.CommandTree(self)
+        super().__init__(command_prefix="!", intents=_intents(),
+                         help_command=None)
 
     async def setup_hook(self) -> None:
         # les cogs du package cogs
