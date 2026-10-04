@@ -39,3 +39,18 @@ par champ. Et LA correction d'unité : premium_history est en POURCENT (-0,0448 
 pas en décimal — le piège premium_pct est inversé vs la mémoire ; l'évaluateur INV-N calcule
 depuis mark/index bruts (immunisé), crowding_composite lit premium_pct brut (le suspect n°2
 devient sa garde-fou à poser avant le 30/10).
+
+## RÉSOLUTIONS (nuit du 05/10, avant le tir nocturne de 03:00)
+
+**the_machine.py — les gardes flux-vide sont posées** (le SUSPECT n°2) : quatre points
+d'agrégation (nanquantile des al_scores, max/median sur gated, sur meme, nanquantile surv)
+refusaient une liste vide → le nocturne plantait avant son rapport. Fixé : « rapport abstenu »
+propre si un flux est vide, calculs bit-identiques sinon.
+
+**Le suspect n°3 (premiums 0.0) est un FAUX POSITIF — résolu par inspection** : les 4 999
+lignes premium_pct = 0.0 ont mark == idx EXACT et des prix valides — des symboles à micro-prix
+(DOGS 4,84e-05 : 2 616 lignes, DRAM 1 384, NEIRO 937) où la RÉSOLUTION de l'API rend
+mark/idx identiques. Zéros de quantification, pas des données corrompues : zéro ligne avec
+index_price <= 0. Rien à supprimer, rien à corriger dans les collecteurs (le garde
+`if idx else 0.0` reste correct en défense). crowding_composite lit des zéros légitimes —
+l'effet sur ses z-scores = la variance diluée des micro-prix, à garder en tête le 30/10.
