@@ -74,3 +74,26 @@ sans hypothèse vivante : les tables naissent au nocturne, les tests attendent l
 Ce que cette organisation rend possible : qu'un tiers ouvre x_posts.db et sache en 10 minutes
 quoi croire, quoi douter, et quoi attendre — et que le jour où une hypothèse vivante réclame
 de la donnée X, elle soit déjà là, propre, datée, et sans une ligne à récolter en urgence.
+
+## 7. LE MÉDIA (05/10 — la couche que le user réclame : « les images disent tout »)
+
+Les attaches des posts sont maintenant CAPTURÉES : x_posts +3 colonnes (media_count,
+media_types JSON, media_urls JSON) + la table x_media (post_id, media_type, url — UNIQUE
+anti-doublon). Le harvest DOM extrait les images de post (pbs.twimg.com/media — les avatars
+exclus) et le testid videoPlayer.
+
+**La taxonomy du média X et ce qu'elle dit** (les hypothèses à tester quand la donnée aura mûri) :
+- **le CHART joint** = le call a été analysé (une conviction construite) — hypothèse : le WR
+  des calls-avec-chart > les calls-texte-seul
+- **le SCREENSHOT de position** = la preuve de skin-in-the-game (l'appât se montre rempli) —
+  hypothèse : le follow du caller-screenshot surperforme, et sa SUPPRESSION plus tard = le signal
+  de délétion le plus fort du domaine
+- **le MEME seul** = le shill sans analyse — hypothèse : bruit pur, à filtrer du parse
+- **la VIDÉO** = la démo/le live-trade — rare et lourd, à compter avant de télécharger
+- **L'absence de média + un ticker cashtag** = le spam de rotation — la classe la plus bruitée
+
+**La règle de stockage** : les URL d'abord (l'inventaire), le téléchargement des fichiers
+seulement si une hypothèse vivante les réclame (le disque n'est pas gratuit, le CDN de X
+expire les médias anciens — les URL d'aujourd'hui ne seront PAS résolubles dans 6 mois :
+si un jour les images comptent, il faudra les télécharger À LA CAPTURE, décision à prendre
+avec l'hypothèse).
