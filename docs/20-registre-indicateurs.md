@@ -749,3 +749,19 @@ sur les 585 calls parsés, deux cellules pré-déclarées (1h et 15m T+15→T+60
   pas d'infrastructure sans hypothèse vivante.
 
 | **x-calls-fade (chase ET fade, 1h + 15m)** | le chase est TOXIQUE (−37/−58 bps), le fade domine mais sous les coûts ; 44 % WR brut du parseur = bruit de parsing | **NUL/KILL** (REJECTED) — X = collecteur passif assumé |
+
+## 2026-10-05 — VALIDATION DU PARSEUR X (scripts/studies/x_parseur_validation.py)
+
+**VERDICT : NUL — le feed X-calls n'est pas un signal directionnel.** Le protocole
+de tranchage Bonsai : WR(avec entry) 35,8 % vs WR(sans entry) 34,7 % — delta 1,1 pt
+< 5 pts = PAS DE BIAIS DE SÉLECTION ; les deux moitiés sont au même niveau. WR
+global 34,8 % (n=620) < 50 % = le feed perd avant coûts à 24 h — cohérent avec le
+verdict fade/chase de x_calls_fade_test. La qualité du parseur : FAIL sur les deux
+seuils (entry >0 : 11 % vs 80 % requis ; horizon 'none' : 75 % vs 50 %), MAIS la
+re-extraction depuis le texte montre que l'info manque DANS LES TEXTES (entry
+présente dans ~13 % des posts seulement) — réparer le parseur n'ajouterait pas de
+valeur à un feed uniformément faible. Le « WR 44 % » des analyses antérieures ne
+correspond pas à l'engine courant (ret_1h = champ mort, engine_version a bougé).
+Les tables X restent utiles pour les MENTIONS/POSITIONING — pas pour la direction
+des calls. Le WR relatif survit aux bugs d'unité ; ici les ABSOLUS ont bougé
+(44 % → 35 %), la conclusion (feed faible) tient.
