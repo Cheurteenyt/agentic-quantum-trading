@@ -123,12 +123,21 @@ def main() -> int:
         e["hold_h"] = 24
         e["fee_rt_bps"] = MAKER_RT
     add_rolling_scores(events)
+    # FIX 05/10 (bug-hunt) : gardes flux-vide — un max()/median()/nanquantile sur une
+    # liste vide plantait le nocturne avant le rapport (marché calme = zéro pattern).
+    # Flux non-vide : calculs bit-identiques.
+    if not events:
+        print("[machine] cascade majors vide ce soir (aucun event) — rapport abstenu")
+        return 0
     q66 = float(np.nanquantile(
         [e.get("al_score", float("nan"))
          for e in events[:int(len(events) * 0.7)]], 2 / 3))
     gated = [e for e in events
              if not (np.isfinite(e.get("al_score", float("nan")))
                      and e["al_score"] >= q66)]
+    if not gated:
+        print("[machine] cascade majors gated vide ce soir — rapport abstenu")
+        return 0
     med_majors = float(np.median([e["atr_pct"] for e in gated]))
     mae_gated = max(e["mae_adverse"] for e in gated)
     lev_safe = 100 / (mae_gated + 0.5)
@@ -141,6 +150,9 @@ def main() -> int:
 
     # ——— flux 2 : cascade memecoins 1x (levier mécanique) ———
     meme = collect_meme(con)
+    if not meme:
+        print("[machine] cascade meme vide ce soir — rapport abstenu")
+        return 0
     mae_meme = max(e["mae_adverse"] for e in meme)
     lev_meme = max(1, int(100 / (mae_meme + 0.5)))
     med_meme = float(np.median([e["atr_pct"] for e in meme]))
@@ -154,6 +166,9 @@ def main() -> int:
     # + le FILTRE ATR extrême : le décile supérieur (les LAB — les ×520 qui
     # crashent -64 %) est écarté ; c'est lui qui portait le max-DD (26/09)
     surv = collect_arsenal(con, fh_raw).get("survivor_long_72h", [])
+    if not surv:
+        print("[machine] survivor long vide ce soir — rapport abstenu")
+        return 0
     _p90 = float(np.nanquantile([e["atr_pct"] for e in surv], 0.90))
     _n_extreme = len(surv)
     surv = [e for e in surv if e["atr_pct"] <= _p90]
