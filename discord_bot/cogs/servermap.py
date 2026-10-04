@@ -19,7 +19,9 @@ from .. import store
 
 KINDS_CHANNEL = {"log": "le salon des logs de modération",
                  "bienvenue": "le salon des arrivées",
-                 "commandes": "le salon réservé aux commandes"}
+                 "commandes": "le salon réservé aux commandes",
+                 "arrivee": "le salon où les Probatants peuvent parler (le portier)",
+                 "tickets": "la catégorie des tickets (le support)"}
 KINDS_ROLE = {"admin": "les rôles administrateurs",
               "mod": "les rôles modérateurs"}
 RULES = {"no_links": "les liens y sont supprimés",
