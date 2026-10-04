@@ -98,6 +98,26 @@ def extract_articles(page) -> list[dict]:
             )
         except Exception:
             group_label = None
+        # LE MÉDIA (05/10) : les images des calls = des charts, des screenshots de
+        # positions (la preuve de skin-in-the-game), les vidéos = la démo. Les avatars
+        # (profile_images) ne comptent pas ; seuls les MÉDIAS de post (pbs.twimg.com/media
+        # et les videoPlayer) sont capturés.
+        media_urls: list[str] = []
+        try:
+            for img in art.locator(
+                    "img[src*='pbs.twimg.com/media']").all():
+                src = img.get_attribute("src", timeout=800)
+                if src:
+                    media_urls.append(src.split("?")[0])
+        except Exception:
+            pass
+        has_video = False
+        try:
+            has_video = art.locator("[data-testid='videoPlayer']").count() > 0
+        except Exception:
+            pass
+        media_types = (["video"] if has_video else []) + \
+            (["image"] if media_urls else [])
         posts.append({
             "post_id": post_id,
             "author_handle": handle,
@@ -105,6 +125,9 @@ def extract_articles(page) -> list[dict]:
             "posted_at_iso": dt,
             "text": txt.strip(),
             "metrics": _parse_metrics(group_label),
+            "media_count": len(media_types),
+            "media_types": media_types,
+            "media_urls": media_urls,
             "source": "headless_profile",
         })
     return posts

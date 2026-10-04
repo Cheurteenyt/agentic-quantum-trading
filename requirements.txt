@@ -34,3 +34,4 @@ firecrawl>=4.0.0
 scrapling[fetchers]>=0.4.15
 matplotlib>=3.8
 curl_cffi>=0.7.0
+discord.py>=2.4

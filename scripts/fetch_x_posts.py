@@ -172,12 +172,22 @@ def cmd_ingest_json(path: str, query: str) -> int:
                 tm = re.search(TIME_RE, tail)
                 if tm:
                     text = tail[tm.end():].strip()
+        # le média (05/10) : les colonnes sont ajoutées à la volée si la DB est ancienne
+        for col, typ in (("media_count", "INTEGER"), ("media_types", "TEXT"),
+                         ("media_urls", "TEXT")):
+            try:
+                con.execute(f"ALTER TABLE x_posts ADD COLUMN {col} {typ}")
+            except sqlite3.OperationalError:
+                pass  # colonne déjà là
+        media_urls = item.get("media_urls") or []
+        media_types = item.get("media_types") or []
         cur = con.execute(
             """
             INSERT OR IGNORE INTO x_posts
               (post_id, author_handle, author_name, status_url, posted_at_raw,
-               text, metrics, search_query, source, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               text, metrics, search_query, source, fetched_at,
+               media_count, media_types, media_urls)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 post_id,
@@ -190,11 +200,30 @@ def cmd_ingest_json(path: str, query: str) -> int:
                 query or item.get("search_query"),
                 item.get("source") or "browser_live",
                 now,
+                len(media_types),
+                json.dumps(media_types, ensure_ascii=False),
+                json.dumps(media_urls, ensure_ascii=False),
             ),
         )
         inserted += 1 if cur.rowcount else 0
         if not cur.rowcount:
             skipped += 1
+        # la table média (l'inventaire des attaches, l'audit de croissance)
+        try:
+            con.execute(
+                """CREATE TABLE IF NOT EXISTS x_media (
+                    post_id TEXT NOT NULL, media_type TEXT NOT NULL, url TEXT NOT NULL,
+                    captured_at REAL NOT NULL, UNIQUE(post_id, url))""")
+            for i, url in enumerate(media_urls):
+                con.execute(
+                    "INSERT OR IGNORE INTO x_media VALUES (?,?,?,?)",
+                    (post_id, "image", url, now))
+            if "video" in media_types:
+                con.execute(
+                    "INSERT OR IGNORE INTO x_media VALUES (?,?,?,?)",
+                    (post_id, "video", f"video://{post_id}", now))
+        except sqlite3.OperationalError:
+            pass
     con.commit()
     total = con.execute("SELECT COUNT(*) FROM x_posts").fetchone()[0]
     con.close()
