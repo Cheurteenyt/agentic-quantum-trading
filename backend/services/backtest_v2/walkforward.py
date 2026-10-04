@@ -145,7 +145,8 @@ class WalkForwardResult:
     config_fingerprint: str
 
 
-def run_walkforward(returns: Sequence[float], cfg: WalkForwardConfig) -> WalkForwardResult:
+def run_walkforward(returns: Sequence[float], cfg: WalkForwardConfig,
+                    periods_per_year: int = 365) -> WalkForwardResult:
     """Execute le walk-forward sur une serie de rendements par barre.
 
     Le Sharpe IS et le Sharpe OOS sont calcules sur la CONCATENATION des
@@ -153,6 +154,11 @@ def run_walkforward(returns: Sequence[float], cfg: WalkForwardConfig) -> WalkFor
     surponderait les folds courts et lisserait justement l'instabilite qu'on
     cherche a detecter. La dispersion par fold est rendue separement via
     degradation_std.
+
+    periods_per_year : la frequence REELLE des barres (1h -> 8760, 4h ->
+    2190, 1d -> 365). Le defaut 365 est la convention journaliere — le
+    moteur passe la frequence derivee des barres (FIX lot1 F1 : le defaut
+    seul sous-annualisait les series intraday d'un facteur sqrt(24)).
     """
     series = list(returns)
     folds = make_folds(len(series), cfg)
@@ -163,8 +169,8 @@ def run_walkforward(returns: Sequence[float], cfg: WalkForwardConfig) -> WalkFor
     all_train = [r for seg in train_returns for r in seg]
     all_test = [r for seg in test_returns for r in seg]
 
-    sharpe_is = sharpe(all_train)
-    sharpe_oos = sharpe(all_test)
+    sharpe_is = sharpe(all_train, periods_per_year)
+    sharpe_oos = sharpe(all_test, periods_per_year)
 
     # None ou IS <= 0 : le ratio n'a pas de sens, on ne l'invente pas.
     if sharpe_is is None or sharpe_oos is None or sharpe_is <= 0:
@@ -172,7 +178,7 @@ def run_walkforward(returns: Sequence[float], cfg: WalkForwardConfig) -> WalkFor
     else:
         oos_is_ratio = sharpe_oos / sharpe_is
 
-    fold_sharpes_oos = [sharpe(seg) for seg in test_returns]
+    fold_sharpes_oos = [sharpe(seg, periods_per_year) for seg in test_returns]
     measured = [s for s in fold_sharpes_oos if s is not None]
     degradation_std = statistics.stdev(measured) if len(measured) >= 2 else None
 
