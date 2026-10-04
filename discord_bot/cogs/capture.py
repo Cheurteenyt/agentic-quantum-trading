@@ -76,7 +76,8 @@ class Capture(commands.Cog):
                 return
         try:
             row, media = _extract(message)
-            store.save_message(row, media)
+            # FIX review 05/10 : le SQLite synchrone ne bloque JAMAIS l'event loop
+            await asyncio.to_thread(store.save_message, row, media)
         except Exception as exc:  # noqa: BLE001 — jamais de crash sur un message
             print(f"[capture] échec message {message.id} : {exc}")
 
@@ -91,25 +92,33 @@ class Capture(commands.Cog):
         asyncio.create_task(self._backfill_all(BACKFILL_PER_CHANNEL))
 
     async def _backfill_all(self, per_channel: int) -> None:
+        """Le catch-up RÉEL : reprend APRÈS le dernier message capturé par salon
+        (l'idempotence par message_id rend le redémarrage sans coût)."""
         total = 0
         try:
             await self.bot.wait_until_ready()
             for guild in self.bot.guilds:
                 for channel in guild.text_channels:
                     try:
-                        async for message in channel.history(limit=per_channel,
-                                                             oldest_first=False):
+                        last = store.last_message_id(str(channel.id))
+                        after = discord.Object(id=int(last)) if last else None
+                        n0 = 0
+                        async for message in channel.history(
+                                limit=per_channel, oldest_first=False, after=after):
                             if message.author.bot:
                                 continue
                             row, media = _extract(message)
-                            store.save_message(row, media)
+                            await asyncio.to_thread(store.save_message, row, media)
                             total += 1
+                            n0 += 1
+                        if n0:
+                            print(f"[capture] catch-up #{channel.name} : +{n0}")
                     except discord.Forbidden:
                         continue  # un salon sans permission de lecture — normal
                     except Exception as exc:  # noqa: BLE001
                         print(f"[capture] backfill #{channel.name} : {exc}")
         finally:
-            print(f"[capture] backfill terminé : {total} messages historisés, "
+            print(f"[capture] backfill terminé : +{total} nouveaux, "
                   f"total {store.count_messages()}")
 
     @app_commands.command(name="backfill",
