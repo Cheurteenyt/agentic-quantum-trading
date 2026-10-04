@@ -164,6 +164,8 @@ class Trade:
     exit_price: float
     reason: str  # 'stop' | 'take' | 'reverse' | 'eod'
     worst_adverse_pct: float = 0.0  # FIX lot2 (F6) : le MAE reellement observe
+    slip_frac: float = 0.0   # FIX lot3 (F2) : slippage en fraction du notionnel
+    fund_frac: float = 0.0   # FIX lot3 (F2) : funding signe en fraction
 
     @property
     def gross_return(self) -> float:
@@ -171,7 +173,10 @@ class Trade:
 
     @property
     def net_return(self) -> float:
-        return self.gross_return - FEE_FRACTION_ROUND_TRIP
+        # FIX lot3 (F2) : le net porte TOUTES les charges de la même
+        # comptabilité que la courbe (prix + funding - slippage - fees).
+        return (self.gross_return + self.fund_frac + self.slip_frac
+                - FEE_FRACTION_ROUND_TRIP)
 
     @property
     def holding_bars(self) -> int:
@@ -324,10 +329,17 @@ def _build_costs(
     bars: Sequence[Bar],
     params: dict,
     symbol: str,
-) -> tuple[CostBreakdown, dict[str, Any]]:
-    """Agrege les 4 postes sur l'ensemble des trades. Jamais de None implicite."""
+) -> tuple[CostBreakdown, dict[str, Any], list[tuple[float, float]]]:
+    """Agrege les 4 postes sur l'ensemble des trades. Jamais de None implicite.
+
+    FIX lot3 (F2) : renvoie aussi les fractions (slippage, funding) PAR TRADE
+    — l'evaluate les book dans la courbe et dans les nets ; les USD du
+    CostBreakdown et les fractions de la courbe viennent du MÊME calcul
+    (USD == fraction × BOOK_NOTIONAL_USD, exactement).
+    """
     cb = CostBreakdown()
     flags: dict[str, Any] = {"funding_available": False, "funding_reason": None}
+    per_trade: list[tuple[float, float]] = []
 
     fees = 0.0
     slip = 0.0
@@ -351,13 +363,20 @@ def _build_costs(
 
         # slippage : consommation d'un carnet synthetique de 50K notional.
         book = _synthetic_book(t.entry_price, BOOK_NOTIONAL_USD)
-        slip += slippage_usd(BOOK_NOTIONAL_USD, book, t.entry_price)
+        slip_usd = slippage_usd(BOOK_NOTIONAL_USD, book, t.entry_price)
+        slip += slip_usd
 
         # funding sur le notionnel, prorata de la duree de detention.
+        fund_usd = 0.0
         if rate is not None:
             side = "long" if t.side == 1 else "short"
             holding_hours = t.holding_bars * hours_per_bar
-            funding += funding_cost_usd(BOOK_NOTIONAL_USD, holding_hours, side, rate)
+            fund_usd = funding_cost_usd(BOOK_NOTIONAL_USD, holding_hours, side, rate)
+            funding += fund_usd
+
+        # FIX lot3 (F2) : la fraction par trade — la même monnaie que la courbe.
+        per_trade.append((slip_usd / BOOK_NOTIONAL_USD,
+                          fund_usd / BOOK_NOTIONAL_USD))
 
         # FIX lot2 (F6) : liquidation jugee sur le MAE reellement observe
         # (gaps de fill compris), pas sur la distance du stop supposee.
@@ -380,7 +399,7 @@ def _build_costs(
     if not flags["funding_available"]:
         cb.warnings.append("funding indisponible: 0.0 explicite (voir blob)")
 
-    return cb, flags
+    return cb, flags, per_trade
 
 
 # ------------------------------------------------------------------ contrat
@@ -391,13 +410,20 @@ def evaluate(params: dict, bars: Sequence[Bar]) -> StrategyEval:
     symbol = str(params.get("symbol", DEFAULT_SYMBOL))
     trades, bar_ret = simulate(bars, params)
 
-    trade_returns = [t.net_return for t in trades]
     if trades:
         avg_hold = round(sum(t.holding_bars for t in trades) / len(trades))
     else:
         avg_hold = 0
 
-    costs, flags = _build_costs(trades, bars, params, symbol)
+    costs, flags, per_trade = _build_costs(trades, bars, params, symbol)
+    # FIX lot3 (F2) : UNE comptabilité — le slippage et le funding entrent
+    # dans la courbe ET dans les nets, dérivés du même calcul que le
+    # CostBreakdown (USD du rapport == fraction de la courbe × notionnel).
+    for t, (slip_frac, fund_frac) in zip(trades, per_trade):
+        t.slip_frac = slip_frac
+        t.fund_frac = fund_frac
+        bar_ret[t.exit_index] += fund_frac + slip_frac
+    trade_returns = [t.net_return for t in trades]
 
     # Courbe d'equity capitalisee a partir des rendements par barre.
     equity = [1.0]
