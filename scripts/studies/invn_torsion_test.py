@@ -7,8 +7,9 @@
 #   2. si exit 0 → CE script (sans --dry-run) ; verdict → lab_ledger log. FAIL = gravé, STOP.
 #   3. --dry-run = plomberie seule (fenêtre < 30 j), ne rend AUCUN verdict, ne consomme pas le budget.
 #
-# PIÈGE D'UNITÉ ÉVITÉ PAR CONSTRUCTION : le champ premium_pct du WS est en DÉCIMAL malgré son
-# nom (mémoire 03/10) — l'évaluateur recalcule le premium depuis mark_price/index_price BRUTS.
+# CORRECTION (bug-hunt 05/10) : premium_history est en POURCENT (−0,0448 = (mark/idx−1)×100) —
+# mais l'évaluateur recalcule le premium depuis mark/index BRUTS quoi qu'il arrive
+# nom (le piège documenté venait d'une autre table : premiumIndexKlines API = décimal).
 # CONDITIONNEUR, jamais un signal autonome (le pré-enregistrement l'exige — le verdict qualifie
 # le premium comme filtre de timing pour les autres flux).
 

@@ -188,6 +188,23 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 | `depth_indicator_prototype.py` | géométrie 0-liquidation sur le micro-drift d'imbalance — prototype prêt |
 | `backtest_depth.py` | le gate depth — la porte micro-structure du 20x |
 
+### 6e. Les one-shots du week-end 03-05/10 (verdicts dans docs/20)
+
+| Fichier | Rôle / verdict |
+|---|---|
+| `studies/premium_fade_listing_test.py` | l'évaluateur verrouillé du test listing — **KILL ex ante 04/10** (22,2 % toxiques > 15 %) ; le flux gouvernance est dans l'en-tête |
+| `studies/volspike_recost_spread.py` | le re-cost du flux meme au spread réel — **PASS 04/10** (esp +0,0161 $/trade, 0 liq) |
+| `studies/execution_slippage_probe.py` | la sonde slippage depuis la tape (BTC/ETH) — majors ≈ 0 bp, pire-30s p90 +7,5 < seuil 15 |
+| `studies/execution_depth_floor.py` | le plancher de spread du carnet (102M bins) — meme 12-24 bps médian, CATE 152/MEME 200 |
+| `studies/maker_fillrate_tape.py` | le fill-rate maker à l'open — 100 % à 1 min, sélection adverse 1-2 bps (le prize meme attend la tape étendue) |
+| `studies/invn_torsion_test.py` | l'évaluateur INV-N (torsion premium, verdict ~28/10) — premium recalculé depuis mark/index bruts, dry-run < 30 j refusé |
+| `archive_studies/premium_fade_full_remeasure.py` | l'audit qui a TUÉ le claim 87 % WR (3 cellules, coûts 8 bps) — archivé 03/10 |
+
+Protocoles scellés : `research/hypotheses/premium-fade-listing.md` (verdict) ·
+`research/hypotheses/execution-slippage-protocol.md` (seuils kill par flux + plancher) ·
+`reports/aster/bonsai-tournoi-calibration-2026-10.md` (9 prédictions scellées, scoring nov) ·
+`reports/aster/bug-hunt-0510/SYNTHESE.md` (1 critique fixé + re-mesuré, 10 mineurs, 3 suspects).
+
 ## 7. ARCHIVE ÉTUDES (`scripts/archive_studies/`) — le 28/09
 
 Les one-shots d'études CLOSES (verdict NUL/CONTEXTE/fermé ET aucun import
