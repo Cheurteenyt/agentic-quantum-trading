@@ -108,6 +108,15 @@ def collect_meme(con: sqlite3.Connection) -> list[dict]:
     return meme
 
 
+def levier_majors_safe(mae_gated: float, cap: float = 10.0) -> float:
+    """La règle 0-liq plafonnée au cap machine : lev ≤ min(cap, 100/(MAE+0,5)).
+
+    Le même calcul que write_mae_state, exposé pur pour le test — le cap
+    ne bind que si le MAE gated dépasse 9,5 % (lev_safe < 10).
+    """
+    return min(cap, 100.0 / (mae_gated + 0.5))
+
+
 def main() -> int:
     con = sqlite3.connect(KDB, timeout=60)
     fh = funding_hourly_all()
@@ -145,8 +154,12 @@ def main() -> int:
 
     def size_cascade(e, st=None):
         return min(max(0.24 * (e["atr_pct"] / med_majors), 0.08), 0.40)
+    # FIX lot1 (F5) : la machine appliquait 10x même quand son propre
+    # lev_safe < 10 — le rapport affichait « BAISSER LE LEVIER » et
+    # poussait quand même. La règle 0-liq plafonne, elle n'affiche pas.
+    lev_majors = levier_majors_safe(mae_gated)
     for e in gated:
-        e["lev"] = 10
+        e["lev"] = lev_majors
 
     # ——— flux 2 : cascade memecoins 1x (levier mécanique) ———
     meme = collect_meme(con)
