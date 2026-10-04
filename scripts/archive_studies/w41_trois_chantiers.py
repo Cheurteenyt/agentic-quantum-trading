@@ -1,3 +1,4 @@
+# ARCHIVÉ (2026-10-04) — étude W41 close (PR #90, verdicts au registre 2026-10-05 ter) : CH1 MM cap-marge mécanique validé mais edge absent, CH2 funding résilient, CH3 tilt par-symbole FAIL.
 #!/usr/bin/env python
 """W41 — LES TROIS CHANTIERS QUBO (pré-enregistrés research/hypotheses/qubo-w41-trois-chantiers.md).
 
