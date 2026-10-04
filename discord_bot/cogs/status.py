@@ -45,3 +45,17 @@ async def etat(inter: discord.Interaction) -> None:
 async def setup(bot: discord.Client) -> None:
     bot.tree.add_command(ping)
     bot.tree.add_command(etat)
+    bot.tree.add_command(membres)
+
+
+@app_commands.command(name="membres", description="Les membres détectés et leurs ids (détection des identifiants)")
+async def membres(inter: discord.Interaction) -> None:
+    await inter.response.defer(ephemeral=True)
+    guild = inter.guild
+    if not guild:
+        await inter.followup.send("commande de serveur uniquement")
+        return
+    membres = sorted(guild.members, key=lambda m: m.joined_at or 0)[:30]
+    lines = [f"**{guild.member_count} membres** — les 30 premiers (id) :"] if guild.member_count else ["**Membres :**"]
+    lines += [f"• {m.display_name} — `{m.id}`" for m in membres]
+    await inter.followup.send("\n".join(lines)[:1900], ephemeral=True)
