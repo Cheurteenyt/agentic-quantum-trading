@@ -41,6 +41,7 @@ SESSIONS_PATH = ROOT / "data" / "dashboard_sessions.json"
 DDB = ROOT / "data" / "warehouse" / "discord.db"
 COOKIE = "ce_session"
 SESSION_TTL = 7 * 24 * 3600
+PROFILE_TTL = 300  # le cache du profil — 2 fetchs Discord par vue sinon, et un 429 déconnecterait
 
 app = FastAPI(title="Core Equity", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -145,29 +146,54 @@ def _refresh(token: dict) -> dict:
 
 
 def _session_profile(uid: str) -> dict | None:
-    """Le profil à jour (rôles, arrivée) — rafraîchit le token si expiré."""
+    """Le profil à jour (rôles, arrivée) — cache 5 min, fallback périmé si
+    Discord est en vrac (un 429 ou un timeout ne doit PAS déconnecter)."""
     with _sess_lock:
         s = _sessions().get(uid)
     if not s:
         return None
+    prof = s.get("profile") or {}
+
+    def _from_cache() -> dict:
+        return {"user": {"id": uid, "global_name": prof.get("username", "?"),
+                         "avatar": prof.get("avatar")},
+                "member": {"roles": prof.get("roles", []),
+                           "joined_at": prof.get("joined_at")}}
+
+    if prof and time.time() - prof.get("cached_at", 0) < PROFILE_TTL:
+        return _from_cache()
+
     tok = {"access_token": s["access_token"], "refresh_token": s["refresh_token"]}
-    if s.get("expires_at", 0) < time.time() + 60:
-        try:
+    refreshed = False
+    try:
+        if s.get("expires_at", 0) < time.time() + 60:
             tok = _refresh(tok)
-        except Exception:
+            refreshed = True
+        user = _discord_get("/users/@me", tok["access_token"])
+        member = _discord_get(f"/users/@me/guilds/{DISCORD_GUILD_ID}/member", tok["access_token"])
+    except httpx.HTTPStatusError as e:
+        # 401/403 = token mort, 400 = invalid_grant du refresh (Discord renvoie
+        # 400 pas 401) → logout ; le reste (429, 5xx, timeout) = passager →
+        # le cache périmé vaut mieux qu'une déconnexion
+        if e.response.status_code in (400, 401, 403) or not prof:
             return None
-        with _sess_lock:
-            all_s = _sessions()
-            if uid in all_s:
+        return _from_cache()
+    except Exception:
+        if prof:
+            return _from_cache()
+        return None
+    new_prof = {"username": user.get("global_name") or user.get("username", "?"),
+                "avatar": user.get("avatar"), "roles": member.get("roles", []),
+                "joined_at": member.get("joined_at"), "cached_at": time.time()}
+    with _sess_lock:
+        all_s = _sessions()
+        if uid in all_s:
+            all_s[uid]["profile"] = new_prof
+            if refreshed:
                 all_s[uid].update(access_token=tok["access_token"],
                                   refresh_token=tok["refresh_token"],
                                   expires_at=int(time.time()) + tok.get("expires_in", 604800))
-                _save_sessions(all_s)
-    try:
-        user = _discord_get("/users/@me", tok["access_token"])
-        member = _discord_get(f"/users/@me/guilds/{DISCORD_GUILD_ID}/member", tok["access_token"])
-    except Exception:
-        return None
+            _save_sessions(all_s)
     return {"user": user, "member": member}
 
 
@@ -289,7 +315,10 @@ async def oauth_callback(request: Request):
         s[uid] = {"access_token": tok["access_token"], "refresh_token": tok["refresh_token"],
                   "expires_at": int(time.time()) + tok.get("expires_in", 604800),
                   "username": user.get("global_name") or user.get("username", "?"),
-                  "logged_at": time.time()}
+                  "logged_at": time.time(),
+                  "profile": {"username": user.get("global_name") or user.get("username", "?"),
+                              "avatar": user.get("avatar"), "roles": member.get("roles", []),
+                              "joined_at": member.get("joined_at"), "cached_at": time.time()}}
         _save_sessions(s)
     resp = RedirectResponse("/moi", status_code=302)
     resp.set_cookie(COOKIE, _make_cookie(uid), max_age=SESSION_TTL,
