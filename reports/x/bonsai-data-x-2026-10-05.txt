@@ -1,0 +1,50 @@
+**1. L’INVENTAIRE FEASIBLE (Chemin Browser Prouvé)**
+
+*   **Historique des profils (Bio/Stats) :** **Faisable.** L’accès à `data/x_browser_profile` permet de scraper la bio, le nombre de followers/suivis et les tweets récents des 49 comptes.
+    *   *Apport :* Contextualisation du "weight" d'un compte (ex: un compte à 10k followers a plus d'impact qu'un compte à 100). Permet d'affiner le scoring actuel basé uniquement sur le contenu.
+*   **Replies/Threads (Arborescence) :** **Faisable (Partiel).** Les données `latest-replies.json` existent. On peut remonter l'arborescence d'un thread principal (2-3 niveaux) pour voir les retours des autres traders.
+    *   *Apport:* Détecter la "consensus" ou la "divergence" immédiate. Si 80% des replies disent "buy" mais que le tweet original est vague, c'est un signal de conviction.
+*   **Listes (Latest-List) :** **Faisable.** Les listes X sont accessibles via le navigateur.
+    *   *Apport:* Détection des "watchlists" des traders. Si un trader ajoute un symbole dans sa liste, c'est un signal de positionnement avant l'appel formel.
+*   **Engagement par heure (Likes/RTs) :** **Limite.** Les JSON actuels captent l'engagement global. Récupérer l'historique précis par heure nécessite un replay des tweets (difficile sans cache).
+    *   *Apport:* Mesurer la viralité immédiate. Un tweet avec 0 likes à 03:21 mais 500 à 04:00 indique une adoption tardive.
+*   **INACCESSIBLE :** Les DMs (privés), l'historique complet au-delà de 15 tweets par page sans scroll manuel (risque de ban), les données supprimées par les utilisateurs.
+
+**2. LES 3 SIGNAUX LES PLUS PROMETTEURS**
+
+*   **Signal 1 : La Cohérence Profil-Appel (Hypothèse : Le marché ne l'efface pas car c'est un filtre de bruit).**
+    *   *Design :* Comparer le "style" du compte (ex: il ne-trade que des longs à horizon 4h) avec son dernier appel. Si l'appel est hors-profil (ex: short sur un long-term bullish), le score diminue.
+    *   *Critère :* Corrélation entre la "déviation de profil" et le Verdict. Si >60% des appels hors-profil sont des Loss, on punit le score de 15%.
+*   **Signal 2 : La Réaction du Thread (Hypothèse : Le consensus des replies valide la thèse).**
+    *   *Design:* Analyser les 5 premières replies du tweet principal. Si elles contiennent des mots-clés de confirmation (ex: "structure", "liquidity"), le score augmente.
+    *   *Critère:* Ratio de mots-clés positifs dans les replies > 0.5 avant l'entrée = +10% au score.
+*   **Signal 3 : Le Fix du Scoring (Hypothèse : 44% WR est une sous-estimation due à l'absence de rendements).**
+    *   *Design:* Remplir les colonnes `ret_1h/ret_24h` via un join avec le prix historique (voir point 3).
+    *   *Critère:* Recomputer le WR. Si le WR passe à 60%+ avec les bons rendements, le signal est validé. Sinon, le modèle de scoring est défectueux.
+
+**3. LE FIX DU SCORING (Colonnes Ret Vides)**
+
+*   **Cause Probable :** Le moteur de scoring calcule le verdict *au moment de l'appel* (T0). Les rendements `ret_1h` et `ret_24h` se calculent *après* (T1, T2). Si le job de scoring n'a pas de "backfill" ou si le join avec la table des prix (`x_price_history`) échoue (ex: horodatage millisecondre vs seconde), les colonnes restent `NULL`.
+*   **Design du Correctif :**
+    1.  **Créer une table `x_price_ticks`** (ou utiliser une existing) avec `symbol`, `timestamp`, `close_price`.
+    2.  **Job de Backfill nocturne :** Pour chaque `x_call` avec `verdict` rempli mais `ret_1h` NULL :
+        *   Récupérer le `entry_price` (de l'appel ou du prix à T0).
+        *   Récupérer le `close_price` à `T0 + 1h` et `T0 + 24h` depuis `x_price_ticks`.
+        *   Calculer `ret = (close - entry) / entry`.
+        *   Insérer dans `x_call_scores`.
+    3.  **Unité ts :** S'assurer que `timestamp` de l'appel et de l'prix sont dans la même timezone (UTC).
+
+**4. LE PLAN DE COLLECTE PRIORISÉ**
+
+*   **Priorité 1 : Profondeur (Depth) sur les 49 comptes existants.**
+    *   *Action:* Au lieu de scraper uniquement les 15 derniers tweets, scraper les 50 derniers tweets de chaque compte suivi.
+    *   *Budget:* 49 comptes * 50 tweets = 2450 requêtes.
+    *   *Risque:* Faible. Le profil browser gère déjà le volume actuel. 2450 requêtes en 2h (1 par seconde) est bien en dessous du rate-limit (souvent ~180 req/min par IP, mais le browser a un "fingerprint" humain).
+    *   *Apport:* Mieux comprendre l'historique des trades (pour le Signal 1).
+*   **Priorité 2 : Nouveaux Comptes (Discovery).**
+    *   *Action:* Scrapper les "Top Tweets" de la dernière heure dans la catégorie "Trading". Ajouter les comptes qui ont plus de 100 likes.
+    *   *Budget:* 1 requête de recherche + 10 requêtes de profil = 11 req/nuit.
+    *   *Risque:* Nul.
+    *   *Apport:* Élargir la base de données pour un échantillon plus robuste.
+*   **Priorité 3 : Les Lists.**
+    *   *
