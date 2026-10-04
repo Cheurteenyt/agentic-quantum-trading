@@ -816,34 +816,31 @@ route = re-valider le levier majors à la baisse sur la fenêtre récente**
 l'expérience n°1 de W41. Le bug hunt de v1 est passé (run_stack recalcule
 MAE ≥ 100/lev − 0,5 ; le levier natif 10x des events est bien remplacé).
 
-## 2026-10-05 (ter) — W41 : LES TROIS CHANTIERS exécutés (scripts/studies/w41_trois_chantiers.py)
+## 2026-10-05 (quater) — LA MORT DU +5 082 %/an : la cellule QUBO jointe ré-mesurée sur la période complète
 
-**CH1 — MM liq-tolérant : FAIL sur les critères, VALIDÉ mécaniquement.** Le cap
-de marge fonctionne EXACTEMENT comme le propriétaire l'intuivait : cap 4 % →
-DD 12,2 % (vs 39,5 % sans cap), la liq coûte 4 % au lieu de 16 %. MAIS le
-ROI suit la marge vers le bas et — le vrai problème — **la fenêtre récente
-est un régime PERDANT pour la cascade majors** : même la référence 8x perd
-(VAL $94/$100, ret/DD négatif partout). Le MM contient les dégâts, il ne
-crée pas un edge absent. La question déplacée : pourquoi la cascade majors
-saigne depuis 2025-10 (le régime a changé — cohérent avec le gel de
-promotion T3) ; c'est LA question ouverte, pas le sizing.
+**LA LOI S'APPLIQUE À ELLE-MÊME : tout chiffre non reproductible par le code
+committé = mort, même gravé en mémoire.** La cellule codifiée
+w=[0.857/0.857/2.0/0.857] lev=[11/1/1/1], re-mesurée sur la période complète
+2021→2026 avec les données ACTUELLES (post-fix fetch_deep_klines) :
 
-**CH2 — le stress funding : RÉSILIENT, la peur est désamorcée.** Le scénario
-cadence ×8 (8h → 1h) ne bouge les soldes que de −4,4 % (majors), +0,2 %
-(meme), +3,8 % (survivor), +0,1 % (vol_spike). La surprise : les flux alts
-REÇOIVENT du funding (les shorts encaissent le positif) — le funding est
-actuellement une micro-revenue, pas un coût. Le danger plateforme est
-CONTENU au niveau de taux actuels (reste à monitorer le level des rates,
-pas la cadence).
+- **11x sans cap : final $1, DD 99,2 %, 20 LIQUIDATIONS, 20/28 mois
+  négatifs.** Le +5 082 %/an @ DD 23,3 % « 0 liq » du 27/09 est mort — la
+  cause racine probable : le bug d'unité fetch_deep_klines (12 valeurs vs 14
+  colonnes, mort silencieuse depuis le backfill CVD) corrompait les volumes
+  que les gates (AL p66, ATR) consomment ; le claim a été mesuré AVANT le fix.
+- Le propriétaire se souvenait de « 6 liquidations » — c'était 20 (11 à 8x).
+  Sa mémoire était plus proche de la vérité que le registre.
+- **Le cap de marge fait son travail mécanique** : cap 2 % → DD 32,9 % (les
+  32 liqs coûtent ~2 % chacune), cap 1 % → DD 17,6 %. Mais il n'y a PAS
+  d'edge à protéger sur les données fixées : même plafonnée, la cellule
+  finit sous l'eau ($68-92). Le flux cascade majors n'a pas d'edge mesurable
+  sur 2021→2026 avec les données corrigées.
+- **Ce qui SURVIT** : le forward paper des survivants (mesuré en réel, pas
+  rétro-calculé), les verdicts RELATIFS (les gradients, les fermées), et le
+  harnais lui-même. Ce qui est MORT : tous les ABSOLUS du QUBO joint.
 
-**CH3 — le tilt par-symbole sur les alts : FAIL (aucun effet).** 18 symboles
-avec une médiane TRAIN, les seuils 1,5/2,0 ne changent ni le DD ni le ROI —
-le funding des alts est du bruit devant leur volatilité. La famille tilt est
-maintenant fermée SUR TOUTES ses formes (marché, majors, par-symbole).
-
-**L'ÉTAT CONSOLIDÉ QUBO** : la cellule 11x est morte dans le régime récent,
-le MM plafonné contient le DD (12 %) mais le flux majors cascade est en
-perte dans ce régime, le funding n'est ni le problème ni le levier, et le
-tilt est épuisé sous toutes ses formes. LA question ouverte = le régime de
-la cascade majors depuis 2025-10 (quoi a changé : la vol ? la structure ?
-les gates ?). Le forward paper des survivants reste le juge vivant.
+**CONSÉQUENCE MAJEURE** : la machine doit être RE-FOUNDÉE sur les données
+fixées — les gates (AL score, ATR p90, vol-inverse) ont été calibrées sur des
+volumes corrompus ; leur re-calibrage est le programme W41/W42 (avant tout
+nouveau claim d'ABSOLU). Le cap de marge liq-tolérant reste LA bonne brique
+de défense (DD 17,6 % à cap 1 %) pour le jour où l'edge sera re-démontré.
