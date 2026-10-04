@@ -31,7 +31,7 @@ Contrôles : inverse (le wallet short-survivor doit être pire — sinon artefac
   corr jointe mesurée sur les rets d'events ; comparaison APPARIÉE aux solos
   (mêmes events, même split, mêmes coûts) ; hors top 5 % des trades (la tail
   survivor porte tout — le verdict doit survivre sans ses 3 meilleurs trades).
-Hash de commit du gel : <scellé au commit de la PR de pré-enregistrement>
+Hash de commit du gel : 12465ab — protocol-v1
 Jugé sous : protocol_v1 · Exécution : semaine W41 (budget W40 épuisé 22/20 —
   verrou lab_ledger exit 4 le 04/10, un seul run à la reset du lundi 06/10).
 Baseline anti-dérive : les wallets solo du grand audit (survivor $155/DD 7,4 % ;
