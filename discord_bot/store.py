@@ -71,3 +71,35 @@ def count_messages() -> int:
         return con.execute("SELECT COUNT(*) FROM d_messages").fetchone()[0]
     finally:
         con.close()
+
+
+def mod_db(action: str, guild_id: str, moderator_id: str, target_id: str,
+           reason: str, detail: str = "") -> None:
+    """Chaque action de modération est tracée — « absolument tout » est auditable."""
+    con = connect()
+    try:
+        con.execute("""CREATE TABLE IF NOT EXISTS d_mod_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
+            action TEXT NOT NULL, guild_id TEXT, moderator_id TEXT,
+            target_id TEXT, reason TEXT, detail TEXT)""")
+        con.execute("INSERT INTO d_mod_actions (ts, action, guild_id, moderator_id, "
+                    "target_id, reason, detail) VALUES (?,?,?,?,?,?,?)",
+                    (time.time(), action, guild_id, moderator_id, target_id,
+                     reason or "—", detail))
+        con.commit()
+    finally:
+        con.close()
+
+
+def warns_of(guild_id: str, target_id: str) -> list[tuple]:
+    con = connect()
+    try:
+        con.execute("""CREATE TABLE IF NOT EXISTS d_mod_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
+            action TEXT NOT NULL, guild_id TEXT, moderator_id TEXT,
+            target_id TEXT, reason TEXT, detail TEXT)""")
+        return con.execute(
+            "SELECT ts, reason FROM d_mod_actions WHERE action='warn' AND guild_id=? "
+            "AND target_id=? ORDER BY ts", (guild_id, target_id)).fetchall()
+    finally:
+        con.close()
