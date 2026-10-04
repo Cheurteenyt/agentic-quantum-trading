@@ -58,6 +58,22 @@ class Capture(commands.Cog):
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot:
             return
+        # LES RÈGLES PAR SALON (la carte du registre) — les admins en sont exempts
+        admin = isinstance(message.author, discord.Member) \
+            and message.author.guild_permissions.administrator
+        if message.guild and not admin:
+            gid, cid = message.guild.id, message.channel.id
+            content = message.content or ""
+            if store.reg_rule(gid, cid, "commands_only") and content:
+                await message.delete()
+                return
+            if store.reg_rule(gid, cid, "no_links") \
+                    and re.search(r"https?://", content):
+                await message.delete()
+                return
+            if store.reg_rule(gid, cid, "media_only") and not message.attachments:
+                await message.delete()
+                return
         try:
             row, media = _extract(message)
             store.save_message(row, media)
