@@ -168,10 +168,17 @@ class StateManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Clear daily stats
+        # Clear daily stats — types préservés (FIX lot1 F10 : '{}' cassait
+        # le contrat float/int et aurait explosé risk_guard à la lecture)
         cursor.execute(
-            "UPDATE risk_state SET value = '{}', updated_at = ? WHERE key IN ('daily_pnl', 'daily_trades')"
-            , (datetime.now().isoformat(),)
+            "UPDATE risk_state SET value = '0.0', updated_at = ? "
+            "WHERE key = 'daily_pnl'",
+            (datetime.now().isoformat(),)
+        )
+        cursor.execute(
+            "UPDATE risk_state SET value = '0', updated_at = ? "
+            "WHERE key = 'daily_trades'",
+            (datetime.now().isoformat(),)
         )
         
         conn.commit()
