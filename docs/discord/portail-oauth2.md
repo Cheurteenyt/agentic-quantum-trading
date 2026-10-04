@@ -46,3 +46,26 @@ Les membres se connectent avec Discord (OAuth2 authorization_code, redirect
 leur rang du leaderboard, leurs stats de modération. Les clés sont prêtes
 (`DISCORD_CLIENT_ID` + `DISCORD_CLIENT_SECRET` dans `.env`, exposées dans
 `discord_bot/config.py`), rien d'autre ne bloque.
+
+## La gestion continue (05/10, l'état complet)
+
+```
+.venv/bin/python scripts/discord_dev.py status    # l'audit complet en 1 commande
+.venv/bin/python scripts/discord_dev.py sync-global   # globales = la guilde
+.venv/bin/python scripts/discord_dev.py webhooks / invite
+```
+
+L'état au 05/10 : commandes **36 globales = 36 guilde** (69 fantômes purgés),
+webhooks 2 (les siens, aucun orphelin), intents privilégiés 3/3 ON (prouvé par
+libellé), code grant OFF, **bot passé en PRIVÉ** (sauvé au portail — se
+re-confirmer au prochain login), install_params 1099780140054.
+
+⚠ LA SESSION PORTAIL VIT AUSSI LONGTEMPS QUE LE PROCESS NAVIGATEUR — chaque
+redémarrage du chromium force un re-login Discord. **Laisser
+`discord-dev-browser` tourner** au lieu de le stopper : la fenêtre reste sur
+l'écran de login quand la session est morte, le QR règle ça en 10 secondes.
+
+⚠ L'API Discord derrière Cloudflare : curl nu = OK ; urllib/httpx par défaut =
+souvent OK ; httpx avec un UA Chrome spoofé = 40333 systématique (le TLS ne
+ colle pas avec l'UA). `scripts/discord_dev.py` subprocess du curl nu, jamais
+de spoof.
