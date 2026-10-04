@@ -270,5 +270,59 @@ class TestStats(unittest.TestCase):
         self.assertTrue(any(c["channel_name"] == "commandes" for c in s["top_channels"]))
 
 
+class TestMarketSnapshot(unittest.TestCase):
+    """La photo marché : les vrais prix 24 h, les périmés exclus, le format."""
+
+    @classmethod
+    def setUpClass(cls):
+        import sqlite3
+        from discord_bot import stats
+        cls.stats = stats
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.db = Path(cls._tmp.name) / "klines.db"
+        con = sqlite3.connect(cls.db)
+        con.execute("CREATE TABLE klines (symbol TEXT, interval TEXT, "
+                    "open_time INTEGER, close REAL)")
+        now = 1_790_000_000_000  # ms
+        # BTC : +10 % sur 24 h (vivante) ; ETH : -5 % ; STALE : périmée (30 h)
+        for i, close in enumerate([100.0, 105.0, 110.0]):
+            con.execute("INSERT INTO klines VALUES ('BTCUSDT','1h',?,?)",
+                        (now - (24 - i) * 3600000, close))
+        for i, close in enumerate([200.0, 195.0, 190.0]):
+            con.execute("INSERT INTO klines VALUES ('ETHUSDT','1h',?,?)",
+                        (now - (24 - i) * 3600000, close))
+        con.execute("INSERT INTO klines VALUES ('PEPEUSDT','1h',?,?)",
+                    (now - 30 * 3600000, 5.0))
+        for i, close in enumerate([0.40, 0.50, 0.60]):
+            con.execute("INSERT INTO klines VALUES ('DOGEUSDT','1h',?,?)",
+                        (now - (24 - i) * 3600000, close))
+        con.commit()
+        con.close()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_snapshot(self):
+        snap = self.stats.market_snapshot(self.db)
+        self.assertIsNotNone(snap)
+        self.assertAlmostEqual(snap["majors"]["BTCUSDT"][1], 10.0, places=6)
+        self.assertAlmostEqual(snap["majors"]["ETHUSDT"][1], -5.0, places=6)
+        self.assertNotIn("PEPEUSDT", snap["majors"])  # périmé → exclu
+        self.assertEqual(snap["n_symbols"], 3)
+
+    def test_lines_et_context(self):
+        snap = self.stats.market_snapshot(self.db)
+        majors_line, movers = self.stats.market_lines(snap)
+        self.assertIn("**BTC** $110.00", majors_line)
+        self.assertIn("+10.0 %", majors_line)
+        self.assertIn("DOGE", movers)  # les movers = les non-majeures
+        ctx = self.stats.market_context(snap)
+        self.assertIn("$110.00", ctx)  # le cerveau ne peut que CITER ces prix
+
+    def test_absente(self):
+        self.assertIsNone(self.stats.market_snapshot(Path("/nonexistent/k.db")))
+
+
 if __name__ == "__main__":
     unittest.main()
