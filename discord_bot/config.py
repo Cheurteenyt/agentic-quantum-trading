@@ -37,6 +37,11 @@ DISCORD_BOT_TOKEN = _env.get("DISCORD_BOT_TOKEN") or os.environ.get("DISCORD_BOT
 DISCORD_GUILD_ID = _env.get("DISCORD_GUILD_ID") or os.environ.get("DISCORD_GUILD_ID", "")
 DISCORD_HOME_CHANNEL = _env.get("DISCORD_HOME_CHANNEL") or os.environ.get("DISCORD_HOME_CHANNEL", "")
 
+# OAuth2 (portail développeur → OAuth2) — pour le futur dashboard web où les
+# membres se connectent avec Discord. Optionnel : rien ne dépend de ces clés.
+DISCORD_CLIENT_ID = _env.get("DISCORD_CLIENT_ID") or os.environ.get("DISCORD_CLIENT_ID", "")
+DISCORD_CLIENT_SECRET = _env.get("DISCORD_CLIENT_SECRET") or os.environ.get("DISCORD_CLIENT_SECRET", "")
+
 # La DB warehouse (lecture seule pour les commandes /status etc.)
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 XPDB = ROOT / "data" / "warehouse" / "x_posts.db"
