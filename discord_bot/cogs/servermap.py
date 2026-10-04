@@ -9,9 +9,11 @@ dans #logs : la carte vit avec le serveur. /map montre tout.
 """
 from __future__ import annotations
 
+import datetime as dt
+
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from .. import store
 
@@ -47,6 +49,113 @@ def is_admin(inter: discord.Interaction) -> bool:
 class ServerMap(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+        self.access_loop.start()
+
+    def cog_unload(self) -> None:
+        self.access_loop.cancel()
+
+    # ——— le monitor d'accès AUTONOME (ce que le screenshot montre, en continu) ———
+
+    def _access_snapshot(self, guild: discord.Guild) -> list[dict]:
+        """Pour chaque salon : privé ?, sync catégorie ?, QUI a accès (rôles + membres)."""
+        out = []
+        for ch in guild.channels:
+            if not isinstance(ch, (discord.TextChannel, discord.ForumChannel,
+                                   discord.VoiceChannel)):
+                continue
+            base = ch.overwrites_for(guild.default_role)
+            private = base.view_channel is False
+            access = []
+            for target, ow in ch.overwrites.items():
+                if ow.view_channel is True:
+                    access.append(f"{type(target).__name__}:{target.name}")
+            try:
+                viewers = [m.mention for m in guild.members
+                           if ch.permissions_for(m).view_channel][:20]
+            except Exception:
+                viewers = []
+            out.append({
+                "channel_id": str(ch.id), "channel_name": ch.name,
+                "private": int(private),
+                "synced": int(ch.permissions_synced),
+                "access_json": "; ".join(access) or "@everyone",
+                "viewers": "; ".join(viewers),
+            })
+        return out
+
+    async def _upsert_access(self, guild: discord.Guild, snap: dict,
+                             log_ch: discord.TextChannel | None) -> None:
+        con = store.connect()
+        try:
+            con.execute("""CREATE TABLE IF NOT EXISTS d_access (
+                channel_id TEXT PRIMARY KEY, channel_name TEXT,
+                private INTEGER, synced INTEGER, access_json TEXT,
+                viewers TEXT, updated_at REAL)""")
+            prev = con.execute("SELECT private, synced, access_json, viewers "
+                               "FROM d_access WHERE channel_id=?",
+                               (snap["channel_id"],)).fetchone()
+            digest = f"{snap['private']}|{snap['synced']}|{snap['access_json']}|{snap['viewers']}"
+            now_ts = dt.datetime.now(dt.UTC).timestamp()
+            if prev is None:
+                con.execute("""INSERT INTO d_access
+                    (channel_id, channel_name, private, synced, access_json,
+                     viewers, updated_at) VALUES (?,?,?,?,?,?,?)""",
+                    (snap["channel_id"], snap["channel_name"],
+                     snap["private"], snap["synced"],
+                     snap["access_json"], snap["viewers"], now_ts))
+                con.commit()
+                return  # la première cartographie ne crie pas
+            old = f"{prev['private']}|{prev['synced']}|{prev['access_json']}|{prev['viewers']}"
+            if old == digest:
+                return
+            con.execute("UPDATE d_access SET channel_name=?, private=?, synced=?, "
+                        "access_json=?, viewers=?, updated_at=? WHERE channel_id=?",
+                        (snap["channel_name"], snap["private"], snap["synced"],
+                         snap["access_json"], snap["viewers"], now_ts,
+                         snap["channel_id"]))
+            con.commit()
+            flags = []
+            if prev["private"] != snap["private"]:
+                flags.append("privé=" + ("ON" if snap["private"] else "OFF"))
+            if prev["synced"] != snap["synced"]:
+                flags.append("sync catégorie=" + ("ON" if snap["synced"] else "OFF"))
+            if prev["access_json"] != snap["access_json"]:
+                flags.append("les overwrites ont bougé")
+            if prev["viewers"] != snap["viewers"]:
+                flags.append("la liste des voyants a changé")
+            if log_ch and flags:
+                e = discord.Embed(
+                    title=f"🔐 ACCÈS MODIFIÉ — #{snap['channel_name']}",
+                    description=" · ".join(flags),
+                    color=discord.Color.Orange(),
+                    timestamp=dt.datetime.now(dt.UTC))
+                e.add_field(name="accès actuels",
+                            value=snap["access_json"][:1000] or "@everyone")
+                try:
+                    await log_ch.send(embed=e)
+                except discord.Forbidden:
+                    pass
+        finally:
+            con.close()
+
+    @tasks.loop(minutes=30)
+    async def access_loop(self) -> None:
+        """La capture + la détection de changement : un accès qui bouge = un event de sécurité."""
+        await self.bot.wait_until_ready()
+        log_ch = None
+        for guild in self.bot.guilds:
+            log_ch = discord.utils.get(guild.text_channels, name="logs") \
+                or discord.utils.get(guild.text_channels,
+                                     id=store.reg_channel(guild.id, "log") or 0)
+            for snap in self._access_snapshot(guild):
+                try:
+                    await self._upsert_access(guild, snap, log_ch)
+                except Exception as exc:  # noqa: BLE001 — un salon ne tue pas la cartographie
+                    print(f"[carte] accès {snap.get('channel_name')} : {exc}")
+
+    @access_loop.before_loop
+    async def _wait_ready(self) -> None:
+        await self.bot.wait_until_ready()
 
     # ——— les déclarations ———
 

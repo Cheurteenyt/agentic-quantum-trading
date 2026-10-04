@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS d_cases (
     case_id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
     guild_id TEXT, user_id TEXT, user_name TEXT, ctype TEXT, reason TEXT
 );
+CREATE TABLE IF NOT EXISTS d_access (
+    channel_id TEXT PRIMARY KEY, channel_name TEXT, private INTEGER,
+    synced INTEGER, access_json TEXT, viewers TEXT, updated_at REAL
+);
 CREATE TABLE IF NOT EXISTS d_members (
     user_id TEXT PRIMARY KEY, user_name TEXT, display_name TEXT,
     bot INTEGER, joined_at TEXT, account_created TEXT,
