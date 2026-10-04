@@ -249,6 +249,7 @@ class Trade:
     exit_price: float
     reason: str  # 'stop' | 'flat' | 'reverse' | 'eod'
     funding_return: float = 0.0  # funding encaisse (>0) ou paye (<0), en fraction
+    worst_adverse_pct: float = 0.0  # FIX lot2 (F6) : le MAE reellement observe
 
     @property
     def price_return(self) -> float:
@@ -303,26 +304,31 @@ def simulate(
     entry_index = 0
     acc_funding = 0.0
     last_mark = 0.0  # dernier prix de valorisation de la position ouverte
+    worst = 0.0      # pire mouvement adverse de la position courante (F6)
 
     def open_trade(i: int, price: float, side: int) -> None:
-        nonlocal pos, entry_price, entry_index, last_mark, acc_funding
+        nonlocal pos, entry_price, entry_index, last_mark, acc_funding, worst
         pos = side
         entry_price = price
         entry_index = i
         last_mark = price
         acc_funding = 0.0
+        worst = 0.0
         # Frais d'entree bookes SUR la barre d'entree (taker par fill) :
         # sans eux l'equite oubliait la moitie des frais (bug T7).
         bar_ret[i] += -FEE_FRACTION_PER_FILL
 
     def close_trade(idx: int, price: float, reason: str) -> None:
-        nonlocal pos, last_mark, acc_funding
+        nonlocal pos, last_mark, acc_funding, worst
         # Jambe de sortie : du dernier mark au prix de sortie REEL (stop, open
         # de retournement, close d'eod). AVANT le fix, la barre de stop restait
         # a 0.0 : la perte stoppee n'entrait JAMAIS dans l'equite (bug T7,
         # reports/aster_deep_regimes.md). Le funding de la barre est deja
         # accrue (accrue_funding) AVANT ce close.
         bar_ret[idx] += pos * (price / last_mark - 1.0) - FEE_FRACTION_PER_FILL
+        # FIX lot2 (F6) : le MAE du trade = le pire adverse OBSERVE, fill de
+        # gap compris — jamais une distance de stop supposee.
+        worst = max(worst, -pos * (price / entry_price - 1.0))
         trades.append(
             Trade(
                 entry_index=entry_index,
@@ -332,6 +338,7 @@ def simulate(
                 exit_price=price,
                 reason=reason,
                 funding_return=acc_funding,
+                worst_adverse_pct=worst,
             )
         )
         pos = 0
@@ -363,20 +370,33 @@ def simulate(
                     open_trade(i, bar.open, desired)
 
         # B. Stop de protection pendant la barre (high/low), barre d'entree incluse.
+        # FIX lot2 (F7) : un gap d'ouverture au-dela du stop execute au MARCHE.
         stopped = False
         if pos != 0:
             if pos == 1:
                 stop_price = entry_price * (1.0 - stop_frac)
-                if bar.low <= stop_price:
+                if bar.open <= stop_price:
+                    accrue_funding(i)
+                    close_trade(i, bar.open, "stop")
+                    stopped = True
+                elif bar.low <= stop_price:
                     accrue_funding(i)
                     close_trade(i, stop_price, "stop")
                     stopped = True
+                else:
+                    worst = max(worst, (entry_price - bar.low) / entry_price)
             else:
                 stop_price = entry_price * (1.0 + stop_frac)
-                if bar.high >= stop_price:
+                if bar.open >= stop_price:
+                    accrue_funding(i)
+                    close_trade(i, bar.open, "stop")
+                    stopped = True
+                elif bar.high >= stop_price:
                     accrue_funding(i)
                     close_trade(i, stop_price, "stop")
                     stopped = True
+                else:
+                    worst = max(worst, (bar.high - entry_price) / entry_price)
 
         # C. Mark-to-market du prix + funding encaisse par le cote gagnant.
         if pos != 0 and not stopped:
@@ -438,12 +458,14 @@ def _build_costs(
                 BOOK_NOTIONAL_USD, t.holding_bars * hours_per_bar, side, rate
             )
 
+        # FIX lot2 (F6) : liquidation jugee sur le MAE reellement observe
+        # (gaps de fill compris), pas sur la distance du stop supposee.
         chk = check_liquidation(
             entry_price=t.entry_price,
             side=side,
             leverage=float(params["max_leverage"]),
             maintenance_margin_rate=MAINTENANCE_MARGIN_RATE,
-            worst_adverse_pct=float(params["stop_bps"]) / 100.0,
+            worst_adverse_pct=t.worst_adverse_pct,
         )
         all_safe = all_safe and chk.safe
 

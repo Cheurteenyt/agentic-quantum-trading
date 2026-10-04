@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterator, Sequence
 
-from .baselines import Bar, bar_returns, compare_to_baselines
+from .baselines import Bar, bar_returns, compare_to_baselines, compounded_total_return
 from .costs import CostBreakdown
 from .gates import (
     BenchmarkVerdict,
@@ -200,7 +200,9 @@ def evaluate_one(
     bench: BenchmarkVerdict | None = None
     bench_detail: dict[str, Any] = {}
     if gate.passed:
-        strategy_return = sum(ev.trade_returns)
+        # FIX lot2 (F14) : la MEME algebre que les benchmarks — compose, pas
+        # somme (sommer des pourcentages surestime les series gagnantes).
+        strategy_return = compounded_total_return(ev.trade_returns)
         cmp_out = compare_to_baselines(
             strategy_return=strategy_return,
             bars=bars,

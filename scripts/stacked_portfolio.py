@@ -41,6 +41,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
+from scripts.funding_series import FundingSeries, funding_series_all  # noqa: E402,F401
 from scripts.portfolio_sim import (  # noqa: E402
     KDB, MAJORS, btc_regime_series, monthly_rows)
 
@@ -50,16 +51,15 @@ TAKER_RT = (4 + 10) * 2      # bps aller-retour sur le notionnel
 MAKER_RT = (2 + 0) * 2
 
 
-def funding_hourly_all() -> dict[str, float]:
-    con = sqlite3.connect(KDB, timeout=60)
-    acc: dict[str, list[float]] = {}
-    for s, r in con.execute("SELECT symbol, rate FROM funding_history"):
-        try:
-            acc.setdefault(s, []).append(float(r))
-        except (TypeError, ValueError):
-            continue
-    con.close()
-    return {s: sum(v) / len(v) * 100 / 8 for s, v in acc.items()}
+def funding_hourly_all() -> dict[str, "FundingSeries"]:
+    """FIX lot2 (F3+F12) : retourne les SÉRIES de funding réelles par symbole.
+
+    L'intégration as-of (sum_pct_between) remplace la moyenne full-sample —
+    un trade 2022 ne reçoit plus la moyenne 2022-2026 — et l'intervalle est
+    MESURÉ (médiane des gaps), jamais supposé 8h. Le nom historique est
+    conservé : 20+ appelants passent le dict à run_stack sans l'ouvrir.
+    """
+    return funding_series_all()
 
 
 def collect_funding_strategies(con: sqlite3.Connection
@@ -180,7 +180,18 @@ def run_stack(events: list[dict], capital: float, size_fn,
         margin = balance * sz
         notional = margin * e["lev"]
         fees = notional * e["fee_rt_bps"] / 10000
-        fund = notional * funding_hourly.get(e["sym"], 0.0) / 100 * e["hold_h"]
+        # FIX lot2 (F3) : le funding réellement applicable sur (entrée, sortie]
+        # — la moyenne full-sample fabriquait un look-ahead (un trade 2022
+        # recevait la moyenne 2022-2026). Shim float : appelants RO legacy.
+        fser = funding_hourly.get(e["sym"])
+        if fser is None:
+            fund = 0.0
+        elif hasattr(fser, "sum_pct_between"):
+            _t0 = e["ts_ms"] / 1e6
+            fund = notional * fser.sum_pct_between(
+                _t0, _t0 + e["hold_h"] * 3_600_000.0) / 100.0
+        else:
+            fund = notional * fser / 100.0 * e["hold_h"]
         # fund_sign : +1 = short (reçoit le funding positif), -1 = long (le paie)
         pnl = (e["price_ret_short"] / 100 * notional
                + e.get("fund_sign", 1) * fund - fees)

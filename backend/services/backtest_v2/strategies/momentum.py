@@ -163,6 +163,7 @@ class Trade:
     entry_price: float
     exit_price: float
     reason: str  # 'stop' | 'take' | 'reverse' | 'eod'
+    worst_adverse_pct: float = 0.0  # FIX lot2 (F6) : le MAE reellement observe
 
     @property
     def gross_return(self) -> float:
@@ -199,24 +200,29 @@ def simulate(bars: Sequence[Bar], params: dict) -> tuple[list[Trade], list[float
     entry_price = 0.0
     entry_index = 0
     last_mark = 0.0  # dernier prix de valorisation de la position ouverte
+    worst = 0.0      # pire mouvement adverse de la position courante (F6)
 
     def open_trade(i: int, price: float, side: int) -> None:
-        nonlocal pos, entry_price, entry_index, last_mark
+        nonlocal pos, entry_price, entry_index, last_mark, worst
         pos = side
         entry_price = price
         entry_index = i
         last_mark = price
+        worst = 0.0
         # Frais d'entree bookes SUR la barre d'entree (taker par fill) :
         # sans eux l'equite oubliait la moitie des frais (bug T7).
         bar_ret[i] += -FEE_FRACTION_PER_FILL
 
     def close_trade(idx: int, price: float, reason: str) -> None:
-        nonlocal pos, last_mark
+        nonlocal pos, last_mark, worst
         # Jambe de sortie : du dernier mark au prix de sortie REEL (stop, take,
         # open de retournement, close d'eod). AVANT le fix, la barre de stop
         # restait a 0.0 : la perte stoppee n'entrait JAMAIS dans l'equite
         # (bug T7, reports/aster_deep_regimes.md).
         bar_ret[idx] += pos * (price / last_mark - 1.0) - FEE_FRACTION_PER_FILL
+        # FIX lot2 (F6) : le MAE du trade = le pire adverse OBSERVE, fill de
+        # gap compris — jamais une distance de stop supposee.
+        worst = max(worst, -pos * (price / entry_price - 1.0))
         trades.append(
             Trade(
                 entry_index=entry_index,
@@ -225,6 +231,7 @@ def simulate(bars: Sequence[Bar], params: dict) -> tuple[list[Trade], list[float
                 entry_price=entry_price,
                 exit_price=price,
                 reason=reason,
+                worst_adverse_pct=worst,
             )
         )
         pos = 0
@@ -242,21 +249,32 @@ def simulate(bars: Sequence[Bar], params: dict) -> tuple[list[Trade], list[float
                     open_trade(i, bar.open, desired)
 
         # B. Stop / take pendant la barre (high/low), y compris barre d'entree.
+        # FIX lot2 (F7) : un gap d'ouverture au-dela du stop execute au MARCHE
+        # (open) — le modele taker_market ne donne jamais un fill meilleur
+        # que le prix disponible apres le gap.
         if pos != 0:
             if pos == 1:
                 stop_price = entry_price * (1.0 - stop_frac)
                 take_price = entry_price * (1.0 + take_frac)
-                if bar.low <= stop_price:
+                if bar.open <= stop_price:
+                    close_trade(i, bar.open, "stop")
+                elif bar.low <= stop_price:
                     close_trade(i, stop_price, "stop")
                 elif bar.high >= take_price:
                     close_trade(i, take_price, "take")
+                else:
+                    worst = max(worst, (entry_price - bar.low) / entry_price)
             else:  # short
                 stop_price = entry_price * (1.0 + stop_frac)
                 take_price = entry_price * (1.0 - take_frac)
-                if bar.high >= stop_price:
+                if bar.open >= stop_price:
+                    close_trade(i, bar.open, "stop")
+                elif bar.high >= stop_price:
                     close_trade(i, stop_price, "stop")
                 elif bar.low <= take_price:
                     close_trade(i, take_price, "take")
+                else:
+                    worst = max(worst, (bar.high - entry_price) / entry_price)
 
         # C. Mark-to-market : la position ouverte est valorisee du dernier mark
         #    (open d'entree ou close precedent) au close de la barre. Pour une
@@ -341,9 +359,10 @@ def _build_costs(
             holding_hours = t.holding_bars * hours_per_bar
             funding += funding_cost_usd(BOOK_NOTIONAL_USD, holding_hours, side, rate)
 
-        # liquidation : le pire mouvement adverse est borne par le stop.
+        # FIX lot2 (F6) : liquidation jugee sur le MAE reellement observe
+        # (gaps de fill compris), pas sur la distance du stop supposee.
         side = "long" if t.side == 1 else "short"
-        worst_adverse_pct = float(params["stop_bps"]) / 100.0
+        worst_adverse_pct = t.worst_adverse_pct
         chk = check_liquidation(
             entry_price=t.entry_price,
             side=side,
