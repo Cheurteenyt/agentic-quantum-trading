@@ -145,25 +145,18 @@ def fund7_gate_pass(name: str, sym: str, fund7_pct: float) -> bool:
     return True
 
 
-def load_env_funding_stats(con: sqlite3.Connection) -> dict[str, float]:
-    """taux de funding moyen PAR HEURE par symbole (comme le harnais)."""
-    import statistics
-    by_sym: dict[str, list[float]] = defaultdict(list)
-    by_ts: dict[str, list[float]] = defaultdict(list)
-    for s, t, rate in con.execute("SELECT symbol, funding_time, rate FROM funding_history"):
-        try:
-            by_sym[s].append(float(rate))
-            by_ts[s].append(float(t))
-        except (TypeError, ValueError):
-            continue
-    out: dict[str, float] = {}
-    for s, rates in by_sym.items():
-        ts = sorted(by_ts[s])
-        gaps = [(ts[i + 1] - ts[i]) / 3600000 for i in range(len(ts) - 1)
-                if 0 < ts[i + 1] - ts[i] < 40000000]
-        iv = statistics.median(gaps) if gaps else 8.0
-        out[s] = (statistics.mean(rates) * 100) / max(iv, 0.5)
-    return out
+def funding_paid_pct(con: sqlite3.Connection, sym: str,
+                     t0_ms: int, t1_ms: int) -> float:
+    """FIX lot2 (F3) : le funding RÉELLEMENT applicable sur (entrée, sortie]
+    — les taux signés de funding_history, en points de %. Remplace
+    load_env_funding_stats (supprimée) dont la moyenne full-sample
+    fabriquait un look-ahead : un trade recevait la moyenne de tout
+    l'historique au lieu des taux de sa propre fenêtre."""
+    rows = con.execute(
+        "SELECT rate FROM funding_history WHERE symbol=? "
+        "AND funding_time>? AND funding_time<=?",
+        (sym, t0_ms, t1_ms)).fetchall()
+    return sum(float(r[0]) for r in rows if r[0] is not None) * 100.0
 
 
 def funding_div_mask(df: pd.DataFrame, fh_sym: pd.DataFrame) -> pd.Series:
@@ -186,13 +179,14 @@ def funding_extreme_events(fh_sym: pd.DataFrame) -> pd.DatetimeIndex:
     return pd.to_datetime(ts[(rate > p90).fillna(False)].values, unit="ms")
 
 
-def funding_applied_pct(direction: int, rate_pct_hour: float, hold_h: float) -> float:
+def funding_applied_pct(direction: int, rates_sum_pct: float) -> float:
     """Le funding appliqué au ret du trade, en points de % (payé < 0,
     reçu > 0) — FIX lot1 (F11) : la valeur n'était jamais persistée
     (0/659 lignes non nulles) et le ledger restait inauditable sur ce
     poste. Persistée, elle rend ret recomputable : ret = prix - coûts
-    + funding_pct."""
-    return -direction * rate_pct_hour * hold_h
+    + funding_pct. FIX lot2 (F3) : l'entrée est la SOMME des taux réels
+    de la fenêtre (funding_paid_pct), plus jamais une moyenne × hold."""
+    return -direction * rates_sum_pct
 
 
 def ensure_paper_schema(con: sqlite3.Connection) -> None:
@@ -252,7 +246,6 @@ def main() -> int:
 
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
-    funding_stats = load_env_funding_stats(con)
     fh = pd.read_sql_query("SELECT symbol, funding_time, rate FROM funding_history", con)
     btc = load_df(con, "BTCUSDT")
 
@@ -310,7 +303,8 @@ def main() -> int:
                     exit_ts = exit_ts_ms   # l'heure de prix réelle = entry + hold
                     hold_h = (exit_ts_ms - entry_ts) / 3600000.0
                     fund_col = round(funding_applied_pct(
-                        direction, funding_stats.get(sym, 0.0), hold_h), 4)
+                        direction,
+                        funding_paid_pct(con, sym, entry_ts, exit_ts_ms)), 4)
                     ret = ((exit_price - entry_price) / entry_price * 100 * direction
                            - COST_PCT + fund_col)
                     status = "closed"
@@ -506,7 +500,7 @@ def main() -> int:
         exit_ts = exit_ts_ms
         hold_h = (exit_ts_ms - entry_ts) / 3600000.0
         fund_col = round(funding_applied_pct(
-            direction, funding_stats.get(sym, 0.0), hold_h), 4)
+            direction, funding_paid_pct(con, sym, entry_ts, exit_ts_ms)), 4)
         ret = ((exit_price - entry_price) / entry_price * 100 * direction
                - COST_PCT + fund_col)
         con.execute("UPDATE paper_trades SET exit_ts=?, exit_price=?, ret_pct=?, "

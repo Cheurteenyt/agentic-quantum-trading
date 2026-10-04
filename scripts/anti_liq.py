@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.backtest_indicators import load_df  # noqa: E402
+from scripts.funding_series import FundingSeries, funding_series_all  # noqa: E402,F401
 from scripts.portfolio_sim import (  # noqa: E402
     KDB, MAJORS, HOLD_H, LIQ_MOVE_PCT, btc_regime_series, run_sim)
 
@@ -45,16 +46,11 @@ NUMERIC = ["atr_pct", "vol24", "cascade_depth", "accel", "dd_pct",
 CATEGORIC = ["regime"]
 
 
-def funding_hourly_map() -> dict[str, float]:
-    con = sqlite3.connect(KDB, timeout=60)
-    acc: dict[str, list[float]] = {}
-    for s, r in con.execute("SELECT symbol, rate FROM funding_history"):
-        try:
-            acc.setdefault(s, []).append(float(r))
-        except (TypeError, ValueError):
-            continue
-    con.close()
-    return {s: sum(v) / len(v) * 100 / 8 for s, v in acc.items()}
+def funding_hourly_map() -> dict[str, "FundingSeries"]:
+    """FIX lot2 (F3) : délègue au loader unique — les séries réelles
+    as-of, plus jamais la moyenne full-sample. Nom conservé pour les
+    appelants internes (run_sim consomme les deux formes)."""
+    return funding_series_all()
 
 
 def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:

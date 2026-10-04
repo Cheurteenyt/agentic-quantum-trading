@@ -41,6 +41,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.backtest_indicators import load_df  # noqa: E402
+from scripts.funding_series import funding_series_all  # noqa: E402
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
@@ -96,7 +97,17 @@ def run_sim(events: list[dict], capital: float, size: float,
         margin_alloc = balance * trade_size
         notional = margin_alloc * LEV
         fees = notional * (fee_bps + slip_bps) / 10000 * 2
-        funding = notional * funding_hourly.get(e["sym"], 0.0) / 100 * HOLD_H
+        # FIX lot2 (F3) : funding as-of — Σ des taux réels de (entrée, sortie],
+        # plus jamais la moyenne full-sample × hold. Shim float : legacy RO.
+        fser = funding_hourly.get(e["sym"])
+        if fser is None:
+            funding = 0.0
+        elif hasattr(fser, "sum_pct_between"):
+            _t0 = e["ts_ms"] / 1e6
+            funding = notional * fser.sum_pct_between(
+                _t0, _t0 + HOLD_H * 3_600_000.0) / 100.0
+        else:
+            funding = notional * fser / 100.0 * HOLD_H
         pnl = e["price_ret_short"] / 100 * notional + funding - fees
 
         liq = e["mae_adverse"] >= LIQ_MOVE_PCT or pnl <= -margin_alloc
@@ -172,14 +183,7 @@ def main() -> int:
     fee_bps, slip_bps = (MAKER_BPS, 0) if args.maker else (FEE_BPS, SLIP_BPS)
 
     con = sqlite3.connect(KDB, timeout=60)
-    funding_hourly: dict[str, float] = {}
-    for s, r in con.execute("SELECT symbol, rate FROM funding_history"):
-        try:
-            funding_hourly.setdefault(s, []).append(float(r))
-        except (TypeError, ValueError):
-            continue
-    for s, rates in funding_hourly.items():
-        funding_hourly[s] = sum(rates) / len(rates) * 100 / 8  # %/h (8h ref)
+    funding_hourly = funding_series_all(KDB)
     regime = btc_regime_series()
     # UN SEUL collecteur cascade (anti_liq) — la divergence des deux
     # collecteurs (warmup + features) produisait deux vérités (25/09)

@@ -126,25 +126,27 @@ class TestMigrationOldPk(unittest.TestCase):
 
 
 class TestFundingPersiste(unittest.TestCase):
-    """F11 : funding_pct = le funding appliqué au ret (payé < 0, reçu > 0)."""
+    """F11 : funding_pct = le funding appliqué au ret (payé < 0, reçu > 0).
+    FIX lot2 (F3) : l'entrée est la SOMME des taux réels de la fenêtre
+    (funding_paid_pct) — le signature (rate_horaire, hold) est mort avec
+    la moyenne full-sample."""
 
     def test_un_long_paie_un_funding_positif(self):
-        self.assertAlmostEqual(funding_applied_pct(1, 0.01, 24), -0.24)
+        self.assertAlmostEqual(funding_applied_pct(1, 0.24), -0.24)
 
     def test_un_short_recoit_un_funding_positif(self):
-        self.assertAlmostEqual(funding_applied_pct(-1, 0.01, 24), 0.24)
+        self.assertAlmostEqual(funding_applied_pct(-1, 0.24), 0.24)
 
     def test_un_funding_negatif_inverse_le_sens(self):
-        self.assertAlmostEqual(funding_applied_pct(1, -0.02, 12), 0.24)
+        self.assertAlmostEqual(funding_applied_pct(1, -0.24), 0.24)
 
     def test_le_ret_est_recomputable_depuis_les_parties_persistees(self):
         """La promesse d'auditabilité : ret = prix - coûts + funding_pct."""
         price_ret = 2.0
         cost = 0.28
-        fund = funding_applied_pct(-1, 0.01, 48)
+        fund = funding_applied_pct(-1, 0.48)   # short, 2 taux de 0,24 %
         self.assertAlmostEqual(price_ret - cost + fund,
-                               price_ret - cost
-                               - (-1) * 0.01 * 48)
+                               price_ret - cost + 0.48)
 
 
 if __name__ == "__main__":
