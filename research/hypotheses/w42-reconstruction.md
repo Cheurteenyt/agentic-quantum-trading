@@ -53,3 +53,14 @@ par event), Sharpe re-annualisé, réconciliation coûts↔courbe. Conséquences
    appariée sur la construction seule.
 4. Exécution : semaine W41 (le verrou lab_ledger a dit STOP le 04/10 sur
    W40 22/20) — un seul run, loggé au ledger, verdict au registre (APPEND).
+
+## AMENDEMENT 2 du 05/10 (l'audit v3 passe AVANT le run)
+L'audit GPT v3 (18/18 confirmés, PR #105) a corrigé les COLLECTEURS eux-mêmes :
+l'ATR est devenu un vrai True Range + Wilder (l'ancien = moyenne des |Δclose|),
+le p90 du gate survivor est EXPANDING (plus de full-sample), le funding des
+sims est as-of, les events portent atr[t] (la bougie du signal). LES GATES DU
+SURVIVOR ET DU VOL_SPIKE CHANGENT DONC : les event sets post-audit-v3 ne sont
+plus ceux de l'amendement 1. La baseline anti-dérive reste : les solos
+RE-MESURÉS avec le moteur ET les collecteurs post-audit-v3 = LA référence
+(uniquement). Les critères PASS/FAIL relatifs restent inchangés. Le run est
+relancé après ce merge — un seul run, budget W41.
