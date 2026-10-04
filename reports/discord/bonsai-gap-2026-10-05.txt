@@ -1,0 +1,45 @@
+**1. AUDIT D’INTÉGRATION : L’ANTI-DUPLICATION STRUCTURELLE**
+
+Le bug du rapport 24h dans `#stats` (nouveau) vs `#logs` (existant) illustre le défaut majeur : l’architecture créative du bot. La règle générale s’applique à **tout** le bot : *Le Bot Intègre, Il Ne Crée Pas*.
+
+*   **Mécanisme d’Intégration du Rapport 24h :**
+    1.  **Résolution de Canal :** Avant toute écriture, le module `ReportEngine` interroge la base de données (`db.channels`) pour le nom du canal de destination configuré (ex: `logs` ou `revue-secu`).
+    2.  **Vérification d’Existence (Checksum) :** Le bot vérifie l’ID du canal. Si le canal existe, il utilise cet ID. S’il ne l’existe pas, il ne le crée **pas** par défaut. Il renvoie une erreur d’intégration (ou utilise le canal par défaut `#logs` si `#stats` n’est pas défini dans la config).
+    3.  **Formatage Inertie :** Le rapport est formaté en Markdown/Embed directement dans le stream existant. Pas de canal dédié sauf explicitement demandé par un Admin via `/setchannel report=#stats`.
+
+*   **Règle Anti-Duplication Globale (Le "Système d'Ancre") :**
+    *   **Principe :** Tout module qui crée une structure (canal, rôle, embed, ticket) doit passer par le `StructureManager`.
+    *   **Algorithme :** `if not db.exists(resource_id): create(resource_id) else: use(resource_id)`.
+    *   **Application :** Le `#revue-secu` n’existe que si `/setchannel revue=#revue-secu` a été appelé par un admin. Sinon, le triage se fait dans `#logs` (mode lecture seule) ou en DM. Le bot doit mapper les salons existants du serveur ("Core Equity") et s'y conformer, ne jamais proposer de "salon idéal" s'il diffère de la réalité.
+
+**2. ANALYSE D’ÉCART VERS LE 100 % (AUTONOMIE 30 JOURS)**
+
+Pour qu’un serveur crypto tienne 30 jours sans mod humain, les modules suivants manquent ou sont insuffisants :
+
+1.  **Gestion des Roles Dynamiques (RBAC Fin):** Le bot gère `admin/mod`, mais pas les rôles contextuels (ex: `trader_active`, `new_member_quarantine`). Sans cela, un membre peut spammer dans `#vos-trades` avant d'être validé.
+2.  **Analyse Sémantique du Contenu (NLP Crypto-Specifique):** Le juge Bonsai détecte la toxicité et le scam générique, mais pas la *volatilité sémantique*. Il ne détecte pas un "pump & dump" narratif (ex: "Rise ce token, 10x en 1h") ni la désinformation macro-économique dans `#calendrier-économique`.
+3.  **Gestion des Tickets/Support Asynchrone:** Il manque un système de ticketing intégré (`/ticket`) pour les questions complexes des traders, permettant au staff de répondre sans polluer `#discussions-trading`.
+4.  **Mise à Jour des Règles (Live Config):** Le bot applique `no_links`, mais ne met à jour pas les règles en temps réel. Si un admin change la règle de `#annonces` en `media_only`, le bot doit s'adapter sans redémarrer.
+5.  **Analyse des Attachés (Images/Vidéos):** Le bot capture les attaches, mais ne les analyse pas (ex: capture d'écran d'une fausse transaction, graphique trompeur).
+6.  **Gestion des Inactifs (Prune):** Pas de mécanisme pour désactiver les roles ou purger les membres inactifs > 30 jours pour maintenir la santé de la base de données et la pertinence des stats.
+7.  **Alerte des Patterns de Comportement (Social Engineering):** Détection des "phishing" subtils (ex: lien ressemblant à Discord mais pointant vers un site de fausse récupération de seed).
+
+**3. LE TOP 4 DES MANQUES (DESIGN, AUTONOMIE, EFFORT, CRITÈRE)**
+
+| Rang | Module Manquant | Design (3 Lignes) | Autonomie | Effort | Critère de Réussite |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **1** | **Analyse Sémantique Crypto-Narrative** | Le juge Bonsai est étendu par un modèle fine-tuned sur les patterns de "Pump&Dump" et de "FOMO". Il analyse le contexte des messages dans `#vos-trades` et `#discussions-trading`. S'il détecte une corrélation entre excitation et volatilité, il tague le message. | **QUEUE** (Alerte staff) | **M** | Détection de 90% des fausses alertes de trading (Pump&Dump) dans un échantillon de 100 msgs. |
+| **2** | **Système de Tickets Asynchrones** | Création d'un canal privé par utilisateur via `/ticket`. Le bot génère un embed avec boutons (Répondre, Fermer, Escalader). Les messages sont archivés dans la DB pour l'IA. Le staff répond via une interface simple. | **AUTO** (Création) / **QUEUE** (Réponse) | **S** | 0 message de support perdu dans les salons publics. Temps moyen de réponse < 2h (automatisé par le bot si absent). |
+| **3** | **Analyse Multimédia (Vision AI)** | Intégration d'un modèle Vision léger (ex: MobileNet) pour analyser les images envoyées. Détection de logos de fausses bourses, de captures d'écran de seeds, ou de graphes incohérents. Le bot remplace l'image par un avertissement ou tague le message. | **AUTO** (Analyse) | **L** | Taux de faux positifs < 5% sur les images analysées. Détection de 85% des seeds volés ou captures d'écran frauduleuses. |
+| **4** | **RBAC Contextuel & Quarantaine** | Le bot gère des rôles temporaires. Un nouveau membre entre en `quarantine` (rôle invisible) pour 48h. Il ne peut parler que dans `#salon-arrivée`. Après analyse de son premier message par le Juge, le rôle `trader_active` est accordé. | **AUTO** (Attribution) | **M** | 0 spam dans `#vos-trades` par un nouveau membre < 48h. Taux de conversion des quarantaines en membres actifs > 70%. |
+
+**4. LA PRÉDICTION : LE PREMIER COûT CHEP**
+
+**Le Manque :** L'Analyse Sémantique Crypto-Narrative (Rang 1) / Plus précisément, l'**Absence de Contexte Macro-Économique**.
+
+**Quand :** Dans les **72 premières heures** (ou au premier "Event" majeur : ex: Décision de la Fed, Résultat d'entreprise majeure).
+
+**Pourquoi :** Le juge Bonsai actuel détecte le *toxicité* (insulte) et le *scam* (lien suspect). Mais il ne détecte pas la *désinformation*.
+*   **Scénario :** Un membre poste dans `#calendrier-économique` : "La Fed va baisser les taux cette semaine, achetez le BTC avant la clôture."
+*   **Réalité :** La Fed a déjà annoncé l'inverse, ou le message est un "Pump" caché.
+*   **Conséquence :** Le bot ne le bloque pas (pas de toxic
