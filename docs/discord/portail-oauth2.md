@@ -69,3 +69,29 @@ l'écran de login quand la session est morte, le QR règle ça en 10 secondes.
 souvent OK ; httpx avec un UA Chrome spoofé = 40333 systématique (le TLS ne
  colle pas avec l'UA). `scripts/discord_dev.py` subprocess du curl nu, jamais
 de spoof.
+
+## Le bot PRIVÉ (05/10 — la procédure qui a fini par marcher)
+
+Le toggle « Bot public → OFF » rebondissait silencieusement. La chaîne des
+blocages, dans l'ordre :
+
+1. **User Install actif** (page Installation) → le désactiver d'abord
+   (l'installation pour un utilisateur exige une app publique).
+2. **Le lien d'autorisation par défaut** (`install_params`, posé par API
+   PATCH) → le retirer par API : `PATCH /applications/@me` avec
+   `"install_params": null`. L'erreur de validation du portail ne s'affichait
+   que dans `div[role=alert]` — invisible si on ne la cherche pas.
+3. Alors le toggle accepte OFF et persiste (vérifié au reload).
+
+Trade-off assumé : plus de lien d'invitation générable automatiquement — un
+bot privé s'ajoute depuis le portail (« Add to server »). L'URL d'invitation
+manuelle reste possible via le générateur OAuth2.
+
+## La persistance de session (le test réel du 05/10)
+
+La session Discord **survit** au `systemctl --user restart discord-dev-browser`
+quand le navigateur a tourné quelques minutes après le login (les cookies ont
+été flushés). Les deux sessions mortes du jour = des stops immédiats après le
+login. Règle : après un QR login, laisser tourner au moins une minute avant
+tout restart. Camoufox/Scrapling reste le choix pour le SCRAPING anti-bot —
+inutile pour le portail.
