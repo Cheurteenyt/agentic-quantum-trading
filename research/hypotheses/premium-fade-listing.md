@@ -65,3 +65,24 @@ L'amendement Δindex EXACT (index = perp/(1+prem)) est confirmé par le red-team
 premier ordre ≈ 0,017 % aux magnitudes extrêmes — négligeable vs le seuil 0,5 %, le premier
 ordre reste en colonne de sensibilité. Aucun bug réel trouvé. L'évaluateur est verrouillé ;
 toute modification APRÈS le run de lundi = interdite.
+
+## LE VERDICT (04/10 — le run réel, gate GO sous la comptabilité v2 16/20)
+
+**KILL (P5) — la famille premium-fade-listing est MORTE au registre.**
+
+| Critère | Résultat | Verdict |
+|---|---|---|
+| **P5 discriminateur** | **22,2 % de toxiques** (seuil 15 %) — concordant premier ordre/exact (22,2/22,2) | **FAIL → KILL** |
+| P1 WR train/val | 4,9 % (n=708) / 55,2 % (n=62 162) | FAIL |
+| P2 espérance VAL | +4,61 bps | pass |
+| P3 contrôle inverse | −20,61 vs +4,61 | pass |
+| P4 gradient d'âge | 0-7j +9,4 → 7-30j +6,0 → 30-90j +3,8 (monotone) | pass |
+| P6 mois positifs | 62 % | pass |
+
+n = 80 770 trades listing <90 j (un crash de plomberie — colonne `period` créée après usage — a interrompu la PREMIERE exécution AVANT tout verdict ; fixé et tracé ici, les critères n'ont pas bougé d'un iota).
+
+**La lecture honnête** : le mécanisme directionnel existe (P3/P4 passent — le fade bat le chase et se date) MAIS plus d'1 signal sur 5 est un pump suivi (Δindex > 0,5 %) — la ligne ex ante était 15 %. **Interdit de « réparer » par le filtre après coup** : la règle était écrite avant, elle tue. Le gradient P4 et l'espérance P2 sont gravés comme CONTEXTE pour une éventuelle réouverture si un discriminateur THÉORIQUE plus fin émerge un jour — pas aujourd'hui.
+
+**Calibration Bonsai** : P5 FAIL prédit à 70 % = **HIT** (1er point du tournoi, 1/1).
+
+Docs/20 : inscription immédiate. Ledger : FAIL 29e essai, 17/20 W40.

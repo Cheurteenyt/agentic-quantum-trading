@@ -175,6 +175,7 @@ def main():
           f"(klines perp manquantes comptées comme non-évaluables)")
 
     print("\n== BLOC STATS (trades VALIDES, net 8 bps) ==")
+    tr["period"] = np.where(tr["ts"] < cutoff, "TRAIN", "VAL")  # créé ici aussi (judge le recrée)
     for per in ("TRAIN", "VAL"):
         sub = tr[(tr["period"] == per) & tr["valid"]]
         if len(sub):
