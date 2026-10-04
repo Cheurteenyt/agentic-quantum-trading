@@ -63,6 +63,33 @@ class FundingSeries:
         k1 = int(np.searchsorted(self.times_ms, t1_ms, side="right"))
         return float(self.rates_pct[k0:k1].sum())
 
+    def rate_asof(self, ts_ms: float) -> float | None:
+        """Le dernier taux CONNU à ts (prints ≤ ts), en points de %.
+
+        FIX audit v3 (C6/C7) : l'as-of STRICT — jamais d'interpolation.
+        Entre deux prints, le taux connu est le premier : un print futur
+        ne peut strictement rien changer à une décision passée.
+        """
+        if not len(self.times_ms):
+            return None
+        k = int(np.searchsorted(self.times_ms, ts_ms, side="right")) - 1
+        return float(self.rates_pct[k]) if k >= 0 else None
+
+
+def funding_series_for(symbol: str, db_path: Path | None = None) -> FundingSeries:
+    """La série d'UN symbole — le loader ciblé pour la comptabilité par trade."""
+    path = Path(db_path) if db_path else KDB
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        rows = con.execute(
+            "SELECT funding_time, rate FROM funding_history "
+            "WHERE symbol=? ORDER BY funding_time", (symbol,)).fetchall()
+    finally:
+        con.close()
+    if not rows:
+        raise ValueError(f"aucun funding_history pour {symbol}")
+    return FundingSeries.from_rows(rows)
+
 
 def funding_series_all(db_path: Path | None = None) -> dict[str, FundingSeries]:
     """L'état funding de TOUS les symboles — LE loader unique du projet.

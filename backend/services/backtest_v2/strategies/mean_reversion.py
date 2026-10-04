@@ -46,8 +46,7 @@ from backend.services.backtest_v2.costs import (
     CostBreakdown,
     CostDataUnavailable,
     check_liquidation,
-    funding_cost_usd,
-    load_funding_rate,
+    load_funding_series,
     round_trip_fees_usd,
     slippage_usd,
 )
@@ -368,15 +367,16 @@ def _build_costs(
     all_safe = True
     hours_per_bar = _bar_hours(bars)
 
-    # Funding : cache reel prioritaire ; si indisponible -> 0.0 EXPLICITE + flag.
-    rate = None
+    # FIX audit v3 (C1) : la comptabilité funding = la série RÉELLE as-of par
+    # trade — jamais la moyenne du cache (un trade ne paie pas un taux observé
+    # après sa sortie). FundingRate reste un diagnostic de régime.
+    fser = None
     try:
-        rate = load_funding_rate(symbol)
+        fser = load_funding_series(symbol)
         flags["funding_available"] = True
     except CostDataUnavailable as exc:
         flags["funding_available"] = False
         flags["funding_reason"] = str(exc)
-        funding = 0.0  # explicite, jamais None
 
     for t in trades:
         # fees taker USDT aller-retour (8 bps) sur le notional du carnet.
@@ -387,12 +387,15 @@ def _build_costs(
         slip_usd = slippage_usd(BOOK_NOTIONAL_USD, book, t.entry_price)
         slip += slip_usd
 
-        # funding sur le notionnel, prorata de la duree de detention.
+        # funding : Σ des taux réels de (entrée, sortie], signé par le côté.
         fund_usd = 0.0
-        if rate is not None:
+        if fser is not None:
             side = "long" if t.side == 1 else "short"
             holding_hours = t.holding_bars * hours_per_bar
-            fund_usd = funding_cost_usd(BOOK_NOTIONAL_USD, holding_hours, side, rate)
+            entry_ms = bars[t.entry_index].ts
+            raw = (BOOK_NOTIONAL_USD * fser.sum_pct_between(
+                entry_ms, entry_ms + holding_hours * 3_600_000.0) / 100.0)
+            fund_usd = -raw if side == "long" else raw
             funding += fund_usd
 
         # FIX lot3 (F2) : la fraction par trade — la même monnaie que la courbe.

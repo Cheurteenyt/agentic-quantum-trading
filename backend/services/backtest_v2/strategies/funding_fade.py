@@ -55,6 +55,7 @@ from backend.services.backtest_v2.costs import (
     check_liquidation,
     funding_cost_usd,
     load_funding_rate,
+    load_funding_series,
     round_trip_fees_usd,
     slippage_usd,
 )
@@ -446,14 +447,16 @@ def _build_costs(
     hours_per_bar = _bar_hours(bars)
     per_trade_slip: list[float] = []
 
-    rate = None
+    # FIX audit v3 (C1) : le funding reporté = la série RÉELLE as-of par
+    # trade (la courbe, elle, porte la série synthétique documentée).
+    fser = None
     if flags.get("funding_available"):
         try:
-            rate = load_funding_rate(symbol, params.get("funding_cache"))
+            fser = load_funding_series(symbol)
         except CostDataUnavailable as exc:  # pragma: no cover - defensif
             flags["funding_available"] = False
             flags["funding_reason"] = str(exc)
-            rate = None
+            fser = None
 
     for t in trades:
         fees += round_trip_fees_usd(BOOK_NOTIONAL_USD, symbol, DEFAULT_EXECUTION_MODEL)
@@ -464,10 +467,13 @@ def _build_costs(
         per_trade_slip.append(slip_usd / BOOK_NOTIONAL_USD)
 
         side = "long" if t.side == 1 else "short"
-        if rate is not None:
-            funding += funding_cost_usd(
-                BOOK_NOTIONAL_USD, t.holding_bars * hours_per_bar, side, rate
-            )
+        if fser is not None:
+            entry_ms = bars[t.entry_index].ts
+            raw = (BOOK_NOTIONAL_USD * fser.sum_pct_between(
+                entry_ms,
+                entry_ms + t.holding_bars * hours_per_bar * 3_600_000.0
+            ) / 100.0)
+            funding += -raw if side == "long" else raw
 
         # FIX lot2 (F6) : liquidation jugee sur le MAE reellement observe
         # (gaps de fill compris), pas sur la distance du stop supposee.

@@ -50,8 +50,7 @@ from backend.services.backtest_v2.costs import (
     CostBreakdown,
     CostDataUnavailable,
     check_liquidation,
-    funding_cost_usd,
-    load_funding_rate,
+    load_funding_series,
     round_trip_fees_usd,
     slippage_usd,
 )
@@ -97,6 +96,7 @@ class Trade:
     entry_price: float
     exit_price: float
     reason: str  # 'roll' | 'stop' | 'eod'
+    worst_adverse_pct: float = 0.0  # FIX audit v3 : le MAE reellement observe
 
     @property
     def gross_return(self) -> float:
@@ -121,58 +121,60 @@ def _side_from_rate(avg_bps_per_8h: float) -> str | None:
 
 
 def simulate(
-    bars: Sequence[Bar], params: dict, side: str | None, hold_max_bars: int
+    bars: Sequence[Bar], params: dict, side_fn, hold_max_bars: int
 ) -> tuple[list[Trade], list[float]]:
     """Simule la strategie. Renvoie (trades clotures, rendement par barre).
 
-    Execution : entree a l'OPEN de la barre i (i >= 1) dans le sens collecteur,
-    connu ex-ante (funding exogene au prix). La position est roulee tous les
-    hold_max_bars (stop de duree) et coupe par un stop de protection. Rendement
-    par barre = signe_position * (close[i]/close[i-1] - 1), 0.0 hors position.
+    Execution : entree a l'OPEN de la barre i (i >= 1) dans le sens collecteur
+    DECIDE A CET OPEN par side_fn(bars[i].ts) — l'as-of strict sur les prints
+    de funding connus. FIX audit v3 (C2) : le sens n'est plus une constante
+    full-sample (le futur ne choisit plus le cote du passe) ; il est
+    re-evalue a chaque open, avec renversement si le cote collecteur change.
+    La position est roulee tous les hold_max_bars et coupee par un stop.
     """
     n = len(bars)
     bar_ret: list[float] = [0.0] * n
-    if side is None:
-        return [], bar_ret
-
-    sd = 1 if side == "long" else -1
     stop_frac = float(params["stop_bps"]) / 10_000.0
 
     trades: list[Trade] = []
     pos_open = False
+    pos_sd = 0              # +1 long / -1 short tant que la position vit
     entry_price = 0.0
     entry_index = 0
     held = 0
     last_mark = 0.0  # dernier prix de valorisation de la position ouverte
+    worst = 0.0      # FIX audit v3 : le MAE reellement observe
 
-    def open_at(i: int, price: float) -> None:
-        nonlocal entry_price, entry_index, held, pos_open, last_mark
+    def open_at(i: int, price: float, sd: int) -> None:
+        nonlocal pos_sd, entry_price, entry_index, held, pos_open, last_mark, worst
+        pos_sd = sd
         entry_price = price
         entry_index = i
         held = 1
         pos_open = True
         last_mark = price
+        worst = 0.0
         # Frais d'entree bookes SUR la barre d'entree (taker par fill) :
         # sans eux l'equite oubliait la moitie des frais (bug T7).
         bar_ret[i] += -FEE_FRACTION_PER_FILL
 
     def close_trade(idx: int, price: float, reason: str) -> None:
-        nonlocal pos_open, entry_price, entry_index, held, last_mark
+        nonlocal pos_open, entry_price, entry_index, held, last_mark, worst
         if not pos_open:
             return
         # Jambe de sortie : du dernier mark au prix de sortie REEL (stop, open
-        # de roulement, close d'eod). AVANT le fix, la barre de stop restait a
-        # 0.0 : la perte stoppee n'entrait JAMAIS dans l'equite (bug T7,
-        # reports/aster_deep_regimes.md).
-        bar_ret[idx] += sd * (price / last_mark - 1.0) - FEE_FRACTION_PER_FILL
+        # de roulement, close d'eod).
+        bar_ret[idx] += pos_sd * (price / last_mark - 1.0) - FEE_FRACTION_PER_FILL
+        worst = max(worst, -pos_sd * (price / entry_price - 1.0))
         trades.append(
             Trade(
                 entry_index=entry_index,
                 exit_index=idx,
-                side=sd,
+                side=pos_sd,
                 entry_price=entry_price,
                 exit_price=price,
                 reason=reason,
+                worst_adverse_pct=worst,
             )
         )
         pos_open = False
@@ -181,30 +183,42 @@ def simulate(
     for i in range(1, n):
         bar = bars[i]
 
-        # A. Ouverture si plat. Le sens est constant et exogene : on entre des
-        #    qu'une barre d'execution existe. Aucune info future n'est lue.
+        # A. Le sens collecteur est re-decide a CHAQUE open, as-of : le taux
+        #    connu a cet instant, jamais une moyenne du futur.
+        desired = side_fn(bar.ts)
+        desired_sd = 1 if desired == "long" else (-1 if desired == "short" else 0)
         if not pos_open:
-            open_at(i, bar.open)
+            if desired_sd == 0:
+                continue
+            open_at(i, bar.open, desired_sd)
         else:
             held += 1
+            if desired_sd != 0 and desired_sd != pos_sd:
+                close_trade(i, bar.open, "roll")
+                open_at(i, bar.open, desired_sd)
 
         # B. Stop de protection sur le high/low de la barre.
         if pos_open:
-            if sd == 1:
+            if pos_sd == 1:
                 stop_price = entry_price * (1.0 - stop_frac)
                 if bar.low <= stop_price:
                     close_trade(i, stop_price, "stop")
+                else:
+                    worst = max(worst, (entry_price - bar.low) / entry_price)
             else:
                 stop_price = entry_price * (1.0 + stop_frac)
                 if bar.high >= stop_price:
                     close_trade(i, stop_price, "stop")
+                else:
+                    worst = max(worst, (bar.high - entry_price) / entry_price)
 
         # C. Roulement si la duree max est atteinte (stop de duree). Le close et
-        #    le reopen se font au meme open : l'exposition reste continue.
+        #    le reopen se font au meme open : l'exposition reste continue, le
+        #    cote roule est celui du moment (re-decide au prochain open).
         if pos_open and held >= hold_max_bars:
             close_trade(i, bar.open, "roll")
-            if not pos_open:  # roule au meme open
-                open_at(i, bar.open)
+            if not pos_open:  # roule au meme open, meme cote
+                open_at(i, bar.open, pos_sd)
 
         # D. Mark-to-market : la position ouverte est valorisee du dernier mark
         #    (open d'entree/roulement ou close precedent) au close de la barre.
@@ -212,7 +226,7 @@ def simulate(
         #    d'avant ; la difference porte sur l'entree (base = open reel) et
         #    la barre de sortie (bookee au prix de sortie, pas 0).
         if pos_open:
-            bar_ret[i] += sd * (bar.close / last_mark - 1.0)
+            bar_ret[i] += pos_sd * (bar.close / last_mark - 1.0)
             last_mark = bar.close
 
     # Sortie forcee de fin de serie : une position ouverte doit etre valorisee.
@@ -256,7 +270,7 @@ def _build_costs(
     bars: Sequence[Bar],
     params: dict,
     symbol: str,
-    rate: Any,
+    fser,
 ) -> tuple[CostBreakdown, dict[str, Any]]:
     """Agrege les 4 postes sur l'ensemble des trades. Jamais de None implicite.
 
@@ -272,10 +286,10 @@ def _build_costs(
     all_safe = True
     hours_per_bar = _bar_hours(bars)
 
-    if rate is not None:
+    if fser is not None:
         flags["funding_available"] = True
     else:
-        flags["funding_reason"] = "funding cache indisponible ou perime"
+        flags["funding_reason"] = "série funding indisponible"
         funding = 0.0  # explicite, jamais None
 
     for t in trades:
@@ -288,19 +302,22 @@ def _build_costs(
         book = _synthetic_book(t.entry_price, BOOK_NOTIONAL_USD)
         slip += slippage_usd(BOOK_NOTIONAL_USD, book, t.entry_price)
 
-        # funding sur le notionnel, prorata de la duree de detention (periodes
-        # de 8h = holding_hours / 8).
-        if rate is not None:
+        # FIX audit v3 (C1) : funding as-of — Σ des taux réels de
+        # (entrée, sortie], signé par le côté.
+        if fser is not None:
             holding_hours = t.holding_bars * hours_per_bar
-            funding += funding_cost_usd(BOOK_NOTIONAL_USD, holding_hours, side, rate)
+            entry_ms = bars[t.entry_index].ts
+            raw = (BOOK_NOTIONAL_USD * fser.sum_pct_between(
+                entry_ms, entry_ms + holding_hours * 3_600_000.0) / 100.0)
+            funding += -raw if side == "long" else raw
 
-        # liquidation : le pire mouvement adverse est borne par le stop.
+        # FIX audit v3 : liquidation jugee sur le MAE reellement observe.
         chk = check_liquidation(
             entry_price=t.entry_price,
             side=side,
             leverage=float(params["max_leverage"]),
             maintenance_margin_rate=MAINTENANCE_MARGIN_RATE,
-            worst_adverse_pct=float(params["stop_bps"]) / 100.0,
+            worst_adverse_pct=t.worst_adverse_pct,
         )
         all_safe = all_safe and chk.safe
 
@@ -323,29 +340,36 @@ def evaluate(params: dict, bars: Sequence[Bar]) -> StrategyEval:
     symbol = str(params.get("symbol", DEFAULT_SYMBOL))
     hold_max_bars = int(params["hold_max_bars"])
 
-    # Funding : cache reel Aster (signe + taille). Si indisponible -> None.
-    rate = None
+    # FIX audit v3 (C2) : le sens collecteur est decide AS-OF, barre par
+    # barre, sur le dernier print CONNU — plus jamais par la moyenne
+    # full-sample du cache (le futur ne choisit plus le cote du passe).
+    fser = None
     try:
-        rate = load_funding_rate(symbol, FUNDING_CACHE_PATH)
+        fser = load_funding_series(symbol)
     except CostDataUnavailable:
-        rate = None
+        fser = None
 
-    # Sens collecteur, resolu depuis le signe du funding (side_filter 'auto').
-    side: str | None = None
-    if rate is not None:
-        side = _side_from_rate(rate.avg_bps_per_8h)
     sf = params.get("side_filter", ("auto",))
     if isinstance(sf, (tuple, list)):
         sf = sf[0] if sf else "auto"
-    if sf not in ("auto", None):
-        # Filtre explicite (non utilise par PARAM_SPACE) : override le sens.
-        side = sf if sf in ("long", "short") else side
-    # Pas de short si interdit : on reste plat plutot que de prendre le mauvais
-    # cote (on paierait le funding au lieu de le collecter).
-    if side == "short" and not bool(params.get("allow_short", True)):
-        side = None
+    explicit = sf if sf in ("long", "short") else None
 
-    trades, bar_ret = simulate(bars, params, side, hold_max_bars)
+    def side_fn(ts_ms: float) -> str | None:
+        if explicit is not None:
+            return explicit
+        if fser is None:
+            return None
+        r = fser.rate_asof(ts_ms)
+        if r is None:
+            return None
+        s = _side_from_rate(r)
+        # Pas de short si interdit : on reste plat plutot que de prendre le
+        # mauvais cote (on paierait le funding au lieu de le collecter).
+        if s == "short" and not bool(params.get("allow_short", True)):
+            return None
+        return s
+
+    trades, bar_ret = simulate(bars, params, side_fn, hold_max_bars)
 
     trade_returns = [t.net_return for t in trades]
     if trades:
@@ -353,7 +377,7 @@ def evaluate(params: dict, bars: Sequence[Bar]) -> StrategyEval:
     else:
         avg_hold = 0
 
-    costs, flags = _build_costs(trades, bars, params, symbol, rate)
+    costs, flags = _build_costs(trades, bars, params, symbol, fser)
 
     # Courbe d'equity capitalisee a partir des rendements par barre.
     equity = [1.0]
@@ -363,7 +387,7 @@ def evaluate(params: dict, bars: Sequence[Bar]) -> StrategyEval:
     blob: dict[str, Any] = {
         "strategy": "funding_carry",
         "symbol": symbol,
-        "side": side,
+        "side_as_of": True,
         "n_trades": len(trades),
         "entries": [(t.entry_index, t.side) for t in trades],
         "exit_reasons": [t.reason for t in trades],

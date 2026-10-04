@@ -146,6 +146,25 @@ def load_funding_rate(
     return rate
 
 
+def load_funding_series(symbol: str, db_path: Path | None = None) -> "FundingSeries":
+    """La série funding RÉELLE du symbole (klines.db, append-only) pour la
+    comptabilité historique trade par trade.
+
+    FIX audit v3 (C1) : FundingRate (la moyenne du cache) reste un diagnostic
+    de régime — JAMAIS la comptabilité d'un trade historique : un trade ne
+    peut pas payer un taux observé après sa sortie. Lève CostDataUnavailable
+    si la série est absente (l'appelant décide du 0.0 explicite).
+    """
+    try:
+        from scripts.funding_series import funding_series_for
+    except ImportError as exc:  # pragma: no cover - layout
+        raise CostDataUnavailable(f"série funding indisponible: {exc}") from exc
+    try:
+        return funding_series_for(symbol, db_path)
+    except ValueError as exc:
+        raise CostDataUnavailable(str(exc)) from exc
+
+
 def funding_cost_usd(
     notional_usd: float,
     holding_hours: float,
