@@ -10,8 +10,11 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import threading
 import time
 import urllib.request
+
+_LLM_LOCK = threading.Semaphore(1)   # un seul appel LLM à la fois (le 27B local n'est pas parallèle)
 
 LLAMA = "http://127.0.0.1:8080"
 
@@ -60,7 +63,7 @@ def classify(message: str, age_days: float, channel: str) -> dict | None:
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with _LLM_LOCK, urllib.request.urlopen(req, timeout=60) as r:
             text = json.loads(r.read().decode())["choices"][0]["message"].get("content") or ""
     except Exception:
         return None

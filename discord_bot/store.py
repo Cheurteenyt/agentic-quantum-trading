@@ -84,6 +84,18 @@ def save_message(msg_row: dict, media_rows: list[dict]) -> None:
         con.close()
 
 
+def last_message_id(channel_id: str) -> str | None:
+    """Le dernier message_id capturé d'un salon — le point de reprise du catch-up."""
+    con = connect()
+    try:
+        row = con.execute(
+            "SELECT message_id FROM d_messages WHERE channel_id=? "
+            "ORDER BY CAST(message_id AS INTEGER) DESC LIMIT 1", (str(channel_id),)).fetchone()
+        return row["message_id"] if row else None
+    finally:
+        con.close()
+
+
 def count_messages() -> int:
     con = connect()
     try:
