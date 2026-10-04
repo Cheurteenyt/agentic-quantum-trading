@@ -137,6 +137,19 @@ def sharpe(returns: Sequence[float], periods_per_year: int = 365) -> float | Non
     return (mean / math.sqrt(var)) * math.sqrt(periods_per_year)
 
 
+def bars_per_year(dt_ms: float) -> int:
+    """Nombre de barres par an pour un intervalle regulier (en ms).
+
+    FIX lot1 (F1) : le moteur V2 tourne en 1h (8760 barres/an) mais le
+    defaut 365 de sharpe() sous-annualisait tout Sharpe intraday d'un
+    facteur sqrt(24) ≈ 4.9 — sharpe_is / sharpe_oos / oos_is_ratio
+    etaient systematiquement faux.
+    """
+    if dt_ms <= 0:
+        raise ValueError(f"dt_ms doit etre > 0, recu {dt_ms}")
+    return int(round(365.0 * 24 * 3600 * 1000 / dt_ms))
+
+
 def max_drawdown_pct(equity: Sequence[float]) -> float | None:
     """Drawdown maximal en %, calcule sur une courbe d'equity."""
     if len(equity) < 2:

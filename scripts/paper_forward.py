@@ -186,17 +186,50 @@ def funding_extreme_events(fh_sym: pd.DataFrame) -> pd.DatetimeIndex:
     return pd.to_datetime(ts[(rate > p90).fillna(False)].values, unit="ms")
 
 
-def main() -> int:
-    con = sqlite3.connect(KDB, timeout=60)
-    con.executescript("""
-    CREATE TABLE IF NOT EXISTS paper_trades (
+def funding_applied_pct(direction: int, rate_pct_hour: float, hold_h: float) -> float:
+    """Le funding appliqué au ret du trade, en points de % (payé < 0,
+    reçu > 0) — FIX lot1 (F11) : la valeur n'était jamais persistée
+    (0/659 lignes non nulles) et le ledger restait inauditable sur ce
+    poste. Persistée, elle rend ret recomputable : ret = prix - coûts
+    + funding_pct."""
+    return -direction * rate_pct_hour * hold_h
+
+
+def ensure_paper_schema(con: sqlite3.Connection) -> None:
+    """Crée/migre paper_trades. FIX lot1 (F4) : horizon_h entre dans la PK —
+    les candidats bi-horizons (24/168, 1440/2160) s'avaluaient mutuellement
+    via le pré-check + INSERT OR IGNORE (l'horizon 2160 est resté à 0
+    trades depuis l'origine). Migration idempotente : rebuild si l'ancienne
+    PK 3-colonnes est détectée, colonnes et lignes préservées, DROP refusé
+    si le compteur ne colle pas."""
+    con.execute("""CREATE TABLE IF NOT EXISTS paper_trades (
         signal TEXT NOT NULL, symbol TEXT NOT NULL, horizon_h INTEGER NOT NULL,
         direction INTEGER NOT NULL, signal_ts INTEGER NOT NULL,
         entry_ts INTEGER NOT NULL, entry_price REAL NOT NULL,
         exit_ts INTEGER, exit_price REAL, ret_pct REAL,
         funding_pct REAL, status TEXT NOT NULL, created_at REAL NOT NULL,
-        PRIMARY KEY (signal, symbol, signal_ts));
-    """)
+        PRIMARY KEY (signal, symbol, signal_ts, horizon_h))""")
+    pk = [r[1] for r in sorted(
+        (r for r in con.execute("PRAGMA table_info(paper_trades)") if r[5]),
+        key=lambda r: r[5])]
+    if pk[:3] != ["signal", "symbol", "signal_ts"] or "horizon_h" in pk:
+        return
+    con.execute("ALTER TABLE paper_trades RENAME TO paper_trades_old_pk")
+    old = [(r[1], r[2], r[3]) for r in con.execute(
+        "PRAGMA table_info(paper_trades_old_pk)")]
+    defs = ", ".join(f"{n} {t}{' NOT NULL' if nn else ''}" for n, t, nn in old)
+    con.execute(f"CREATE TABLE paper_trades ({defs}, "
+                "PRIMARY KEY (signal, symbol, signal_ts, horizon_h))")
+    names = ", ".join(n for n, _, _ in old)
+    n_old = con.execute(
+        "SELECT COUNT(*) FROM paper_trades_old_pk").fetchone()[0]
+    con.execute(f"INSERT INTO paper_trades ({names}) "
+                f"SELECT {names} FROM paper_trades_old_pk")
+    n_new = con.execute("SELECT COUNT(*) FROM paper_trades").fetchone()[0]
+    if n_old != n_new:
+        raise RuntimeError(
+            f"migration paper_trades : {n_old} -> {n_new} lignes — DROP refusé")
+    con.execute("DROP TABLE paper_trades_old_pk")
     # ——— sonde P3 (fund7/vol7/liq24h, les gradients de l'autopsie 27/09) :
     # 3 colonnes ajoutées en fin de table, idempotent. Ajout seul : le
     # tracker qubo_forward_tracker lit en ro avec colonnes nommées. ———
@@ -208,6 +241,11 @@ def main() -> int:
         except sqlite3.OperationalError as _e:
             if "duplicate column" not in str(_e).lower():
                 raise
+
+
+def main() -> int:
+    con = sqlite3.connect(KDB, timeout=60)
+    ensure_paper_schema(con)
     now = time.time()
     now_ms = int(now * 1000)
     since_ms = now_ms - WINDOW_H * 3600 * 1000
@@ -252,7 +290,8 @@ def main() -> int:
                 sig_ts = int(ts.timestamp() * 1000)
                 if con.execute(
                     "SELECT 1 FROM paper_trades WHERE signal=? AND symbol=? "
-                    "AND signal_ts=?", (name, sym, sig_ts)).fetchone():
+                    "AND signal_ts=? AND horizon_h=?",
+                    (name, sym, sig_ts, horizon)).fetchone():
                     continue
                 i = int(df.index.searchsorted(ts, side="right"))
                 if i >= len(df.index):
@@ -263,15 +302,17 @@ def main() -> int:
                 if entry_price <= 0:
                     continue
                 exit_ts_ms = entry_ts + horizon * 3600 * 1000
+                fund_col = None
                 if now_ms >= exit_ts_ms:
                     # horizon déjà écoulé : clôture immédiate au prix réel
                     j = min(entry_i + horizon - 1, len(df.index) - 1)
                     exit_price = float(df["close"].iloc[j])
                     exit_ts = exit_ts_ms   # l'heure de prix réelle = entry + hold
                     hold_h = (exit_ts_ms - entry_ts) / 3600000.0
+                    fund_col = round(funding_applied_pct(
+                        direction, funding_stats.get(sym, 0.0), hold_h), 4)
                     ret = ((exit_price - entry_price) / entry_price * 100 * direction
-                           - COST_PCT
-                           - direction * funding_stats.get(sym, 0.0) * hold_h)
+                           - COST_PCT + fund_col)
                     status = "closed"
                     closed_n += 1
                 else:
@@ -288,7 +329,7 @@ def main() -> int:
                     "created_at, fund7, vol7, liq24h) "
                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, sym, horizon, direction, sig_ts, entry_ts, entry_price,
-                     exit_ts, exit_price, ret, None, status, now, f7, v7, l24))
+                     exit_ts, exit_price, ret, fund_col, status, now, f7, v7, l24))
                 opened += 1
 
     # ——— le CANDIDAT QUALITÉ : cascade ∩ funding-rank-bas (25/09) ———
@@ -344,8 +385,8 @@ def main() -> int:
             sig_ts = int(e["ts_ms"])
             if con.execute(
                 "SELECT 1 FROM paper_trades WHERE signal=? AND symbol=? "
-                "AND signal_ts=?",
-                ("cascade_funding_rank_low", e["sym"], sig_ts)).fetchone():
+                "AND signal_ts=? AND horizon_h=?",
+                ("cascade_funding_rank_low", e["sym"], sig_ts, 24)).fetchone():
                 continue
             sig_ms = sig_ts // 10**6          # ts_ms = des NS (nom hérité)
             f7, v7, l24 = probe_fields(con, e["sym"], sig_ms)   # sonde P3
@@ -423,7 +464,8 @@ def main() -> int:
                     continue
                 if con.execute(
                     "SELECT 1 FROM paper_trades WHERE signal=? AND symbol=? "
-                    "AND signal_ts=?", (_sig, e["sym"], sig_ms)).fetchone():
+                    "AND signal_ts=? AND horizon_h=?",
+                    (_sig, e["sym"], sig_ms, _hold)).fetchone():
                     continue
                 _f7, _v7, _l24 = probe_fields(con, e["sym"], sig_ms)
                 if not fund7_gate_pass(_sig, e["sym"], _f7):
@@ -463,12 +505,13 @@ def main() -> int:
         exit_price = float(df["close"].iloc[j])
         exit_ts = exit_ts_ms
         hold_h = (exit_ts_ms - entry_ts) / 3600000.0
+        fund_col = round(funding_applied_pct(
+            direction, funding_stats.get(sym, 0.0), hold_h), 4)
         ret = ((exit_price - entry_price) / entry_price * 100 * direction
-               - COST_PCT
-               - direction * funding_stats.get(sym, 0.0) * hold_h)
+               - COST_PCT + fund_col)
         con.execute("UPDATE paper_trades SET exit_ts=?, exit_price=?, ret_pct=?, "
-                    "status='closed' WHERE rowid=?", (exit_ts, exit_price,
-                                                      round(ret, 4), rid))
+                    "funding_pct=?, status='closed' WHERE rowid=?",
+                    (exit_ts, exit_price, round(ret, 4), fund_col, rid))
         closed_n += 1
     con.commit()
 

@@ -36,6 +36,7 @@ from .gates import (
     GateConfig,
     GateVerdict,
     LaneMetrics,
+    bars_per_year,
     evaluate_gates,
     max_drawdown_pct,
 )
@@ -164,7 +165,12 @@ def evaluate_one(
     param_sensitivity: float | None = None,
 ) -> tuple[LaneMetrics, GateVerdict, BenchmarkVerdict | None, dict[str, Any]]:
     """Juge UNE combinaison. Ne persiste rien : c'est run_campaign qui ecrit."""
-    wf = run_walkforward(ev.bar_returns_per_bar, cfg.walkforward_config)
+    # FIX lot1 (F1) : la frequence des barres pilote l'annualisation du
+    # Sharpe — 1h = 8760 barres/an, pas 365.
+    dt_ms = (bars[1].ts - bars[0].ts) if len(bars) >= 2 else 0.0
+    wf = run_walkforward(
+        ev.bar_returns_per_bar, cfg.walkforward_config,
+        periods_per_year=bars_per_year(dt_ms) if dt_ms > 0 else 365)
 
     dd = (
         max_drawdown_pct(ev.equity_curve)
