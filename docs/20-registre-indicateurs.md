@@ -815,3 +815,35 @@ route = re-valider le levier majors à la baisse sur la fenêtre récente**
 (≈ 7x pour un 0-liq sur le MAE max observé, ou un gate event-level) — c'est
 l'expérience n°1 de W41. Le bug hunt de v1 est passé (run_stack recalcule
 MAE ≥ 100/lev − 0,5 ; le levier natif 10x des events est bien remplacé).
+
+## 2026-10-05 (ter) — W41 : LES TROIS CHANTIERS exécutés (scripts/studies/w41_trois_chantiers.py)
+
+**CH1 — MM liq-tolérant : FAIL sur les critères, VALIDÉ mécaniquement.** Le cap
+de marge fonctionne EXACTEMENT comme le propriétaire l'intuivait : cap 4 % →
+DD 12,2 % (vs 39,5 % sans cap), la liq coûte 4 % au lieu de 16 %. MAIS le
+ROI suit la marge vers le bas et — le vrai problème — **la fenêtre récente
+est un régime PERDANT pour la cascade majors** : même la référence 8x perd
+(VAL $94/$100, ret/DD négatif partout). Le MM contient les dégâts, il ne
+crée pas un edge absent. La question déplacée : pourquoi la cascade majors
+saigne depuis 2025-10 (le régime a changé — cohérent avec le gel de
+promotion T3) ; c'est LA question ouverte, pas le sizing.
+
+**CH2 — le stress funding : RÉSILIENT, la peur est désamorcée.** Le scénario
+cadence ×8 (8h → 1h) ne bouge les soldes que de −4,4 % (majors), +0,2 %
+(meme), +3,8 % (survivor), +0,1 % (vol_spike). La surprise : les flux alts
+REÇOIVENT du funding (les shorts encaissent le positif) — le funding est
+actuellement une micro-revenue, pas un coût. Le danger plateforme est
+CONTENU au niveau de taux actuels (reste à monitorer le level des rates,
+pas la cadence).
+
+**CH3 — le tilt par-symbole sur les alts : FAIL (aucun effet).** 18 symboles
+avec une médiane TRAIN, les seuils 1,5/2,0 ne changent ni le DD ni le ROI —
+le funding des alts est du bruit devant leur volatilité. La famille tilt est
+maintenant fermée SUR TOUTES ses formes (marché, majors, par-symbole).
+
+**L'ÉTAT CONSOLIDÉ QUBO** : la cellule 11x est morte dans le régime récent,
+le MM plafonné contient le DD (12 %) mais le flux majors cascade est en
+perte dans ce régime, le funding n'est ni le problème ni le levier, et le
+tilt est épuisé sous toutes ses formes. LA question ouverte = le régime de
+la cascade majors depuis 2025-10 (quoi a changé : la vol ? la structure ?
+les gates ?). Le forward paper des survivants reste le juge vivant.
