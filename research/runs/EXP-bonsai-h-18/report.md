@@ -2,7 +2,7 @@
 
 Hypothèse : Volatility Squeeze Short
 
-- spec_sha 0a7cfb39471f6846 · git 10ba7ae · snapshot k1h-8df3d3b694401749
+- spec_sha 0a7cfb39471f6846 · git c162faa · snapshot k1h-83424f79e713e8c6
 - verdict : **CONFIRMED** · n 5181 · mean 0.3598501932102101
 
 - BTCUSDT@6h : n 1443 · mean 0.312

@@ -168,9 +168,11 @@ class TestCollectEvents(unittest.TestCase):
             start_ms = 0
             end_ms = 120 * H_MS
 
-        events = collect_events(spec, matrix_cols, {"BTCUSDT": feats}, V(),
-                                db_path=db)
+        events, fund_cov = collect_events(spec, matrix_cols,
+                                          {"BTCUSDT": feats}, V(),
+                                          db_path=db)
         self.assertGreater(len(events), 0)
+        self.assertGreater(fund_cov, 0.99)   # fund_6 fourni → connu
         e0 = events[0]
         self.assertEqual(e0["side"], -1)
         self.assertEqual(e0["cost_pct"], 0.28)

@@ -2,14 +2,16 @@
  "verdict": "CONFIRMED",
  "n": 5181,
  "mean": 0.3598501932102101,
- "train_mean": 0.29041478621813704,
- "degradation_pct": -23.909046745270945,
+ "train_mean": 0.2899266789840992,
+ "degradation_pct": -24.117654322507462,
  "stress_mean": 0.2198501932102102,
  "stress_multiplier": 1.5,
+ "fund_coverage": 1.0,
+ "protocol_id": "protocol-v2",
  "per_window": {
   "2025-09": {
-   "n": 824,
-   "mean": 0.3562610888067706,
+   "n": 821,
+   "mean": 0.355660084198451,
    "coverage_pct": 100.0,
    "eligible": true,
    "pass": true
@@ -22,15 +24,15 @@
    "pass": true
   },
   "2026-01": {
-   "n": 829,
-   "mean": 0.5287624036433549,
+   "n": 826,
+   "mean": 0.5414322713348927,
    "coverage_pct": 100.0,
    "eligible": true,
    "pass": true
   },
   "2026-03": {
-   "n": 883,
-   "mean": 0.22298244199210368,
+   "n": 881,
+   "mean": 0.2244079769750406,
    "coverage_pct": 100.0,
    "eligible": true,
    "pass": true
@@ -43,8 +45,8 @@
    "pass": true
   },
   "2026-07": {
-   "n": 678,
-   "mean": 0.15431136959057132,
+   "n": 673,
+   "mean": 0.15356736032055276,
    "coverage_pct": 100.0,
    "eligible": true,
    "pass": true
@@ -55,8 +57,8 @@
  "embargo_ms": 1756944000000,
  "frozen_src": "discovery_artifact",
  "slots_consumed": 1,
- "label_hash": "c6789f1de492e40d",
- "snapshot": "k1h-8df3d3b694401749",
+ "label_hash": "444074b98586042b",
+ "snapshot": "k1h-83424f79e713e8c6",
  "validation_window": [
   1756684800000,
   1790000000000

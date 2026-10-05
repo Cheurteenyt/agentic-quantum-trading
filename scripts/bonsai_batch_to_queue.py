@@ -55,9 +55,12 @@ def _check_conditions(conds: list) -> list[str]:
     return errs
 
 
-def convert(batch: dict, symbols: list[str], min_n_default: int = 50,
-            min_mean: float = 0.02) -> tuple[list[dict], list[str]]:
-    """Convertit les hypothèses en specs. Retourne (specs, erreurs)."""
+def convert(batch: dict, symbols: list[str],
+            min_n_override: int | None = None,
+            min_mean_override: float | None = None) -> tuple[list[dict], list[str]]:
+    """Convertit les hypothèses en specs. Retourne (specs, erreurs).
+    FIX v8 (rapport GLM 5.3 №25) : les overrides CLI pilotent RÉELLEMENT —
+    None = défaut de la classe de compute, valeur explicite = priorité."""
     specs, errors = [], []
     for h in batch.get("hypotheses", []):
         hid = str(h.get("id", "?"))
@@ -74,7 +77,11 @@ def convert(batch: dict, symbols: list[str], min_n_default: int = 50,
             errors.append(f"{hid} : horizon {h1} horsmur {sorted(HORIZONS)}")
             continue
         cls = str(h.get("compute_class", "small"))
-        rules = CLASS_RULES.get(cls, CLASS_RULES["small"])
+        rules = dict(CLASS_RULES.get(cls, CLASS_RULES["small"]))
+        if min_n_override is not None:
+            rules["min_n"] = int(min_n_override)
+        if min_mean_override is not None:
+            rules["min_mean"] = float(min_mean_override)
         sid = f"EXP-bonsai-{hid.lower()}"
         side = 1 if str(h.get("side", "short")).lower() == "long" else -1
         spec = {
@@ -109,8 +116,10 @@ def main() -> int:
     ap.add_argument("--batch", type=int, required=True)
     ap.add_argument("--symbols",
                     default="BTCUSDT,ETHUSDT,SOLUSDT")
-    ap.add_argument("--min-n", type=int, default=50)
-    ap.add_argument("--min-mean", type=float, default=0.02)
+    ap.add_argument("--min-n", type=int, default=None,
+                    help="override du min_n (défaut : la classe de compute)")
+    ap.add_argument("--min-mean", type=float, default=None,
+                    help="override du min_mean (défaut : la classe de compute)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     src = BONSAI_DIR / f"hypotheses-batch-{a.batch:03d}.json"

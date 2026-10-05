@@ -86,6 +86,16 @@ def preflight(scope: DataScope, symbols: list[str],
                 ts = [r[0] for r in rows[:2000]]
                 check(f"monotonicité {sym}", all(b > a for a, b in zip(ts, ts[1:])),
                       f"{len(ts)} barres spot-check")
+                # FIX v8 (rapport GLM 5.3 №19) : les TROUS horaires — la
+                # monotonicité seule laisse passer 10:00, 11:00, 13:00. Le
+                # kernel masque désormais les labels à travers un gap
+                # (contiguïté exigée) ; ici on les rend VISIBLES.
+                gaps = sum(1 for a, b in zip(ts, ts[1:]) if b - a != 3_600_000)
+                max_gap = max((b - a for a, b in zip(ts, ts[1:])),
+                              default=0) // 3_600_000
+                check(f"trous horaires {sym}", gaps == 0,
+                      f"{gaps} trou(s)/doublon(s) · écart max {max_gap} h "
+                      "— les labels à travers un trou sont masqués (gapless)")
             frows = con.execute(
                 "SELECT COUNT(*) FROM funding_history WHERE symbol=? "
                 "AND funding_time BETWEEN ? AND ?",

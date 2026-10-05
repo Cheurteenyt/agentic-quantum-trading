@@ -81,13 +81,16 @@ class TestLabels(unittest.TestCase):
         self.assertAlmostEqual(cols["lo_2"][0], 99.0 / 100 - 1, places=9)
 
     def test_le_futur_inexistant_est_nan_jamais_fabrique(self):
+        """v8 (GLM 5.3 №24) : le DERNIER event H (i = n-H) est VALIDE — il
+        dispose encore des H barres i..n-1 ; seul ce qui dépasse est NaN."""
         from scripts.label_matrix import build_matrix
         _, mat = build_matrix(["BTCUSDT"], horizons=(6,), db_path=self.db,
                               use_cache=False)
         cols = mat["BTCUSDT"]
         n = len(cols["ret_6"])
         self.assertTrue(np.isnan(cols["ret_6"][n - 1]))
-        self.assertTrue(np.isnan(cols["ret_6"][n - 6]))
+        self.assertFalse(np.isnan(cols["ret_6"][n - 6]))   # valide depuis v8
+        self.assertTrue(np.isnan(cols["ret_6"][n - 5]))    # au-delà : NaN
         self.assertFalse(np.isnan(cols["ret_6"][0]))
 
     def test_le_funding_est_la_somme_des_prints_de_la_fenetre(self):

@@ -69,6 +69,7 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
     cost = float(spec.get("cost_pct", 0.28))
     h1 = int(spec.get("horizons", [24])[0])
     events = []
+    n_fund_known = 0
     for sym in spec["data"]["symbols"]:
         if sym not in matrix or sym not in feats_by_sym:
             continue
@@ -78,9 +79,13 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
             fz = [None] * len(rr._signal_conditions(sig))
         mask = rr.event_mask(spec, feats, view, frozen=fz,
                              min_event_ms=min_event_ms,
-                             thr_key=(str(db_path), sym))
+                             thr_key=(*rr._db_key(db_path), sym))
         ret = cols[f"ret_{h1}"]
-        idx = np.flatnonzero(mask & np.isfinite(ret))
+        # FIX v8 : la SORTIE (open(i) + H heures) doit rester dans la vue —
+        # un trade dont l'horizon déborde simulerait au-delà de la fenêtre
+        idx = np.flatnonzero(
+            mask & np.isfinite(ret)
+            & (feats["open_time_ns"] < (view.end_ms - h1 * 3_600_000) * 10**6))
         hi = cols[f"hi_{h1}"]
         lo = cols[f"lo_{h1}"]
         fund = cols.get(f"fund_{h1}")
@@ -88,6 +93,8 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
             fv = float(fund[i]) if fund is not None else 0.0
             if not np.isfinite(fv):
                 fv = 0.0          # l'inconnu contribue 0 ; fund_cov le dit
+            else:
+                n_fund_known += 1
             # MAE côté position, % : short souffre du high, long du low
             # (hi/lo du kernel sont des FRACTIONS → ×100)
             mae_pct = (float(hi[i]) * 100.0) if side == -1 \
@@ -98,7 +105,10 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
                 "side": side, "ret_pct": float(ret[i]),
                 "mae_pct": mae_pct, "fund_pct": fv, "cost_pct": cost})
     events.sort(key=lambda e: e["t_ms"])
-    return events
+    # FIX v8 (rapport GLM 5.3 №4) : la couverture de funding des events est
+    # retournée — l'inconnu ne devient jamais 0 en silence sans être compté
+    fund_cov = (n_fund_known / len(events)) if events else 0.0
+    return events, fund_cov
 
 
 # ------------------------------------------------------------------ wallet
@@ -116,26 +126,42 @@ def run_wallet(events: list[dict], capital: float = 100.0,
     curve: list[tuple[int, float]] = []
     skipped = 0
     liq_thr = 100.0 / lev - 0.5
+    # FIX v8 (rapport GLM 5.3 №29) : la concurrence du portefeuille est
+    # MESURÉE — le cap 1 %/trade n'empêche pas 10 positions simultanées
+    open_exits: list[int] = []
+    max_conc = 0
+    max_margin_used_pct = 0.0
     for ev in events:
         if ev["t_ms"] < busy.get(ev["sym"], -1):
             skipped += 1
             continue
+        # les positions ouvertes dont la sortie est passée libèrent leur marge
+        open_exits = [x for x in open_exits if x > ev["t_ms"]]
         margin = eq * cap_pct / 100.0
         if margin <= 0:
             break
         notional = margin * lev
         fund_signed = ev["fund_pct"] * (1.0 if ev["side"] == -1 else -1.0)
         if ev["mae_pct"] >= liq_thr:
+            # FIX v8 (rapport GLM 5.3 №28, option A) : la liquidation est une
+            # perte TOUT COMPRIS (marge absorbée = prix de liq + frais +
+            # funding) — les frais/funding ne sont PAS comptés à côté, la
+            # comptabilité se réconcilie exactement : delta_equity = -margin
             pnl = -margin
             liq += 1
         else:
             gross = ev["side"] * ev["ret_pct"] + fund_signed - ev["cost_pct"]
             pnl = notional * gross / 100.0
-        fees += notional * ev["cost_pct"] / 100.0
-        fund_net += notional * fund_signed / 100.0
+            fees += notional * ev["cost_pct"] / 100.0
+            fund_net += notional * fund_signed / 100.0
         eq += pnl
         wins += 1 if pnl > 0 else 0
         busy[ev["sym"]] = ev["exit_ms"]
+        open_exits.append(ev["exit_ms"])
+        max_conc = max(max_conc, len(open_exits))
+        if eq > 0:
+            max_margin_used_pct = max(max_margin_used_pct,
+                                      len(open_exits) * cap_pct)
         month = datetime.fromtimestamp(ev["exit_ms"] / 1000,
                                        tz=timezone.utc).strftime("%Y-%m")
         monthly[month] = monthly.get(month, 0.0) + pnl
@@ -157,6 +183,8 @@ def run_wallet(events: list[dict], capital: float = 100.0,
             "worst_month": worst_m, "best_month": best_m,
             "ret_dd": (roi / max_dd) if max_dd > 0 else float("inf"),
             "fees": fees, "funding_net": fund_net, "monthly": monthly,
+            "max_concurrency": max_conc,
+            "max_margin_used_pct": max_margin_used_pct,
             "cap_pct": cap_pct, "lev": lev}
 
 
@@ -258,12 +286,22 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
     seuils sont ceux de la découverte — JAMAIS re-calibrés."""
     rdir = RUNS / run_id
     spec = json.loads((rdir / "spec.json").read_text(encoding="utf-8"))
-    has_conf = (rdir / "summary_confirmation.json").exists()
-    vk = view_kind or ("validation" if has_conf else "train")
-    if vk == "validation" and not has_conf:
+    # FIX v8 (rapport GLM 5.3 №15) : on vérifie le VERDICT du résumé de
+    # confirmation, pas l'existence du fichier — un run REJECTED ne donne
+    # aucun droit à la vue validation.
+    conf_verdict = None
+    cfile = rdir / "summary_confirmation.json"
+    if cfile.exists():
+        try:
+            conf_verdict = json.loads(
+                cfile.read_text(encoding="utf-8")).get("verdict")
+        except (OSError, json.JSONDecodeError):
+            conf_verdict = None
+    vk = view_kind or ("validation" if conf_verdict == "CONFIRMED" else "train")
+    if vk == "validation" and conf_verdict != "CONFIRMED":
         raise ValueError(
-            f"{run_id} : pas de confirmation — le wallet validation se "
-            "mérite (un slot consommé). Utilisez --view train.")
+            f"{run_id} : pas de confirmation CONFIRMED — le wallet "
+            "validation se mérite (un slot consommé). Utilisez --view train.")
     d = spec["data"]
     snap = snapshot_id(db_path)
     scope = DataScope(snap, int(d["train_start"]), int(d["train_end"]),
@@ -292,21 +330,24 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
     feats_by_sym = rr._features_by_sym(spec, db_path)
     if vk == "train":
         view = scope.discovery_view()
-        events = collect_events(spec, matrix, feats_by_sym, view,
-                                frozen=None, min_event_ms=0, db_path=db_path)
+        events, fund_cov = collect_events(spec, matrix, feats_by_sym, view,
+                                          frozen=None, min_event_ms=0,
+                                          db_path=db_path)
         per_window = None
     else:
         view = scope.confirmation_view()[1]
-        events = collect_events(spec, matrix, feats_by_sym, view,
-                                frozen=frozen, min_event_ms=embargo_ms,
-                                db_path=db_path)
+        events, fund_cov = collect_events(spec, matrix, feats_by_sym, view,
+                                          frozen=frozen,
+                                          min_event_ms=embargo_ms,
+                                          db_path=db_path)
         per_window = wallet_per_window(events, proto, capital, cap_pct, lev)
     wallet = run_wallet(events, capital=capital, cap_pct=cap_pct, lev=lev)
     baseline = baseline_hold(spec, view, db_path=db_path, capital=capital)
     out = {"run_id": run_id, "view": vk, "capital": capital,
            "cap_pct": cap_pct, "lev": lev, "frozen_src": frozen_src,
            "embargo_ms": embargo_ms if vk == "validation" else 0,
-           "n_events": len(events), "wallet": wallet, "baseline": baseline,
+           "n_events": len(events), "fund_cov": fund_cov,
+           "wallet": wallet, "baseline": baseline,
            "per_window": per_window,
            "max_window_loss_pct": float(proto.get("max_window_loss_pct", 15))}
     if per_window:

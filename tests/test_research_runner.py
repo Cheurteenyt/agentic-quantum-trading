@@ -129,7 +129,9 @@ class TestRunner(unittest.TestCase):
         self.assertLess(thr[200], thr[60])
 
     def test_confirm_consomme_un_slot_et_juge_la_validation(self):
-        rr.run_discovery(self.spec, db_path=self.db)
+        res_d = rr.run_discovery(self.spec, db_path=self.db)
+        rr.write_artifacts(self.spec["id"], self.spec, res_d, "discovery",
+                           db_path=self.db)
         res2 = rr.run_confirmation(self.spec, db_path=self.db,
                                    protocol=PROTO_MINI)
         self.assertEqual(res2["slots_consumed"], 1)
@@ -140,6 +142,16 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(res2["windows_required"], 1)
         self.assertIn("train_mean", res2)
         self.assertIn("stress_mean", res2)
+
+    def test_confirm_sans_artefact_est_bloque(self):
+        """v8 (GLM 5.3 №17) : sans artefact de découverte (seuils gelés), la
+        confirmation est BLOQUÉE (0 slot) — le re-calcul train n'est plus un
+        fallback silencieux du chemin officiel."""
+        rr.run_discovery(self.spec, db_path=self.db)   # pas de write_artifacts
+        res = rr.run_confirmation(self.spec, db_path=self.db,
+                                  protocol=PROTO_MINI)
+        self.assertEqual(res["verdict"], "CONFIRMATION_BLOCKED")
+        self.assertEqual(res["slots_consumed"], 0)
 
     def test_confirm_refuse_une_spec_discovery(self):
         """v6 : la garde MODE — une spec déclarée discovery ne passe jamais

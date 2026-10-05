@@ -62,6 +62,22 @@ RUNS = ROOT / "research" / "runs"
 JOURNAL = ROOT / "research" / "ledger" / "experiments.jsonl"
 WARMUP = 50
 
+# FIX v8 (rapport GLM 5.3 №1) : la table d'opérateurs EXPLICITE. L'ancien
+# code faisait « >= → >=, tout le reste → <= » : un "<" de spec était
+# silencieusement exécuté "<=" — le langage d'exécution différait du langage
+# pré-enregistré. Tout opérateur hors table = ValueError.
+OPS = {">=": np.greater_equal, "<=": np.less_equal,
+       ">": np.greater, "<": np.less}
+
+
+def apply_op(values, op: str, thr):
+    try:
+        fn = OPS[op]
+    except (KeyError, TypeError) as exc:
+        raise ValueError(f"opérateur interdit : {op!r} "
+                         f"(autorisés : {sorted(OPS)})") from exc
+    return fn(values, thr)
+
 
 # ------------------------------------------------------------------ spec
 def load_spec(path: Path) -> dict:
@@ -74,6 +90,13 @@ def load_spec(path: Path) -> dict:
               "validation_end"):
         if k not in d:
             raise ValueError(f"spec.data incomplète : '{k}' manquant")
+    # FIX v8 (rapport GLM 5.3 №1) : la spec doit déclarer des opérateurs
+    # EXISTANTS — refus précoce plutôt qu'interprétation fausse au masque
+    sig = spec["signal"]
+    for cond in ([sig] if "feature" in sig else sig.get("conditions", [])):
+        if cond.get("op", ">=") not in OPS:
+            raise ValueError(f"opérateur interdit {cond.get('op')!r} dans "
+                             f"{spec['id']} (autorisés : {sorted(OPS)})")
     return spec
 
 
@@ -92,9 +115,12 @@ def _git() -> str:
 
 
 # ------------------------------------------------------------------ données
-def compute_features(con: sqlite3.Connection, sym: str) -> dict[str, np.ndarray]:
+def compute_features(con: sqlite3.Connection, sym: str,
+                     db_path: Path = KDB) -> dict[str, np.ndarray]:
     """Les features causales par barre 1h : range_pct, volume_z, ret_1h.
-    Toutes connues au CLOSE de leur barre (availability = close_t)."""
+    Toutes connues au CLOSE de leur barre (availability = close_t).
+    FIX v8 (rapport GLM 5.3 №2) : le funding vient de LA MÊME DB que les
+    prix (db_path) — plus jamais le warehouse global en implicit."""
     rows = con.execute(
         "SELECT open_time, open, high, low, close, volume FROM klines "
         "WHERE symbol=? AND interval='1h' ORDER BY open_time",
@@ -110,13 +136,14 @@ def compute_features(con: sqlite3.Connection, sym: str) -> dict[str, np.ndarray]
     cs = pd.Series(c)
     # fund_last : le dernier taux de funding CONNU au moment de la barre
     # (as-of strict, searchsorted — le print futur ne fuite pas)
-    # FIX v6 : funding ABSENT ≠ funding nul. Le 0.0 inventé faisait matcher
+    # FIX v8 : funding ABSENT ≠ funding nul. Le 0.0 inventé faisait matcher
     # les conditions « fund_last <= 0 » (le candidat H-01) sur des symboles
     # sans AUCUNE donnée de funding. NaN = inconnu, exclu des masques.
+    # Et : la série vient de la DB DU RUN (provenance, fix v8).
     fund_last = np.full(len(ts), np.nan)
     try:
         from scripts.funding_series import funding_series_for
-        fser = funding_series_for(sym)
+        fser = funding_series_for(sym, db_path=db_path)
         if fser is not None and len(fser.times_ms):
             k = np.searchsorted(fser.times_ms / 1e6, ts / 1e6, side="right") - 1
             fund_last = np.where(k >= 0, fser.rates_pct[np.maximum(k, 0)], np.nan)
@@ -156,11 +183,21 @@ def expanding_cached(values: np.ndarray, q: float, key: tuple | None) -> np.ndar
     return out
 
 
+def _db_key(db_path: Path) -> tuple:
+    """L'identité bon marché d'une DB pour les clés de cache : chemin +
+    (mtime_ns, size) — une DB modifiée pendant un process ne réutilise pas
+    un cache périmé (rapport GLM 5.3 №23)."""
+    st = Path(db_path).stat()
+    return (str(db_path), st.st_mtime_ns, st.st_size)
+
+
 def _mask_for(cols, fvals, op, thr, view):
+    # FIX v8 : bornes [start, end) — une barre frontière n'appartient qu'à
+    # UNE période (les fenêtres protocolaires sont adjacentes)
     in_view = ((cols["open_time_ns"] >= view.start_ms * 10**6)
-               & (cols["open_time_ns"] <= view.end_ms * 10**6))
+               & (cols["open_time_ns"] < view.end_ms * 10**6))
     finite = np.isfinite(fvals) & (np.isfinite(thr) if np.ndim(thr) else True)
-    base = (fvals >= thr) if op == ">=" else (fvals <= thr)
+    base = apply_op(fvals, op, thr)   # FIX v8 : opérateurs explicites
     return base & finite & in_view
 
 
@@ -187,18 +224,18 @@ def _multi_mask(feats: dict, conditions: list[dict], view, frozen=None,
             if ft is None:
                 mask &= np.zeros(n, dtype=bool)
             else:
-                mask &= (v >= ft) if cond["op"] == ">=" else (v <= ft)
+                mask &= apply_op(v, cond["op"], ft)
         elif "quantile" in cond:
             thr = expanding_cached(v, float(cond["quantile"]),
                                    (*thr_key, cond["feature"],
                                     float(cond["quantile"]))
                                    if thr_key else None)
-            mask &= (v >= thr) if cond["op"] == ">=" else (v <= thr)
+            mask &= apply_op(v, cond["op"], thr)
         else:
-            mask &= ((v >= cond["threshold"]) if cond["op"] == ">="
-                     else (v <= cond["threshold"])) & np.isfinite(v)
+            mask &= apply_op(v, cond["op"], cond["threshold"]) & np.isfinite(v)
+    # FIX v8 : bornes [start, end)
     in_view = ((feats["open_time_ns"] >= view.start_ms * 10**6)
-               & (feats["open_time_ns"] <= view.end_ms * 10**6))
+               & (feats["open_time_ns"] < view.end_ms * 10**6))
     return mask & in_view
 
 
@@ -239,7 +276,7 @@ def _features_by_sym(spec: dict, db_path: Path) -> dict[str, dict]:
     for sym in spec["data"]["symbols"]:
         con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         try:
-            out[sym] = compute_features(con, sym)
+            out[sym] = compute_features(con, sym, db_path=db_path)
         finally:
             con.close()
     return out
@@ -293,13 +330,19 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
             fz = [None] * len(_signal_conditions(sig))
         mask = event_mask(spec, feats, view, frozen=fz,
                           min_event_ms=min_event_ms,
-                          thr_key=(str(db_path), sym))
+                          thr_key=(*_db_key(db_path), sym))
         if mask.any():
             view.assert_range(
                 int(feats["open_time_ns"][mask][0]) // 10**6,
                 int(feats["open_time_ns"][mask][-1]) // 10**6)
         for H in horizons:
-            out[f"{sym}@{H}h"] = event_study(matrix[sym], mask, H,
+            # FIX v8 (rapport GLM 5.3 №7) : la SORTIE doit rester dans la
+            # vue — un event dont l'horizon H déborde de la fenêtre
+            # consommerait les prix de la fenêtre suivante. Sortie = close
+            # de la barre i+H-1 = open(i) + H heures.
+            m_h = mask & (feats["open_time_ns"]
+                          < (view.end_ms - H * 3_600_000) * 10**6)
+            out[f"{sym}@{H}h"] = event_study(matrix[sym], m_h, H,
                                              side=int(side * side_mult),
                                              cost_pct=cost)
     return out
@@ -345,23 +388,34 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
     # le contrôle inverse : le côté inversé doit être pire sur l'horizon 1
     inv = _study(spec, matrix, view, -1.0, db_path,
                  feats_by_sym=feats_by_sym)
-    _, inv_mean = _aggregate({k: v for k, v in inv.items()
-                              if k.endswith(f"@{spec.get('horizons', [24])[0]}h")},
-                             min_n)
+    inv_h1 = {k: v for k, v in inv.items()
+              if k.endswith(f"@{spec.get('horizons', [24])[0]}h")}
+    inv_n, inv_mean = _aggregate(inv_h1, min_n=min_n)
+    # FIX v8 (rapport GLM 5.3 №9) : le contrôle inverse est un GATE — le
+    # sens codé doit battre le sens inversé d'au moins min_edge_advantage_pct
+    # (seuil du protocole, discovery_gate). Si l'inverse n'a pas assez
+    # d'events pour être mesuré (inv_n < min_window_events), il ne gate pas.
+    proto = load_confirmation_protocol()
+    min_adv = float(proto.get("discovery_gate", {})
+                    .get("min_edge_advantage_pct", 0.0))
+    min_inv_n = int(proto.get("confirmation_gate", {})
+                    .get("min_window_events", 5))
+    advantage = (mean_all - inv_mean
+                 if np.isfinite(mean_all) and np.isfinite(inv_mean)
+                 else float("nan"))
+    advantage_ok = (not np.isfinite(inv_mean) or inv_n < min_inv_n
+                    or advantage > min_adv)
     verdict = ("DISCOVERY_PASS" if (n_total >= min_n
                                     and mean_all > float(spec.get("criteria",
-                                                                 {}).get("min_mean", 0.0)))
+                                                                 {}).get("min_mean", 0.0))
+                                    and advantage_ok)
                else "DISCOVERY_FAIL")
     return {"verdict": verdict, "n": n_total, "mean": mean_all,
-            "inverse_mean": inv_mean, "per_symbol": per_symbol,
+            "inverse_mean": inv_mean, "edge_advantage": advantage, "per_symbol": per_symbol,
             "frozen_thresholds": frozen,
             "label_hash": lh, "snapshot": snapshot_id(db_path),
             "scope": {"mode": Mode.DISCOVERY.value,
                       "start": view.start_ms, "end": view.end_ms}}
-
-
-# — le plancher d'events pour qu'une fenêtre de 2 mois démontre un signe —
-WINDOW_MIN_N = 5
 
 
 def _month_ms(m: str) -> int:
@@ -377,7 +431,8 @@ def _frozen_windows_ms(proto: dict) -> list[tuple[str, int, int]]:
 
 
 def run_confirmation(spec: dict, db_path: Path = KDB,
-                     protocol: dict | None = None) -> dict:
+                     protocol: dict | None = None,
+                     repair: bool = False) -> dict:
     """La CONFIRMATION sous protocole-v2 (rapport v6 — la porte conforme) :
 
       1. garde MODE : une spec déclarée « discovery » ne passe JAMAIS la
@@ -434,22 +489,37 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
     train_view, val_view = scope.confirmation_view()
     feats_by_sym = _features_by_sym(spec, db_path)
     conditions = _signal_conditions(spec["signal"])
-    # — les seuils gelés : l'artefact de découverte fait foi ; à défaut,
-    #   recalcul sur le TRAIN uniquement (jamais sur la validation) —
-    frozen, frozen_src = None, "recomputed_train"
+    # — les seuils gelés : l'artefact de découverte EST OBLIGATOIRE sur le
+    #   chemin officiel (fix v8, rapport GLM 5.3 №17 — un re-calcul sur le
+    #   train actuel ne correspondrait plus à la découverte qui a produit
+    #   le candidat). Le re-calcul ne survit qu'en mode réparation explicite.
+    frozen, frozen_src = None, "missing"
     sfile = RUNS / str(spec["id"]) / "summary_discovery.json"
     if sfile.exists():
         s = json.loads(sfile.read_text(encoding="utf-8"))
         if s.get("frozen_thresholds"):
             frozen, frozen_src = s["frozen_thresholds"], "discovery_artifact"
+    if frozen is None and not repair:
+        return {"verdict": "CONFIRMATION_BLOCKED", "slots_consumed": 0,
+                "reason": ("aucun artefact de découverte avec frozen_thresholds "
+                           f"pour {spec['id']} — le re-calcul est interdit sur "
+                           "le chemin officiel (re-lancez la découverte ou "
+                           "passez repair=True en connaissance de cause)")}
     if frozen is None:
         frozen = _frozen_thresholds(feats_by_sym, conditions, train_view)
+        frozen_src = "recomputed_train_repair"
     embargo_ms = (int(d["train_end"])
                   + int(proto.get("embargo_hours", 0)) * 3_600_000)
     cost = float(spec.get("cost_pct", 0.28))
     stress_mult = float(proto.get("cost_stress_multiplier", 1.5))
     deg_max = float(proto.get("degradation_max_pct", 70))
     need = int(proto.get("windows_pass_required", 5))
+    # FIX v8 (rapport GLM 5.3 №10/№22) : TOUS les seuils de jugement viennent
+    # du protocole — le plancher d'events par fenêtre n'est plus une
+    # constante Python (ex WINDOW_MIN_N) mais confirmation_gate.
+    gate = proto.get("confirmation_gate", {})
+    min_window_events = int(gate.get("min_window_events", 5))
+    min_fund_cov = float(gate.get("min_fund_coverage", 0.5))
     h1 = int(spec.get("horizons", [24])[0])
     min_n = int(spec.get("criteria", {}).get("min_n", 30))
 
@@ -468,11 +538,13 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
                      feats_by_sym=feats_by_sym, frozen=frozen,
                      min_event_ms=embargo_ms)
         n_w, mean_w = _aggregate({k: v for k, v in wst.items()
-                                  if k.endswith(f"@{h1}h")}, min_n=WINDOW_MIN_N)
+                                  if k.endswith(f"@{h1}h")},
+                                 min_n=min_window_events)
         eligible = cov >= 99.9     # une fenêtre tronquée ne démontre rien
         per_window[name] = {"n": n_w, "mean": mean_w,
                             "coverage_pct": cov, "eligible": eligible,
-                            "pass": bool(eligible and n_w >= WINDOW_MIN_N
+                            "pass": bool(eligible
+                                         and n_w >= min_window_events
                                          and mean_w > 0.0)}
 
     # — la validation d'un bloc : l'agrégat + le stress de coûts —
@@ -492,14 +564,27 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
 
     n_pass = sum(1 for w in per_window.values() if w["pass"])
     min_mean = float(spec.get("criteria", {}).get("min_mean", 0.0))
+    # FIX v8 (rapport GLM 5.3 №4) : la couverture de funding de l'agrégat
+    # est un gate du protocole — un funding massivement inconnu ne peut plus
+    # passer inaperçu (la contribution inconnue reste 0, jamais inventée).
+    kept_cov = [(float(v.get("fund_cov", 0.0)), int(v.get("n", 0)))
+                for v in val_h1.values() if v.get("n", 0) >= min_n]
+    if kept_cov and sum(n for _, n in kept_cov) > 0:
+        fund_cov = float(sum(c * n for c, n in kept_cov)
+                         / sum(n for _, n in kept_cov))
+    else:
+        fund_cov = 0.0
     verdict = ("CONFIRMED" if (n_total >= min_n and val_mean > min_mean
                                and n_pass >= need
                                and stress_mean > 0.0
+                               and fund_cov >= min_fund_cov
                                and (not np.isfinite(deg) or deg <= deg_max))
                else "REJECTED")
     return {"verdict": verdict, "n": n_total, "mean": val_mean,
             "train_mean": tr_mean, "degradation_pct": deg,
             "stress_mean": stress_mean, "stress_multiplier": stress_mult,
+            "fund_coverage": fund_cov,
+            "protocol_id": proto.get("protocol_id"),
             "per_window": per_window, "windows_pass": n_pass,
             "windows_required": need, "embargo_ms": embargo_ms,
             "frozen_src": frozen_src, "per_symbol": val,
@@ -545,14 +630,22 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
     return rdir
 
 
-def _log_ledger(spec: dict, verdict: str, mode: str, ref: str) -> None:
+def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
+                snapshot: str | None = None) -> None:
+    """FIX v8 (rapport GLM 5.3 №21) : le snapshot du ledger est CELUI DU RUN
+    (result['snapshot']) — jamais recalculé implicitement sur une autre DB."""
+    if snapshot is None:
+        try:
+            snapshot = str(snapshot_id())
+        except sqlite3.Error:
+            snapshot = "unknown"
     subprocess.run([
         sys.executable, "scripts/lab_ledger.py", "log",
         "--family", str(spec.get("family", "research")),
         "--strategy", str(spec.get("strategy", "runner")),
         "--hypothesis", str(spec.get("hypothesis", ""))[:300],
         "--verdict", verdict, "--mode", mode,
-        "--snapshot", str(snapshot_id()), "--ref", ref],
+        "--snapshot", snapshot, "--ref", ref],
         check=False, cwd=ROOT)
 
 
@@ -562,7 +655,7 @@ def cmd_discovery(a) -> int:
     res = run_discovery(spec, db_path=Path(a.db))
     rdir = write_artifacts(spec["id"], spec, res, "discovery", db_path=Path(a.db))
     _log_ledger(spec, res["verdict"], Mode.DISCOVERY.value,
-                str(rdir / "report.md"))
+                str(rdir / "report.md"), snapshot=res.get("snapshot"))
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
           f"{res['mean']:.3f} · inverse {res['inverse_mean']:.3f}")
     print("DISCOVERY = TRAIN only — jamais promote sans confirmation.")
@@ -571,8 +664,22 @@ def cmd_discovery(a) -> int:
 
 def cmd_confirm(a) -> int:
     spec = load_spec(Path(a.spec))
+    # FIX v8 (rapport GLM 5.3 №18) : la réservation du slot est sérialisée
+    # par un verrou fichier — deux process ne peuvent plus croire
+    # simultanément qu'il reste un slot (le budget est jugé au log, sous
+    # le même verrou).
+    import fcntl
+    lock_path = ROOT / "research" / "ledger" / "confirm.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "w") as lock_fh:
+        fcntl.flock(lock_fh, fcntl.LOCK_EX)
+        return _confirm_locked(spec, a)
+
+
+def _confirm_locked(spec: dict, a) -> int:
     res = run_confirmation(spec, db_path=Path(a.db))
-    if res["verdict"] in ("MODE_MISMATCH", "WINDOW_MISMATCH"):
+    if res["verdict"] in ("MODE_MISMATCH", "WINDOW_MISMATCH",
+                          "CONFIRMATION_BLOCKED"):
         print(f"{spec['id']} : {res['verdict']} — 0 slot consommé\n"
               f"  {res.get('reason', '')}")
         return 1
@@ -585,12 +692,14 @@ def cmd_confirm(a) -> int:
     rdir = write_artifacts(spec["id"], spec, res, "confirmation",
                            db_path=Path(a.db))
     _log_ledger(spec, "FAIL" if res["verdict"] == "REJECTED" else "PASS",
-                Mode.CONFIRMATION.value, str(rdir / "report.md"))
+                Mode.CONFIRMATION.value, str(rdir / "report.md"),
+                snapshot=res.get("snapshot"))
     pw = res.get("windows_pass")
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
           f"{res['mean']:.3f} · fenêtres {pw}/{res.get('windows_required')} "
           f"PASS · stress ×{res.get('stress_multiplier')} mean "
-          f"{res.get('stress_mean', float('nan')):.3f} · slot consommé")
+          f"{res.get('stress_mean', float('nan')):.3f} · fund_cov "
+          f"{res.get('fund_coverage', 0.0):.2f} · slot consommé")
     if res["verdict"] == "CONFIRMED":
         # PR-B : le wallet 100 $ sur la validation, obligatoire au rapport
         try:
@@ -697,7 +806,8 @@ def cmd_grind(a) -> int:
         if _passes(r2, spec):
             write_artifacts(spec["id"], spec, r2, "discovery")
             _log_ledger(spec, r2["verdict"], Mode.DISCOVERY.value,
-                        str(RUNS / spec["id"] / "report.md"))
+                        str(RUNS / spec["id"] / "report.md"),
+                        snapshot=r2.get("snapshot"))
             survivors.append(spec["id"])
             print(f"[grind]   CANDIDATE discovery : {r2['verdict']} "
                   f"(n {r2['n']}, mean {r2['mean']:.3f})")

@@ -1,15 +1,17 @@
 {
  "verdict": "CONFIRMED",
- "n": 6350,
- "mean": 1.129662556767976,
- "train_mean": 1.0408166051130823,
- "degradation_pct": -8.536177384030179,
- "stress_mean": 0.989662556767976,
+ "n": 6349,
+ "mean": 1.1291645230989082,
+ "train_mean": 1.0406348214225485,
+ "degradation_pct": -8.507278427925332,
+ "stress_mean": 0.9891645230989085,
  "stress_multiplier": 1.5,
+ "fund_coverage": 1.0,
+ "protocol_id": "protocol-v2",
  "per_window": {
   "2025-09": {
-   "n": 1153,
-   "mean": 1.253021865585527,
+   "n": 1152,
+   "mean": 1.2528599120533686,
    "coverage_pct": 100.0,
    "eligible": true,
    "pass": true
@@ -55,8 +57,8 @@
  "embargo_ms": 1756944000000,
  "frozen_src": "discovery_artifact",
  "slots_consumed": 1,
- "label_hash": "dc1f0daa5f23d8ad",
- "snapshot": "k1h-7d5269146038a186",
+ "label_hash": "444074b98586042b",
+ "snapshot": "k1h-83424f79e713e8c6",
  "validation_window": [
   1756684800000,
   1790000000000
@@ -149,13 +151,13 @@
    "fund_cov": 1.0
   },
   "AVAXUSDT@6h": {
-   "n": 563,
-   "mean": 1.252638124613334,
-   "median": 0.9208005336891281,
-   "p10": -1.459338314700251,
-   "p90": 4.421176148796495,
-   "wr": 72.11367673179396,
-   "mae_mean": 0.007523987822251399,
+   "n": 562,
+   "mean": 1.2472305797786987,
+   "median": 0.9157924490863414,
+   "p10": -1.4690904057998972,
+   "p90": 4.4228856673960575,
+   "wr": 72.06405693950177,
+   "mae_mean": 0.007537375700938679,
    "worst": -8.17313904068003,
    "best": 20.28710775047258,
    "fund_cov": 1.0
