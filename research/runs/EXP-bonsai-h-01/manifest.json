@@ -1,0 +1,9 @@
+{
+ "run_id": "EXP-bonsai-h-01",
+ "kind": "discovery",
+ "spec_sha": "6b2ffd6a8decc740",
+ "git_sha": "7ce9183",
+ "label_hash": "eb0afaba3eaa85f6",
+ "snapshot": "k1h-781d4a476d1acff5",
+ "timestamp": "2026-10-05T03:54:14.064563+00:00"
+}

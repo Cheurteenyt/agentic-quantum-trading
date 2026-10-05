@@ -1,0 +1,46 @@
+{
+ "domain": "aster",
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "id": "EXP-bonsai-h-01",
+ "family": "bonsai_fund_H",
+ "strategy": "H-01",
+ "hypothesis": "Funding Crowding Reversal",
+ "signal": {
+  "conditions": [
+   {
+    "feature": "fund_last",
+    "op": ">",
+    "threshold": 0.05
+   },
+   {
+    "feature": "ret_1h",
+    "op": "<",
+    "threshold": 0.1
+   }
+  ],
+  "side": -1
+ },
+ "horizons": [
+  6
+ ],
+ "compute": {
+  "class": "tiny"
+ }
+}
