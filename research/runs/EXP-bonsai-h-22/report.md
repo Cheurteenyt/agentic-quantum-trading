@@ -2,7 +2,7 @@
 
 Hypothèse : [H-22] Volume Surge Reversion — ret_2h < 0.1 (falsification : ret_2h > 0.5)
 
-- spec_sha 92f53ea4f3bc6075 · git c2fadaf · snapshot k1h-83424f79e713e8c6
+- spec_sha 92f53ea4f3bc6075 · git 13cc659 · snapshot k1h-c22625d61aca89cf
 - verdict : **DISCOVERY_PASS** · n 12963 · mean 0.9688999989265287
 
 - BTCUSDT@2h : n 1382 · mean 0.654

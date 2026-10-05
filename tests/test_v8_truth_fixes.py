@@ -148,15 +148,15 @@ class TestBoundsAndLabels(unittest.TestCase):
                     {"feature": "ret_1h", "op": "<=", "threshold": -1.0}],
                     "side": -1},
                 "horizons": [6], "cost_pct": 0.0}
-        # vue qui s'arrête à 106 h : les events du crash (100..105 h) sont
-        # dans la vue MAIS leur sortie (106..111 h) en sort → 0 event
+        # v10 : la sortie EXACTEMENT sur la fin de fenêtre est VALIDE —
+        # vue [0, 106h) : l'event 100h (sortie 106h pile) compte → 1
         view = rr.DataView("t", "train", 0, 106 * H_MS)
         st = rr._study(spec, matrix, view, +1.0, self.db)
-        self.assertEqual(st["BTCUSDT@6h"]["n"], 0)
-        # vue élargie à 112 h : les sorties 106..111 h passent
+        self.assertEqual(st["BTCUSDT@6h"]["n"], 1)
+        # vue [0, 112h) : sorties ≤ 112h → entrées 100..106 → 7 events
         view2 = rr.DataView("t", "train", 0, 112 * H_MS)
         st2 = rr._study(spec, matrix, view2, +1.0, self.db)
-        self.assertGreater(st2["BTCUSDT@6h"]["n"], 0)
+        self.assertEqual(st2["BTCUSDT@6h"]["n"], 7)
 
     def test_dernier_label_h_valide_present(self):
         """GLM 5.3 №24 : i = n-H est un event VALIDE (H barres restantes) —
@@ -263,6 +263,10 @@ class TestForwardV8(unittest.TestCase):
                 {"timestamp": "1970-01-10T00:00:00+00:00"}), encoding="utf-8")
             db = Path(tmp) / "k.db"
             con = self._db(db)
+            for k in range(126):   # des prints de funding (gate v10)
+                con.execute("INSERT INTO funding_history VALUES "
+                            "('BTCUSDT', ?, 0.0001)", ((k * 8 + 1) * H_MS,))
+            con.commit()
             con.close()
             # 120 trades fermés, alternance +5/+6 % (Sharpe positif élevé)
             fwd = Path(tmp) / "forward"

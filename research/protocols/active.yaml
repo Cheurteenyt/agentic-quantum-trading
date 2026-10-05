@@ -50,6 +50,7 @@ forward_confirmation:
   min_forward_trades: 100
   min_vs_discovery: 0.5         # forward >= 0.5 × discovery
   maturation_days: 30           # le runbook docs/13 (30 jours de données inédites)
+  min_fund_coverage: 95         # % de trades forward à funding CONNU (gate v10)
 
 # ——— les stress obligatoires ———
 cost_stress_multiplier: 1.5    # l'edge qui meurt à ×1,5 = fragile, refusé

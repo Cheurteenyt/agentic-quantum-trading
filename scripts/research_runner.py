@@ -53,7 +53,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.aster_indicators import volume_z  # noqa: E402
-from scripts.label_matrix import build_matrix, snapshot_id  # noqa: E402
+from scripts.label_matrix import (  # noqa: E402
+    LABEL_VERSION, build_matrix, snapshot_id)
 from scripts.research_os import (  # noqa: E402
     DataScope, DataView, Mode, ScopeViolation, load_confirmation_protocol)
 
@@ -112,6 +113,32 @@ def _git() -> str:
                               cwd=ROOT).stdout.strip()
     except OSError:
         return "?"
+
+
+def _provenance() -> dict:
+    """La provenance COMPLÈTE du code exécuté (fix v10, audit GLM 5.3
+    post-#135) : le manifest ne doit pas seulement citer le commit HEAD —
+    un run lancé sur un arbre sale exécute du code que git_sha ne décrit
+    pas. On enregistre commit intégral + drapeau dirty + hash du diff."""
+    prov = {"git_sha": _git(), "git_dirty": False, "diff_sha": None}
+    try:
+        full = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                              text=True, cwd=ROOT).stdout.strip()
+        if full:
+            prov["git_sha"] = full
+        status = subprocess.run(["git", "status", "--porcelain"],
+                                capture_output=True, text=True,
+                                cwd=ROOT).stdout
+        prov["git_dirty"] = bool(status.strip())
+        if prov["git_dirty"]:
+            diff = subprocess.run(
+                ["git", "diff", "HEAD"], capture_output=True, text=True,
+                cwd=ROOT).stdout + "\n--untracked--\n" + "\n".join(
+                l[3:] for l in status.splitlines() if l.startswith("??"))
+            prov["diff_sha"] = hashlib.sha256(diff.encode()).hexdigest()[:16]
+    except OSError:
+        pass
+    return prov
 
 
 # ------------------------------------------------------------------ données
@@ -344,7 +371,7 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
             # consommerait les prix de la fenêtre suivante. Sortie = close
             # de la barre i+H-1 = open(i) + H heures.
             m_h = mask & (feats["open_time_ns"]
-                          < (view.end_ms - H * 3_600_000) * 10**6)
+                          <= (view.end_ms - H * 3_600_000) * 10**6)
             out[f"{sym}@{H}h"] = event_study(matrix[sym], m_h, H,
                                              side=int(side * side_mult),
                                              cost_pct=cost)
@@ -416,7 +443,8 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
     return {"verdict": verdict, "n": n_total, "mean": mean_all,
             "inverse_mean": inv_mean, "edge_advantage": advantage, "per_symbol": per_symbol,
             "frozen_thresholds": frozen,
-            "label_hash": lh, "snapshot": snapshot_id(db_path),
+            "label_hash": lh, "label_version": LABEL_VERSION,
+            "snapshot": snapshot_id(db_path),
             "scope": {"mode": Mode.DISCOVERY.value,
                       "start": view.start_ms, "end": view.end_ms}}
 
@@ -481,7 +509,12 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
     except sqlite3.Error:
         snap = "unknown"       # schéma cassé : preflight le dira, pas ici
     scope = DataScope(snap, int(d["train_start"]), int(d["train_end"]), vs, ve)
-    pre = preflight(scope, d["symbols"], db_path=db_path)
+    conditions = _signal_conditions(spec["signal"])
+    feats_used = {c.get("feature") for c in conditions}
+    needs_funding = any(f and str(f).startswith("fund")
+                        for f in feats_used)
+    pre = preflight(scope, d["symbols"], db_path=db_path,
+                    needs_funding=needs_funding)
     if pre["verdict"] != "PREFLIGHT_OK":
         return {"verdict": "PREFLIGHT_FAILED", "preflight": pre,
                 "slots_consumed": 0}       # §47 : 0 slot sur un échec d'infra
@@ -491,7 +524,6 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
                               db_path=db_path, use_cache=use_cache)
     train_view, val_view = scope.confirmation_view()
     feats_by_sym = _features_by_sym(spec, db_path)
-    conditions = _signal_conditions(spec["signal"])
     # — les seuils gelés : l'artefact de découverte EST OBLIGATOIRE sur le
     #   chemin officiel (fix v8, rapport GLM 5.3 №17 — un re-calcul sur le
     #   train actuel ne correspondrait plus à la découverte qui a produit
@@ -517,6 +549,10 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
     stress_mult = float(proto.get("cost_stress_multiplier", 1.5))
     deg_max = float(proto.get("degradation_max_pct", 70))
     need = int(proto.get("windows_pass_required", 5))
+    # FIX v10 (audit GLM 5.3 post-#135) : l'agrégat validation est évalué sur
+    # LE MÊME UNIVERS que les fenêtres gelées — la zone entre la dernière
+    # fenêtre et validation_end n'appartient à aucun univers protocolaire.
+    ve_eval = min(ve, max((we for _, _, we, _c in windows_cut), default=ve))
     # FIX v8 (rapport GLM 5.3 №10/№22) : TOUS les seuils de jugement viennent
     # du protocole — le plancher d'events par fenêtre n'est plus une
     # constante Python (ex WINDOW_MIN_N) mais confirmation_gate.
@@ -534,29 +570,60 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
                              if k.endswith(f"@{h1}h")}, min_n)
 
     # — les fenêtres gelées, une par une, seuils gelés + embargo —
+    # FIX v10 : chaque fenêtre est jugée sur TROIS gates (mean, STRESS ×1,5,
+    # DD MTM ≤ max_window_loss_pct) — l'ancien code laissait une fenêtre
+    # « PASS » survivre à un stress ou un DD catastrophique
+    from scripts.portfolio_runner import (  # import tardif (cycle évité)
+        _fetch_marks, collect_events, run_wallet_mtm)
+    max_w_loss = float(proto.get("max_window_loss_pct", 15))
     per_window: dict[str, dict] = {}
     for name, ws, we, cov in windows_cut:
         wview = DataView(snap, Mode.CONFIRMATION.value, ws, we)
         wst = _study(spec, matrix, wview, +1.0, db_path,
                      feats_by_sym=feats_by_sym, frozen=frozen,
                      min_event_ms=embargo_ms)
+        wst_s = _study(spec, matrix, wview, +1.0, db_path,
+                       feats_by_sym=feats_by_sym, frozen=frozen,
+                       min_event_ms=embargo_ms, cost_pct=cost * stress_mult)
         n_w, mean_w = _aggregate({k: v for k, v in wst.items()
                                   if k.endswith(f"@{h1}h")},
                                  min_n=min_window_events)
+        _ns, stress_w = _aggregate({k: v for k, v in wst_s.items()
+                                    if k.endswith(f"@{h1}h")},
+                                   min_n=min_window_events)
+        dd_w = None
+        try:
+            ev_w, _cov = collect_events(spec, matrix, feats_by_sym, wview,
+                                        frozen=frozen,
+                                        min_event_ms=embargo_ms,
+                                        db_path=db_path)
+            mk_w = _fetch_marks(db_path, spec["data"]["symbols"], ws, we)
+            if ev_w and mk_w:
+                dd_w = run_wallet_mtm(ev_w, mk_w, capital=100.0,
+                                      cap_pct=1.0, lev=1.0)["max_dd_mtm"]
+        except Exception:
+            dd_w = None
         eligible = cov >= 99.9     # une fenêtre tronquée ne démontre rien
+        pass_base = bool(eligible and n_w >= min_window_events
+                         and mean_w > 0.0)
+        pass_stress = bool(eligible and stress_w > 0.0)
+        pass_dd = bool(dd_w is None or dd_w <= max_w_loss)
         per_window[name] = {"n": n_w, "mean": mean_w,
+                            "stress_mean": stress_w, "max_dd_mtm": dd_w,
                             "coverage_pct": cov, "eligible": eligible,
-                            "pass": bool(eligible
-                                         and n_w >= min_window_events
-                                         and mean_w > 0.0)}
+                            "pass_base": pass_base, "pass_stress": pass_stress,
+                            "pass_dd": pass_dd,
+                            "pass": bool(pass_base and pass_stress
+                                         and pass_dd)}
 
     # — la validation d'un bloc : l'agrégat + le stress de coûts —
-    val = _study(spec, matrix, val_view, +1.0, db_path,
+    val_view_eval = DataView(snap, Mode.CONFIRMATION.value, vs, ve_eval)
+    val = _study(spec, matrix, val_view_eval, +1.0, db_path,
                  feats_by_sym=feats_by_sym, frozen=frozen,
                  min_event_ms=embargo_ms)
     val_h1 = {k: v for k, v in val.items() if k.endswith(f"@{h1}h")}
     n_total, val_mean = _aggregate(val_h1, min_n)
-    stress = _study(spec, matrix, val_view, +1.0, db_path,
+    stress = _study(spec, matrix, val_view_eval, +1.0, db_path,
                     feats_by_sym=feats_by_sym, frozen=frozen,
                     min_event_ms=embargo_ms, cost_pct=cost * stress_mult)
     _, stress_mean = _aggregate({k: v for k, v in stress.items()
@@ -577,17 +644,23 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
                          / sum(n for _, n in kept_cov))
     else:
         fund_cov = 0.0
+    dd_breach = [k for k, w in per_window.items()
+                 if w["eligible"] and not w["pass_dd"]]
     verdict = ("CONFIRMED" if (n_total >= min_n and val_mean > min_mean
                                and n_pass >= need
                                and stress_mean > 0.0
                                and fund_cov >= min_fund_cov
+                               and not dd_breach
                                and (not np.isfinite(deg) or deg <= deg_max))
                else "REJECTED")
     return {"verdict": verdict, "n": n_total, "mean": val_mean,
             "train_mean": tr_mean, "degradation_pct": deg,
             "stress_mean": stress_mean, "stress_multiplier": stress_mult,
             "fund_coverage": fund_cov,
+            "dd_breach_windows": dd_breach,
+            "max_window_loss_pct": max_w_loss,
             "protocol_id": proto.get("protocol_id"),
+            "label_version": LABEL_VERSION,
             "per_window": per_window, "windows_pass": n_pass,
             "windows_required": need, "embargo_ms": embargo_ms,
             "frozen_src": frozen_src, "per_symbol": val,
@@ -610,9 +683,18 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
             snap = snapshot_id(db_path)
         except sqlite3.Error:
             snap = "unknown"   # DB absente (CI) : le manifest reste écrit
+    prov = _provenance()
+    try:
+        proto_id = load_confirmation_protocol().get("protocol_id")
+    except Exception:
+        proto_id = None
     (rdir / "manifest.json").write_text(json.dumps({
-        "run_id": run_id, "kind": kind, "spec_sha": sha, "git_sha": _git(),
+        "run_id": run_id, "kind": kind, "spec_sha": sha,
+        "git_sha": prov["git_sha"], "git_dirty": prov["git_dirty"],
+        "diff_sha": prov["diff_sha"],
         "label_hash": result.get("label_hash"), "snapshot": snap,
+        "label_version": result.get("label_version"),
+        "protocol_id": result.get("protocol_id") or proto_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }, ensure_ascii=False, indent=1), encoding="utf-8")
     summary = {k: v for k, v in result.items() if k != "per_symbol"}
@@ -679,7 +761,30 @@ def cmd_confirm(a) -> int:
         return _confirm_locked(spec, a)
 
 
+def _budget_precheck(spec: dict) -> tuple[bool, str]:
+    """Le budget JUGE AVANT de laisser courir (fix v10 : contrôle bloquant,
+    plus seulement une journalisation). Le sous-commande `check` de
+    lab_ledger évalue sans écrire : 0 = GO, 4 = STOP."""
+    out = subprocess.run(
+        [sys.executable, "scripts/lab_ledger.py", "check",
+         "--family", str(spec.get("family", "research")),
+         "--strategy", str(spec.get("strategy", "runner")),
+         "--hypothesis", str(spec.get("hypothesis", ""))[:300],
+         "--mode", "confirmation",
+         "--snapshot", str(snapshot_id())],
+        capture_output=True, text=True, cwd=ROOT)
+    ok = out.returncode == 0
+    return ok, (out.stdout + out.stderr).strip()
+
+
 def _confirm_locked(spec: dict, a) -> int:
+    ok, why = _budget_precheck(spec)
+    if not ok:
+        print(f"{spec['id']} : BUDGET_STOP — 0 slot consommé (le budget est "
+              "une barrière, pas une journalisation)")
+        for line in why.splitlines():
+            print("  " + line)
+        return 1
     res = run_confirmation(spec, db_path=Path(a.db))
     if res["verdict"] in ("MODE_MISMATCH", "WINDOW_MISMATCH",
                           "CONFIRMATION_BLOCKED"):
