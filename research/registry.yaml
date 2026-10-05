@@ -575,29 +575,45 @@ strategies:
 # PRE-MORTEM CONFIRMÉ (02/10 soir) : le MAE max Q1 = 17,95 % vs médiane 0,66 % (3,3×) — le short squeeze que le red-team Bonsai a prédit est VISIBLE dans les données. Le re-tir reste SOUS_PUISSANT (0 nouvel event cascade depuis le 01/10 03:00 — le flux est silencieux en T3). Le verdict final attend ~2 sem de plus de cascade events.
 - id: EXP-crash-short-6h-004
   family: forced_flow
-  status: CANDIDATE
+  status: OOS_PASS
   timeframe: 1h
   hypothesis: une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à
     6h — le flux forcé vendeur ne s'épuise pas
   discovery: DISCOVERY_PASS 05/10 (grind stage 2, re-mesuré post-fix v6) —
     n 8682, mean +1.050 %/trade, inverse -1.610 (le côté codé domine),
     coûts 0.28 % RT inclus
-  notes: candidat du 1er grind Research OS ; la confirmation juge (porte v6 —
-    fenêtres gelées, seuils gelés, stress ×1.5, puis wallet 100 $)
+  confirmation: CONFIRMED 05/10 porte v6 (slot W41) — n 1908, mean +1.014
+    %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.874, dégradation ok
+  wallet_validation: $100 → $112.79 (+12.8 %/13 mois), WR 73.7 %, DD 0.18 %,
+    0 liq, 0 mois négatif, ret/DD 69.9 — baseline hold $66.78 (le short bat
+    un marché qui perd -33 %)
+  notes: 1er candidat CONFIRMÉ du Research OS sous protocole-v2 ; étape
+    suivante = forward confirmation (maturation 30 j, active.yaml)
 - id: EXP-bonsai-h-01
   family: bonsai_fund_H
-  status: CANDIDATE
+  status: REJECTED
   timeframe: 1h
   hypothesis: Funding Crowding Reversal (hypothèse Bonsai H-01)
   discovery: DISCOVERY_PASS 05/10 re-mesuré POST-fix funding-absent=NaN —
     n 61978, mean +0.090 %/trade, inverse -0.650 (avant fix +0.095 — le fix
     coûte 0.005 pt, le candidat tient)
-  notes: 1re re-mesure v6 ; fund_cov désormais rapporté par event_study
+  confirmation: REJECTED 05/10 porte v6 (slot W41) — n 16961, mean +0.054,
+    5/5 fenêtres PASS MAIS stress ×1.5 mean -0.086 — l'edge MEURT sous coûts
+    majorés, exactement le filet que le protocole pose
+  notes: le funding crowding passe les fenêtres mais pas le stress de coûts ;
+    re-derivation = nouvelle hypothèse (un edge à +0.05 %/trade brut n'a pas
+    la marge)
 - id: EXP-bonsai-h-18
   family: bonsai_range_pct
-  status: CANDIDATE
+  status: OOS_PASS
   timeframe: 1h
   hypothesis: Volatility Squeeze Short (hypothèse Bonsai H-18)
   discovery: DISCOVERY_PASS 05/10 (re-mesuré post-fix v6) — n 22137,
     mean +0.290 %/trade, inverse -0.850
-  notes: candidat du 1er grind Research OS (queue Bonsai) ; la confirmation juge
+  confirmation: CONFIRMED 05/10 porte v6 (slot W41) — n 5181, mean +0.360
+    %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.220
+  wallet_validation: $100 → $109.08 (+9.1 %/13 mois), WR 60.9 %, DD 0.43 %,
+    0 liq, 0 mois négatif, ret/DD 21.3 — baseline hold $66.78
+  notes: le squeeze des majeures CONFIRMÉ sous protocole-v2 (l'ancien verdict
+    « réfuté sur 6 ans » portait sur un autre univers/un autre protocole) ;
+    étape suivante = forward confirmation (maturation 30 j)
