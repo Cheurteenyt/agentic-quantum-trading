@@ -334,9 +334,12 @@ def cmd_log(a) -> int:
         f.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
     entries = load(a.ledger, pol["effective"])
     total, by_fam, by_str = week_usage(entries, iso_week(ts))
+    n_log = sum(1 for e in entries if e.get("verdict") != "PREREG")
+    n_rev = sum(1 for e in entries if e.get("reverify"))
+    extra = (f" ({n_rev} re-vérifications exemptées)" if n_rev else "")
     print(f"logué : {verdict} · {family}/{strategy} · semaine {iso_week(ts)} : total {total}/{pol['budget']['total_experiments']}, "
           f"famille {by_fam[family]}/{pol['budget']['per_family']}, stratégie {by_str[strategy]}/{pol['budget']['per_strategy']} "
-          f"· cumul {sum(1 for e in entries if e.get('verdict') != 'PREREG')} essais")
+          f"· cumul {n_log} essais{extra}")
     return EXIT_OK
 
 

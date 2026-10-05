@@ -653,29 +653,42 @@ strategies:
   notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
 - id: EXP-bonsai-h-22
   family: bonsai_volume_z
-  status: CANDIDATE
+  status: OOS_PASS
   timeframe: 1h
   hypothesis: '[H-22] Volume Surge Reversion — un pic de volume sur bougie
     baissière marque l''épuisement : reversion à 2h'
   discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 12963,
     mean +0.969 %/trade, inverse -1.529
-  notes: candidat du batch-002 Bonsai ; la confirmation juge (porte v10)
+  confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 3812 val, mean
+    +0.895 %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.755
+  wallet_validation: $100 → $135.32 (+35.3 %/13 mois), DD MTM 0.21 %,
+    0 liq, 0 mois négatif
+  notes: 3e candidat CONFIRMÉ du batch-002 Bonsai ; forward en maturation
 - id: EXP-bonsai-h-29
   family: bonsai_range_pct
-  status: CANDIDATE
+  status: OOS_PASS
   timeframe: 1h
   hypothesis: '[H-29] Momentum-Range Confirmation — momentum confirmé par la
     compression de range : continuation à 6h'
   discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 24893,
     mean +1.449 %/trade, inverse -2.009
-  notes: le plus massif des 3 candidats du batch-002 ; la confirmation juge
+  confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 5631 val, mean
+    +1.124 %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.984
+  wallet_validation: $100 → $150.82 (+50.8 %/13 mois), DD MTM 0.88 %,
+    0 liq, 0 mois négatif
+  notes: le plus massif des 3 candidats du batch-002 ; forward en maturation
 - id: EXP-bonsai-h-31
   family: bonsai_volume_z
-  status: CANDIDATE
+  status: OOS_PASS
   timeframe: 1h
   hypothesis: '[H-31] High-Volume Low-Return Mean Reversion — gros volume,
     faible rendement : absorption, reversion à 1h'
   discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 4210,
     mean +1.845 %/trade, inverse -2.405
+  confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 1195 val, mean
+    +1.596 %/trade, 6/6 fenêtres PASS, stress ×1.5 +1.456 (le stress le
+    plus robuste du projet)
+  wallet_validation: $100 → $122.13 (+22.1 %/13 mois), DD MTM 0.04 %,
+    0 liq, 0 mois négatif
   notes: le mean/trade le plus élevé du batch-002 mais n le plus faible ;
-    la confirmation juge
+    forward en maturation

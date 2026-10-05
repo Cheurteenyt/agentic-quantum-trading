@@ -706,11 +706,16 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
             attempt = prev + 1
             adir = rdir / "attempts" / f"{prev:03d}"
             adir.mkdir(parents=True, exist_ok=True)
+            import shutil
             for f in ("manifest.json", "spec.json", "summary_discovery.json",
                       "summary_confirmation.json", "wallet.json",
                       "report.md", "report_wallet.md"):
                 if (rdir / f).exists():
-                    (rdir / f).rename(adir / f)
+                    # ARCHIVAGE PAR COPIE (fix v13) : le déplacement cassait
+                    # l'auto-contenance du run — la confirmation a besoin du
+                    # summary_discovery (seuils gelés) au niveau racine pour
+                    # le forward et le wallet. L'historique reste intact.
+                    shutil.copy2(rdir / f, adir / f)
     (rdir / "spec.json").write_text(
         json.dumps(spec, ensure_ascii=False, indent=1, sort_keys=True),
         encoding="utf-8")

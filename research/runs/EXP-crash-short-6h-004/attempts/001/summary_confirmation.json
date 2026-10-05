@@ -1,0 +1,106 @@
+{
+ "verdict": "CONFIRMED",
+ "n": 1908,
+ "mean": 1.0151491619106334,
+ "train_mean": 1.0497973314582407,
+ "degradation_pct": 3.300462718787693,
+ "stress_mean": 0.8751491619106334,
+ "stress_multiplier": 1.5,
+ "fund_coverage": 1.0,
+ "protocol_id": "protocol-v2",
+ "per_window": {
+  "2025-09": {
+   "n": 291,
+   "mean": 1.1178859871712061,
+   "coverage_pct": 100.0,
+   "eligible": true,
+   "pass": true
+  },
+  "2025-11": {
+   "n": 411,
+   "mean": 1.3565006856911461,
+   "coverage_pct": 100.0,
+   "eligible": true,
+   "pass": true
+  },
+  "2026-01": {
+   "n": 392,
+   "mean": 1.2293626845601975,
+   "coverage_pct": 100.0,
+   "eligible": true,
+   "pass": true
+  },
+  "2026-03": {
+   "n": 293,
+   "mean": 0.622235077090577,
+   "coverage_pct": 100.0,
+   "eligible": true,
+   "pass": true
+  },
+  "2026-05": {
+   "n": 316,
+   "mean": 0.7744436018463803,
+   "coverage_pct": 100.0,
+   "eligible": true,
+   "pass": true
+  },
+  "2026-07": {
+   "n": 152,
+   "mean": 0.6334636391148817,
+   "coverage_pct": 100.0,
+   "eligible": true,
+   "pass": true
+  }
+ },
+ "windows_pass": 6,
+ "windows_required": 5,
+ "embargo_ms": 1756944000000,
+ "frozen_src": "discovery_artifact",
+ "slots_consumed": 1,
+ "label_hash": "cbd1eacb4a7b6d6d",
+ "snapshot": "k1h-c22625d61aca89cf",
+ "validation_window": [
+  1756684800000,
+  1790000000000
+ ],
+ "run_id": "EXP-crash-short-6h-004",
+ "spec_sha": "08b7cf90e1fa7a25",
+ "per_symbol": {
+  "BTCUSDT@6h": {
+   "n": 728,
+   "mean": 0.6374391385297289,
+   "median": 0.5268137250378923,
+   "p10": -0.9234698479237361,
+   "p90": 2.4016222799130054,
+   "wr": 68.68131868131869,
+   "mae_mean": 0.004702510090064675,
+   "worst": -4.701111125657675,
+   "best": 7.789787846200405,
+   "fund_cov": 1.0
+  },
+  "ETHUSDT@6h": {
+   "n": 734,
+   "mean": 1.0933578229980823,
+   "median": 0.8669331864487051,
+   "p10": -1.0512957254186774,
+   "p90": 3.590830406763341,
+   "wr": 72.75204359673025,
+   "mae_mean": 0.006119452073908923,
+   "worst": -4.579350507026575,
+   "best": 9.458667413998448,
+   "fund_cov": 1.0
+  },
+  "SOLUSDT@6h": {
+   "n": 446,
+   "mean": 1.5029692062673843,
+   "median": 1.350370607779602,
+   "p10": -1.1197117761304818,
+   "p90": 4.299341523559182,
+   "wr": 77.13004484304933,
+   "mae_mean": 0.006691726391811088,
+   "worst": -6.876553053245957,
+   "best": 10.746258830745779,
+   "fund_cov": 1.0
+  }
+ }
+}
