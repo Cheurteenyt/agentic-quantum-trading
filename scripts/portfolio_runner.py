@@ -207,7 +207,8 @@ def _unrealized(pos: dict, marks_map: dict[str, float]) -> float:
 def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                    capital: float = 100.0, cap_pct: float = 1.0,
                    lev: float = 1.0,
-                   span: tuple[int, int] | None = None) -> dict:
+                   span: tuple[int, int] | None = None,
+                   liq_mode: str = "simulated") -> dict:
     """LE MOTEUR MTM HORAIRE (PR-2, rapport GLM 5.3 №6).
 
     equity_t = cash + Σ unrealized(position, dernier mark connu) — les
@@ -219,9 +220,14 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                            l'excursion adverse maximale, short au high,
                            long au low)
       - max_dd_close     : l'ancien DD clôture-seule (comparaison)
-    Convention liq inchangée (ex ante, MAE ≥ 100/lev − 0,5, option A) : la
-    marge est absorbée ENTIÈREMENT à l'heure d'entrée (frais et funding
-    compris — la comptabilité se réconcilie exactement).
+    Convention liq (option A : la mort absorbe la marge TOUT COMPRIS —
+    la comptabilité se réconcilie exactement) avec DEUX timings :
+      - liq_mode="simulated" (défaut, PR-8) : la position vit heure par
+        heure et meurt au PREMIER franchissement du seuil (100/lev − 0,5)
+        sur le chemin intrabar réel — la trajectoire d'exécution ;
+      - liq_mode="stress" (l'ancienne) : la marge est absorbée ENTIÈREMENT
+        dès l'heure d'entrée — la borne conservatrice (le moteur sait ex
+        ante, via la MAE de l'horizon, que le trade mourra).
     Ordre horaire : sorties → entrées → funding → marks → équité."""
     if not events:
         return run_wallet([], capital=capital, cap_pct=cap_pct, lev=lev)
@@ -251,6 +257,8 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
     max_long_pct = max_short_pct = 0.0
     last_close: dict[str, float] = {}
     last_worst: dict[str, float] = {}
+    stale_mark_hours = 0
+    max_mark_gap_h = 0
 
     t = (evs[0]["t_ms"] // H_MS) * H_MS
     t_end = max(e["exit_ms"] for e in evs)
@@ -259,18 +267,35 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
         #    AVANT les sorties : le print de l'heure de sortie est dû
         for pos in open_pos.values():
             while pos["fund_prints"] and pos["fund_prints"][0][0] <= t:
-                cash += pos["fund_prints"].pop(0)[1]
-        # 2. les sorties réalisent leur PnL (hors funding déjà accru)
+                amt = pos["fund_prints"].pop(0)[1]
+                cash += amt
+                pos["fund_accrued"] = pos.get("fund_accrued", 0.0) + amt
+        # 2. les sorties réalisent leur PnL (hors funding déjà accru) ;
+        #    un liq_pending qui atteint sa sortie sans franchissement
+        #    détecté (donnée trouée) est absorbé à la sortie (option A)
         for sym, pos in list(open_pos.items()):
             if pos["exit_ms"] == t:
+                n_trades += 1
+                month = datetime.fromtimestamp(
+                    t / 1000, tz=timezone.utc).strftime("%Y-%m")
+                if pos.get("liq_pending"):
+                    cash += -pos["margin"] + pos["fees"] \
+                        - pos.get("fund_accrued", 0.0)
+                    liq += 1
+                    monthly[month] = monthly.get(month, 0.0) - pos["margin"]
+                    trade_pnls.append({"sym": sym,
+                                       "t_ms": pos["entry_ms"], "exit_ms": t,
+                                       "notional": pos["notional"],
+                                       "net": -pos["margin"],
+                                       "liquidated": True})
+                    fund_net += pos["fund_total"]
+                    del open_pos[sym]
+                    continue
                 realized = (pos["side"] * pos["ret_pct"] / 100.0
                             * pos["notional"])
                 cash += realized
-                n_trades += 1
                 wins += 1 if (realized + pos["fund_total"]
                               - pos["fees"]) > 0 else 0
-                month = datetime.fromtimestamp(
-                    t / 1000, tz=timezone.utc).strftime("%Y-%m")
                 net = realized + pos["fund_total"] - pos["fees"]
                 monthly[month] = monthly.get(month, 0.0) + net
                 trade_pnls.append({"sym": pos["sym"],
@@ -292,9 +317,9 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
             notional = margin * lev
             month = datetime.fromtimestamp(
                 t / 1000, tz=timezone.utc).strftime("%Y-%m")
-            if e["mae_pct"] >= liq_thr:
-                # option A : la mort absorbe la marge TOUT COMPRIS, dès
-                # l'heure d'entrée (le MTM la voit immédiatement)
+            if e["mae_pct"] >= liq_thr and liq_mode == "stress":
+                # option A, borne conservatrice : la mort absorbée dès
+                # l'entrée (le moteur sait ex ante que le trade mourra)
                 cash -= margin
                 liq += 1
                 n_trades += 1
@@ -327,11 +352,13 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                     "ret_pct": e["ret_pct"], "entry_ms": t,
                     "exit_ms": e["exit_ms"],
                     "fees": fee, "fund_total": fund_signed * notional / 100.0,
-                    "fund_prints": prints}
+                    "fund_prints": prints,
+                    "liq_pending": (e["mae_pct"] >= liq_thr
+                                    and liq_mode == "simulated")}
 
         # 4. les marks de l'heure : le DERNIER prix clôturé connu (pas de
         #    look-ahead) ; worst = high intrabar (short) / low (long)
-        for sym, pos in open_pos.items():
+        for sym, pos in list(open_pos.items()):
             mk = marks.get(sym)
             if mk is None:
                 continue
@@ -339,8 +366,42 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
             if i is None:
                 continue
             last_close[sym] = float(mk["close"][i])
-            last_worst[sym] = float(
+            worst_px = float(
                 (mk["high"] if pos["side"] == -1 else mk["low"])[i])
+            last_worst[sym] = worst_px
+            # PR-8 : CONTIGUOUS_MARK — un trou de données rend le mark
+            # suspect ; on le publie (le mark lui-même est conservé, la
+            # politique « risque UNKNOWN » reste une option future)
+            gap_h = (t - int(mk["t"][i])) // H_MS - 1
+            if gap_h > 0:
+                stale_mark_hours += gap_h
+                max_mark_gap_h = max(max_mark_gap_h, gap_h)
+            # PR-8 : LIQ_SIMULATED — la mort au PREMIER franchissement réel
+            # du seuil sur le chemin intrabar (la position vit jusqu'ici :
+            # la trajectoire d'exécution, pas l'oracle ex ante)
+            if pos.get("liq_pending"):
+                adverse = ((worst_px / pos["entry"] - 1.0)
+                           if pos["side"] == -1
+                           else (1.0 - worst_px / pos["entry"])) * 100.0
+                if adverse >= liq_thr:
+                    # total de la position = −marge (option A) : le cash a
+                    # déjà payé les frais (−fee à l'entrée) et reçu le
+                    # funding (+Σ) → la clôture ramène le cumul exactement
+                    # à −marge : X = −marge + fee − funding_accrué
+                    cash += -pos["margin"] + pos["fees"] \
+                        - pos.get("fund_accrued", 0.0)
+                    liq += 1
+                    n_trades += 1
+                    month = datetime.fromtimestamp(
+                        t / 1000, tz=timezone.utc).strftime("%Y-%m")
+                    monthly[month] = monthly.get(month, 0.0) - pos["margin"]
+                    trade_pnls.append({"sym": sym, "t_ms": pos["entry_ms"],
+                                       "exit_ms": t,
+                                       "notional": pos["notional"],
+                                       "net": -pos["margin"],
+                                       "liquidated": True})
+                    del open_pos[sym]
+                    busy[sym] = pos["exit_ms"]
         # 5. l'équité MTM de l'heure + les métriques de concurrence (№29)
         eq_mtm = cash + sum(_unrealized(p, last_close)
                             for p in open_pos.values())
@@ -440,6 +501,9 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
             "ret_dd": (roi / max_dd_mtm) if max_dd_mtm > 0 else float("inf"),
             "fees": fees, "funding_net": fund_net, "monthly": monthly,
             "max_concurrency": max_conc,
+            "stale_mark_hours": stale_mark_hours,
+            "max_mark_gap_h": max_mark_gap_h,
+            "liq_mode": liq_mode,
             "avg_concurrency": (conc_sum / conc_n) if conc_n else 0.0,
             "max_margin_used_pct": max_margin_pct,
             "avg_margin_used_pct": (margin_sum / conc_n) if conc_n else 0.0,
@@ -694,7 +758,10 @@ def baseline_hold(spec: dict, view, db_path: Path = KDB,
         meq[datetime.fromtimestamp(t / 1000, tz=timezone.utc)
             .strftime("%Y-%m")] = eq
     vals = list(meq.values())
-    months_neg = sum(1 for a, b in zip(vals, vals[1:]) if b < a)
+    # FIX v12 (audit GLM 5.3) : le PREMIER mois se compare au capital
+    # initial — l'ancien zip(vals, vals[1:]) le rates
+    months_neg = (1 if vals and vals[0] < capital else 0) \
+        + sum(1 for a, b in zip(vals, vals[1:]) if b < a)
     final = port[-1][1]
     return {"solde": final, "roi_pct": (final - capital) / capital * 100.0,
             "max_dd_pct": max_dd, "months_neg": months_neg,

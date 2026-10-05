@@ -52,6 +52,9 @@
    "2026-09": 0.2629807566002673
   },
   "max_concurrency": 3,
+  "stale_mark_hours": 0,
+  "max_mark_gap_h": 0,
+  "liq_mode": "simulated",
   "avg_concurrency": 1.678692098092643,
   "max_margin_used_pct": 3.005243219004261,
   "avg_margin_used_pct": 1.678586978214757,
@@ -104,9 +107,9 @@
  "counterfactual_sans_top10": 105.73167699390254,
  "counterfactual_liqs": 0,
  "provenance": {
-  "git_sha": "0d51e86508feff8328fc9a1dda7b95c9c786fc1e",
+  "git_sha": "a081012762a07ec74494acfdae309518ce4cd781",
   "git_dirty": true,
-  "diff_sha": "f45afbb2380bbef3",
+  "diff_sha": "3497ea075b70f438",
   "spec_sha": "0a7cfb39471f6846",
   "snapshot": "k1h-c22625d61aca89cf",
   "portfolio_metrics_version": "pr7-v1"
@@ -147,6 +150,9 @@
     "2025-11": 0.01606372979345791
    },
    "max_concurrency": 3,
+   "stale_mark_hours": 0,
+   "max_mark_gap_h": 0,
+   "liq_mode": "simulated",
    "avg_concurrency": 1.708751793400287,
    "max_margin_used_pct": 3.0014643474659954,
    "avg_margin_used_pct": 1.708629012897353,
@@ -190,6 +196,9 @@
     "2025-12": 0.6579173989216287
    },
    "max_concurrency": 3,
+   "stale_mark_hours": 0,
+   "max_mark_gap_h": 0,
+   "liq_mode": "simulated",
    "avg_concurrency": 1.73187414500684,
    "max_margin_used_pct": 3.002424093197903,
    "avg_margin_used_pct": 1.7317280153564,
@@ -234,6 +243,9 @@
     "2026-03": -0.09036551729951556
    },
    "max_concurrency": 3,
+   "stale_mark_hours": 0,
+   "max_mark_gap_h": 0,
+   "liq_mode": "simulated",
    "avg_concurrency": 1.6973125884016973,
    "max_margin_used_pct": 3.002581860758447,
    "avg_margin_used_pct": 1.697193517112058,
@@ -278,6 +290,9 @@
     "2026-05": -0.004147686830700393
    },
    "max_concurrency": 3,
+   "stale_mark_hours": 0,
+   "max_mark_gap_h": 0,
+   "liq_mode": "simulated",
    "avg_concurrency": 1.8061433447098976,
    "max_margin_used_pct": 3.005243219004262,
    "avg_margin_used_pct": 1.806057587390163,
@@ -321,6 +336,9 @@
     "2026-06": 1.3361525273436758
    },
    "max_concurrency": 3,
+   "stale_mark_hours": 0,
+   "max_mark_gap_h": 0,
+   "liq_mode": "simulated",
    "avg_concurrency": 1.7255172413793103,
    "max_margin_used_pct": 3.0017810602879424,
    "avg_margin_used_pct": 1.7253858189295248,
@@ -365,6 +383,9 @@
     "2026-09": 0.015129782025709486
    },
    "max_concurrency": 3,
+   "stale_mark_hours": 0,
+   "max_mark_gap_h": 0,
+   "liq_mode": "simulated",
    "avg_concurrency": 1.4637096774193548,
    "max_margin_used_pct": 3.0028574374939807,
    "avg_margin_used_pct": 1.4636593218710654,
