@@ -70,12 +70,13 @@ class TestExitBoundary(unittest.TestCase):
                 "side": -1}
             view = rr.DataView("t", "train", 0, 100 * H)
             st = rr._study(spec, matrix, view, +1.0, db)
-            # barres 0..94 éligibles (exit ≤ 100h) = 95 events
-            self.assertEqual(st["BTCUSDT@6h"]["n"], 95)
-            # vue fin 99h : sortie ≤ 99 → entrées 0..93 = 94 events
+            # v14 : entrées = signaux décalés d'une bougie (1..94, la barre
+            # 0 n'a pas de signal antérieur) avec sortie ≤ 100h → 94 events
+            self.assertEqual(st["BTCUSDT@6h"]["n"], 94)
+            # vue fin 99h : sortie ≤ 99 → entrées 1..93 = 93 events
             view2 = rr.DataView("t", "train", 0, 99 * H)
             st2 = rr._study(spec, matrix, view2, +1.0, db)
-            self.assertEqual(st2["BTCUSDT@6h"]["n"], 94)
+            self.assertEqual(st2["BTCUSDT@6h"]["n"], 93)
 
 
 class TestFundingMtm(unittest.TestCase):

@@ -120,9 +120,8 @@ class TestForward(unittest.TestCase):
         self.assertTrue(all(e["open_time_ms"] > 300 * H_MS for e in j))
         self.assertTrue(all(e["open_time_ms"] <= (NOW_MS // H_MS - 1) * H_MS
                             for e in j))
-        # le crash commence à la barre 320 : le premier event est là (ret_1h
-        # = -3 % <= seuil gelé -1.0)
-        self.assertEqual(min(e["open_time_ms"] for e in j), 320 * H_MS)
+        # v14 : le signal du crash (320) entre à la bougie SUIVANTE (321)
+        self.assertEqual(min(e["open_time_ms"] for e in j), 321 * H_MS)
 
     def test_collect_est_idempotent(self):
         """Une deuxième collecte sur les mêmes barres ne journalise RIEN —

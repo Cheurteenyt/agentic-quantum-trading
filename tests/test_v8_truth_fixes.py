@@ -136,7 +136,9 @@ class TestBoundsAndLabels(unittest.TestCase):
             {"feature": "range_pct", "op": ">=", "threshold": 0.0}],
             "side": -1}}
         mask = rr.event_mask(spec, feats, view)
-        self.assertEqual(int(mask.sum()), 10)      # pas 11
+        # v14 : l'entrée est la bougie SUIVANTE du signal — la barre 0 ne
+        # peut pas être une entrée (aucun signal à −1) → 9 entrées (1..9)
+        self.assertEqual(int(mask.sum()), 9)       # pas 10, pas 11
 
     def test_la_sortie_doit_rester_dans_la_vue(self):
         """GLM 5.3 №7 : un event dont l'horizon H déborde de la fenêtre est
@@ -148,15 +150,16 @@ class TestBoundsAndLabels(unittest.TestCase):
                     {"feature": "ret_1h", "op": "<=", "threshold": -1.0}],
                     "side": -1},
                 "horizons": [6], "cost_pct": 0.0}
-        # v10 : la sortie EXACTEMENT sur la fin de fenêtre est VALIDE —
-        # vue [0, 106h) : l'event 100h (sortie 106h pile) compte → 1
+        # v14 : le signal du crash (100..119) entre à la bougie SUIVANTE
+        # (101..120) — vue [0, 106h) : l'entrée la plus précoce (101h)
+        # sort à 107h → AUCUN trade complet dans la vue
         view = rr.DataView("t", "train", 0, 106 * H_MS)
         st = rr._study(spec, matrix, view, +1.0, self.db)
-        self.assertEqual(st["BTCUSDT@6h"]["n"], 1)
-        # vue [0, 112h) : sorties ≤ 112h → entrées 100..106 → 7 events
+        self.assertEqual(st["BTCUSDT@6h"]["n"], 0)
+        # vue [0, 112h) : sorties ≤ 112h → entrées 101..106 → 6 events
         view2 = rr.DataView("t", "train", 0, 112 * H_MS)
         st2 = rr._study(spec, matrix, view2, +1.0, self.db)
-        self.assertEqual(st2["BTCUSDT@6h"]["n"], 7)
+        self.assertEqual(st2["BTCUSDT@6h"]["n"], 6)
 
     def test_dernier_label_h_valide_present(self):
         """GLM 5.3 №24 : i = n-H est un event VALIDE (H barres restantes) —

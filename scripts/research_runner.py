@@ -277,31 +277,56 @@ def _multi_mask(feats: dict, conditions: list[dict], view, frozen=None,
     return mask & in_view
 
 
+# l'horizon large pour l'évaluation BRUTE des signaux (le filtre de vue
+# s'applique à la barre d'ENTRÉE, après le décalage)
+_FAR_FUTURE_MS = 4102444800000   # 2100-01-01
+
+
 def event_mask(spec: dict, feats: dict, view, frozen=None,
                min_event_ms: int = 0, thr_key: tuple | None = None) -> np.ndarray:
     """Le masque d'une spec sur les features d'UN symbole — le point
-    partagé entre l'étude d'événement et la couche portefeuille."""
+    partagé entre l'étude d'événement et la couche portefeuille.
+
+    FIX v14 (PR-143, audit GLM 5.3 — P0 look-ahead CONFIRMÉ par mutation
+    test) : le signal évalué sur la barre i n'est CONNU qu'au close(i) —
+    l'entrée ne peut donc être qu'à open(i+1). L'ancien code entrait à
+    open(i) AVEC la connaissance de close(i) : le trade mesurait sa propre
+    bougie de sélection (h-31, horizon 1h : WR 99,6 % par construction).
+    Convention du registre appliquée : signal=close(t) → entry=open(t+1).
+    TOUTES les bornes (vue, embargo, sortie-dans-fenêtre) s'appliquent à
+    la barre d'ENTRÉE."""
     sig = spec["signal"]
+    wide = DataView(getattr(view, "snapshot_id", "unknown"),
+                    getattr(view, "mode", "train"), 0, _FAR_FUTURE_MS)
     if "conditions" in sig:
-        mask = _multi_mask(feats, _signal_conditions(sig), view,
-                           frozen=frozen, thr_key=thr_key)
+        raw = _multi_mask(feats, _signal_conditions(sig), wide,
+                          frozen=frozen, thr_key=thr_key)
     else:
         fvals = feats[sig["feature"]]
         if frozen is not None:
             ft = frozen[0] if frozen else None
             if ft is None:
-                mask = np.zeros(len(fvals), dtype=bool)
+                raw = np.zeros(len(fvals), dtype=bool)
             else:
-                mask = _mask_for(cols=feats, fvals=fvals,
-                                 op=sig.get("op", ">="),
-                                 thr=np.full(len(fvals), float(ft)), view=view)
+                raw = _mask_for(cols=feats, fvals=fvals,
+                                op=sig.get("op", ">="),
+                                thr=np.full(len(fvals), float(ft)), view=wide)
         else:
             q = float(sig.get("quantile", 0.95))
             thr = expanding_cached(fvals, q,
                                    (*thr_key, sig["feature"], q)
                                    if thr_key else None)
-            mask = _mask_for(cols=feats, fvals=fvals, op=sig.get("op", ">="),
-                             thr=thr, view=view)
+            raw = _mask_for(cols=feats, fvals=fvals, op=sig.get("op", ">="),
+                            thr=thr, view=wide)
+    # LE DÉCALAGE : l'entrée est la bougie SUIVANTE (le signal de i entre
+    # à open(i+1)) — un trade ne mesure plus sa propre bougie de sélection
+    mask = np.empty_like(raw)
+    mask[0] = False
+    mask[1:] = raw[:-1]
+    # les bornes s'appliquent à la barre d'ENTRÉE
+    in_view = ((feats["open_time_ns"] >= view.start_ms * 10**6)
+               & (feats["open_time_ns"] < view.end_ms * 10**6))
+    mask &= in_view
     if min_event_ms:
         mask &= feats["open_time_ns"] >= min_event_ms * 10**6
     return mask
@@ -369,6 +394,20 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
         mask = event_mask(spec, feats, view, frozen=fz,
                           min_event_ms=min_event_ms,
                           thr_key=(*_db_key(db_path), sym))
+        # FIX v14 (audit GLM 5.3 №8) : l'univers déclaré devient une
+        # CONTRAINTE du masque — entry ET sortie dans le span tradable
+        if spec.get("universe"):
+            from scripts.universe import load as _uload, tradable_window_ms
+            try:
+                uman = _uload(str(spec["universe"]))
+                tw = tradable_window_ms(uman, sym)
+            except FileNotFoundError:
+                tw = None
+            if tw is not None:
+                t0, t1 = tw
+                ns = feats["open_time_ns"]
+                in_span = (ns >= t0 * 10**6) &                     (ns + horizons[0] * 3_600_000 * 10**6 <= t1 * 10**6)
+                mask = mask & in_span
         if mask.any():
             view.assert_range(
                 int(feats["open_time_ns"][mask][0]) // 10**6,
@@ -616,9 +655,15 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
         pass_base = bool(eligible and n_w >= min_window_events
                          and mean_w > 0.0)
         pass_stress = bool(eligible and stress_w > 0.0)
-        pass_dd = bool(dd_w is None or dd_w <= max_w_loss)
+        # FIX v14 (audit GLM 5.3 №5) : FAIL-CLOSED — un DD inconnu n'est
+        # plus un PASS (l'ancien or dd_w is None était un fail-open sur un
+        # gate de risque)
+        dd_status = ("UNKNOWN" if dd_w is None
+                     else ("PASS" if dd_w <= max_w_loss else "FAIL"))
+        pass_dd = bool(eligible and dd_status == "PASS")
         per_window[name] = {"n": n_w, "mean": mean_w,
                             "stress_mean": stress_w, "max_dd_mtm": dd_w,
+                            "dd_status": dd_status,
                             "coverage_pct": cov, "eligible": eligible,
                             "pass_base": pass_base, "pass_stress": pass_stress,
                             "pass_dd": pass_dd,
@@ -671,6 +716,14 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
             "universe": spec.get("universe"),
             "protocol_id": proto.get("protocol_id"),
             "label_version": LABEL_VERSION,
+            "discovery_artifact": {"frozen_src": frozen_src,
+                                   "spec_sha": (json.loads(
+                                       (RUNS / str(spec["id"]) /
+                                        "summary_discovery.json")
+                                       .read_text(encoding="utf-8")
+                                   ).get("spec_sha")
+                                   if frozen_src == "discovery_artifact"
+                                   else None)},
             "per_window": per_window, "windows_pass": n_pass,
             "windows_required": need, "embargo_ms": embargo_ms,
             "frozen_src": frozen_src, "per_symbol": val,
@@ -792,6 +845,16 @@ def cmd_discovery(a) -> int:
 
 def cmd_confirm(a) -> int:
     spec = load_spec(Path(a.spec))
+    # FIX v14 (audit GLM 5.3 post-#142) : une confirmation OFFICIELLE exige
+    # un arbre propre — git_dirty=true signifie que le code exécuté n'est
+    # dans AUCUN commit (le diff_sha aide mais ne reconstruit pas). Le
+    # workflow est : committer d'abord, confirmer ensuite.
+    prov = _provenance()
+    if prov["git_dirty"]:
+        print(f"{spec['id']} : EXECUTION_NOT_SEALED — l'arbre Git est sale "
+              f"(diff_sha {prov['diff_sha']}) : committer le code d'abord, "
+              "confirmer ensuite (0 slot consommé)")
+        return 1
     # FIX v8 (rapport GLM 5.3 №18) : la réservation du slot est sérialisée
     # par un verrou fichier — deux process ne peuvent plus croire
     # simultanément qu'il reste un slot (le budget est jugé au log, sous
@@ -852,10 +915,17 @@ def _confirm_locked(spec: dict, a) -> int:
           f"{res.get('stress_mean', float('nan')):.3f} · fund_cov "
           f"{res.get('fund_coverage', 0.0):.2f} · slot consommé")
     if res["verdict"] == "CONFIRMED":
-        # PR-B : le wallet 100 $ sur la validation, obligatoire au rapport
+        # PR-B + FIX v14 (№9) : le wallet écrit ATOMIQUEMENT avec le run
+        # (wallet.json + report_wallet.md + report.md) — un run confirmé
+        # sans son wallet.json est incomplet
         try:
             from scripts.portfolio_runner import wallet_for_run, wallet_report_block
             w = wallet_for_run(spec["id"], db_path=Path(a.db))
+            (rdir / "wallet.json").write_text(
+                json.dumps(w, ensure_ascii=False, indent=1, default=float),
+                encoding="utf-8")
+            (rdir / "report_wallet.md").write_text(
+                wallet_report_block(w), encoding="utf-8")
             block = wallet_report_block(w)
             with open(rdir / "report.md", "a", encoding="utf-8") as fh:
                 fh.write(block)
