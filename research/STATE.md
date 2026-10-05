@@ -5,11 +5,11 @@ MAJ manuelle : 2026-10-06. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/l
 
 ## Ledger & budget
 <!-- LEDGER:BEGIN (généré par lab_ledger.py sync-state — ne pas éditer à la main) -->
-- Ledger : **88** entrées (88 essais, dont 12 backfill hors budget) — PASS 25 · FAIL 29 · NUL 1 · SOUS_PUISSANT 3
+- Ledger : **88** entrées (58 essais, dont 12 backfill hors budget) — PASS 25 · FAIL 29 · NUL 1 · SOUS_PUISSANT 3
 - Budget semaine 2026-W41 (effet policy : 2026-10-02) : **20/20** consommés (hors re-vérifications exemptées), reste 0
 - Familles bloquantes hors reverify : bonsai_range_pct 7/5, forced_flow 7/5
 - Familles raw historiques (re-verifies incluses) : bonsai_range_pct 9/5, forced_flow 9/5
-- Seuil de preuve du prochain essai : |t| ≥ 3.45 (Bonferroni, N=89)
+- Seuil de preuve du prochain essai : |t| ≥ 3.34 (Bonferroni, N=59)
 <!-- LEDGER:END -->
 
 ## Verdicts qui comptent

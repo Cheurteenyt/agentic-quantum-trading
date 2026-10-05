@@ -150,7 +150,8 @@ class TestUniverseMs(unittest.TestCase):
             "bars": 100}}}
         t0, t1 = tradable_window_ms(manifest, "BTCUSDT")
         self.assertEqual(t0, 10 * 86400_000)
-        self.assertEqual(t1, 19 * 86400_000 + 23 * H)   # pas le 19 à 00:00
+        # №5 : la borne = la CLÔTURE de la dernière bougie (+1h de son open)
+        self.assertEqual(t1, 19 * 86400_000 + 23 * H + H)
 
 
 if __name__ == "__main__":

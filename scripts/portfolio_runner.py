@@ -288,7 +288,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                                        "notional": pos["notional"],
                                        "net": -pos["margin"],
                                        "liquidated": True})
-                    fund_net += pos["fund_total"]
+                    fund_net += pos.get("fund_accrued", 0.0)
                     del open_pos[sym]
                     continue
                 realized = (pos["side"] * pos["ret_pct"] / 100.0
@@ -331,6 +331,8 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                                    "exit_ms": e["exit_ms"],
                                    "notional": notional, "net": -margin,
                                    "liquidated": True})
+                # (mode stress : la position n'a jamais vécu — aucun
+                # funding accru, fund_net ne bouge pas)
                 max_dd_mtm = max(max_dd_mtm, 100.0 * margin / eq_now
                                  if eq_now > 0 else 0.0)
                 max_dd_worst = max_dd_mtm
@@ -403,6 +405,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                                        "notional": pos["notional"],
                                        "net": -pos["margin"],
                                        "liquidated": True})
+                    fund_net += pos.get("fund_accrued", 0.0)
                     del open_pos[sym]
                     busy[sym] = pos["exit_ms"]
         # 5. l'équité MTM de l'heure + les métriques de concurrence (№29)
