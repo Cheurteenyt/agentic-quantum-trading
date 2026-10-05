@@ -87,6 +87,44 @@ class TestMomentumFundingInvariance(unittest.TestCase):
         self.assertNotEqual(ev1.costs.funding_usd, 0.0)  # le coût est réel
 
 
+class TestMissingDBDegradation(unittest.TestCase):
+    """Le cas CI : pas de data/warehouse/klines.db — le funding se dégrade
+    en 0.0 explicite + flag, JAMAIS en OperationalError traversant (46 erreurs
+    du 05/10)."""
+
+    def test_load_funding_series_db_absente_cost_data_unavailable(self):
+        from backend.services.backtest_v2.costs import CostDataUnavailable, load_funding_series
+        with self.assertRaises(CostDataUnavailable):
+            load_funding_series("BTCUSDT",
+                                db_path=Path(self.tmpdir()) / "n-existe-pas.db")
+
+    def test_une_strategie_evalue_sans_db_funding_zero_explicite(self):
+        mom.compute_signals = lambda b, p: [1, 1, 0, 0, 0]
+        import scripts.label_matrix  # noqa: F401  (le chemin scripts est chargé)
+        from scripts import funding_series as _fs
+        real = _fs.funding_series_for
+        def _absent(symbol, db_path=None):
+            raise FileNotFoundError("pas de warehouse en CI")
+        import backend.services.backtest_v2.costs as _costs
+        _costs.funding_series_for = _absent
+        try:
+            ev = mom.evaluate(dict(PARAMS), [
+                _bar(0, 100, 100.01, 99.99, 100),
+                _bar(1, 100, 100.5, 99.5, 100.5),
+                _bar(2, 100, 100.5, 99.5, 100.5),
+                _bar(3, 100, 100.5, 99.5, 100.5)])
+            self.assertEqual(ev.costs.funding_usd, 0.0)   # 0.0 EXPLICITE
+            self.assertTrue(any("funding indisponible" in w
+                                for w in ev.costs.warnings))
+        finally:
+            _costs.funding_series_for = real
+
+    @staticmethod
+    def tmpdir():
+        import tempfile
+        return tempfile.mkdtemp()
+
+
 class TestCarrySideAsof(unittest.TestCase):
     """C2 : le sens collecteur est décidé AS-OF — un funding qui change de
     signe inverse la position ; le futur ne décide pas du passé."""
