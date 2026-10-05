@@ -2,9 +2,9 @@
 
 # PROTOCOL_V2 — le walk-forward fenêtre par fenêtre
 
-**STATUT : PROPOSITION — en attente de ratification user** (le protocole v1 reste
-intouchable tant que la signature n'est pas posée ; la ratification se fait par un
-tag git `protocol-v2-ratified` + la ligne ci-dessous décochée).
+**STATUT : RATIFIÉE — APPLIQUÉE depuis le 2026-10-05** (nouveaux candidats
+seulement ; les seuils vivent dans `research/protocols/active.yaml`, lus par
+candidates.py et vérifiés contre gates.py par test de cohérence).
 
 ## Pourquoi (la leçon des 7 inventions + l'audit §33)
 

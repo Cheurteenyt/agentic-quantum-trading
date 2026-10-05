@@ -1,0 +1,39 @@
+# L'AUTORITÉ DE CONFIRMATION — RATIFIÉE le 2026-10-05 (le propriétaire)
+# Une SEULE source pour tous les seuils de confirmation : gates.py,
+# candidates.py, le runner, STATE et le paper forward lisent CE fichier.
+# Toute modification = une décision du propriétaire, tracée au registre.
+
+protocol_id: protocol-v2
+status: RATIFIED
+ratified_at: "2026-10-05"
+applies_to: new_candidates_from_2026-10-05
+# Les verdicts antérieurs restent jugés sous v1 (aucune comparaison
+# inter-protocole — research/protocols/protocol_v2.md §"v1 reste la loi").
+
+# ——— les fenêtres gelées (Aster 1h, jamais ré-ajustées ; les futures
+#      s'ajoutent au fil du forward) ———
+frozen_windows:
+  - {start: "2025-09", end: "2025-11"}
+  - {start: "2025-11", end: "2026-01"}
+  - {start: "2026-01", end: "2026-03"}
+  - {start: "2026-03", end: "2026-05"}
+  - {start: "2026-05", end: "2026-07"}
+  - {start: "2026-07", end: "2026-09"}
+embargo_hours: 72
+windows_pass_required: 5        # 5/6 fenêtres PASS minimum
+
+# ——— STAGE backtest gate (backend/services/backtest_v2/gates.py) ———
+backtest_gate:
+  min_sharpe_oos: 0.8           # la valeur actuelle de gates.py, désormais déclarée ICI
+
+# ——— STAGE forward confirmation (backend/.../candidates.py, docs/13) ———
+forward_confirmation:
+  min_forward_sharpe: 0.5       # la valeur actuelle de candidates.py
+  min_forward_trades: 100
+  min_vs_discovery: 0.5         # forward >= 0.5 × discovery
+  maturation_days: 30           # le runbook docs/13 (30 jours de données inédites)
+
+# ——— les stress obligatoires ———
+cost_stress_multiplier: 1.5    # l'edge qui meurt à ×1,5 = fragile, refusé
+max_window_loss_pct: 15        # aucune fenêtre sous le plancher
+degradation_max_pct: 70        # dégradation train→test maximale
