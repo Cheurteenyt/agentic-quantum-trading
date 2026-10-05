@@ -98,6 +98,14 @@ def load_spec(path: Path) -> dict:
         if cond.get("op", ">=") not in OPS:
             raise ValueError(f"opérateur interdit {cond.get('op')!r} dans "
                              f"{spec['id']} (autorisés : {sorted(OPS)})")
+    if "universe" in spec:
+        from scripts.universe import check as _ucheck, load as _uload
+        manifest = _uload(str(spec["universe"]))
+        missing, empty = _ucheck(manifest, d["symbols"])
+        if missing or empty:
+            raise ValueError(
+                f"{spec['id']} : univers {spec['universe']!r} incohérent — "
+                f"absents {missing} · vides {empty}")
     return spec
 
 
@@ -444,6 +452,7 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
             "inverse_mean": inv_mean, "edge_advantage": advantage, "per_symbol": per_symbol,
             "frozen_thresholds": frozen,
             "label_hash": lh, "label_version": LABEL_VERSION,
+            "universe": spec.get("universe"),
             "snapshot": snapshot_id(db_path),
             "scope": {"mode": Mode.DISCOVERY.value,
                       "start": view.start_ms, "end": view.end_ms}}
@@ -659,6 +668,7 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
             "fund_coverage": fund_cov,
             "dd_breach_windows": dd_breach,
             "max_window_loss_pct": max_w_loss,
+            "universe": spec.get("universe"),
             "protocol_id": proto.get("protocol_id"),
             "label_version": LABEL_VERSION,
             "per_window": per_window, "windows_pass": n_pass,
@@ -674,6 +684,33 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
     rdir = RUNS / run_id
     rdir.mkdir(parents=True, exist_ok=True)
     sha = spec_sha(spec)
+    # FIX v11 (PR-4, audit GLM 5.3 №20) : le dossier de run est APPEND-ONLY
+    # en PROVENANCE — si un manifeste existe avec une provenance DIFFÉRENTE
+    # (snapshot, git, diff), l'ancienne preuve est archivée sous attempts/<n>/
+    # avant réécriture. Une réécriture à provenance IDENTIQUE reste
+    # idempotente (le même run re-jeté, pas une nouvelle expérience).
+    mfile = rdir / "manifest.json"
+    attempt = 1
+    if mfile.exists():
+        try:
+            old_m = json.loads(mfile.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            old_m = {}
+        prov_now = _provenance()
+        same = (old_m.get("spec_sha") == sha
+                and old_m.get("snapshot") == result.get("snapshot")
+                and old_m.get("git_sha") == prov_now.get("git_sha")
+                and old_m.get("diff_sha") == prov_now.get("diff_sha"))
+        if not same:
+            prev = int(old_m.get("attempt", 1))
+            attempt = prev + 1
+            adir = rdir / "attempts" / f"{prev:03d}"
+            adir.mkdir(parents=True, exist_ok=True)
+            for f in ("manifest.json", "spec.json", "summary_discovery.json",
+                      "summary_confirmation.json", "wallet.json",
+                      "report.md", "report_wallet.md"):
+                if (rdir / f).exists():
+                    (rdir / f).rename(adir / f)
     (rdir / "spec.json").write_text(
         json.dumps(spec, ensure_ascii=False, indent=1, sort_keys=True),
         encoding="utf-8")
@@ -690,6 +727,7 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
         proto_id = None
     (rdir / "manifest.json").write_text(json.dumps({
         "run_id": run_id, "kind": kind, "spec_sha": sha,
+        "attempt": attempt,
         "git_sha": prov["git_sha"], "git_dirty": prov["git_dirty"],
         "diff_sha": prov["diff_sha"],
         "label_hash": result.get("label_hash"), "snapshot": snap,
