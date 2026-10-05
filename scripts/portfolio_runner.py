@@ -211,6 +211,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
     liq = wins = skipped = 0
     fees = fund_net = 0.0
     monthly: dict[str, float] = {}
+    trade_pnls: list[dict] = []
     n_trades = 0
     conc_sum = conc_n = 0
     max_conc = 0
@@ -239,8 +240,11 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                               - pos["fees"]) > 0 else 0
                 month = datetime.fromtimestamp(
                     t / 1000, tz=timezone.utc).strftime("%Y-%m")
-                monthly[month] = monthly.get(month, 0.0) + (
-                    realized + pos["fund_total"] - pos["fees"])
+                net = realized + pos["fund_total"] - pos["fees"]
+                monthly[month] = monthly.get(month, 0.0) + net
+                trade_pnls.append({"t_ms": pos["entry_ms"],
+                                   "exit_ms": t, "notional": pos["notional"],
+                                   "net": net})
                 fund_net += pos["fund_total"]
                 del open_pos[sym]
         # 2. les nouvelles entrées
@@ -281,7 +285,8 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                 open_pos[e["sym"]] = {
                     "sym": e["sym"], "side": e["side"], "entry": e["entry"],
                     "notional": notional, "margin": margin,
-                    "ret_pct": e["ret_pct"], "exit_ms": e["exit_ms"],
+                    "ret_pct": e["ret_pct"], "entry_ms": t,
+                    "exit_ms": e["exit_ms"],
                     "fees": fee, "fund_total": fund_signed * notional / 100.0,
                     "fund_prints": prints}
 
@@ -335,7 +340,41 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
     months = sorted(monthly)
     final = cash + sum(_unrealized(p, last_close) for p in open_pos.values())
     roi = (final - capital) / capital * 100.0
+    # — PR-6 : les métriques du rapport final (§36) —
+    pnl_list = [tp["net"] for tp in trade_pnls]
+    wins_gross = sum(x for x in pnl_list if x > 0)
+    losses_gross = abs(sum(x for x in pnl_list if x < 0))
+    profit_factor = (wins_gross / losses_gross) if losses_gross > 0 \
+        else float("inf") if wins_gross > 0 else 0.0
+    if trade_pnls:
+        years = ((trade_pnls[-1]["exit_ms"] - trade_pnls[0]["t_ms"])
+                 / (365.25 * 86400_000))
+        cagr = ((final / capital) ** (1.0 / years) - 1.0) * 100.0 \
+            if years > 0 and final > 0 else float("nan")
+    else:
+        years, cagr = 0.0, float("nan")
+    rets_pct = [tp["net"] / tp["notional"] * 100.0 for tp in trade_pnls]
+    downside = float(np.sqrt(np.mean([min(r, 0.0) ** 2 for r in rets_pct])
+                             )) if rets_pct else 0.0
+    if rets_pct and downside > 0:
+        mean_r = float(np.mean(rets_pct))
+        per_year = len(rets_pct) / max(years, 1 / 365.25)
+        sortino = mean_r / downside * np.sqrt(per_year)
+    else:
+        sortino = None
+    def _solde_sans_top(pct_cut: float) -> float:
+        if not pnl_list:
+            return final
+        k = max(1, int(round(len(pnl_list) * pct_cut / 100.0)))
+        worst = sorted(pnl_list, reverse=True)[k:]
+        return capital + sum(worst)
     return {"capital": capital, "solde": final, "roi_pct": roi,
+            "cagr_pct": cagr, "years": years, "sortino": sortino,
+            "profit_factor": profit_factor,
+            "solde_sans_top1": _solde_sans_top(1.0),
+            "solde_sans_top5": _solde_sans_top(5.0),
+            "solde_sans_top10": _solde_sans_top(10.0),
+            "trade_pnls": trade_pnls,
             "max_dd_pct": max_dd_mtm, "max_dd_mtm": max_dd_mtm,
             "max_dd_mtm_worst": max_dd_worst, "max_dd_close": max_dd_close,
             "liqs": liq, "trades": n_trades,
@@ -355,6 +394,76 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
             "max_long_notional_pct": max_long_pct,
             "max_short_notional_pct": max_short_pct,
             "cap_pct": cap_pct, "lev": lev, "mtm": True}
+
+
+# ------------------------------------------------------- effective N
+def effective_sample_size(trade_pnls: list[dict]) -> dict:
+    """PR-6, amélioration 2 du rapport : n = 20 000 events chevauchants ne
+    valent pas 20 000 observations indépendantes. Publie n_raw, n_nonoverlap
+    (balayage glouton global), autocorr_1 et effective_n (ajustement AR(1))."""
+    n_raw = len(trade_pnls)
+    if n_raw == 0:
+        return {"n_raw": 0, "n_nonoverlap": 0, "autocorr_1": None,
+                "effective_n": 0}
+    ordered = sorted(trade_pnls, key=lambda x: x["t_ms"])
+    n_nonoverlap, last_exit = 0, -1
+    for tp in ordered:
+        if tp["t_ms"] >= last_exit:
+            n_nonoverlap += 1
+            last_exit = tp["exit_ms"]
+    rets = np.array([tp["net"] / tp["notional"] * 100.0
+                     for tp in ordered])
+    rho = None
+    if n_raw > 2 and float(np.std(rets)) > 0:
+        rho = float(np.corrcoef(rets[:-1], rets[1:])[0, 1])
+    if rho is not None and -0.99 < rho < 0.99:
+        eff = max(1.0, n_raw * (1.0 - rho) / (1.0 + rho))
+    else:
+        eff = float(n_raw)
+    return {"n_raw": n_raw, "n_nonoverlap": n_nonoverlap,
+            "autocorr_1": rho, "effective_n": round(eff, 1)}
+
+
+# ------------------------------------------------------- bootstrap
+def block_bootstrap(trade_pnls: list[dict], cost_pct: float,
+                    block: int = 8, iters: int = 2000,
+                    seed: int = 42) -> dict:
+    """PR-6, amélioration 3 : le bootstrap par blocs MOVING-BLOCK sur la
+    série temporelle des rendements nets par trade (ordre temporel, blocs
+    de `block` trades, graine fixée = reproductible). Publie les CI95 de la
+    moyenne et du Sharpe par trade, P(mean > 0) et P(stress ×1,5 > 0) —
+    le stress retire 0,5 × cost_pct à chaque trade (coût majoré)."""
+    if len(trade_pnls) < block:
+        return {"iters": 0, "note": "pas assez de trades pour bootstrapper"}
+    ordered = sorted(trade_pnls, key=lambda x: x["t_ms"])
+    rets = np.array([tp["net"] / tp["notional"] * 100.0
+                     for tp in ordered])
+    stress_rets = rets - 0.5 * cost_pct
+    rng = np.random.default_rng(seed)
+    n = len(rets)
+    n_blocks = int(np.ceil(n / block))
+    starts = rng.integers(0, n - block + 1, size=(iters, n_blocks))
+    means = np.empty(iters)
+    sharpes = np.empty(iters)
+    p_stress = 0
+    sd0 = float(np.std(rets, ddof=1)) or 1e-12
+    for i in range(iters):
+        sample = np.concatenate(
+            [rets[s:s + block] for s in starts[i]])[:n]
+        means[i] = sample.mean()
+        sd = float(np.std(sample, ddof=1))
+        sharpes[i] = sample.mean() / sd * np.sqrt(n) if sd > 0 else 0.0
+        ssample = stress_rets[starts[i].repeat(block)[:n] +
+                              np.tile(np.arange(block), n_blocks)[:n]]
+        if ssample.mean() > 0:
+            p_stress += 1
+    return {"iters": iters, "block": block, "seed": seed,
+            "mean_ci95": [float(np.percentile(means, 2.5)),
+                          float(np.percentile(means, 97.5))],
+            "sharpe_trade_ci95": [float(np.percentile(sharpes, 2.5)),
+                                  float(np.percentile(sharpes, 97.5))],
+            "p_mean_gt0": float((means > 0).mean()),
+            "p_stress_gt0": float(p_stress / iters)}
 
 
 # ------------------------------------------------------------------ wallet
@@ -598,23 +707,30 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
                                           frozen=frozen,
                                           min_event_ms=embargo_ms,
                                           db_path=db_path)
-        per_window = wallet_per_window(events, proto, capital, cap_pct, lev,
-                                       marks=marks)
-    # PR-2 : le moteur MTM horaire quand les marks sont disponibles — le DD
-    # published est désormais celui que le compte AURAIT VÉCU heure par heure
+    # les marks horaires du span — le moteur MTM marque le compte heure
+    # par heure (le DD publié est celui que le compte AURAIT VÉCU)
     marks = _fetch_marks(db_path, spec["data"]["symbols"],
                          view.start_ms, view.end_ms)
+    if vk == "validation":
+        per_window = wallet_per_window(events, proto, capital, cap_pct, lev,
+                                       marks=marks)
+    # le moteur MTM quand les marks sont disponibles
     if marks:
         wallet = run_wallet_mtm(events, marks, capital=capital,
                                 cap_pct=cap_pct, lev=lev)
     else:
         wallet = run_wallet(events, capital=capital, cap_pct=cap_pct, lev=lev)
+    # PR-6 : effective-N + bootstrap par blocs (graine fixée = reproductible)
+    tpnls = wallet.pop("trade_pnls", [])
+    eff = effective_sample_size(tpnls)
+    boot = block_bootstrap(tpnls, cost_pct=float(spec.get("cost_pct", 0.28)))
     baseline = baseline_hold(spec, view, db_path=db_path, capital=capital)
     out = {"run_id": run_id, "view": vk, "capital": capital,
            "cap_pct": cap_pct, "lev": lev, "frozen_src": frozen_src,
            "embargo_ms": embargo_ms if vk == "validation" else 0,
            "n_events": len(events), "fund_cov": fund_cov,
            "wallet": wallet, "baseline": baseline,
+           "effective_n": eff, "bootstrap": boot,
            "per_window": per_window,
            "max_window_loss_pct": float(proto.get("max_window_loss_pct", 15))}
     if per_window:
@@ -653,7 +769,27 @@ def wallet_report_block(w: dict) -> str:
             f" / {wl['max_dd_close']:.2f} % |",
             f"| concurrence max / marge max engagée | "
             f"{wl['max_concurrency']} positions / "
-            f"{wl['max_margin_used_pct']:.1f} % de l'équité |"]
+            f"{wl['max_margin_used_pct']:.1f} % de l'équité |",
+            f"| CAGR / Sortino / profit factor | "
+            f"{wl.get('cagr_pct', float('nan')):+.1f} % / "
+            f"{wl.get('sortino') if wl.get('sortino') is not None else float('nan'):.1f} / "
+            f"{wl.get('profit_factor', float('nan')):.2f} |",
+            f"| solde sans top 1 / 5 / 10 % | ${wl.get('solde_sans_top1', wl['solde']):.2f} / "
+            f"${wl.get('solde_sans_top5', wl['solde']):.2f} / "
+            f"${wl.get('solde_sans_top10', wl['solde']):.2f} |"]
+    bs = w.get("bootstrap") or {}
+    if bs.get("iters"):
+        en = w.get("effective_n", {})
+        lines += [
+            f"| n brut / sans chevauchement / effectif | "
+            f"{en.get('n_raw')} / {en.get('n_nonoverlap')} / "
+            f"{en.get('effective_n')} (autocorr {en.get('autocorr_1') if en.get('autocorr_1') is not None else float('nan'):+.3f}) |",
+            f"| bootstrap mean CI95 (P>0) | "
+            f"[{bs['mean_ci95'][0]:+.3f}, {bs['mean_ci95'][1]:+.3f}] "
+            f"({bs['p_mean_gt0'] * 100:.1f} %) |",
+            f"| bootstrap Sharpe/trade CI95 | "
+            f"[{bs['sharpe_trade_ci95'][0]:+.2f}, {bs['sharpe_trade_ci95'][1]:+.2f}] |",
+            f"| P(stress ×1,5 > 0) | {bs['p_stress_gt0'] * 100:.1f} % |"]
     if bl and bl.get("solde") == bl.get("solde"):
         lines.append(
             f"| baseline long-and-hold 1x | ${bl['solde']:.2f} "
