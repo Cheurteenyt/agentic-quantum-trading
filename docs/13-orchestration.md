@@ -4,7 +4,7 @@
 title: Orchestration de la boucle découverte → validation OOS
 status: living
 owner: cheurteen
-updated: 2026-08-09
+updated: 2026-10-05
 ---
 
 # Orchestration — la boucle découverte/validation
@@ -135,3 +135,73 @@ backtest gagnant » en « j'ai une hypothèse survivante à confirmer ».
 - `fomo_ohlcv` reste écrit dans fomo.db : 15+ lecteurs (dont derek_watch.py)
   rendent une base dédiée cassante. Dette assumée : writer borné (commit par
   token, rollback anti-fantôme, busy_timeout 30 s, budget de passe 480 s).
+
+## La porte conforme v6 + la couche portefeuille (05/10)
+
+Le Research OS a sa chaîne complète — la découverte produit, la porte de
+confirmation JUGE sous protocole, la couche portefeuille dit ce que vit un
+wallet de 100 $ (audit GPT v6, 10 réclamations confirmées et corrigées).
+
+### La découverte (gratuite, TRAIN only)
+
+```bash
+# une spec
+python3 scripts/research_runner.py discovery --spec research/queue/EXP-xxx.json
+# la file entière (récursive — bonsai/ inclus, done/ exclu)
+python3 scripts/research_runner.py grind
+# la sélection (clusters + Pareto, AUCUN verdict de PASS ici)
+python3 scripts/research_runner.py select
+```
+
+La découverte gèle ses **seuils** (l'expanding quantile à la dernière barre
+TRAIN) dans `research/runs/<id>/summary_discovery.json` →
+`frozen_thresholds`. C'est l'artefact que la confirmation réutilisera tels
+quels — re-calibrer sur la validation est structurellement impossible.
+
+### La confirmation (1 slot, protocole-v2 obligatoire)
+
+```bash
+python3 scripts/research_runner.py confirm --spec research/queue/EXP-xxx.json
+```
+
+La porte applique, dans l'ordre : **MODE_MISMATCH** (une spec déclarée
+`mode: discovery` ne passe jamais — 0 slot) → **WINDOW_MISMATCH** (la
+validation doit intersecter les fenêtres gelées d'`active.yaml` ; une
+fenêtre tronquée est tracée `coverage_pct` et INÉLIGIBLE au PASS) →
+preflight (0 slot sur échec d'infra) → étude **par fenêtre gelée** avec
+seuils gelés + embargo 72h à la frontière train→validation → verdict :
+`windows_pass ≥ windows_pass_required` (5/6) ET moyenne pondérée par n >
+min_mean ET stress de coûts ×1,5 > 0 ET dégradation train→validation ≤ 70 %.
+
+**CONFIRMED ≠ promote.** Le verdict ouvre le droit au wallet et au forward
+(maturation 30 jours, seuils forward_confirmation d'active.yaml).
+
+### Le wallet (la couche portefeuille)
+
+```bash
+python3 scripts/research_runner.py portfolio --id EXP-xxx                    # vue dispo
+python3 scripts/research_runner.py portfolio --id EXP-xxx --view validation  # exige un confirm
+python3 scripts/research_runner.py portfolio --id EXP-xxx --baseline         # buy-and-hold seul
+```
+
+Un wallet sur la vue **validation** exige un run de confirmation existant
+(l'artefact fait foi) — la vue **train** est libre. Séquence : une position
+par symbole (anti-chevauchement), marge ≤ 1 % de l'équité courante, lev 1x
+défaut, liquidation ex ante (MAE ≥ 100/lev − 0,5), bookage au mois de
+sortie, DD par fenêtre gelée contre le plafond `max_window_loss_pct` (15 %).
+Le rapport inclut la **baseline equal-weight long-and-hold** des mêmes
+symboles : un edge qui ne bat pas ses propres actifs tenus passifs est une
+narration. Sur CONFIRMED, le bloc WALLET est appendu automatiquement au
+report.md du run.
+
+### Ce qui a changé le 05/10 (audit v6) — à savoir pour lire les anciens chiffres
+
+- **funding absent = NaN** (plus 0.0) : les symboles sans funding_history ne
+  matchent plus les conditions `fund_last` ; `event_study` rapporte
+  `fund_cov`. Les discoveries d'avant le fix (H-01 notamment) sont à
+  re-mesurer avant tout confirm.
+- **snapshot_id** hash high/low/volume en plus de close : un backfill de
+  bougies invalide le cache des labels (re-build au premier run, ~minutes).
+- **moyenne agrégée pondérée par n** : un symbole à 3 events ne pèse plus
+  autant qu'un symbole à 3 000.
+- `grind` est récursif (les sous-dossiers de la queue sont traités).

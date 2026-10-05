@@ -53,20 +53,20 @@ HORIZONS = (1, 2, 4, 6, 12, 24, 48, 72)  # heures
 
 def snapshot_id(db_path: Path = KDB) -> str:
     """L'identité de l'état des données : un hash du CONTENU 1h
-    (symbol|open_time|close de chaque barre).
+    (symbol|open_time|open|high|low|close|volume de chaque barre).
 
-    FIX : l'ancienne identité paresseuse (rows + min + max open_time)
-    COLLAIT entre deux datasets différents de mêmes statistiques — les
-    fixtures de test empoisonnaient le cache de la vraie recherche (ret_6
-    réduit à 1 valeur finie). Un sha256 du contenu est déterministe,
-    sensible à toute ligne, et coûte quelques secondes sur 1,7 M barres."""
+    FIX v6 : l'ancien hash (symbol|open_time|close) laissait un backfill de
+    HIGHS / LOWS / VOLUMES — qui change les labels hi/lo et les features de
+    volume — INVISIBLE : le cache servait des labels périmés en silence.
+    FIX précédent : l'identité paresseuse (rows + min + max open_time)
+    collait entre deux datasets différents de mêmes statistiques."""
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
         h = hashlib.sha256()
-        for sym, ots, cl in con.execute(
-                "SELECT symbol, open_time, close FROM klines "
-                "WHERE interval='1h' ORDER BY symbol, open_time"):
-            h.update(f"{sym}|{ots}|{cl};".encode())
+        for sym, ots, o, hi, lo, cl, v in con.execute(
+                "SELECT symbol, open_time, open, high, low, close, volume "
+                "FROM klines WHERE interval='1h' ORDER BY symbol, open_time"):
+            h.update(f"{sym}|{ots}|{o}|{hi}|{lo}|{cl}|{v};".encode())
         n = h.hexdigest()[:16]
     finally:
         con.close()
@@ -126,8 +126,11 @@ def _build_symbol(con: sqlite3.Connection, sym: str,
                      - cum[np.minimum(k0[ok], len(cum) - 1)])
             out[f"fund_{H}"] = f
     else:
+        # FIX v6 : PAS de série de funding ≠ funding nul. Le zéro inventé
+        # rendait « inconnu » indistinguable de « 0 % » — NaN, et les
+        # event_studies rapportent fund_cov ; les masques excluent.
         for H in horizons:
-            out[f"fund_{H}"] = np.zeros(n)
+            out[f"fund_{H}"] = np.full(n, np.nan)
     return out
 
 
@@ -182,7 +185,9 @@ def build_matrix(symbols: list[str], horizons: tuple[int, ...] = HORIZONS,
 def event_study(cols: dict[str, np.ndarray], mask: np.ndarray, horizon: int,
                 side: int = -1, cost_pct: float = 0.28) -> dict:
     """STAGE 1 — l'étude d'événement : un masque de découverte × un horizon →
-    les statistiques conditionnelles coûtées (le côté : +1 long, -1 short)."""
+    les statistiques conditionnelles coûtées (le côté : +1 long, -1 short).
+    fund_cov = la part des events dont le funding est CONNU (rapport v6 :
+    l'inconnu ne prétend plus être un 0 %)."""
     ret = cols[f"ret_{horizon}"]
     hi = cols[f"hi_{horizon}"]
     lo = cols[f"lo_{horizon}"]
@@ -191,8 +196,14 @@ def event_study(cols: dict[str, np.ndarray], mask: np.ndarray, horizon: int,
     n = int(m.sum())
     if n == 0:
         return {"n": 0}
-    pos_ret = side * ret[m] + (fund[m] if fund is not None else 0.0) * (
-        1 if side == -1 else -1) - cost_pct
+    if fund is not None:
+        fv = fund[m]
+        fund_cov = float(np.isfinite(fv).mean())
+        fv = np.where(np.isfinite(fv), fv, 0.0)
+    else:
+        fund_cov = 0.0
+        fv = np.zeros(n)
+    pos_ret = side * ret[m] + fv * (1 if side == -1 else -1) - cost_pct
     # MAE côté position : short souffre du high, long du low
     mae = (hi[m] if side == -1 else -lo[m])
     q = np.percentile(pos_ret, [10, 50, 90])
@@ -201,7 +212,8 @@ def event_study(cols: dict[str, np.ndarray], mask: np.ndarray, horizon: int,
             "p10": float(q[0]), "p90": float(q[2]),
             "wr": float((pos_ret > 0).mean() * 100),
             "mae_mean": float(np.mean(mae)) if len(mae) else None,
-            "worst": float(pos_ret.min()), "best": float(pos_ret.max())}
+            "worst": float(pos_ret.min()), "best": float(pos_ret.max()),
+            "fund_cov": fund_cov}
 
 
 def main() -> int:

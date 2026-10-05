@@ -573,3 +573,31 @@ strategies:
     % (reporting only, aucun re-tuning — le primaire reste gelé). Source : /tmp/hikari_h45_rt.txt
     (35 lignes, tronqué à la faille 3/5 — les 2 fatales sont livrées).'
 # PRE-MORTEM CONFIRMÉ (02/10 soir) : le MAE max Q1 = 17,95 % vs médiane 0,66 % (3,3×) — le short squeeze que le red-team Bonsai a prédit est VISIBLE dans les données. Le re-tir reste SOUS_PUISSANT (0 nouvel event cascade depuis le 01/10 03:00 — le flux est silencieux en T3). Le verdict final attend ~2 sem de plus de cascade events.
+- id: EXP-crash-short-6h-004
+  family: forced_flow
+  status: CANDIDATE
+  timeframe: 1h
+  hypothesis: une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à
+    6h — le flux forcé vendeur ne s'épuise pas
+  discovery: DISCOVERY_PASS 05/10 (grind stage 2, re-mesuré post-fix v6) —
+    n 8682, mean +1.050 %/trade, inverse -1.610 (le côté codé domine),
+    coûts 0.28 % RT inclus
+  notes: candidat du 1er grind Research OS ; la confirmation juge (porte v6 —
+    fenêtres gelées, seuils gelés, stress ×1.5, puis wallet 100 $)
+- id: EXP-bonsai-h-01
+  family: bonsai_fund_H
+  status: CANDIDATE
+  timeframe: 1h
+  hypothesis: Funding Crowding Reversal (hypothèse Bonsai H-01)
+  discovery: DISCOVERY_PASS 05/10 re-mesuré POST-fix funding-absent=NaN —
+    n 61978, mean +0.090 %/trade, inverse -0.650 (avant fix +0.095 — le fix
+    coûte 0.005 pt, le candidat tient)
+  notes: 1re re-mesure v6 ; fund_cov désormais rapporté par event_study
+- id: EXP-bonsai-h-18
+  family: bonsai_range_pct
+  status: CANDIDATE
+  timeframe: 1h
+  hypothesis: Volatility Squeeze Short (hypothèse Bonsai H-18)
+  discovery: DISCOVERY_PASS 05/10 (re-mesuré post-fix v6) — n 22137,
+    mean +0.290 %/trade, inverse -0.850
+  notes: candidat du 1er grind Research OS (queue Bonsai) ; la confirmation juge
