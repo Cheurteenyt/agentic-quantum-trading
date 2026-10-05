@@ -193,7 +193,7 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
                else "DISCOVERY_FAIL")
     return {"verdict": verdict, "n": n_total, "mean": mean_all,
             "inverse_mean": inv_mean, "per_symbol": per_symbol,
-            "label_hash": lh,
+            "label_hash": lh, "snapshot": snapshot_id(db_path),
             "scope": {"mode": Mode.DISCOVERY.value,
                       "start": view.start_ms, "end": view.end_ms}}
 
@@ -222,11 +222,13 @@ def run_confirmation(spec: dict, db_path: Path = KDB) -> dict:
                else "REJECTED")
     return {"verdict": verdict, "n": n_total, "mean": mean_all,
             "per_symbol": per_symbol, "slots_consumed": 1, "label_hash": lh,
+            "snapshot": snapshot_id(db_path),
             "validation_window": [val_view.start_ms, val_view.end_ms]}
 
 
 # ------------------------------------------------------------------ artefacts
-def write_artifacts(run_id: str, spec: dict, result: dict, kind: str) -> Path:
+def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
+                    db_path: Path = KDB) -> Path:
     rdir = RUNS / run_id
     rdir.mkdir(parents=True, exist_ok=True)
     sha = spec_sha(spec)
@@ -235,7 +237,8 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str) -> Path:
         encoding="utf-8")
     (rdir / "manifest.json").write_text(json.dumps({
         "run_id": run_id, "kind": kind, "spec_sha": sha, "git_sha": _git(),
-        "label_hash": result.get("label_hash"), "snapshot": snapshot_id(),
+        "label_hash": result.get("label_hash"),
+        "snapshot": result.get("snapshot", snapshot_id(db_path)),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }, ensure_ascii=False, indent=1), encoding="utf-8")
     summary = {k: v for k, v in result.items() if k != "per_symbol"}
@@ -246,7 +249,8 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str) -> Path:
         encoding="utf-8")
     lines = [f"# {run_id} — {kind}", "",
              f"Hypothèse : {spec.get('hypothesis', '')}", "",
-             f"- spec_sha {sha} · git {_git()} · snapshot {snapshot_id()}",
+             f"- spec_sha {sha} · git {_git()} · snapshot "
+             f"{result.get('snapshot', snapshot_id(db_path))}",
              f"- verdict : **{result.get('verdict')}** · n {result.get('n')} · "
              f"mean {result.get('mean')}", ""]
     for key, st in result.get("per_symbol", {}).items():
@@ -271,7 +275,7 @@ def _log_ledger(spec: dict, verdict: str, mode: str, ref: str) -> None:
 def cmd_discovery(a) -> int:
     spec = load_spec(Path(a.spec))
     res = run_discovery(spec, db_path=Path(a.db))
-    rdir = write_artifacts(spec["id"], spec, res, "discovery")
+    rdir = write_artifacts(spec["id"], spec, res, "discovery", db_path=Path(a.db))
     _log_ledger(spec, res["verdict"], Mode.DISCOVERY.value,
                 str(rdir / "report.md"))
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
@@ -289,7 +293,8 @@ def cmd_confirm(a) -> int:
             if not c["ok"]:
                 print(f"  [ÉCHEC] {c['check']} — {c['detail']}")
         return 1
-    rdir = write_artifacts(spec["id"], spec, res, "confirmation")
+    rdir = write_artifacts(spec["id"], spec, res, "confirmation",
+                           db_path=Path(a.db))
     _log_ledger(spec, "FAIL" if res["verdict"] == "REJECTED" else "PASS",
                 Mode.CONFIRMATION.value, str(rdir / "report.md"))
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
