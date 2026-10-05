@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-29",
+ "domain": "aster",
+ "family": "bonsai_ret_1h",
+ "strategy": "momentum-range_confirmation",
+ "hypothesis": "[H-29] Momentum-Range Confirmation — ret_6h > 0.5 (falsification : ret_6h < 0.3)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "ret_1h",
+    "op": ">=",
+    "quantile": 0.9
+   },
+   {
+    "feature": "range_pct",
+    "op": ">=",
+    "quantile": 0.6
+   }
+  ],
+  "side": 1
+ },
+ "horizons": [
+  6
+ ],
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "tiny"
+ },
+ "bonsai": {
+  "novelty": 0.6,
+  "mask_text": "Momentum soutenu dans range large"
+ }
+}

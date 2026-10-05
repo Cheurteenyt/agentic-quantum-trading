@@ -617,3 +617,32 @@ strategies:
   notes: le squeeze des majeures CONFIRMÉ sous protocole-v2 (l'ancien verdict
     « réfuté sur 6 ans » portait sur un autre univers/un autre protocole) ;
     étape suivante = forward confirmation (maturation 30 j)
+- id: EXP-crash-short-6h-univ10
+  family: forced_flow
+  status: OOS_PASS
+  timeframe: 1h
+  hypothesis: RÉPLICATION UNIVERSE — le même flux forcé vendeur (ret_1h <= p10
+    expanding) continue de baisser à 6h sur les 10 majeures
+  discovery: DISCOVERY_PASS 05/10 (post-backfill profond des 7 nouvelles
+    majeures, 2021-10→2022-04) — n 30033, mean +1.041 %/trade, inverse -1.601
+  confirmation: CONFIRMED 05/10 porte v6 (slot W41) — n 6350 val, mean +1.130
+    %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.990
+  wallet_validation: $100 → $155.95 (+56.0 %/13 mois), WR ~76 %, DD 0.44 %,
+    0 liq, 0 mois négatif — l'extension d'universe MULTIPLIE les events sans
+    diluer l'edge (val 3-maj +1.014 → univ10 +1.130)
+  notes: le backfill fetch_deep_klines (version fixée) vérifié — les barres
+    0-volume sont des heures réellement sans trade (quote 0 aussi), pas la
+    corruption historique
+- id: EXP-bonsai-h-18-univ10
+  family: bonsai_range_pct
+  status: OOS_PASS
+  timeframe: 1h
+  hypothesis: RÉPLICATION UNIVERSE — le squeeze (range_pct < 2.0 ET ret_1h <
+    -0.3) porte un short 6h sur les 10 majeures
+  discovery: DISCOVERY_PASS 05/10 — n 74602, mean +0.249 %/trade, inverse -0.809
+  confirmation: CONFIRMED 05/10 porte v6 (slot W41) — n 19961 val, mean +0.329
+    %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.189
+  wallet_validation: $100 → $134.51 (+34.5 %/13 mois), DD 0.90 %, 0 liq,
+    0 mois négatif
+  notes: le squeeze tient sur l'univers élargi (val 3-maj +0.360 → univ10
+    +0.329, dilution minime)

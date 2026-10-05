@@ -1,0 +1,44 @@
+{
+ "compute": {
+  "class": "tiny"
+ },
+ "cost_pct": 0.28,
+ "criteria": {
+  "min_mean": 0.05,
+  "min_n": 100
+ },
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_end": 1756684800000,
+  "train_start": 1609459200000,
+  "validation_end": 1790000000000,
+  "validation_start": 1756684800000
+ },
+ "domain": "aster",
+ "family": "forced_flow",
+ "horizons": [
+  6
+ ],
+ "hypothesis": "RÉPLICATION UNIVERSE : le même flux forcé vendeur (ret_1h <= p10 expanding) continue de baisser à 6h sur les 10 majeures, pas seulement BTC/ETH/SOL",
+ "id": "EXP-crash-short-6h-univ10",
+ "mode": "confirmation",
+ "signal": {
+  "feature": "ret_1h",
+  "op": "<=",
+  "quantile": 0.1,
+  "side": -1
+ },
+ "strategy": "ret1h_p10_short_univ10"
+}

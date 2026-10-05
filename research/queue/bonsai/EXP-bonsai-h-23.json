@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-23",
+ "domain": "aster",
+ "family": "bonsai_fund_last",
+ "strategy": "funding-price_synchrony",
+ "hypothesis": "[H-23] Funding-Price Synchrony — ret_12h < 0.5 (falsification : ret_12h > 1.0)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "fund_last",
+    "op": ">=",
+    "quantile": 0.7
+   },
+   {
+    "feature": "ret_1h",
+    "op": ">=",
+    "quantile": 0.6
+   }
+  ],
+  "side": -1
+ },
+ "horizons": [
+  12
+ ],
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "small"
+ },
+ "bonsai": {
+  "novelty": 0.7,
+  "mask_text": "Funding aligné avec le rendement récent"
+ }
+}
