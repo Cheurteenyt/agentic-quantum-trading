@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""lab_ledger.py v2 — registre d'essais CUMULATIF + garde-fou de budget (agent/policy.yaml).
+"""lab_ledger.py v3 — registre d'essais CUMULATIF + garde-fou de budget + MODES
+(research_os : discovery / confirmation / paper, brief Research OS V3 §203 PR2).
+
+NOUVEAU v3 : --mode discovery (TRAIN only — ne consomme JAMAIS le budget
+scientifique, jamais promote) · --snapshot (la dédup distingue DUPLICATE /
+REPLICATION / transition discovery→confirmation via scripts/research_os.py) ·
+le journal d'états d'exécution (research/ledger/experiments.jsonl, append-only :
+PLANNED→PREFLIGHT→READY→RESERVED→RUNNING→SEALED→VERIFIED→VERDICT, brief §46-47).
 
 Lit le registre existant research/ledger/trials.jsonl (champs date/family/strategy/hypothesis/verdict[/params][/backfill])
 et applique RÉELLEMENT la policy : 20/semaine ISO, 5/famille, 3/stratégie, 12 variantes de paramètres.
@@ -37,7 +44,12 @@ from pathlib import Path
 from statistics import NormalDist
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from scripts.research_os import Mode, dedup_verdict  # noqa: E402
+
 DEFAULT_LEDGER = ROOT / "research" / "ledger" / "trials.jsonl"
+DEFAULT_JOURNAL = ROOT / "research" / "ledger" / "experiments.jsonl"
 DEFAULT_POLICY = ROOT / "agent" / "policy.yaml"
 DEFAULT_STATE = ROOT / "research" / "STATE.md"
 
@@ -127,7 +139,11 @@ def load(ledger: Path, effective: datetime | None) -> list[dict]:
         e.update({
             "_ts": ts, "_week": iso_week(ts), "_hh": sha(norm_text(e.get("hypothesis", ""))),
             "_ph": sha(json.dumps(params, sort_keys=True)), "_backfill": bf,
-            "_consumes": (e.get("verdict") not in ("PREREG",)) and not bf,
+            "_mode": e.get("mode", "confirmation"),       # v3 : les essais legacy = confirmations
+            "_snapshot": e.get("snapshot", "default"),
+            # FIX v3 : une discovery ne consomme JAMAIS le budget scientifique
+            "_consumes": (e.get("verdict") not in ("PREREG",)) and not bf
+                         and e.get("mode", "confirmation") != "discovery",
             "family": slug(e.get("family", "")), "strategy": slug(e.get("strategy", "")),
         })
         out.append(e)
@@ -158,17 +174,30 @@ def week_usage(entries, week):
     return len(cur), Counter(e["family"] for e in cur), Counter(e["strategy"] for e in cur)
 
 
-def assess(entries, budget, now, family, strategy, hypothesis, params) -> dict:
+def assess(entries, budget, now, family, strategy, hypothesis, params,
+           mode="confirmation", snapshot="default") -> dict:
     hh, ph = sha(norm_text(hypothesis)), sha(json.dumps(params, sort_keys=True))
-    same_h = [e for e in entries if e["_hh"] == hh]
-    exact = [e for e in same_h if e["_ph"] == ph]
-    if exact:
-        e = exact[0]
+    # FIX v3 (dédupe sémantique research_os) : DUPLICATE ≠ REPLICATION ≠
+    # transition discovery→confirmation — l'ancien dedup aveugle au mode
+    # aurait bloqué la confirmation d'une découverte du même couple.
+    d = dedup_verdict(mode, hh, ph, snapshot,
+                      [{"mode": e.get("_mode", "confirmation"), "hh": e["_hh"],
+                        "ph": e["_ph"], "snapshot": e.get("_snapshot", "default")}
+                       for e in entries])
+    if d == "DUPLICATE":
+        e = next(x for x in entries if x["_hh"] == hh and x["_ph"] == ph
+                 and x.get("_snapshot", "default") == snapshot
+                 and x.get("_mode", "confirmation") == mode)
         where = f"{e['family']}/{e['strategy']}"
         return {"status": "NO-OP", "code": EXIT_DUP, "msgs": [
-            f"DOUBLON : même hypothèse (normalisée) et mêmes paramètres déjà logués le {e.get('date') or e['_ts']:.10} "
-            f"sous {where} → {e.get('verdict')}. NO-OP : ne pas relancer, même reformulé ou sous une autre stratégie."]}
+            f"DOUBLON : même hypothèse, mêmes paramètres, même snapshot, même mode "
+            f"({mode}) déjà logués le {e.get('date') or e['_ts']:.10} "
+            f"sous {where} → {e.get('verdict')}. NO-OP."]}
     msgs, status, code = [], "GO", EXIT_OK
+    if d == "REPLICATION":
+        msgs.append("REPLICATION : même spécification sur un NOUVEAU snapshot — "
+                    "autorisé (le N de multiplicité reste cumulatif).")
+    same_h = [e for e in entries if e["_hh"] == hh]
     if same_h:
         variants = len({e["_ph"] for e in same_h})
         msgs.append(f"PARAMETER_MUTATION : cette hypothèse a déjà {variants} variante(s) loguée(s) — une variation "
@@ -178,21 +207,34 @@ def assess(entries, budget, now, family, strategy, hypothesis, params) -> dict:
             msgs.append(f"STOP : {variants + 1} variantes > max_parameter_variants={budget['max_parameter_variants']}.")
     week = iso_week(now)
     total, by_fam, by_str = week_usage(entries, week)
-    msgs.append(f"Semaine {week} : total {total}/{budget['total_experiments']} · famille « {family} » "
-                f"{by_fam[family]}/{budget['per_family']} · stratégie « {strategy} » {by_str[strategy]}/{budget['per_strategy']}")
-    for label, used, cap in (("total", total, budget["total_experiments"]),
-                             (f"famille « {family} »", by_fam[family], budget["per_family"]),
-                             (f"stratégie « {strategy} »", by_str[strategy], budget["per_strategy"])):
-        if used >= cap:
-            status, code = "STOP", EXIT_STOP
-            msgs.append(f"STOP : budget {label} épuisé ({used}/{cap}) — file B (maintenance), pas de variante déguisée.")
+    if mode == "discovery":
+        # FIX v3 (brief §28) : la découverte ne consomme PAS le budget
+        # scientifique — TRAIN only, jamais promote ; le compute est gouverné
+        # par le resource guard, pas par ce plafond.
+        msgs.append(f"DISCOVERY : hors budget scientifique (TRAIN only, jamais promote) "
+                    f"— semaine {week} : {total}/{budget['total_experiments']} confirmations.")
+    else:
+        msgs.append(f"Semaine {week} : total {total}/{budget['total_experiments']} · famille « {family} » "
+                    f"{by_fam[family]}/{budget['per_family']} · stratégie « {strategy} » {by_str[strategy]}/{budget['per_strategy']}")
+        for label, used, cap in (("total", total, budget["total_experiments"]),
+                                 (f"famille « {family} »", by_fam[family], budget["per_family"]),
+                                 (f"stratégie « {strategy} »", by_str[strategy], budget["per_strategy"])):
+            if used >= cap:
+                status, code = "STOP", EXIT_STOP
+                msgs.append(f"STOP : budget {label} épuisé ({used}/{cap}) — file B (maintenance), pas de variante déguisée.")
     fam_all = [e for e in entries if e["family"] == family and e.get("verdict") != "PREREG"]
     dead = sum(1 for e in fam_all if e.get("verdict") in ("FAIL", "NUL"))
     if dead >= 3 and not any(e.get("verdict") == "PASS" for e in fam_all):
         msgs.append(f"MORTALITÉ : « {family} » = {dead} FAIL/NUL pour 0 PASS — écrire la mécanique qui justifie un nouvel essai.")
-    n_all = sum(1 for e in entries if e.get("verdict") != "PREREG")
-    msgs.append(f"Multiplicité : {n_all} essais cumulés (backfill inclus) → seuil indicatif du prochain |t| ≥ "
-                f"{tstar(n_all + 1):.2f} (Bonferroni 5 % bilatéral, N={n_all + 1}).")
+    # FIX v3 (brief §76) : le N de multiplicité = les CONFIRMATIONS cumulées
+    # (jamais remis à zéro par le changement de semaine) ; les discoveries
+    # sont comptées à part (la pression de sélection, §75).
+    n_conf = sum(1 for e in entries if e.get("verdict") != "PREREG"
+                 and e.get("_mode", "confirmation") != "discovery")
+    n_disc = sum(1 for e in entries if e.get("_mode", "confirmation") == "discovery")
+    msgs.append(f"Multiplicité : N_confirmation {n_conf} cumulées (backfill inclus, "
+                f"jamais remis à zéro) + {n_disc} discoveries → seuil indicatif du prochain |t| ≥ "
+                f"{tstar(n_conf + 1):.2f} (Bonferroni 5 % bilatéral, N={n_conf + 1}).")
     return {"status": status, "code": code, "msgs": msgs}
 
 
@@ -223,7 +265,8 @@ def ctx(a):
 
 def cmd_check(a) -> int:
     pol, entries, now = ctx(a)
-    res = assess(entries, pol["budget"], now, slug(a.family), slug(a.strategy), a.hypothesis, parse_params(a.params))
+    res = assess(entries, pol["budget"], now, slug(a.family), slug(a.strategy), a.hypothesis,
+                 parse_params(a.params), mode=a.mode, snapshot=a.snapshot)
     for m in res["msgs"]:
         print(m)
     print({"GO": "→ GO", "NO-OP": "→ NO-OP (doublon)", "STOP": "→ STOP (budget)"}[res["status"]])
@@ -240,12 +283,14 @@ def cmd_log(a) -> int:
     family, strategy, params = slug(a.family), slug(a.strategy), parse_params(a.params)
     backfill = True if a.backfill else (None if not pol["effective"] else ts < pol["effective"])
     if verdict != "PREREG" and not backfill:
-        res = assess(entries, pol["budget"], ts, family, strategy, a.hypothesis, params)
+        res = assess(entries, pol["budget"], ts, family, strategy, a.hypothesis, params,
+                     mode=a.mode, snapshot=a.snapshot)
         if res["status"] != "GO":
             print(f"⚠ {res['status']} au moment du log — enregistré quand même (le registre reflète ce qui a été exécuté) :")
             for m in res["msgs"]:
                 print("  " + m)
     entry = {"date": ts.strftime("%Y-%m-%d"), "ts": ts.strftime("%Y-%m-%dT%H:%M:%SZ"), "domain": slug(a.domain),
+             "mode": a.mode, "snapshot": a.snapshot,
              "family": family, "strategy": strategy, "hypothesis": a.hypothesis.strip(),
              "hypothesis_hash": sha(norm_text(a.hypothesis)), "parameter_hash": sha(json.dumps(params, sort_keys=True)),
              "verdict": verdict, "n": a.n, "er": a.er, "se": a.se, "ref": a.ref, "notes": a.notes, "git": git_short()}
@@ -302,6 +347,59 @@ def cmd_sync_state(a) -> int:
     return EXIT_OK
 
 
+def _append_event(journal: Path, ev: dict) -> None:
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    with journal.open("a", encoding="utf-8"):
+        pass
+    with journal.open("a", encoding="utf-8") as f:  # append atomique ligne à ligne
+        f.write(json.dumps(ev, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def cmd_state(a) -> int:
+    """Le journal d'états d'exécution (append-only, brief V3 §48-49) :
+    RESERVED → RUNNING → SEALED → VERIFIED → VERDICT (ou les échecs)."""
+    a.state = a.state.lower()   # RESERVED / reserved : la même chose
+    import scripts.research_os as _ros
+    if a.state not in {s.value for s in _ros.ExecState}:
+        print(f"état invalide : {a.state} (attendu : {', '.join(s.value for s in _ros.ExecState)})")
+        return EXIT_ERR
+    ev = {"ts": now_utc().strftime("%Y-%m-%dT%H:%M:%SZ"),
+          "experiment_id": slug(a.experiment), "state": a.state,
+          "mode": a.mode, "snapshot": a.snapshot, "git": git_short()}
+    if a.notes:
+        ev["notes"] = a.notes
+    _append_event(Path(a.journal), ev)
+    cur = current_state(Path(a.journal), slug(a.experiment))
+    slot = "slot CONSOMMÉ" if _ros.consumes_slot(a.state) else "slot intact"
+    print(f"{slug(a.experiment)} : {a.state} ({slot}) — état courant : {cur}")
+    return EXIT_OK
+
+
+def current_state(journal: Path, experiment_id: str) -> str | None:
+    """Reconstruit l'état courant d'une expérience depuis le journal append-only."""
+    jp = Path(journal)
+    if not jp.exists():
+        return None
+    cur = None
+    with jp.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if e.get("experiment_id") == experiment_id:
+                cur = e.get("state")
+    return cur
+
+
+def cmd_current(a) -> int:
+    cur = current_state(Path(a.journal), slug(a.experiment))
+    print(f"{slug(a.experiment)} : {cur or 'aucun événement'}")
+    return EXIT_OK
+
+
 def cmd_selftest(a) -> int:
     """Preuve fonctionnelle : tourne sur un registre jetable, jamais sur le vrai."""
     fails = []
@@ -348,11 +446,40 @@ def cmd_selftest(a) -> int:
         ok("registre append-only (6 lignes, aucune réécriture)", len(lines) == 6)
         lg("v1", "p", "q", extra=("--params", "k=1"))
         ok("variante de paramètres signalée", "PARAMETER_MUTATION" in chk("v1", "p", "q", ("--params", "k=2"))[1])
+
+        # ——— v3 : les modes discovery/confirmation et le journal d'états ———
+        ok("v3 discovery : budget épuisé mais GO (hors budget scientifique)",
+           chk("hyp disc", "z", "z", ("--mode", "discovery"))[0] == EXIT_OK)
+        lg("hyp disc", "z", "z", "FAIL", ("--mode", "discovery"))
+        ok("v3 discovery loggée ne consomme pas (5/4 : la discovery n'a pas mordu)",
+           "5/4" in chk("hyp disc2", "z", "z")[1])
+        code_dc = chk("hyp disc", "z", "z")[0]
+        ok("v3 discovery → confirmation du même couple = autorisé (pas DOUBLON)",
+           code_dc != EXIT_DUP)
+        lg("hyp disc", "z", "z", "FAIL")
+        ok("v3 confirmation en doublon (même mode, même snapshot) = NO-OP",
+           chk("hyp disc", "z", "z")[0] == EXIT_DUP)
+        ok("v3 réplication sur nouveau snapshot = autorisé (pas DOUBLON)",
+           chk("hyp disc", "z", "z", ("--snapshot", "S2"))[0] != EXIT_DUP)
+        ok("v3 réplication : le message REPLICATION est émis",
+           "REPLICATION" in chk("hyp disc", "z", "z", ("--snapshot", "S3"))[1])
+        jrn = Path(d) / "experiments.jsonl"
+        run("state", "--experiment", "EXP-1", "--state", "RESERVED", "--journal", str(jrn))
+        run("state", "--experiment", "EXP-1", "--state", "RUNNING", "--journal", str(jrn))
+        _, out_cur = run("current", "--experiment", "EXP-1", "--journal", str(jrn))
+        ok("v3 journal d'états : RESERVED → RUNNING → current=running",
+           "running" in out_cur.lower())
+        code_bad = run("state", "--experiment", "EXP-2", "--state", "MADEUP", "--journal", str(jrn))[0]
+        ok("v3 état invalide refusé", code_bad == EXIT_ERR)
+        ok("v3 PREFLIGHT_FAILED ne consomme pas de slot", "slot intact" in run(
+            "state", "--experiment", "EXP-3", "--state", "PREFLIGHT_FAILED",
+            "--journal", str(jrn))[1])
     if fails:
         print("SELFTEST ÉCHEC : " + " | ".join(fails))
         return 1
-    print("SELFTEST OK (11 propriétés : doublon reformulé, autre stratégie, plafonds famille/total, NUL/SOUS_PUISSANT, "
-          "PREREG, backfill, append-only, log sans --date, variantes)")
+    print("SELFTEST OK (18 propriétés : doublon reformulé, autre stratégie, plafonds famille/total, NUL/SOUS_PUISSANT, "
+          "PREREG, backfill, append-only, log sans --date, variantes, discovery hors budget, "
+          "discovery→confirmation autorisé, doublon par mode, réplication, journal d'états, état invalide, preflight 0 slot)")
     return EXIT_OK
 
 
@@ -368,6 +495,8 @@ def build_parser() -> argparse.ArgumentParser:
         s.add_argument("--strategy", required=True)
         s.add_argument("--hypothesis", required=True)
         s.add_argument("--params", nargs="*", default=[])
+        s.add_argument("--mode", default="confirmation", choices=["discovery", "confirmation", "paper"])
+        s.add_argument("--snapshot", default="default")
         if name == "log":
             s.add_argument("--verdict", required=True)
             s.add_argument("--date", help="AAAA-MM-JJ (défaut : maintenant UTC)")
@@ -378,6 +507,16 @@ def build_parser() -> argparse.ArgumentParser:
             s.add_argument("--ref")
             s.add_argument("--notes")
             s.add_argument("--backfill", action="store_true")
+    stx = sub.add_parser("state")
+    stx.add_argument("--experiment", required=True)
+    stx.add_argument("--state", required=True)
+    stx.add_argument("--mode", default="confirmation")
+    stx.add_argument("--snapshot", default="default")
+    stx.add_argument("--notes")
+    stx.add_argument("--journal", default=str(DEFAULT_JOURNAL))
+    cur = sub.add_parser("current")
+    cur.add_argument("--experiment", required=True)
+    cur.add_argument("--journal", default=str(DEFAULT_JOURNAL))
     st = sub.add_parser("status")
     st.add_argument("--md", action="store_true")
     sy = sub.add_parser("sync-state")
@@ -390,7 +529,8 @@ def main(argv=None) -> int:
     a = build_parser().parse_args(argv)
     try:
         return {"check": cmd_check, "log": cmd_log, "status": cmd_status,
-                "sync-state": cmd_sync_state, "selftest": cmd_selftest}[a.cmd](a)
+                "sync-state": cmd_sync_state, "selftest": cmd_selftest,
+                "state": cmd_state, "current": cmd_current}[a.cmd](a)
     except ValueError as e:
         print(f"erreur : {e}")
         return EXIT_ERR
