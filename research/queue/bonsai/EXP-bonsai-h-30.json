@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-30",
+ "domain": "aster",
+ "family": "bonsai_fund_last",
+ "strategy": "funding-range_contradiction",
+ "hypothesis": "[H-30] Funding-Range Contradiction — ret_48h < 1.0 (falsification : ret_48h > 2.0)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "fund_last",
+    "op": ">=",
+    "quantile": 0.8
+   },
+   {
+    "feature": "range_pct",
+    "op": "<=",
+    "quantile": 0.2
+   }
+  ],
+  "side": -1
+ },
+ "horizons": [
+  48
+ ],
+ "criteria": {
+  "min_n": 30,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "medium"
+ },
+ "bonsai": {
+  "novelty": 0.5,
+  "mask_text": "Funding bullish mais range faible"
+ }
+}

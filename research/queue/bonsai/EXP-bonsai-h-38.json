@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-38",
+ "domain": "aster",
+ "family": "bonsai_volume_z",
+ "strategy": "volume_spike_range_reversion",
+ "hypothesis": "[H-38] Volume Spike Range Reversion — ret_1h < 0.2 (falsification : ret_1h > 0.8)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "volume_z",
+    "op": ">=",
+    "quantile": 0.95
+   },
+   {
+    "feature": "range_pct",
+    "op": ">=",
+    "quantile": 0.8
+   }
+  ],
+  "side": -1
+ },
+ "horizons": [
+  1
+ ],
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "tiny"
+ },
+ "bonsai": {
+  "novelty": 0.9,
+  "mask_text": "Pic de volume avec range élevé"
+ }
+}

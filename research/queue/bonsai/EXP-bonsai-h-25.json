@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-25",
+ "domain": "aster",
+ "family": "bonsai_fund_last",
+ "strategy": "funding_divergence_reversion",
+ "hypothesis": "[H-25] Funding Divergence Reversion — ret_24h < 0.5 (falsification : ret_24h > 1.5)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "fund_last",
+    "op": ">=",
+    "quantile": 0.85
+   },
+   {
+    "feature": "ret_1h",
+    "op": "<=",
+    "quantile": 0.15
+   }
+  ],
+  "side": -1
+ },
+ "horizons": [
+  24
+ ],
+ "criteria": {
+  "min_n": 30,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "medium"
+ },
+ "bonsai": {
+  "novelty": 0.6,
+  "mask_text": "Funding élevé mais prix stagnant"
+ }
+}

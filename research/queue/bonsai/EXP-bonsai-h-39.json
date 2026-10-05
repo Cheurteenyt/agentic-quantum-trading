@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-39",
+ "domain": "aster",
+ "family": "bonsai_range_pct",
+ "strategy": "low_funding_range_expansion",
+ "hypothesis": "[H-39] Low Funding Range Expansion — ret_6h > 0.6 (falsification : ret_6h < 0.3)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "range_pct",
+    "op": ">=",
+    "quantile": 0.8
+   },
+   {
+    "feature": "fund_last",
+    "op": "<=",
+    "quantile": 0.3
+   }
+  ],
+  "side": 1
+ },
+ "horizons": [
+  6
+ ],
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "small"
+ },
+ "bonsai": {
+  "novelty": 0.7,
+  "mask_text": "Range qui s'élargit avec funding faible"
+ }
+}

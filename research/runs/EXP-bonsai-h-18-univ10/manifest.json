@@ -1,0 +1,9 @@
+{
+ "run_id": "EXP-bonsai-h-18-univ10",
+ "kind": "confirmation",
+ "spec_sha": "d44d08c08136a820",
+ "git_sha": "a0db33f",
+ "label_hash": "dc1f0daa5f23d8ad",
+ "snapshot": "k1h-7d5269146038a186",
+ "timestamp": "2026-10-05T14:45:55.835321+00:00"
+}

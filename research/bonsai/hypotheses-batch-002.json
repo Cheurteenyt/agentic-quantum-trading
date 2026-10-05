@@ -1,0 +1,496 @@
+{
+ "batch": 2,
+ "generated": "2026-10-05",
+ "hypotheses": [
+  {
+   "id": "H-21",
+   "mechanism": "Range Compression Rebound",
+   "feature": "range_pct",
+   "mask": "Basse volatilité relative suivie de momentum",
+   "conditions": [
+    {
+     "feature": "range_pct",
+     "op": "<=",
+     "quantile": 0.15
+    },
+    {
+     "feature": "ret_1h",
+     "op": ">=",
+     "quantile": 0.8
+    }
+   ],
+   "side": "long",
+   "horizon_h": 4,
+   "prediction": "ret_4h > 0.2",
+   "falsification": "ret_4h < 0",
+   "compute_class": "tiny",
+   "novelty": 0.8
+  },
+  {
+   "id": "H-22",
+   "mechanism": "Volume Surge Reversion",
+   "feature": "volume_z",
+   "mask": "Pic de volume sans tendance forte",
+   "conditions": [
+    {
+     "feature": "volume_z",
+     "op": ">=",
+     "quantile": 0.9
+    },
+    {
+     "feature": "ret_1h",
+     "op": "<=",
+     "quantile": 0.3
+    }
+   ],
+   "side": "short",
+   "horizon_h": 2,
+   "prediction": "ret_2h < 0.1",
+   "falsification": "ret_2h > 0.5",
+   "compute_class": "tiny",
+   "novelty": 0.9
+  },
+  {
+   "id": "H-23",
+   "mechanism": "Funding-Price Synchrony",
+   "feature": "fund_last",
+   "mask": "Funding aligné avec le rendement récent",
+   "conditions": [
+    {
+     "feature": "fund_last",
+     "op": ">=",
+     "quantile": 0.7
+    },
+    {
+     "feature": "ret_1h",
+     "op": ">=",
+     "quantile": 0.6
+    }
+   ],
+   "side": "short",
+   "horizon_h": 12,
+   "prediction": "ret_12h < 0.5",
+   "falsification": "ret_12h > 1.0",
+   "compute_class": "small",
+   "novelty": 0.7
+  },
+  {
+   "id": "H-24",
+   "mechanism": "Low Range High Volume Momentum",
+   "feature": "range_pct",
+   "mask": "Tension entre volatilité et volume",
+   "conditions": [
+    {
+     "feature": "range_pct",
+     "op": "<=",
+     "quantile": 0.25
+    },
+    {
+     "feature": "volume_z",
+     "op": ">=",
+     "quantile": 0.75
+    }
+   ],
+   "side": "long",
+   "horizon_h": 6,
+   "prediction": "ret_6h > 0.3",
+   "falsification": "ret_6h < 0.1",
+   "compute_class": "tiny",
+   "novelty": 0.8
+  },
+  {
+   "id": "H-25",
+   "mechanism": "Funding Divergence Reversion",
+   "feature": "fund_last",
+   "mask": "Funding élevé mais prix stagnant",
+   "conditions": [
+    {
+     "feature": "fund_last",
+     "op": ">=",
+     "quantile": 0.85
+    },
+    {
+     "feature": "ret_1h",
+     "op": "<=",
+     "quantile": 0.15
+    }
+   ],
+   "side": "short",
+   "horizon_h": 24,
+   "prediction": "ret_24h < 0.5",
+   "falsification": "ret_24h > 1.5",
+   "compute_class": "medium",
+   "novelty": 0.6
+  },
+  {
+   "id": "H-26",
+   "mechanism": "Range Expansion Breakout",
+   "feature": "range_pct",
+   "mask": "Début d'expansion de range avec volume",
+   "conditions": [
+    {
+     "feature": "range_pct",
+     "op": ">=",
+     "quantile": 0.85
+    },
+    {
+     "feature": "volume_z",
+     "op": ">=",
+     "quantile": 0.5
+    }
+   ],
+   "side": "long",
+   "horizon_h": 4,
+   "prediction": "ret_4h > 0.4",
+   "falsification": "ret_4h < 0.2",
+   "compute_class": "tiny",
+   "novelty": 0.7
+  },
+  {
+   "id": "H-27",
+   "mechanism": "Negative Funding Pullback",
+   "feature": "fund_last",
+   "mask": "Funding négatif avec retresse",
+   "conditions": [
+    {
+     "feature": "fund_last",
+     "op": "<=",
+     "quantile": 0.1
+    },
+    {
+     "feature": "ret_1h",
+     "op": "<=",
+     "quantile": 0.2
+    }
+   ],
+   "side": "long",
+   "horizon_h": 12,
+   "prediction": "ret_12h > 0.5",
+   "falsification": "ret_12h < 0.2",
+   "compute_class": "small",
+   "novelty": 0.8
+  },
+  {
+   "id": "H-28",
+   "mechanism": "Volume-Range Imbalance Short",
+   "feature": "volume_z",
+   "mask": "Volume élevé sur range modéré",
+   "conditions": [
+    {
+     "feature": "volume_z",
+     "op": ">=",
+     "quantile": 0.9
+    },
+    {
+     "feature": "range_pct",
+     "op": "<=",
+     "quantile": 0.5
+    }
+   ],
+   "side": "short",
+   "horizon_h": 2,
+   "prediction": "ret_2h < 0.2",
+   "falsification": "ret_2h > 0.6",
+   "compute_class": "tiny",
+   "novelty": 0.9
+  },
+  {
+   "id": "H-29",
+   "mechanism": "Momentum-Range Confirmation",
+   "feature": "ret_1h",
+   "mask": "Momentum soutenu dans range large",
+   "conditions": [
+    {
+     "feature": "ret_1h",
+     "op": ">=",
+     "quantile": 0.9
+    },
+    {
+     "feature": "range_pct",
+     "op": ">=",
+     "quantile": 0.6
+    }
+   ],
+   "side": "long",
+   "horizon_h": 6,
+   "prediction": "ret_6h > 0.5",
+   "falsification": "ret_6h < 0.3",
+   "compute_class": "tiny",
+   "novelty": 0.6
+  },
+  {
+   "id": "H-30",
+   "mechanism": "Funding-Range Contradiction",
+   "feature": "fund_last",
+   "mask": "Funding bullish mais range faible",
+   "conditions": [
+    {
+     "feature": "fund_last",
+     "op": ">=",
+     "quantile": 0.8
+    },
+    {
+     "feature": "range_pct",
+     "op": "<=",
+     "quantile": 0.2
+    }
+   ],
+   "side": "short",
+   "horizon_h": 48,
+   "prediction": "ret_48h < 1.0",
+   "falsification": "ret_48h > 2.0",
+   "compute_class": "medium",
+   "novelty": 0.5
+  },
+  {
+   "id": "H-31",
+   "mechanism": "High Volume Low Return Mean Reversion",
+   "feature": "volume_z",
+   "mask": "Volume anormal avec rendement faible",
+   "conditions": [
+    {
+     "feature": "volume_z",
+     "op": ">=",
+     "quantile": 0.95
+    },
+    {
+     "feature": "ret_1h",
+     "op": "<=",
+     "quantile": 0.1
+    }
+   ],
+   "side": "short",
+   "horizon_h": 1,
+   "prediction": "ret_1h < 0.1",
+   "falsification": "ret_1h > 0.5",
+   "compute_class": "tiny",
+   "novelty": 0.9
+  },
+  {
+   "id": "H-32",
+   "mechanism": "Range Floor Bounce",
+   "feature": "range_pct",
+   "mask": "Range au minimum avec retresse",
+   "conditions": [
+    {
+     "feature": "range_pct",
+     "op": "<=",
+     "quantile": 0.1
+    },
+    {
+     "feature": "ret_1h",
+     "op": "<=",
+     "quantile": 0.3
+    }
+   ],
+   "side": "long",
+   "horizon_h": 12,
+   "prediction": "ret_12h > 0.8",
+   "falsification": "ret_12h < 0.4",
+   "compute_class": "small",
+   "novelty": 0.7
+  },
+  {
+   "id": "H-33",
+   "mechanism": "Funding Neutral Momentum",
+   "feature": "fund_last",
+   "mask": "Funding proche de zéro avec momentum",
+   "conditions": [
+    {
+     "feature": "fund_last",
+     "op": "<=",
+     "quantile": 0.6
+    },
+    {
+     "feature": "fund_last",
+     "op": ">=",
+     "quantile": 0.3
+    },
+    {
+     "feature": "ret_1h",
+     "op": ">=",
+     "quantile": 0.7
+    }
+   ],
+   "side": "long",
+   "horizon_h": 6,
+   "prediction": "ret_6h > 0.4",
+   "falsification": "ret_6h < 0.2",
+   "compute_class": "tiny",
+   "novelty": 0.8
+  },
+  {
+   "id": "H-34",
+   "mechanism": "Volume-Range Squeeze Break",
+   "feature": "range_pct",
+   "mask": "Squeeze de range avec volume croissant",
+   "conditions": [
+    {
+     "feature": "range_pct",
+     "op": "<=",
+     "quantile": 0.3
+    },
+    {
+     "feature": "volume_z",
+     "op": ">=",
+     "quantile": 0.8
+    }
+   ],
+   "side": "long",
+   "horizon_h": 2,
+   "prediction": "ret_2h > 0.3",
+   "falsification": "ret_2h < 0.1",
+   "compute_class": "tiny",
+   "novelty": 0.9
+  },
+  {
+   "id": "H-35",
+   "mechanism": "Negative Funding Rebound",
+   "feature": "fund_last",
+   "mask": "Funding très négatif, retour à la normale",
+   "conditions": [
+    {
+     "feature": "fund_last",
+     "op": "<=",
+     "quantile": 0.05
+    },
+    {
+     "feature": "ret_1h",
+     "op": ">=",
+     "quantile": 0.5
+    }
+   ],
+   "side": "long",
+   "horizon_h": 24,
+   "prediction": "ret_24h > 1.0",
+   "falsification": "ret_24h < 0.5",
+   "compute_class": "medium",
+   "novelty": 0.7
+  },
+  {
+   "id": "H-36",
+   "mechanism": "High Range Low Volume Fade",
+   "feature": "range_pct",
+   "mask": "Range large mais volume faible (faux breakdown)",
+   "conditions": [
+    {
+     "feature": "range_pct",
+     "op": ">=",
+     "quantile": 0.9
+    },
+    {
+     "feature": "volume_z",
+     "op": "<=",
+     "quantile": 0.2
+    }
+   ],
+   "side": "short",
+   "horizon_h": 4,
+   "prediction": "ret_4h < 0.5",
+   "falsification": "ret_4h > 1.0",
+   "compute_class": "tiny",
+   "novelty": 0.8
+  },
+  {
+   "id": "H-37",
+   "mechanism": "Funding-Range Momentum Sync",
+   "feature": "fund_last",
+   "mask": "Funding et range alignés sur la tendance",
+   "conditions": [
+    {
+     "feature": "fund_last",
+     "op": ">=",
+     "quantile": 0.7
+    },
+    {
+     "feature": "range_pct",
+     "op": ">=",
+     "quantile": 0.7
+    },
+    {
+     "feature": "ret_1h",
+     "op": ">=",
+     "quantile": 0.6
+    }
+   ],
+   "side": "short",
+   "horizon_h": 12,
+   "prediction": "ret_12h < 0.5",
+   "falsification": "ret_12h > 1.0",
+   "compute_class": "small",
+   "novelty": 0.6
+  },
+  {
+   "id": "H-38",
+   "mechanism": "Volume Spike Range Reversion",
+   "feature": "volume_z",
+   "mask": "Pic de volume avec range élevé",
+   "conditions": [
+    {
+     "feature": "volume_z",
+     "op": ">=",
+     "quantile": 0.95
+    },
+    {
+     "feature": "range_pct",
+     "op": ">=",
+     "quantile": 0.8
+    }
+   ],
+   "side": "short",
+   "horizon_h": 1,
+   "prediction": "ret_1h < 0.2",
+   "falsification": "ret_1h > 0.8",
+   "compute_class": "tiny",
+   "novelty": 0.9
+  },
+  {
+   "id": "H-39",
+   "mechanism": "Low Funding Range Expansion",
+   "feature": "range_pct",
+   "mask": "Range qui s'élargit avec funding faible",
+   "conditions": [
+    {
+     "feature": "range_pct",
+     "op": ">=",
+     "quantile": 0.8
+    },
+    {
+     "feature": "fund_last",
+     "op": "<=",
+     "quantile": 0.3
+    }
+   ],
+   "side": "long",
+   "horizon_h": 6,
+   "prediction": "ret_6h > 0.6",
+   "falsification": "ret_6h < 0.3",
+   "compute_class": "small",
+   "novelty": 0.7
+  },
+  {
+   "id": "H-40",
+   "mechanism": "Volume-Return Asymmetry",
+   "feature": "ret_1h",
+   "mask": "Rendement positif avec volume modéré",
+   "conditions": [
+    {
+     "feature": "ret_1h",
+     "op": ">=",
+     "quantile": 0.8
+    },
+    {
+     "feature": "volume_z",
+     "op": "<=",
+     "quantile": 0.5
+    }
+   ],
+   "side": "short",
+   "horizon_h": 2,
+   "prediction": "ret_2h < 0.3",
+   "falsification": "ret_2h > 0.7",
+   "compute_class": "tiny",
+   "novelty": 0.8
+  }
+ ]
+}
