@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 
 class Mode(str, Enum):
@@ -139,6 +140,26 @@ class DataScope:
 # ------------------------------------------------------------------ dedup
 #: les verdicts de déduplication (brief V3 §4-6) — lab_ledger les applique
 DUPLICATE, REPLICATION, NEW = "DUPLICATE", "REPLICATION", "NEW"
+
+
+PROTOCOL_FILE = Path(__file__).resolve().parents[1] / "research" / "protocols" / "active.yaml"
+_PROTOCOL_CACHE: dict | None = None
+
+
+def load_confirmation_protocol() -> dict:
+    """L'instance UNIQUE du protocole de confirmation (brief V3 §13).
+
+    gates.py, candidates.py, le runner, STATE et le paper forward lisent
+    leurs seuils ICI — aucun seuil de confirmation codé en dur ailleurs
+    (le test de cohérence le vérifie). Ratifiée le 2026-10-05 (F-036
+    documente l'historique honnête du tag).
+    """
+    global _PROTOCOL_CACHE
+    if _PROTOCOL_CACHE is None:
+        import yaml
+        _PROTOCOL_CACHE = yaml.safe_load(
+            PROTOCOL_FILE.read_text(encoding="utf-8"))
+    return _PROTOCOL_CACHE
 
 
 def dedup_verdict(mode: str, hyp_hash: str, param_hash: str, snapshot_id: str,

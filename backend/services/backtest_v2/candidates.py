@@ -30,6 +30,11 @@ from pathlib import Path
 from typing import Any
 
 from . import SCHEMA_VERSION
+from scripts.research_os import load_confirmation_protocol
+
+# L'AUTORITÉ UNIQUE des seuils de confirmation (ratifiée 2026-10-05,
+# research/protocols/active.yaml) — plus aucun seuil codé en dur ici.
+PROTOCOL = load_confirmation_protocol()
 
 
 class CandidateStatus(str, Enum):
@@ -207,9 +212,9 @@ class CandidateRegistry:
 
         RÈGLES (le None = non mesuré = jamais un pass) :
           CONFIRMED seulement si TOUTES :
-            forward_sharpe     >= 0.5
-            forward_trades     >= 100
-            forward_sharpe     >= 0.5 * sharpe_oos_discovery
+            forward_sharpe     >= PROTOCOL["forward_confirmation"]["min_forward_sharpe"]
+            forward_trades     >= PROTOCOL["forward_confirmation"]["min_forward_trades"]
+            forward_sharpe     >= PROTOCOL["forward_confirmation"]["min_vs_discovery"] * sharpe_oos_discovery
           Sinon REJECTED, avec `decision_reason` explicite.
 
         Lève KeyError si (identity_key, run_id) inconnu.
