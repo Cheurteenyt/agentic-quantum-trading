@@ -252,6 +252,19 @@ vérification → evidence → ledger → STATE.
   fait est CONTRADICTED/UNVERIFIED). Un fait contredit se corrige via PR.
 - **Le brief d'entrée de session** : `python scripts/context_manifest.py` —
   HEAD + STATE + les faits + le budget + les derniers verdicts. LIRE CELA
-  AVANT docs/20 (127 Ko) ou toute relecture massive.
+  AVANT docs/20 (146 Ko) ou toute relecture massive.
 - **La règle** : toute affirmation porte son id de fait (F-XXX) ou sa
   commande de reproduction. UNVERIFIED n'entre jamais dans STATE.md.
+
+# ⚡ RESEARCH OS (depuis le 05/10 — brief Research OS V3, PR 1-3)
+
+Deux modes, deux budgets (policy.yaml + lab_ledger v3) :
+- **DISCOVERY** : `--mode discovery` — TRAIN only, hors budget scientifique,
+  JAMAIS promote ; le compute est gouverné, pas le budget.
+- **CONFIRMATION** : pré-enregistré, protocole gelé, le budget 20/sem
+  s'applique ; N de multiplicité CUMULATIF (jamais remis à zéro par la
+  semaine).
+- **PREFLIGHT avant tout run couplé à la DB** : `python scripts/preflight.py
+  ...` — IMPORT OK ≠ PIPELINE OK (le crash open_time du 05/10). Un smoke
+  test sur données réelles est la règle.
+- Le journal d'états : research/ledger/experiments.jsonl (append-only).

@@ -1,3 +1,5 @@
+> ⚖️ **STATUT (clarifié 2026-10-05)** : PROPOSITION scellée (tag `protocol-v2-ratified`, 02/10) mais **NON APPLIQUÉE** — le propriétaire a dit « pas pour l'instant », v1 reste la loi opérationnelle. La ratification explicite (décision du propriétaire) est un prérequis de toute comparaison inter-protocole — interdite en l'état.
+
 # PROTOCOL_V2 — le walk-forward fenêtre par fenêtre
 
 **STATUT : PROPOSITION — en attente de ratification user** (le protocole v1 reste

@@ -1,3 +1,5 @@
+> ⚖️ **PÉRIMÈTRE (audit GPT v3 §14)** : ce document est le RUNBOOK opérationnel (quand lancer quoi). Les critères scientifiques de confirmation font autorité dans `research/protocols/` + `agent/policy.yaml`. CONFLIT CONNU NON TRANCHÉ : la logique 30 jours ci-dessous ≠ protocol_v2 (6 fenêtres + embargo, non ratifié) — la ratification est une décision du propriétaire.
+
 ---
 title: Orchestration de la boucle découverte → validation OOS
 status: living
