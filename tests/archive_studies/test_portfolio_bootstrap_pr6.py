@@ -1,3 +1,4 @@
+# ARCHIVÉ (05/10) — remplacé par tests/test_portfolio_v12.py : les métriques PR-6 étaient calculées sur les TRADES (Sortino gonflé par la fréquence, « Sharpe/trade » = t-stat, blocs en trades) — l'audit GLM 5.3 post-#138 impose la courbe d'équité horaire comme unité d'observation.
 """Tests PR-6 : les métriques du rapport final et le bootstrap par blocs
 (audit GLM 5.3 §36 + améliorations 2-3).
 

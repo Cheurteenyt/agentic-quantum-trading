@@ -12,9 +12,11 @@
   "capital": 100.0,
   "solde": 112.80472201809489,
   "roi_pct": 12.804722018094894,
-  "cagr_pct": 12.203279959075841,
-  "years": 1.0464293862651153,
-  "sortino": 48.332162507557975,
+  "cagr_pct": 12.089947323166506,
+  "years": 1.0556949831419373,
+  "portfolio_sharpe": 9.97,
+  "portfolio_sortino": 19.9,
+  "trade_sortino": 48.11959481767181,
   "profit_factor": 5.008760692594327,
   "solde_sans_top1": 111.74717098569033,
   "solde_sans_top5": 109.04584727097073,
@@ -75,24 +77,41 @@
  "effective_n": {
   "n_raw": 1173,
   "n_nonoverlap": 525,
+  "n_time_buckets": 688,
   "autocorr_1": 0.5162339149816625,
   "effective_n": 374.3
  },
  "bootstrap": {
   "iters": 2000,
-  "block": 8,
+  "block_hours": 24,
   "seed": 42,
   "mean_ci95": [
-   0.8599202565593883,
-   1.1990229087198558
+   1.0623035235473722e-05,
+   1.5816652027176967e-05
   ],
-  "sharpe_trade_ci95": [
-   15.96867031678544,
-   21.096359993761343
+  "sharpe_ci95": [
+   8.40869671543415,
+   11.534434112328336
   ],
-  "p_mean_gt0": 1.0,
-  "p_stress_gt0": 1.0
+  "t_stat_ci95": [
+   8.601687335383508,
+   11.799164505805054
+  ],
+  "bootstrap_mass_mean_gt0": 1.0,
+  "n_neg_mean": 0,
+  "n_replications": 2000
  },
+ "counterfactual_sans_top10": 109.96157066113545,
+ "counterfactual_liqs": 0,
+ "provenance": {
+  "git_sha": "0d51e86508feff8328fc9a1dda7b95c9c786fc1e",
+  "git_dirty": true,
+  "diff_sha": "2f9f8d3b7386f9fd",
+  "spec_sha": "08b7cf90e1fa7a25",
+  "snapshot": "k1h-c22625d61aca89cf",
+  "portfolio_metrics_version": "pr7-v1"
+ },
+ "provenance_warning": true,
  "per_window": {
   "2025-09": {
    "capital": 100.0,
@@ -100,7 +119,9 @@
    "roi_pct": 1.7770416573472545,
    "cagr_pct": 11.80277026610792,
    "years": 0.15788272872461784,
-   "sortino": 37.8391787110354,
+   "portfolio_sharpe": 10.1,
+   "portfolio_sortino": 20.22,
+   "trade_sortino": 37.8391787110354,
    "profit_factor": 4.120158014909792,
    "solde_sans_top1": 101.58824747004454,
    "solde_sans_top5": 101.22899122493988,
@@ -141,7 +162,9 @@
    "roi_pct": 3.2911598747050306,
    "cagr_pct": 22.2663898922147,
    "years": 0.16107688797627195,
-   "sortino": 81.76390352601064,
+   "portfolio_sharpe": 13.89,
+   "portfolio_sortino": 30.64,
+   "trade_sortino": 81.76390352601064,
    "profit_factor": 6.948006786470447,
    "solde_sans_top1": 103.11564305393166,
    "solde_sans_top5": 102.42343533573212,
@@ -182,7 +205,9 @@
    "roi_pct": 2.849531788224766,
    "cagr_pct": 19.695280744249754,
    "years": 0.15628564909879078,
-   "sortino": 81.30483859045923,
+   "portfolio_sharpe": 12.06,
+   "portfolio_sortino": 23.87,
+   "trade_sortino": 81.30483859045923,
    "profit_factor": 6.351817501666722,
    "solde_sans_top1": 102.6511690095509,
    "solde_sans_top5": 102.06059870740471,
@@ -223,7 +248,9 @@
    "roi_pct": 1.2363945959103688,
    "cagr_pct": 7.756113716178814,
    "years": 0.1644992014601871,
-   "sortino": 23.419494547661422,
+   "portfolio_sharpe": 7.35,
+   "portfolio_sortino": 13.0,
+   "trade_sortino": 23.419494547661422,
    "profit_factor": 2.6656618121225883,
    "solde_sans_top1": 101.12659257441582,
    "solde_sans_top5": 100.80635469634862,
@@ -264,7 +291,9 @@
    "roi_pct": 1.8806370995328479,
    "cagr_pct": 12.027963490832793,
    "years": 0.16404289299566507,
-   "sortino": 48.09389241182349,
+   "portfolio_sharpe": 9.54,
+   "portfolio_sortino": 18.3,
+   "trade_sortino": 48.09389241182349,
    "profit_factor": 5.625627218709866,
    "solde_sans_top1": 101.76984838069156,
    "solde_sans_top5": 101.42734384208981,
@@ -305,7 +334,9 @@
    "roi_pct": 0.8083979462715264,
    "cagr_pct": 4.942546055399588,
    "years": 0.16689482089892768,
-   "sortino": 41.35261151722278,
+   "portfolio_sharpe": 7.1,
+   "portfolio_sortino": 14.16,
+   "trade_sortino": 41.35261151722278,
    "profit_factor": 5.113950757972862,
    "solde_sans_top1": 100.74822161054087,
    "solde_sans_top5": 100.59783523963509,
