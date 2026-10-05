@@ -129,7 +129,10 @@ def collect(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
         # la dernière barre 1h ENTIÈREMENT fermée (open_time + 1h <= now)
         now = now_ms if now_ms is not None else int(time.time() * 1000)
         last_closed = (now // H_MS - 1) * H_MS
-        view = DataView(snap, Mode.PAPER.value, val_end + 1, last_closed)
+        # FIX v14 (audit GLM 5.3 №7) : la vue est [start, end) — pour que
+        # la barre last_closed soit DANS le masque, la fin de vue est son
+        # open + 1h (l'intervalle [open, open+1h) de la barre fermée)
+        view = DataView(snap, Mode.PAPER.value, val_end + 1, last_closed + H_MS)
         new_events = []
         for sym in d["symbols"]:
             feats = feats_by_sym.get(sym)

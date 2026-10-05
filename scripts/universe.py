@@ -113,6 +113,16 @@ def _iso_ms(d: str | None) -> int | None:
                .replace(tzinfo=timezone.utc).timestamp() * 1000)
 
 
+def tradable_window_ms(manifest: dict, symbol: str) -> tuple[int, int] | None:
+    """Le span tradable en ms — pour filtrer les masques vectoriellement."""
+    e = manifest.get("symbols", {}).get(symbol)
+    if not e or e.get("observed_start") is None:
+        return None
+    start = _iso_ms(e["observed_start"])
+    end = _iso_ms(e.get("delisted_at") or e["observed_end"])
+    return (start, end)
+
+
 def tradable(manifest: dict, symbol: str, ts_ms: int) -> bool:
     """L'actif existait-il à l'instant ts ? — le masque anti-survivorship :
     avant observed_start (listing) ou après observed_end/delisted_at, NON."""

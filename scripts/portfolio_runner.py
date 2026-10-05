@@ -379,7 +379,10 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
             # PR-8 : LIQ_SIMULATED — la mort au PREMIER franchissement réel
             # du seuil sur le chemin intrabar (la position vit jusqu'ici :
             # la trajectoire d'exécution, pas l'oracle ex ante)
-            if pos.get("liq_pending"):
+            # FIX v14 (audit GLM 5.3 №6) : JAMAIS la bougie pré-entry — le
+            # mark connu à l'heure d'entrée précède la position ; le premier
+            # test de franchissement se fait à entry + 1h
+            if pos.get("liq_pending") and t > pos["entry_ms"]:
                 adverse = ((worst_px / pos["entry"] - 1.0)
                            if pos["side"] == -1
                            else (1.0 - worst_px / pos["entry"])) * 100.0
@@ -982,8 +985,9 @@ def wallet_report_block(w: dict) -> str:
             f"{en.get('n_raw')} / {en.get('n_nonoverlap')} / "
             f"{en.get('effective_n')} (autocorr {en.get('autocorr_1') if en.get('autocorr_1') is not None else float('nan'):+.3f}"
             f" · {en.get('n_time_buckets')} buckets horaires) |",
-            f"| bootstrap mean CI95 | "
-            f"[{bs['mean_ci95'][0]:+.3f}, {bs['mean_ci95'][1]:+.3f}] |",
+            f"| bootstrap mean CI95 (par heure) | "
+            f"[{bs['mean_ci95'][0] * 10000:+.1f}, "
+            f"{bs['mean_ci95'][1] * 10000:+.1f}] bps/h |",
             f"| bootstrap Sharpe portefeuille CI95 / t-stat CI95 | "
             f"[{bs['sharpe_ci95'][0]:+.2f}, {bs['sharpe_ci95'][1]:+.2f}] / "
             f"[{bs['t_stat_ci95'][0]:+.1f}, {bs['t_stat_ci95'][1]:+.1f}] |",

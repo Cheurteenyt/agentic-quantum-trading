@@ -145,7 +145,13 @@ def _build_symbol(con: sqlite3.Connection, sym: str,
             # COMPLÈTE — une fenêtre qui dépasse le dernier print connu est
             # INCONNUE (NaN), jamais un partiel tronqué présenté comme
             # complet. La couverture réelle remonte via fund_cov/fund_known.
-            complete = (ts / 1e6 + H * 3_600_000.0) <= fts_ms[-1]
+            # FIX v14 (audit GLM 5.3 №4) : la fenêtre doit être couverte
+            # AUX DEUX BOUTS — avant le premier print connu, le funding est
+            # INCONNU (l'ancien code donnait 0.0 « connu » aux fenêtres
+            # pré-listing-funding : 2025-09 → 2025-10-27 sur univ10)
+            known_start = (ts / 1e6 >= fts_ms[0]) | (k1 > k0)
+            complete = known_start & (
+                (ts / 1e6 + H * 3_600_000.0) <= fts_ms[-1])
             ok = complete & (k1 <= len(cum))
             f[ok] = (cum[np.minimum(k1[ok], len(cum) - 1)]
                      - cum[np.minimum(k0[ok], len(cum) - 1)])
