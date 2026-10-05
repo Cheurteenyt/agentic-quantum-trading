@@ -155,6 +155,10 @@ class TestFundingIntervalCosts(unittest.TestCase):
 
 class TestLoaderUnique(unittest.TestCase):
     def test_funding_series_all_lit_la_base_reelle(self):
+        # le warehouse n'existe pas chez le runner CI : le test ne porte que
+        # là où la donnée réelle est (localement / sur la machine de grind)
+        if not (ROOT / "data" / "warehouse" / "klines.db").exists():
+            self.skipTest("warehouse DB absente (CI)")
         out = funding_series_all()
         self.assertGreater(len(out), 0)
         some = next(iter(out.values()))
