@@ -42,8 +42,12 @@ class TestGrindHalving(unittest.TestCase):
         self.queue.mkdir()
         self._runs_backup = rr.RUNS
         rr.RUNS = Path(self.tmp.name) / "runs"
+        # isolation : le grind ne doit JAMAIS écrire dans le vrai ledger
+        self._log_backup = rr._log_ledger
+        rr._log_ledger = lambda *a, **k: None
 
     def tearDown(self):
+        rr._log_ledger = self._log_backup
         rr.RUNS = self._runs_backup
         self.con.close()
         self.tmp.cleanup()
