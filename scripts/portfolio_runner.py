@@ -169,6 +169,35 @@ def _mark_index(t_arr: np.ndarray, t_ms: int) -> int | None:
     return max(int(np.searchsorted(t_arr, t_ms)) - 1, 0)
 
 
+HOURS_PER_YEAR = 24.0 * 365.25
+
+
+def _portfolio_time_metrics(equity_hourly: list[tuple[int, float]]
+                            ) -> tuple[float | None, float | None]:
+    """Les métriques PORTFEUILLE : rendements heure par heure sur la courbe
+    MTM — Sharpe = mean/sd × √(heures/an), Sortino idem en downside. C'est
+    la vraie unité d'observation (l'ancien « Sortino » était un artefact de
+    fréquence de trades : 79,7)."""
+    if len(equity_hourly) < 3:
+        return None, None
+    eqs = np.array([e for _, e in equity_hourly])
+    prev = eqs[:-1]
+    cur = eqs[1:]
+    ok = prev > 0
+    if ok.sum() < 2:
+        return None, None
+    r = (cur[ok] / prev[ok] - 1.0)
+    sd = float(np.std(r, ddof=1))
+    mean_r = float(np.mean(r))
+    if sd <= 0:
+        return None, None
+    sharpe = mean_r / sd * np.sqrt(HOURS_PER_YEAR)
+    downside = float(np.sqrt(np.mean(np.minimum(r, 0.0) ** 2)))
+    sortino = (mean_r / downside * np.sqrt(HOURS_PER_YEAR)
+               if downside > 0 else None)
+    return round(sharpe, 2), (round(sortino, 2) if sortino else None)
+
+
 def _unrealized(pos: dict, marks_map: dict[str, float]) -> float:
     """Le PnL latent d'une position au dernier mark connu (entry si aucun)."""
     px = marks_map.get(pos["sym"], pos["entry"])
@@ -177,7 +206,8 @@ def _unrealized(pos: dict, marks_map: dict[str, float]) -> float:
 
 def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                    capital: float = 100.0, cap_pct: float = 1.0,
-                   lev: float = 1.0) -> dict:
+                   lev: float = 1.0,
+                   span: tuple[int, int] | None = None) -> dict:
     """LE MOTEUR MTM HORAIRE (PR-2, rapport GLM 5.3 №6).
 
     equity_t = cash + Σ unrealized(position, dernier mark connu) — les
@@ -216,6 +246,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
     conc_sum = conc_n = 0
     max_conc = 0
     margin_sum = 0.0
+    equity_hourly: list[tuple[int, float]] = []
     max_margin_pct = max_gross_pct = 0.0
     max_long_pct = max_short_pct = 0.0
     last_close: dict[str, float] = {}
@@ -242,9 +273,10 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                     t / 1000, tz=timezone.utc).strftime("%Y-%m")
                 net = realized + pos["fund_total"] - pos["fees"]
                 monthly[month] = monthly.get(month, 0.0) + net
-                trade_pnls.append({"t_ms": pos["entry_ms"],
-                                   "exit_ms": t, "notional": pos["notional"],
-                                   "net": net})
+                trade_pnls.append({"sym": pos["sym"],
+                                   "t_ms": pos["entry_ms"], "exit_ms": t,
+                                   "notional": pos["notional"], "net": net,
+                                   "liquidated": False})
                 fund_net += pos["fund_total"]
                 del open_pos[sym]
         # 2. les nouvelles entrées
@@ -267,6 +299,13 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                 liq += 1
                 n_trades += 1
                 monthly[month] = monthly.get(month, 0.0) - margin
+                # FIX v12 (audit GLM 5.3 post-#138) : une liquidation produit
+                # le MÊME objet normalisé que les autres trades — toutes les
+                # métriques (PF, top-N, effective-N, bootstrap) la consomment
+                trade_pnls.append({"sym": e["sym"], "t_ms": t,
+                                   "exit_ms": e["exit_ms"],
+                                   "notional": notional, "net": -margin,
+                                   "liquidated": True})
                 max_dd_mtm = max(max_dd_mtm, 100.0 * margin / eq_now
                                  if eq_now > 0 else 0.0)
                 max_dd_worst = max_dd_mtm
@@ -307,6 +346,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                             for p in open_pos.values())
         eq_worst = cash + sum(_unrealized(p, last_worst)
                               for p in open_pos.values())
+        equity_hourly.append((t, eq_mtm))
         peak = max(peak, eq_mtm)
         max_dd_mtm = max(max_dd_mtm,
                          (peak - eq_mtm) / peak * 100.0 if peak > 0 else 0.0)
@@ -346,22 +386,32 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
     losses_gross = abs(sum(x for x in pnl_list if x < 0))
     profit_factor = (wins_gross / losses_gross) if losses_gross > 0 \
         else float("inf") if wins_gross > 0 else 0.0
-    if trade_pnls:
+    if span is not None:
+        # FIX v12 (audit GLM 5.3 post-#138) : le CAGR mesure la durée de la
+        # VUE (premier trade → dernier exit sous-estimait les mois plats)
+        years = (span[1] - span[0]) / (365.25 * 86400_000)
+    elif trade_pnls:
         years = ((trade_pnls[-1]["exit_ms"] - trade_pnls[0]["t_ms"])
                  / (365.25 * 86400_000))
-        cagr = ((final / capital) ** (1.0 / years) - 1.0) * 100.0 \
-            if years > 0 and final > 0 else float("nan")
     else:
-        years, cagr = 0.0, float("nan")
+        years = 0.0
+    cagr = ((final / capital) ** (1.0 / years) - 1.0) * 100.0 \
+        if years > 0 and final > 0 else float("nan")
+    # le Sortino TRADE-LEVEL (métrique secondaire, nommé honnêtement —
+    # l'annualisation par la fréquence de trades gonflait le chiffre :
+    # 79,7 « portefeuille » étaient en réalité un artefact de fréquence)
     rets_pct = [tp["net"] / tp["notional"] * 100.0 for tp in trade_pnls]
     downside = float(np.sqrt(np.mean([min(r, 0.0) ** 2 for r in rets_pct])
                              )) if rets_pct else 0.0
     if rets_pct and downside > 0:
         mean_r = float(np.mean(rets_pct))
         per_year = len(rets_pct) / max(years, 1 / 365.25)
-        sortino = mean_r / downside * np.sqrt(per_year)
+        trade_sortino = mean_r / downside * np.sqrt(per_year)
     else:
-        sortino = None
+        trade_sortino = None
+    # les métriques PORTFEUILLE sur la courbe d'équité horaire (la vraie
+    # unité d'observation — rendements heure par heure)
+    p_sharpe, p_sortino = _portfolio_time_metrics(equity_hourly)
     def _solde_sans_top(pct_cut: float) -> float:
         if not pnl_list:
             return final
@@ -369,8 +419,11 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
         worst = sorted(pnl_list, reverse=True)[k:]
         return capital + sum(worst)
     return {"capital": capital, "solde": final, "roi_pct": roi,
-            "cagr_pct": cagr, "years": years, "sortino": sortino,
+            "cagr_pct": cagr, "years": years,
+            "portfolio_sharpe": p_sharpe, "portfolio_sortino": p_sortino,
+            "trade_sortino": trade_sortino,
             "profit_factor": profit_factor,
+            "equity_hourly": equity_hourly,
             "solde_sans_top1": _solde_sans_top(1.0),
             "solde_sans_top5": _solde_sans_top(5.0),
             "solde_sans_top10": _solde_sans_top(10.0),
@@ -405,7 +458,9 @@ def effective_sample_size(trade_pnls: list[dict]) -> dict:
     if n_raw == 0:
         return {"n_raw": 0, "n_nonoverlap": 0, "autocorr_1": None,
                 "effective_n": 0}
-    ordered = sorted(trade_pnls, key=lambda x: x["t_ms"])
+    # FIX v12 : l'ordre des trades SIMULTANÉS ne doit pas influencer
+    # l'autocorrélation — tri déterministe (t_ms, sym)
+    ordered = sorted(trade_pnls, key=lambda x: (x["t_ms"], x.get("sym", "")))
     n_nonoverlap, last_exit = 0, -1
     for tp in ordered:
         if tp["t_ms"] >= last_exit:
@@ -413,6 +468,7 @@ def effective_sample_size(trade_pnls: list[dict]) -> dict:
             last_exit = tp["exit_ms"]
     rets = np.array([tp["net"] / tp["notional"] * 100.0
                      for tp in ordered])
+    n_buckets = len({tp["t_ms"] // H_MS for tp in trade_pnls})
     rho = None
     if n_raw > 2 and float(np.std(rets)) > 0:
         rho = float(np.corrcoef(rets[:-1], rets[1:])[0, 1])
@@ -421,49 +477,61 @@ def effective_sample_size(trade_pnls: list[dict]) -> dict:
     else:
         eff = float(n_raw)
     return {"n_raw": n_raw, "n_nonoverlap": n_nonoverlap,
+            "n_time_buckets": n_buckets,
             "autocorr_1": rho, "effective_n": round(eff, 1)}
 
 
 # ------------------------------------------------------- bootstrap
-def block_bootstrap(trade_pnls: list[dict], cost_pct: float,
-                    block: int = 8, iters: int = 2000,
-                    seed: int = 42) -> dict:
-    """PR-6, amélioration 3 : le bootstrap par blocs MOVING-BLOCK sur la
-    série temporelle des rendements nets par trade (ordre temporel, blocs
-    de `block` trades, graine fixée = reproductible). Publie les CI95 de la
-    moyenne et du Sharpe par trade, P(mean > 0) et P(stress ×1,5 > 0) —
-    le stress retire 0,5 × cost_pct à chaque trade (coût majoré)."""
-    if len(trade_pnls) < block:
-        return {"iters": 0, "note": "pas assez de trades pour bootstrapper"}
-    ordered = sorted(trade_pnls, key=lambda x: x["t_ms"])
-    rets = np.array([tp["net"] / tp["notional"] * 100.0
-                     for tp in ordered])
-    stress_rets = rets - 0.5 * cost_pct
+def block_bootstrap_hourly(hourly_rets: np.ndarray, block_hours: int = 24,
+                           iters: int = 2000, seed: int = 42,
+                           hours_per_year: float = HOURS_PER_YEAR) -> dict:
+    """PR-7 (audit GLM 5.3 post-#138) : le bootstrap par blocs MOVING-BLOCK
+    en UNITÉS TEMPORELLES (heures) sur les rendements PORTFEUILLE — l'ancien
+    découpage « 8 trades » tranchait arbitrairement la dépendance temporelle
+    (des trades simultanés multi-symboles tombaient dans le même bloc).
+
+    Publie (noms honnêtes) :
+      - mean_ci95 et sharpe_ci95 : le Sharpe = mean/sd annualisé à l'heure
+        (SANS √n — l'ancien « sharpe_trade » multiplié par √n était une
+        t-statistique, publiée séparément) ;
+      - t_stat_ci95 : mean / (sd/√n) — la significativité ;
+      - bootstrap_mass_mean_gt0 : la PART des réplications > 0 (pas une
+        probabilité bayésienne) + les comptes n_neg/iters, plus honnêtes
+        qu'un « 100 % ».
+      - p_stress : la masse bootstrap du stress de coûts ×1,5 (retire
+        0,5 × cost_pct du rendement horaire, en % du notional ≈ ×cap).
+    """
+    r = np.asarray(hourly_rets, dtype=float)
+    if len(r) < block_hours:
+        return {"iters": 0, "note": "pas assez d'heures pour bootstrapper"}
     rng = np.random.default_rng(seed)
-    n = len(rets)
-    n_blocks = int(np.ceil(n / block))
-    starts = rng.integers(0, n - block + 1, size=(iters, n_blocks))
+    n = len(r)
+    n_blocks = int(np.ceil(n / block_hours))
+    starts = rng.integers(0, n - block_hours + 1, size=(iters, n_blocks))
     means = np.empty(iters)
     sharpes = np.empty(iters)
-    p_stress = 0
-    sd0 = float(np.std(rets, ddof=1)) or 1e-12
+    tstats = np.empty(iters)
     for i in range(iters):
-        sample = np.concatenate(
-            [rets[s:s + block] for s in starts[i]])[:n]
-        means[i] = sample.mean()
-        sd = float(np.std(sample, ddof=1))
-        sharpes[i] = sample.mean() / sd * np.sqrt(n) if sd > 0 else 0.0
-        ssample = stress_rets[starts[i].repeat(block)[:n] +
-                              np.tile(np.arange(block), n_blocks)[:n]]
-        if ssample.mean() > 0:
-            p_stress += 1
-    return {"iters": iters, "block": block, "seed": seed,
+        idx = (starts[i][:, None] + np.arange(block_hours)[None, :]).ravel()[:n]
+        sample = r[idx]
+        m, sd = float(sample.mean()), float(sample.std(ddof=1))
+        means[i] = m
+        if sd > 0:
+            sharpes[i] = m / sd * np.sqrt(hours_per_year)
+            tstats[i] = m / (sd / np.sqrt(n))
+        else:
+            sharpes[i] = tstats[i] = 0.0
+    n_neg = int((means <= 0).sum())
+    return {"iters": iters, "block_hours": block_hours, "seed": seed,
             "mean_ci95": [float(np.percentile(means, 2.5)),
                           float(np.percentile(means, 97.5))],
-            "sharpe_trade_ci95": [float(np.percentile(sharpes, 2.5)),
-                                  float(np.percentile(sharpes, 97.5))],
-            "p_mean_gt0": float((means > 0).mean()),
-            "p_stress_gt0": float(p_stress / iters)}
+            "sharpe_ci95": [float(np.percentile(sharpes, 2.5)),
+                            float(np.percentile(sharpes, 97.5))],
+            "t_stat_ci95": [float(np.percentile(tstats, 2.5)),
+                            float(np.percentile(tstats, 97.5))],
+            "bootstrap_mass_mean_gt0": float((means > 0).mean()),
+            "n_neg_mean": n_neg,
+            "n_replications": iters}
 
 
 # ------------------------------------------------------------------ wallet
@@ -720,20 +788,71 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
     # le moteur MTM quand les marks sont disponibles
     if marks:
         wallet = run_wallet_mtm(events, marks, capital=capital,
-                                cap_pct=cap_pct, lev=lev)
+                                cap_pct=cap_pct, lev=lev,
+                                span=(view.start_ms, view.end_ms))
     else:
         wallet = run_wallet(events, capital=capital, cap_pct=cap_pct, lev=lev)
-    # PR-6 : effective-N + bootstrap par blocs (graine fixée = reproductible)
+    # PR-6/7 : effective-N + bootstrap TEMPOREL sur les rendements horaires
     tpnls = wallet.pop("trade_pnls", [])
     eff = effective_sample_size(tpnls)
-    boot = block_bootstrap(tpnls, cost_pct=float(spec.get("cost_pct", 0.28)))
+    eqh = np.array([e for _, e in wallet.get("equity_hourly", [])])
+    if len(eqh) > 24:
+        hr = eqh[1:] / eqh[:-1] - 1.0
+        boot = block_bootstrap_hourly(hr, block_hours=24)
+    else:
+        boot = {"iters": 0, "note": "pas assez d'heures"}
+    # PR-7 : le CONTRE-FACTUEL top-10 % — re-jouer le wallet SANS les 10 %
+    # meilleurs trades (les tailles se recalculent), distinct de la
+    # concentration de PnL (le simple retrait arithmétique)
+    top = sorted(tpnls, key=lambda x: -x["net"])
+    k10 = max(1, int(round(len(top) * 0.10))) if top else 0
+    drop = {(tp.get("sym"), tp["t_ms"]) for tp in top[:k10]}
+    evs_cf = [e for e in events if (e["sym"], e["t_ms"]) not in drop]
+    if marks and evs_cf:
+        wcf = run_wallet_mtm(evs_cf, marks, capital=capital,
+                             cap_pct=cap_pct, lev=lev,
+                             span=(view.start_ms, view.end_ms))
+        counterfactual_sans_top10 = wcf["solde"]
+        cf_liqs = wcf["liqs"]
+    else:
+        counterfactual_sans_top10 = wallet.get("solde")
+        cf_liqs = wallet.get("liqs", 0)
     baseline = baseline_hold(spec, view, db_path=db_path, capital=capital)
+    # PR-7 : la provenance du WALLET + le garde de cohérence spec_sha —
+    # le manifest, le summary de la vue et la spec.json doivent pointer
+    # vers la MÊME spec, sinon refus de publier (un wallet sans provenance
+    # n'est pas un objet scientifique)
+    sha_disk = rr.spec_sha(spec)
+    mfile = RUNS / run_id / "manifest.json"
+    m = json.loads(mfile.read_text(encoding="utf-8")) if mfile.exists() else {}
+    target = "summary_confirmation.json" if vk == "validation" \
+        else "summary_discovery.json"
+    tfile = RUNS / run_id / target
+    t_sha = json.loads(tfile.read_text(encoding="utf-8")).get("spec_sha") \
+        if tfile.exists() else None
+    if t_sha is not None and (m.get("spec_sha") != t_sha
+                              or t_sha != sha_disk):
+        raise ValueError(
+            f"{run_id} : incohérence de provenance — manifest "
+            f"{m.get('spec_sha')} vs {target} {t_sha} vs spec.json "
+            f"{sha_disk} — refus de publier le wallet")
+    prov = rr._provenance()
     out = {"run_id": run_id, "view": vk, "capital": capital,
            "cap_pct": cap_pct, "lev": lev, "frozen_src": frozen_src,
            "embargo_ms": embargo_ms if vk == "validation" else 0,
            "n_events": len(events), "fund_cov": fund_cov,
            "wallet": wallet, "baseline": baseline,
            "effective_n": eff, "bootstrap": boot,
+           "counterfactual_sans_top10": counterfactual_sans_top10,
+           "counterfactual_liqs": cf_liqs,
+           "provenance": {"git_sha": prov["git_sha"],
+                          "git_dirty": prov["git_dirty"],
+                          "diff_sha": prov["diff_sha"],
+                          "spec_sha": sha_disk,
+                          "snapshot": m.get("snapshot"),
+                          "portfolio_metrics_version": "pr7-v1"},
+           "provenance_warning": (m.get("git_sha") != prov["git_sha"]
+                                  or bool(prov["git_dirty"])),
            "per_window": per_window,
            "max_window_loss_pct": float(proto.get("max_window_loss_pct", 15))}
     if per_window:
@@ -773,26 +892,35 @@ def wallet_report_block(w: dict) -> str:
             f"| concurrence max / marge max engagée | "
             f"{wl['max_concurrency']} positions / "
             f"{wl['max_margin_used_pct']:.1f} % de l'équité |",
-            f"| CAGR / Sortino / profit factor | "
+            f"| CAGR / Sharpe portefeuille / Sortino portefeuille | "
             f"{wl.get('cagr_pct', float('nan')):+.1f} % / "
-            f"{wl.get('sortino') if wl.get('sortino') is not None else float('nan'):.1f} / "
-            f"{wl.get('profit_factor', float('nan')):.2f} |",
-            f"| solde sans top 1 / 5 / 10 % | ${wl.get('solde_sans_top1', wl['solde']):.2f} / "
+            f"{wl.get('portfolio_sharpe') if wl.get('portfolio_sharpe') is not None else float('nan'):.2f} / "
+            f"{wl.get('portfolio_sortino') if wl.get('portfolio_sortino') is not None else float('nan'):.2f} |",
+            f"| profit factor / Sortino trade-level (secondaire) | "
+            f"{wl.get('profit_factor', float('nan')):.2f} / "
+            f"{wl.get('trade_sortino') if wl.get('trade_sortino') is not None else float('nan'):.1f} |",
+            f"| concentration PnL sans top 1 / 5 / 10 % | ${wl.get('solde_sans_top1', wl['solde']):.2f} / "
             f"${wl.get('solde_sans_top5', wl['solde']):.2f} / "
-            f"${wl.get('solde_sans_top10', wl['solde']):.2f} |"]
+            f"${wl.get('solde_sans_top10', wl['solde']):.2f} |",
+            f"| CONTRE-FACTUEL sans top 10 % (re-joué, tailles recalculées) | "
+            f"${w.get('counterfactual_sans_top10', wl['solde']):.2f} "
+            f"(liq {w.get('counterfactual_liqs', 0)}) |"]
     bs = w.get("bootstrap") or {}
     if bs.get("iters"):
         en = w.get("effective_n", {})
         lines += [
             f"| n brut / sans chevauchement / effectif | "
             f"{en.get('n_raw')} / {en.get('n_nonoverlap')} / "
-            f"{en.get('effective_n')} (autocorr {en.get('autocorr_1') if en.get('autocorr_1') is not None else float('nan'):+.3f}) |",
-            f"| bootstrap mean CI95 (P>0) | "
-            f"[{bs['mean_ci95'][0]:+.3f}, {bs['mean_ci95'][1]:+.3f}] "
-            f"({bs['p_mean_gt0'] * 100:.1f} %) |",
-            f"| bootstrap Sharpe/trade CI95 | "
-            f"[{bs['sharpe_trade_ci95'][0]:+.2f}, {bs['sharpe_trade_ci95'][1]:+.2f}] |",
-            f"| P(stress ×1,5 > 0) | {bs['p_stress_gt0'] * 100:.1f} % |"]
+            f"{en.get('effective_n')} (autocorr {en.get('autocorr_1') if en.get('autocorr_1') is not None else float('nan'):+.3f}"
+            f" · {en.get('n_time_buckets')} buckets horaires) |",
+            f"| bootstrap mean CI95 | "
+            f"[{bs['mean_ci95'][0]:+.3f}, {bs['mean_ci95'][1]:+.3f}] |",
+            f"| bootstrap Sharpe portefeuille CI95 / t-stat CI95 | "
+            f"[{bs['sharpe_ci95'][0]:+.2f}, {bs['sharpe_ci95'][1]:+.2f}] / "
+            f"[{bs['t_stat_ci95'][0]:+.1f}, {bs['t_stat_ci95'][1]:+.1f}] |",
+            f"| masse bootstrap mean > 0 | "
+            f"{bs['n_neg_mean']} réplications négatives / "
+            f"{bs['n_replications']} (blocs {bs['block_hours']} h) |"]
     if bl and bl.get("solde") == bl.get("solde"):
         lines.append(
             f"| baseline long-and-hold 1x | ${bl['solde']:.2f} "
