@@ -1,10 +1,10 @@
-# EXP-bonsai-h-01 — discovery
+# EXP-bonsai-h-01 — confirmation
 
 Hypothèse : Funding Crowding Reversal
 
-- spec_sha 6b2ffd6a8decc740 · git 59ca1b6 · snapshot k1h-5a9e276d75b6dcd7
-- verdict : **DISCOVERY_PASS** · n 61978 · mean 0.09030185926422217
+- spec_sha 5769e9f9b109a306 · git 10ba7ae · snapshot k1h-8df3d3b694401749
+- verdict : **REJECTED** · n 16961 · mean 0.05361193763433515
 
-- BTCUSDT@6h : n 21776 · mean -0.037
-- ETHUSDT@6h : n 20604 · mean 0.073
-- SOLUSDT@6h : n 19598 · mean 0.251
+- BTCUSDT@6h : n 5935 · mean -0.048
+- ETHUSDT@6h : n 5600 · mean 0.072
+- SOLUSDT@6h : n 5426 · mean 0.146
