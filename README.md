@@ -39,12 +39,14 @@ Historical 1-year backtest table (100 USD, maker costs, real funding) —
 Best QUBO point — **REFUTED**: *+5,082%/yr at 23.3% max drawdown* (20 real
 liquidations on fixed data; the owner remembered "6").
 
-**Current truth (2026-10-05, post-audit-v3 engine + collectors — evidence
-F-034/F-035 + W42):** the only living edge is the **long-only survivor**
-(+1.127%/event pre-fix measurement, tiny at the 1% margin cap — W42
-REFUTED the two-stream reconstruction); vol_spike is **dead post-fix**
-(W42: net negative at honest costs). Zero strategy is proven profitable on
-clean data — the goal is one that survives paper forward.
+**Current truth (2026-10-06, Research OS v14 — causalité verrouillée):**
+ALL 7 W41 candidates were **INVALIDATED** — the mutation test proved the
+signal looked at the bar it entered on (look-ahead); re-measured on the
+causal engine (signal=close(t) → entry=open(t+1)), every one is
+DISCOVERY_FAIL. Nothing is currently confirmed. The v14 engine (protocol
+windows, MTM hourly wallet, temporal bootstrap, blocking budget,
+provenance seals) is the asset — the search restarts from honest grounds.
+(Legacy machine notes below are history, not edges.)
 
 > **Honesty (T8, 2026-09-30):** these **absolute** ROI figures are
 > **window / DB warm-up artefacts**. The same engine on three warm-up states
