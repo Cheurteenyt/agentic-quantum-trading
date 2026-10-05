@@ -144,3 +144,4 @@ scripts/studies/x501_openmarket/results/
 
 # le coffre Obsidian généré par Ariad (dérivé, jamais source)
 .codebase-memory-vault/
+research/ledger/confirm.lock
