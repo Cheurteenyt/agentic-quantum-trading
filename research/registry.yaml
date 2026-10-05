@@ -1,5 +1,6 @@
 version: 1
-generated: 2026-10-02
+generated: 2026-10-06   # mis à jour à chaque édition (les verdicts datent
+                        # du jour de leur mesure — voir research/runs/)
 protocol: harnais-v5 (baseline anti-dérive, horizons muraux, split chrono strict)
 execution_convention: signal=close(t) → entry=open(t+1) → exit=plan du signal, stop
   prioritaire intrabar
