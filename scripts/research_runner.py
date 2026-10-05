@@ -334,22 +334,32 @@ def event_mask(spec: dict, feats: dict, view, frozen=None,
 
 def apply_universe(spec: dict, sym: str, mask: np.ndarray,
                    feats: dict, horizon_h: int) -> np.ndarray:
-    """LA primitive anti-survivorship (PR-147, audit GLM 5.3 №4) : entry et
+    """LA primitive anti-survivorship (PR-147, durcie PR-148) : entry et
     sortie (entry + horizon) dans le span tradable du manifest. Une SEULE
-    interprétation de l'univers pour discovery/confirmation/wallet/forward."""
+    interprétation de l'univers pour discovery/confirmation/wallet/forward.
+
+    FAIL-CLOSED (audit GLM 5.3 post-#147 №2) : un univers DÉCLARÉ mais non
+    résoluble (manifest absent, symbole absent, bornes invalides) lève
+    UniverseViolation — JAMAIS « continue sans contrainte ». Le seul retour
+    sans contrainte est une spec qui ne déclare PAS d'univers."""
     if not spec.get("universe"):
         return mask
+    from scripts.research_os import UniverseViolation
     from scripts.universe import load as _uload, tradable_window_ms
     try:
         tw = tradable_window_ms(_uload(str(spec["universe"])), sym)
-    except FileNotFoundError:
-        return mask
+    except FileNotFoundError as exc:
+        raise UniverseViolation(
+            f"univers {spec['universe']!r} introuvable — fail-closed") from exc
     if tw is None:
-        return mask
+        raise UniverseViolation(
+            f"symbole {sym!r} absent de l'univers {spec['universe']!r} "
+            "— fail-closed")
     t0, t1 = tw
+    if t1 <= t0:
+        raise UniverseViolation(f"span tradable invalide pour {sym}: {tw}")
     ns = feats["open_time_ns"]
-    return mask & (ns >= t0 * 10**6) & \
-        (ns + horizon_h * 3_600_000 * 10**6 <= t1 * 10**6)
+    return mask & (ns >= t0 * 10**6) &         (ns + horizon_h * 3_600_000 * 10**6 <= t1 * 10**6)
 
 
 def _features_by_sym(spec: dict, db_path: Path) -> dict[str, dict]:
@@ -417,18 +427,17 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
         # PR-147 : la primitive UNIQUE anti-survivorship (entry + sortie
         # dans le span tradable du manifest — une seule interprétation de
         # l'univers pour discovery/confirmation/wallet/forward)
-        mask = apply_universe(spec, sym, mask, feats, horizons[0])
         if mask.any():
             view.assert_range(
                 int(feats["open_time_ns"][mask][0]) // 10**6,
                 int(feats["open_time_ns"][mask][-1]) // 10**6)
         for H in horizons:
-            # FIX v8 (rapport GLM 5.3 №7) : la SORTIE doit rester dans la
-            # vue — un event dont l'horizon H déborde de la fenêtre
-            # consommerait les prix de la fenêtre suivante. Sortie = close
-            # de la barre i+H-1 = open(i) + H heures.
-            m_h = mask & (feats["open_time_ns"]
-                          <= (view.end_ms - H * 3_600_000) * 10**6)
+            # FIX v8 (№7) + FIX v15 (№3 post-#147) : la SORTIE reste dans
+            # la vue ET dans le span tradable — PAR HORIZON (l'ancien
+            # horizons[0] laissait un H=72 sortir de l'univers)
+            mask_h = apply_universe(spec, sym, mask, feats, H)
+            m_h = mask_h & (feats["open_time_ns"]
+                            <= (view.end_ms - H * 3_600_000) * 10**6)
             out[f"{sym}@{H}h"] = event_study(matrix[sym], m_h, H,
                                              side=int(side * side_mult),
                                              cost_pct=cost)
@@ -877,24 +886,28 @@ def cmd_confirm(a) -> int:
         return _confirm_locked(spec, a)
 
 
-def _budget_precheck(spec: dict) -> tuple[bool, str]:
+def _budget_precheck(spec: dict, db_path: Path) -> tuple[bool, str]:
     """Le budget JUGE AVANT de laisser courir (fix v10 : contrôle bloquant,
     plus seulement une journalisation). Le sous-commande `check` de
-    lab_ledger évalue sans écrire : 0 = GO, 4 = STOP."""
+    lab_ledger évalue sans écrire : 0 = GO, 4 = STOP.
+    FIX v15 (audit GLM 5.3 post-#147 №1) : le snapshot est calculé sur la
+    DB DU RUN (--db) — l'ancien snapshot_id() implicite interrogeait le
+    warehouse par défaut et pouvait retourner un mauvais DUPLICATE/REVERIFY
+    une fois que #147 a rendu le snapshot déterminant pour le budget."""
     out = subprocess.run(
         [sys.executable, "scripts/lab_ledger.py", "check",
          "--family", str(spec.get("family", "research")),
          "--strategy", str(spec.get("strategy", "runner")),
          "--hypothesis", str(spec.get("hypothesis", ""))[:300],
          "--mode", "confirmation",
-         "--snapshot", str(snapshot_id())],
+         "--snapshot", str(snapshot_id(db_path))],
         capture_output=True, text=True, cwd=ROOT)
     ok = out.returncode == 0
     return ok, (out.stdout + out.stderr).strip()
 
 
 def _confirm_locked(spec: dict, a) -> int:
-    ok, why = _budget_precheck(spec)
+    ok, why = _budget_precheck(spec, db_path=Path(a.db))
     if not ok:
         print(f"{spec['id']} : BUDGET_STOP — 0 slot consommé (le budget est "
               "une barrière, pas une journalisation)")

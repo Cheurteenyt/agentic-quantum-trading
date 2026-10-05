@@ -120,12 +120,17 @@ def _iso_ms(d: str | None) -> int | None:
 
 def tradable_window_ms(manifest: dict, symbol: str) -> tuple[int, int] | None:
     """Le span tradable en ms — pour filtrer les masques vectoriellement.
-    Les champs ms précis sont préférés aux dates ISO (précision jour)."""
+    Les champs ms précis sont préférés aux dates ISO (précision jour).
+    FIX v15 (№5) : la borne de fin = last_bar_open + 1h — last_bar_ms est
+    l'OPEN de la dernière bougie ; les données s'étendent jusqu'à sa
+    clôture (fin EXCLUSIVE), sinon la dernière tranche est perdue."""
     e = manifest.get("symbols", {}).get(symbol)
     if not e or e.get("observed_start") is None:
         return None
     start = e.get("first_bar_ms") or _iso_ms(e["observed_start"])
     end = e.get("last_bar_ms")
+    if end is not None:
+        end = int(end) + 3_600_000     # la clôture de la dernière bougie
     if e.get("delisted_at"):
         end = _iso_ms(e["delisted_at"])
     return (int(start), int(end))

@@ -93,6 +93,13 @@ class DataView:
         self.assert_within(b_ms)
 
 
+class UniverseViolation(Exception):
+    """L'univers déclaré est introuvable, incomplet ou incohérent —
+    FAIL-CLOSED : un univers déclaré mais non résoluble ne laisse JAMAIS
+    passer un masque non contraint (audit GLM 5.3 post-#147, règle
+    MISSING ≠ UNCONSTRAINED)."""
+
+
 @dataclass(frozen=True)
 class DataScope:
     """Les fenêtres gelées d'un snapshot : train / validation / holdout.

@@ -150,7 +150,11 @@ def _build_symbol(con: sqlite3.Connection, sym: str,
             # INCONNU (l'ancien code donnait 0.0 « connu » aux fenêtres
             # pré-listing-funding : 2025-09 → 2025-10-27 sur univ10)
             known_start = (ts / 1e6 >= fts_ms[0]) | (k1 > k0)
-            complete = known_start & (
+            # FIX v15 (№4) : le TROU INTERNE — une fenêtre de durée ≥
+            # l'intervalle du calendrier, sans AUCUN print, est un trou de
+            # données (un print aurait dû exister), pas « 0 connu »
+            hole = (k1 <= k0) & (H >= fser.interval_h)
+            complete = known_start & ~hole & (
                 (ts / 1e6 + H * 3_600_000.0) <= fts_ms[-1])
             ok = complete & (k1 <= len(cum))
             f[ok] = (cum[np.minimum(k1[ok], len(cum) - 1)]

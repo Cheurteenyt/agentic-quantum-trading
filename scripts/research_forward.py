@@ -242,14 +242,24 @@ def _closed_trades(spec: dict, events: list[dict], db_path: Path,
                     # fin ≤ dernier print
                     in_era = (ot >= fs.times_ms[0]) or (k1 > k0)
                     covered = (ot + h1 * H_MS) <= fs.times_ms[-1]
-                    if in_era and covered:
+                    # FIX v15 (№4) : le TROU INTERNE — une fenêtre de
+                    # durée ≥ l'intervalle observé du calendrier, sans
+                    # AUCUN print, n'est pas « 0 connu » mais un TROU de
+                    # données (l'intervalle médian du calendrier dit qu'un
+                    # print aurait dû exister)
+                    window_h = h1
+                    hole = (k1 <= k0 and window_h >= max(fs.interval_h, 1.0))
+                    if in_era and covered and not hole:
                         fund = float(fs.rates_pct[k0:k1].sum())
             except Exception:
                 fund = None
             out.append({"sym": e["symbol"], "t_ms": ot,
                         "exit_ms": ot + h1 * H_MS, "side": side,
                         "ret_pct": ret, "mae_pct": mae, "fund_pct": fund,
-                        "fund_known": fund is not None, "cost_pct": cost})
+                        "fund_known": fund is not None, "cost_pct": cost,
+                        # FIX v15 (№7) : le prix d'entrée du journal —
+                        # requis par le moteur MTM canonique
+                        "entry": float(e.get("entry_open") or entry)})
         return out
     finally:
         con.close()
@@ -286,13 +296,32 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
         stats["mean"] = sum(rets) / len(rets)
         stats["wr"] = sum(1 for r in rets if r > 0) / len(rets) * 100.0
         stats["sharpe"] = _sharpe_trades(rets, now, trades[0]["t_ms"])
-        wallet = run_wallet([{**t, "fund_pct": t["fund_pct"] if t.get("fund_known") else 0.0}
-                             for t in trades],
-                            capital=100.0, cap_pct=1.0, lev=1.0)
-        wallet = {k: wallet[k] for k in ("solde", "roi_pct", "max_dd_pct",
-                                         "liqs", "trades", "wr_pct",
-                                         "months_neg", "months_total",
-                                         "ret_dd", "fees", "funding_net")}
+        # FIX v15 (№7) : le moteur CANONIQUE (MTM horaire, le même que la
+        # confirmation) — l'ancien wallet close-only pouvait dire « excellent
+        # en confirmation, différent en maturation »
+        from scripts.portfolio_runner import _fetch_marks, run_wallet_mtm
+        syms = sorted({t["sym"] for t in trades})
+        span0 = min(t["t_ms"] for t in trades)
+        span1 = max(t["exit_ms"] for t in trades)
+        mk = _fetch_marks(db_path, syms, span0, span1)
+        if mk:
+            evs = [{"sym": t["sym"], "t_ms": t["t_ms"],
+                    "exit_ms": t["exit_ms"], "side": t["side"],
+                    "ret_pct": t["ret_pct"], "entry": t["entry"],
+                    "mae_pct": t["mae_pct"],
+                    "fund_pct": t["fund_pct"] if t.get("fund_known") else 0.0,
+                    "cost_pct": t["cost_pct"],
+                    "fund_prints": []} for t in trades]
+            w = run_wallet_mtm(evs, mk, capital=100.0, cap_pct=1.0, lev=1.0,
+                               span=(span0, span1))
+        else:
+            w = run_wallet([{**t, "fund_pct": t["fund_pct"] if t.get("fund_known") else 0.0}
+                            for t in trades],
+                           capital=100.0, cap_pct=1.0, lev=1.0)
+        wallet = {k: w[k] for k in ("solde", "roi_pct", "max_dd_pct",
+                                    "liqs", "trades", "wr_pct",
+                                    "months_neg", "months_total",
+                                    "ret_dd", "fees", "funding_net")}
     else:
         wallet = None
     need_days = float(fc.get("maturation_days", 30))

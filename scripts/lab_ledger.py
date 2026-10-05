@@ -172,6 +172,15 @@ def git_short() -> str | None:
 
 
 # ---------------------------------------------------------------- logique
+def confirmation_multiplicity(entries) -> int:
+    """Le N de multiplicité = les CONFIRMATIONS cumulées (jamais remis à
+    zéro par la semaine) — UNE seule définition, utilisée par assess()
+    ET par le bloc STATE (fix v15 №6 : le STATE gonflait le N avec les
+    discoveries et affichait un seuil plus sévère que le checker)."""
+    return sum(1 for e in entries if e.get("verdict") != "PREREG"
+               and e.get("_mode", "confirmation") == "confirmation")
+
+
 def week_usage(entries, week):
     cur = [e for e in entries if e["_consumes"] and e["_week"] == week]
     return len(cur), Counter(e["family"] for e in cur), Counter(e["strategy"] for e in cur)
@@ -255,9 +264,9 @@ def assess(entries, budget, now, family, strategy, hypothesis, params,
     # FIX v3 (brief §76) : le N de multiplicité = les CONFIRMATIONS cumulées
     # (jamais remis à zéro par le changement de semaine) ; les discoveries
     # sont comptées à part (la pression de sélection, §75).
-    n_conf = sum(1 for e in entries if e.get("verdict") != "PREREG"
-                 and e.get("_mode", "confirmation") != "discovery")
-    n_disc = sum(1 for e in entries if e.get("_mode", "confirmation") == "discovery")
+    n_conf = confirmation_multiplicity(entries)
+    n_disc = sum(1 for e in entries
+                 if e.get("_mode", "confirmation") == "discovery")
     msgs.append(f"Multiplicité : N_confirmation {n_conf} cumulées (backfill inclus, "
                 f"jamais remis à zéro) + {n_disc} discoveries → seuil indicatif du prochain |t| ≥ "
                 f"{tstar(n_conf + 1):.2f} (Bonferroni 5 % bilatéral, N={n_conf + 1}).")
@@ -269,7 +278,7 @@ def status_md(entries, budget, now, effective) -> str:
     cap_entries = [e for e in entries if not e.get("reverify")]
     total, by_fam, by_str = week_usage(cap_entries, week)
     v = Counter(e.get("verdict") for e in entries)
-    n_all = sum(1 for e in entries if e.get("verdict") != "PREREG")
+    n_all = confirmation_multiplicity(entries)   # le MÊME N que le checker
     n_bf = sum(1 for e in entries if e["_backfill"] and e.get("verdict") != "PREREG")
     cap = [f"{f} {c}/{budget['per_family']}" for f, c in sorted(by_fam.items()) if c >= budget["per_family"]]
     # FIX v14 (audit GLM 5.3 №15) : distinguer le RAW historique (avec les
@@ -377,7 +386,7 @@ def cmd_status(a) -> int:
         print(f"  famille {f:<28s} {c}/{b['per_family']}")
     for s, c in sorted(by_str.items()):
         print(f"  stratégie {s:<30s} {c}/{b['per_strategy']}")
-    n_all = sum(1 for e in entries if e.get("verdict") != "PREREG")
+    n_all = confirmation_multiplicity(entries)   # le MÊME N que le checker
     print(f"Cumul : {n_all} essais · t*(N={n_all}) = {tstar(n_all):.2f} (Bonferroni 5 % bilatéral)")
     return EXIT_OK
 
