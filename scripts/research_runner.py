@@ -102,10 +102,20 @@ def compute_features(con: sqlite3.Connection, sym: str) -> dict[str, np.ndarray]
     c = np.array([r[4] for r in rows])
     v = pd.Series([r[5] for r in rows])
     cs = pd.Series(c)
+    # fund_last : le dernier taux de funding CONNU au moment de la barre
+    # (as-of strict, searchsorted — le print futur ne fuite pas)
+    try:
+        from scripts.funding_series import funding_series_for
+        fser = funding_series_for(sym)
+        k = np.searchsorted(fser.times_ms / 1e6, ts / 1e6, side="right") - 1
+        fund_last = np.where(k >= 0, fser.rates_pct[np.maximum(k, 0)], 0.0)
+    except Exception:
+        fund_last = np.zeros(len(ts))
     return {"open_time_ns": ts,
             "range_pct": (h - l) / c * 100.0,
             "volume_z": volume_z(v, n=20).values,
-            "ret_1h": cs.pct_change().values * 100.0}
+            "ret_1h": cs.pct_change().values * 100.0,
+            "fund_last": fund_last}
 
 
 def expanding_threshold(values: np.ndarray, q: float,
@@ -128,12 +138,31 @@ def _mask_for(cols, fvals, op, thr, view):
     return base & finite & in_view
 
 
+def _multi_mask(feats: dict, conditions: list[dict], view) -> np.ndarray:
+    """Le masque ET de plusieurs conditions (brief V3 §7 de la spec).
+    Chaque condition : {feature, op, quantile OU threshold}.
+    Quantile = expanding (causal) ; threshold = valeur absolue déclarée."""
+    n = len(next(iter(feats.values())))
+    mask = np.ones(n, dtype=bool)
+    for cond in conditions:
+        v = feats[cond["feature"]]
+        if "quantile" in cond:
+            thr = expanding_threshold(v, float(cond["quantile"]), warmup=WARMUP)
+            m = np.isfinite(v) & np.isfinite(thr)
+            mask &= (v >= thr) if cond["op"] == ">=" else (v <= thr)
+        else:
+            m = np.isfinite(v)
+            mask &= ((v >= cond["threshold"]) if cond["op"] == ">="
+                     else (v <= cond["threshold"])) & m
+    in_view = ((feats["open_time_ns"] >= view.start_ms * 10**6)
+               & (feats["open_time_ns"] <= view.end_ms * 10**6))
+    return mask & in_view
+
+
 def _study(spec, matrix, view, side_mult: float, db_path: Path) -> dict:
     """L'étude d'événement sur la vue donnée (train ou validation)."""
     from scripts.label_matrix import event_study
     sig = spec["signal"]
-    feat_name, op = sig["feature"], sig.get("op", ">=")
-    q = float(sig.get("quantile", 0.95))
     side = int(sig.get("side", -1))
     cost = float(spec.get("cost_pct", 0.28))
     horizons = tuple(int(h) for h in spec.get("horizons", [24]))
@@ -146,9 +175,14 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path) -> dict:
             feats = compute_features(con, sym)
         finally:
             con.close()
-        fvals = feats[feat_name]
-        thr = expanding_threshold(fvals, q)
-        mask = _mask_for(matrix[sym], fvals, op, thr, view)
+        # le masque : multi-conditions (Bonsai) OU mono-feature (legacy)
+        if "conditions" in sig:
+            mask = _multi_mask(feats, sig["conditions"], view)
+        else:
+            fvals = feats[sig["feature"]]
+            thr = expanding_threshold(fvals, float(sig.get("quantile", 0.95)))
+            mask = _mask_for(cols=matrix[sym], fvals=fvals,
+                             op=sig.get("op", ">="), thr=thr, view=view)
         if mask.any():
             view.assert_range(
                 int(matrix[sym]["open_time_ns"][mask][0]) // 10**6,
