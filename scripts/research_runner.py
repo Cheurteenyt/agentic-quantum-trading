@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -325,7 +326,146 @@ def cmd_compare(a) -> int:
     return 0
 
 
+def _resource_guard() -> tuple[bool, str]:
+    """Le gouverneur de ressources (brief V3 §27, §138) : une limite
+    PHYSIQUE, pas un plafond arbitraire. RAM disponible et disque libre."""
+    try:
+        mem = {}
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                mem[k] = int(v.strip().split()[0])  # kB
+        avail_gb = mem.get("MemAvailable", 0) / 1024 / 1024
+        if avail_gb < 1.0:
+            return False, f"RAM disponible {avail_gb:.1f} Go < 1 Go — pause"
+    except OSError:
+        pass
+    du = shutil.disk_usage(ROOT)
+    if du.free / 1024**3 < 2.0:
+        return False, f"disque libre {du.free / 1024**3:.1f} Go < 2 Go"
+    return True, "OK"
+
+
+def _stage1_screen(spec: dict, db_path: Path) -> dict:
+    """STAGE 1 — le screen bon marché : l'horizon PRINCIPAL seulement."""
+    mini = dict(spec)
+    mini["horizons"] = [int(spec["horizons"][0])]
+    return run_discovery(mini, db_path=db_path)
+
+
+def _passes(res: dict, spec: dict) -> bool:
+    crit = spec.get("criteria", {})
+    return (res.get("n", 0) >= int(crit.get("min_n", 30))
+            and (res.get("mean", float("nan")) > float(crit.get("min_mean", 0.0))))
+
+
+def cmd_grind(a) -> int:
+    """LE GRIND (brief V3 §167-169) : la queue → screen bon marché → prune
+    → screen complet → candidats. Successive halving : le calcul cher est
+    réservé aux hypothèses qui méritent du calcul (§25-26)."""
+    q = Path(a.queue)
+    specs = sorted(q.glob("*.y*ml")) + sorted(q.glob("*.json"))
+    if not specs:
+        print(f"queue vide : {q}")
+        return 0
+    order = {"tiny": 0, "small": 1, "medium": 2, "large": 3}
+    specs.sort(key=lambda f: order.get(
+        (json.loads(f.read_text(encoding="utf-8")).get("compute", {})
+         .get("class", "small")), 1))
+    ok_guard, why = _resource_guard()
+    if not ok_guard:
+        print(f"grind : garde-fou ressources — {why} (pause, pas d'échec)")
+        return 0
+    survivors = []
+    for f in specs:
+        spec = load_spec(f)
+        print(f"[grind] stage 1 : {spec['id']} — screen {spec['horizons'][0]}h",
+              flush=True)
+        r1 = _stage1_screen(spec, Path(a.db))
+        if not _passes(r1, spec):
+            print(f"[grind]   éliminé (stage 1 : n {r1.get('n')}, "
+                  f"mean {r1.get('mean', float('nan')):.3f})")
+            continue
+        print(f"[grind] stage 2 : {spec['id']} — tous les horizons + inverse")
+        r2 = run_discovery(spec, db_path=Path(a.db))
+        if _passes(r2, spec):
+            write_artifacts(spec["id"], spec, r2, "discovery")
+            _log_ledger(spec, r2["verdict"], Mode.DISCOVERY.value,
+                        str(RUNS / spec["id"] / "report.md"))
+            survivors.append(spec["id"])
+            print(f"[grind]   CANDIDATE discovery : {r2['verdict']} "
+                  f"(n {r2['n']}, mean {r2['mean']:.3f})")
+        else:
+            print(f"[grind]   éliminé (stage 2)")
+        ok_guard, why = _resource_guard()
+        if not ok_guard:
+            print(f"[grind] {why} — arrêt propre de la file")
+            break
+    print(f"\ngrind terminé : {len(survivors)} candidat(s) discovery "
+          f"→ confirmation sur go du propriétaire (jamais promote automatiquement)")
+    return 0
+
+
+def _cluster_key(spec: dict) -> str:
+    """La clé de MECHANISM CLUSTER (brief V3 §61-62) : même famille + même
+    feature + même opérateur = une seule idée conceptuelle, peu importe les
+    seuils (RSI 29/30/31 ne sont pas 3 idées)."""
+    s = spec.get("signal", {})
+    return (f"{spec.get('family', '?')}|{s.get('feature', '?')}|"
+            f"{s.get('op', '?')}|{s.get('side', -1)}")
+
+
+def _pareto_frontier(rows: list[dict]) -> list[dict]:
+    """La frontière de Pareto sur (mean ↑, n ↑, worst ↑) — brief V3 §61."""
+    front = []
+    for r in rows:
+        dominated = any(
+            (o["mean"] >= r["mean"] and o["n"] >= r["n"] and o["worst"] >= r["worst"])
+            and (o["mean"] > r["mean"] or o["n"] > r["n"] or o["worst"] > r["worst"])
+            for o in rows if o is not r)
+        if not dominated:
+            front.append(r)
+    return front
+
+
+def cmd_select(a) -> int:
+    """PR 9 : la sélection des candidats — clusters + Pareto + diversité +
+    pression de sélection (brief V3 §63-64, §73). AUCUNE valeur de PASS ici :
+    la sélection produit des CANDIDATS, la confirmation juge."""
+    rows = []
+    for f in sorted(RUNS.glob("*/summary_discovery.json")):
+        s = json.loads(f.read_text(encoding="utf-8"))
+        spec_f = RUNS / s.get("run_id", f.parent.name) / "spec.json"
+        spec = json.loads(spec_f.read_text(encoding="utf-8")) if spec_f.exists() else {}
+        rows.append({"id": s.get("run_id"), "n": s.get("n", 0),
+                     "mean": s.get("mean", float("nan")),
+                     "worst": s.get("worst", float("nan")),
+                     "cluster": _cluster_key(spec)})
+    if not rows:
+        print("aucune discovery à sélectionner")
+        return 0
+    frontier = _pareto_frontier(rows)
+    clusters: dict[str, list[dict]] = {}
+    for r in frontier:
+        clusters.setdefault(r["cluster"], []).append(r)
+    picked = []
+    for cl, items in clusters.items():
+        items.sort(key=lambda r: -r["mean"])
+        picked.extend(items[:a.per_cluster])   # la diversité : ≤ N par cluster
+    pressure = len(rows)
+    print(f"{pressure} discoveries considérées · {len(frontier)} sur la frontière "
+          f"de Pareto · {len(clusters)} mécanismes clusters · {len(picked)} "
+          f"candidats (≤ {a.per_cluster}/cluster)\n")
+    for r in picked:
+        pct = r["n"] / pressure * 100 if pressure else 0
+        print(f"  {r['id']} : mean {r['mean']:.3f} · n {r['n']} · "
+              f"cluster {r['cluster']} · pression {pct:.1f} %")
+    print("\n⚠️ CANDIDAT ≠ PREUVE : la confirmation juge (le slot scientifique).")
+    return 0
+
+
 def cmd_status(a) -> int:
+    import shutil
     runs = sorted(RUNS.glob("*/manifest.json")) if RUNS.exists() else []
     print(f"{len(runs)} run(s) :")
     for m in runs:
@@ -346,10 +486,16 @@ def main() -> int:
     d2.add_argument("--db", default=str(KDB))
     d3 = sub.add_parser("compare")
     d3.add_argument("ids", nargs="+")
+    gr = sub.add_parser("grind")
+    gr.add_argument("--queue", default=str(ROOT / "research" / "queue"))
+    gr.add_argument("--db", default=str(KDB))
+    sel = sub.add_parser("select")
+    sel.add_argument("--per-cluster", type=int, default=2)
     sub.add_parser("status")
     a = ap.parse_args()
     return {"discovery": cmd_discovery, "confirm": cmd_confirm,
-            "compare": cmd_compare, "status": cmd_status}[a.cmd](a)
+            "compare": cmd_compare, "status": cmd_status,
+            "grind": cmd_grind, "select": cmd_select}[a.cmd](a)
 
 
 if __name__ == "__main__":
