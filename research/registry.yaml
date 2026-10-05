@@ -575,7 +575,7 @@ strategies:
 # PRE-MORTEM CONFIRMÉ (02/10 soir) : le MAE max Q1 = 17,95 % vs médiane 0,66 % (3,3×) — le short squeeze que le red-team Bonsai a prédit est VISIBLE dans les données. Le re-tir reste SOUS_PUISSANT (0 nouvel event cascade depuis le 01/10 03:00 — le flux est silencieux en T3). Le verdict final attend ~2 sem de plus de cascade events.
 - id: EXP-crash-short-6h-004
   family: forced_flow
-  status: OOS_PASS
+  status: REJECTED
   timeframe: 1h
   hypothesis: une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à
     6h — le flux forcé vendeur ne s'épuise pas
@@ -606,7 +606,7 @@ strategies:
     la marge)
 - id: EXP-bonsai-h-18
   family: bonsai_range_pct
-  status: OOS_PASS
+  status: REJECTED
   timeframe: 1h
   hypothesis: Volatility Squeeze Short (hypothèse Bonsai H-18)
   discovery: DISCOVERY_PASS 05/10 (re-mesuré post-fix v6) — n 22137,
@@ -621,7 +621,7 @@ strategies:
   notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
 - id: EXP-crash-short-6h-univ10
   family: forced_flow
-  status: OOS_PASS
+  status: REJECTED
   timeframe: 1h
   hypothesis: RÉPLICATION UNIVERSE — le même flux forcé vendeur (ret_1h <= p10
     expanding) continue de baisser à 6h sur les 10 majeures
@@ -638,7 +638,7 @@ strategies:
   notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
 - id: EXP-bonsai-h-18-univ10
   family: bonsai_range_pct
-  status: OOS_PASS
+  status: REJECTED
   timeframe: 1h
   hypothesis: RÉPLICATION UNIVERSE — le squeeze (range_pct < 2.0 ET ret_1h <
     -0.3) porte un short 6h sur les 10 majeures
@@ -653,7 +653,7 @@ strategies:
   notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
 - id: EXP-bonsai-h-22
   family: bonsai_volume_z
-  status: OOS_PASS
+  status: REJECTED
   timeframe: 1h
   hypothesis: '[H-22] Volume Surge Reversion — un pic de volume sur bougie
     baissière marque l''épuisement : reversion à 2h'
@@ -666,7 +666,7 @@ strategies:
   notes: 3e candidat CONFIRMÉ du batch-002 Bonsai ; forward en maturation
 - id: EXP-bonsai-h-29
   family: bonsai_range_pct
-  status: OOS_PASS
+  status: REJECTED
   timeframe: 1h
   hypothesis: '[H-29] Momentum-Range Confirmation — momentum confirmé par la
     compression de range : continuation à 6h'
@@ -679,7 +679,7 @@ strategies:
   notes: le plus massif des 3 candidats du batch-002 ; forward en maturation
 - id: EXP-bonsai-h-31
   family: bonsai_volume_z
-  status: OOS_PASS
+  status: REJECTED
   timeframe: 1h
   hypothesis: '[H-31] High-Volume Low-Return Mean Reversion — gros volume,
     faible rendement : absorption, reversion à 1h'
@@ -692,3 +692,12 @@ strategies:
     0 liq, 0 mois négatif
   notes: le mean/trade le plus élevé du batch-002 mais n le plus faible ;
     forward en maturation
+
+# ——— VERDICT POST-v14 (05/10 soir, PR-143) : LES 7 CANDIDATS PRÉCÉDENTS
+# SONT REJETÉS — le P0 look-ahead (close(i) connu à l'entrée open(i))
+# invalidait toutes les mesures : le trade mesurait sa propre bougie de
+# sélection. Le mutation test (tests/test_v14_causality.py) verrouille la
+# causalité. Les découvertes re-mesurées post-fix sont TOUTES
+# DISCOVERY_FAIL (crash -0.418, squeeze -0.290/-0.295, h-22 -0.329,
+# h-29 -0.208, h-31 en cours) — le « edge » était l'artefact. La recherche
+# repart de grounds honnêtes sur le moteur v14.

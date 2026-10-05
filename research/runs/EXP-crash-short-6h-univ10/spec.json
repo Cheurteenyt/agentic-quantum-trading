@@ -33,13 +33,12 @@
  ],
  "hypothesis": "RÉPLICATION UNIVERSE : le même flux forcé vendeur (ret_1h <= p10 expanding) continue de baisser à 6h sur les 10 majeures, pas seulement BTC/ETH/SOL",
  "id": "EXP-crash-short-6h-univ10",
- "mode": "confirmation",
+ "mode": "discovery",
  "signal": {
   "feature": "ret_1h",
   "op": "<=",
   "quantile": 0.1,
   "side": -1
  },
- "strategy": "ret1h_p10_short_univ10",
- "universe": "univ10"
+ "strategy": "ret1h_p10_short_univ10"
 }

@@ -33,7 +33,7 @@
  ],
  "hypothesis": "RÉPLICATION UNIVERSE : le squeeze (range_pct < 2.0 ET ret_1h < -0.3) porte un short 6h sur les 10 majeures",
  "id": "EXP-bonsai-h-18-univ10",
- "mode": "confirmation",
+ "mode": "discovery",
  "signal": {
   "conditions": [
    {
@@ -49,6 +49,5 @@
   ],
   "side": -1
  },
- "strategy": "h-18-univ10",
- "universe": "univ10"
+ "strategy": "h-18-univ10"
 }

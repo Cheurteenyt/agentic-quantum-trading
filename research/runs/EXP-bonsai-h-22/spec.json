@@ -37,7 +37,7 @@
  ],
  "hypothesis": "[H-22] Volume Surge Reversion — ret_2h < 0.1 (falsification : ret_2h > 0.5)",
  "id": "EXP-bonsai-h-22",
- "mode": "confirmation",
+ "mode": "discovery",
  "signal": {
   "conditions": [
    {
@@ -53,6 +53,5 @@
   ],
   "side": -1
  },
- "strategy": "volume_surge_reversion",
- "universe": "univ10"
+ "strategy": "volume_surge_reversion"
 }

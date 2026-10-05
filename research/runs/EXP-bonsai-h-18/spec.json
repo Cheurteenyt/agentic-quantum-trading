@@ -26,7 +26,7 @@
  ],
  "hypothesis": "Volatility Squeeze Short",
  "id": "EXP-bonsai-h-18",
- "mode": "confirmation",
+ "mode": "discovery",
  "signal": {
   "conditions": [
    {
@@ -42,6 +42,5 @@
   ],
   "side": -1
  },
- "strategy": "H-18",
- "universe": "univ10"
+ "strategy": "H-18"
 }

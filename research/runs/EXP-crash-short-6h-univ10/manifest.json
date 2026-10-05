@@ -1,14 +1,14 @@
 {
  "run_id": "EXP-crash-short-6h-univ10",
- "kind": "confirmation",
- "spec_sha": "aed39c96a0776bac",
- "attempt": 2,
- "git_sha": "ea993a80df438617dd388409b1895ebaa5bcaf5d",
+ "kind": "discovery",
+ "spec_sha": "824d8590dfbf0164",
+ "attempt": 3,
+ "git_sha": "b7f5a28a52b270c68f51154fea8f15f79373bbf0",
  "git_dirty": true,
- "diff_sha": "cb5c7c3b3d0c4015",
- "label_hash": "d5e2dfc2e93975df",
- "snapshot": "k1h-bbb04c32ed0e1c22",
+ "diff_sha": "417a2ea9e1f2e48a",
+ "label_hash": "acfac2865b1991e0",
+ "snapshot": "k1h-1a509a56e4fba126",
  "label_version": "v2",
  "protocol_id": "protocol-v2",
- "timestamp": "2026-10-05T20:58:44.846266+00:00"
+ "timestamp": "2026-10-05T22:04:32.507819+00:00"
 }
