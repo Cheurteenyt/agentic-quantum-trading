@@ -2,8 +2,8 @@
  "run_id": "EXP-crash-short-6h-univ10",
  "kind": "confirmation",
  "spec_sha": "b7f9ce3286915a3a",
- "git_sha": "c162faa",
- "label_hash": "444074b98586042b",
- "snapshot": "k1h-83424f79e713e8c6",
- "timestamp": "2026-10-05T16:20:03.227769+00:00"
+ "git_sha": "c2fadaf",
+ "label_hash": "cbd1eacb4a7b6d6d",
+ "snapshot": "k1h-c22625d61aca89cf",
+ "timestamp": "2026-10-05T17:14:15.031375+00:00"
 }

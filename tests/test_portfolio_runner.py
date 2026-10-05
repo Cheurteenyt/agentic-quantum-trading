@@ -162,6 +162,7 @@ class TestCollectEvents(unittest.TestCase):
         fund = np.full(n, 0.01)
         matrix_cols = {"BTCUSDT": {
             "open_time_ns": feats["open_time_ns"],
+            "entry": np.full(n, 100.0),
             "ret_6": ret, "hi_6": hi, "lo_6": lo, "fund_6": fund}}
 
         class V:

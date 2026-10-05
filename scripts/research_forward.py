@@ -209,8 +209,9 @@ def _closed_trades(spec: dict, events: list[dict], db_path: Path,
                 fs = funding_series_for(e["symbol"], db_path=db_path)
                 if fs is not None and len(fs.times_ms):
                     import numpy as np
-                    k0 = int(np.searchsorted(fs.times_ms / 1e6, ot, side="right"))
-                    k1 = int(np.searchsorted(fs.times_ms / 1e6,
+                    # FIX v9 : times_ms déjà en ms (contrat FundingSeries)
+                    k0 = int(np.searchsorted(fs.times_ms, ot, side="right"))
+                    k1 = int(np.searchsorted(fs.times_ms,
                                              ot + h1 * H_MS, side="right"))
                     fund = float(fs.rates_pct[k0:k1].sum())
             except Exception:

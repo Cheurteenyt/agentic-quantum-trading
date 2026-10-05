@@ -1,20 +1,3 @@
-# EXP-bonsai-h-18-univ10 — confirmation
-
-Hypothèse : RÉPLICATION UNIVERSE : le squeeze (range_pct < 2.0 ET ret_1h < -0.3) porte un short 6h sur les 10 majeures
-
-- spec_sha d44d08c08136a820 · git c2fadaf · snapshot k1h-c22625d61aca89cf
-- verdict : **CONFIRMED** · n 19955 · mean 0.3325037129786801
-
-- BTCUSDT@6h : n 1443 · mean 0.314
-- ETHUSDT@6h : n 1722 · mean 0.368
-- SOLUSDT@6h : n 2016 · mean 0.388
-- XRPUSDT@6h : n 2006 · mean 0.366
-- BNBUSDT@6h : n 1563 · mean 0.346
-- DOGEUSDT@6h : n 2041 · mean 0.421
-- ADAUSDT@6h : n 2438 · mean 0.319
-- AVAXUSDT@6h : n 2365 · mean 0.248
-- LINKUSDT@6h : n 2304 · mean 0.296
-- LTCUSDT@6h : n 2057 · mean 0.284
 
 ## WALLET (couche portefeuille)
 

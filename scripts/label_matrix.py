@@ -47,7 +47,9 @@ from scripts.funding_series import FundingSeries, funding_series_all  # noqa: E4
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 CACHE = ROOT / "data" / "cache" / "labels"
-LABEL_VERSION = "v1"                     # la convention gelée ci-dessus
+# v2 : fix unité funding (05/10, PR-2) — l'ancien fund_H était du garbage
+# (ms comparés à des kilo-secondes) ; le bump invalide tout le cache labels
+LABEL_VERSION = "v2"
 HORIZONS = (1, 2, 4, 6, 12, 24, 48, 72)  # heures
 
 
@@ -129,13 +131,22 @@ def _build_symbol(con: sqlite3.Connection, sym: str,
         out[f"lo_{H}"] = lo
     # funding cumulé par fenêtre : cumsum des taux as-of (points de %)
     if fser is not None and len(fser.times_ms):
-        fts_ms = fser.times_ms / 1e6
+        # FIX v9 (trouvé par le test №5) : times_ms est DÉJÀ en
+        # MILLISECONDES (contrat FundingSeries.from_rows) — l'ancien /1e6
+        # comparait des ms contre des kilo-secondes : fund_H était du
+        # garbage (≈ 0 partout, d'où les « funding net $+0.00 » des wallets)
+        fts_ms = fser.times_ms
         cum = np.concatenate(([0.0], np.cumsum(fser.rates_pct)))
         for H in horizons:
             f = np.full(n, np.nan)
             k0 = np.searchsorted(fts_ms, ts / 1e6, side="right")
             k1 = np.searchsorted(fts_ms, ts / 1e6 + H * 3_600_000.0, side="right")
-            ok = k1 <= len(cum) - 0
+            # FIX v9 (rapport GLM 5.3 №5) : la fenêtre de funding doit être
+            # COMPLÈTE — une fenêtre qui dépasse le dernier print connu est
+            # INCONNUE (NaN), jamais un partiel tronqué présenté comme
+            # complet. La couverture réelle remonte via fund_cov/fund_known.
+            complete = (ts / 1e6 + H * 3_600_000.0) <= fts_ms[-1]
+            ok = complete & (k1 <= len(cum))
             f[ok] = (cum[np.minimum(k1[ok], len(cum) - 1)]
                      - cum[np.minimum(k0[ok], len(cum) - 1)])
             out[f"fund_{H}"] = f

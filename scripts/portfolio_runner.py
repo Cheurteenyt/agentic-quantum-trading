@@ -56,6 +56,7 @@ from scripts import research_runner as rr  # noqa: E402
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 RUNS = ROOT / "research" / "runs"
+H_MS = 3_600_000
 
 
 # ------------------------------------------------------------------ events
@@ -89,6 +90,7 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
         hi = cols[f"hi_{h1}"]
         lo = cols[f"lo_{h1}"]
         fund = cols.get(f"fund_{h1}")
+        entry_px = cols["entry"]     # l'open(i) — requis par le moteur MTM
         for i in idx:
             fv = float(fund[i]) if fund is not None else 0.0
             if not np.isfinite(fv):
@@ -103,12 +105,223 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
             events.append({
                 "sym": sym, "t_ms": t_ms, "exit_ms": t_ms + h1 * 3_600_000,
                 "side": side, "ret_pct": float(ret[i]),
+                "entry": float(entry_px[i]),
                 "mae_pct": mae_pct, "fund_pct": fv, "cost_pct": cost})
     events.sort(key=lambda e: e["t_ms"])
     # FIX v8 (rapport GLM 5.3 №4) : la couverture de funding des events est
     # retournée — l'inconnu ne devient jamais 0 en silence sans être compté
     fund_cov = (n_fund_known / len(events)) if events else 0.0
     return events, fund_cov
+
+
+# ------------------------------------------------------------------ MTM
+def _fetch_marks(db_path: Path, symbols: list[str], start_ms: int,
+                 end_ms: int) -> dict[str, dict]:
+    """Les marks horaires par symbole : close (MTM réaliste) et high/low
+    (borne conservatrice intrabar). Structure {sym: {t, close, high, low}}."""
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    out: dict[str, dict] = {}
+    try:
+        for sym in symbols:
+            rows = con.execute(
+                "SELECT open_time, close, high, low FROM klines "
+                "WHERE symbol=? AND interval='1h' AND open_time>=? "
+                "AND open_time<? ORDER BY open_time",
+                (sym, start_ms, end_ms)).fetchall()
+            if len(rows) >= 2:
+                out[sym] = {"t": np.array([r[0] for r in rows], dtype=np.int64),
+                            "close": np.array([float(r[1]) for r in rows]),
+                            "high": np.array([float(r[2]) for r in rows]),
+                            "low": np.array([float(r[3]) for r in rows])}
+    finally:
+        con.close()
+    return out
+
+
+def _mark_index(t_arr: np.ndarray, t_ms: int) -> int | None:
+    """L'index du DERNIER bar clôturé à l'instant t (open_time < t) —
+    aucun look-ahead : le compte est marqué au dernier prix connu."""
+    if len(t_arr) == 0 or t_ms <= int(t_arr[0]):
+        return None
+    return max(int(np.searchsorted(t_arr, t_ms)) - 1, 0)
+
+
+def _unrealized(pos: dict, marks_map: dict[str, float]) -> float:
+    """Le PnL latent d'une position au dernier mark connu (entry si aucun)."""
+    px = marks_map.get(pos["sym"], pos["entry"])
+    return pos["side"] * (px / pos["entry"] - 1.0) * pos["notional"]
+
+
+def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
+                   capital: float = 100.0, cap_pct: float = 1.0,
+                   lev: float = 1.0) -> dict:
+    """LE MOTEUR MTM HORAIRE (PR-2, rapport GLM 5.3 №6).
+
+    equity_t = cash + Σ unrealized(position, dernier mark connu) — les
+    positions sont marquées CHAQUE HEURE (funding accru heure par heure,
+    frais déduits à l'entrée), au lieu d'apparaître seulement à leur
+    clôture. Publie :
+      - max_dd_mtm       : le DD sur marks CLOSE (ce que le compte a vécu)
+      - max_dd_mtm_worst : le DD sur marks intrabar hi/lo (borne haute —
+                           l'excursion adverse maximale, short au high,
+                           long au low)
+      - max_dd_close     : l'ancien DD clôture-seule (comparaison)
+    Convention liq inchangée (ex ante, MAE ≥ 100/lev − 0,5, option A) : la
+    marge est absorbée ENTIÈREMENT à l'heure d'entrée (frais et funding
+    compris — la comptabilité se réconcilie exactement).
+    Ordre horaire : sorties → entrées → funding → marks → équité."""
+    if not events:
+        return run_wallet([], capital=capital, cap_pct=cap_pct, lev=lev)
+    evs = sorted(events, key=lambda e: e["t_ms"])
+    liq_thr = 100.0 / lev - 0.5
+    h1 = (evs[0]["exit_ms"] - evs[0]["t_ms"]) // 3_600_000
+
+    cash = float(capital)
+    open_pos: dict[str, dict] = {}
+    busy: dict[str, int] = {}
+    entries_by_t: dict[int, list[dict]] = {}
+    for e in evs:
+        entries_by_t.setdefault(e["t_ms"], []).append(e)
+
+    peak = peak_w = peak_c = float(capital)
+    max_dd_mtm = max_dd_worst = max_dd_close = 0.0
+    liq = wins = skipped = 0
+    fees = fund_net = 0.0
+    monthly: dict[str, float] = {}
+    n_trades = 0
+    conc_sum = conc_n = 0
+    max_conc = 0
+    margin_sum = 0.0
+    max_margin_pct = max_gross_pct = 0.0
+    max_long_pct = max_short_pct = 0.0
+    last_close: dict[str, float] = {}
+    last_worst: dict[str, float] = {}
+
+    t = (evs[0]["t_ms"] // H_MS) * H_MS
+    t_end = max(e["exit_ms"] for e in evs)
+    while t <= t_end:
+        # 1. les sorties réalisent leur PnL (hors funding déjà accru)
+        for sym, pos in list(open_pos.items()):
+            if pos["exit_ms"] == t:
+                realized = (pos["side"] * pos["ret_pct"] / 100.0
+                            * pos["notional"])
+                cash += realized
+                n_trades += 1
+                wins += 1 if (realized + pos["fund_total"]
+                              - pos["fees"]) > 0 else 0
+                month = datetime.fromtimestamp(
+                    t / 1000, tz=timezone.utc).strftime("%Y-%m")
+                monthly[month] = monthly.get(month, 0.0) + (
+                    realized + pos["fund_total"] - pos["fees"])
+                fund_net += pos["fund_total"]
+                del open_pos[sym]
+        # 2. les nouvelles entrées
+        for e in entries_by_t.get(t, []):
+            if e["sym"] in open_pos:
+                skipped += 1
+                continue
+            eq_now = cash + sum(_unrealized(p, last_close)
+                                for p in open_pos.values())
+            margin = eq_now * cap_pct / 100.0
+            if margin <= 0:
+                break
+            notional = margin * lev
+            month = datetime.fromtimestamp(
+                t / 1000, tz=timezone.utc).strftime("%Y-%m")
+            if e["mae_pct"] >= liq_thr:
+                # option A : la mort absorbe la marge TOUT COMPRIS, dès
+                # l'heure d'entrée (le MTM la voit immédiatement)
+                cash -= margin
+                liq += 1
+                n_trades += 1
+                monthly[month] = monthly.get(month, 0.0) - margin
+                max_dd_mtm = max(max_dd_mtm, 100.0 * margin / eq_now
+                                 if eq_now > 0 else 0.0)
+                max_dd_worst = max_dd_mtm
+            else:
+                fee = notional * e["cost_pct"] / 100.0
+                cash -= fee
+                fees += fee
+                fund_signed = e["fund_pct"] * (1.0 if e["side"] == -1 else -1.0)
+                open_pos[e["sym"]] = {
+                    "sym": e["sym"], "side": e["side"], "entry": e["entry"],
+                    "notional": notional, "margin": margin,
+                    "ret_pct": e["ret_pct"], "exit_ms": e["exit_ms"],
+                    "fees": fee, "fund_total": fund_signed * notional / 100.0,
+                    "fund_hourly": fund_signed * notional / 100.0 / h1}
+        # 3. le funding accroît le cash heure par heure (payé au réel)
+        for pos in open_pos.values():
+            cash += pos["fund_hourly"]
+        # 4. les marks de l'heure : le DERNIER prix clôturé connu (pas de
+        #    look-ahead) ; worst = high intrabar (short) / low (long)
+        for sym, pos in open_pos.items():
+            mk = marks.get(sym)
+            if mk is None:
+                continue
+            i = _mark_index(mk["t"], t)
+            if i is None:
+                continue
+            last_close[sym] = float(mk["close"][i])
+            last_worst[sym] = float(
+                (mk["high"] if pos["side"] == -1 else mk["low"])[i])
+        # 5. l'équité MTM de l'heure + les métriques de concurrence (№29)
+        eq_mtm = cash + sum(_unrealized(p, last_close)
+                            for p in open_pos.values())
+        eq_worst = cash + sum(_unrealized(p, last_worst)
+                              for p in open_pos.values())
+        peak = max(peak, eq_mtm)
+        max_dd_mtm = max(max_dd_mtm,
+                         (peak - eq_mtm) / peak * 100.0 if peak > 0 else 0.0)
+        peak_w = max(peak_w, eq_worst)
+        max_dd_worst = max(max_dd_worst,
+                           (peak_w - eq_worst) / peak_w * 100.0
+                           if peak_w > 0 else 0.0)
+        peak_c = max(peak_c, cash)
+        max_dd_close = max(max_dd_close,
+                           (peak_c - cash) / peak_c * 100.0 if peak_c > 0
+                           else 0.0)
+        conc = len(open_pos)
+        conc_sum += conc
+        conc_n += 1
+        max_conc = max(max_conc, conc)
+        if eq_mtm > 0:
+            m_used = sum(p["margin"] for p in open_pos.values())
+            g_not = sum(p["notional"] for p in open_pos.values())
+            mpct = m_used / eq_mtm * 100.0
+            margin_sum += mpct
+            max_margin_pct = max(max_margin_pct, mpct)
+            max_gross_pct = max(max_gross_pct, g_not / eq_mtm * 100.0)
+            max_long_pct = max(max_long_pct,
+                               sum(p["notional"] for p in open_pos.values()
+                                   if p["side"] == 1) / eq_mtm * 100.0)
+            max_short_pct = max(max_short_pct,
+                                sum(p["notional"] for p in open_pos.values()
+                                    if p["side"] == -1) / eq_mtm * 100.0)
+        t += H_MS
+
+    months = sorted(monthly)
+    final = cash + sum(_unrealized(p, last_close) for p in open_pos.values())
+    roi = (final - capital) / capital * 100.0
+    return {"capital": capital, "solde": final, "roi_pct": roi,
+            "max_dd_pct": max_dd_mtm, "max_dd_mtm": max_dd_mtm,
+            "max_dd_mtm_worst": max_dd_worst, "max_dd_close": max_dd_close,
+            "liqs": liq, "trades": n_trades,
+            "skipped_overlap": skipped,
+            "wr_pct": (wins / n_trades * 100.0) if n_trades else 0.0,
+            "months_neg": sum(1 for v in monthly.values() if v < 0),
+            "months_total": len(months),
+            "worst_month": min(monthly.values()) if monthly else 0.0,
+            "best_month": max(monthly.values()) if monthly else 0.0,
+            "ret_dd": (roi / max_dd_mtm) if max_dd_mtm > 0 else float("inf"),
+            "fees": fees, "funding_net": fund_net, "monthly": monthly,
+            "max_concurrency": max_conc,
+            "avg_concurrency": (conc_sum / conc_n) if conc_n else 0.0,
+            "max_margin_used_pct": max_margin_pct,
+            "avg_margin_used_pct": (margin_sum / conc_n) if conc_n else 0.0,
+            "max_gross_notional_pct": max_gross_pct,
+            "max_long_notional_pct": max_long_pct,
+            "max_short_notional_pct": max_short_pct,
+            "cap_pct": cap_pct, "lev": lev, "mtm": True}
 
 
 # ------------------------------------------------------------------ wallet
@@ -341,7 +554,15 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
                                           min_event_ms=embargo_ms,
                                           db_path=db_path)
         per_window = wallet_per_window(events, proto, capital, cap_pct, lev)
-    wallet = run_wallet(events, capital=capital, cap_pct=cap_pct, lev=lev)
+    # PR-2 : le moteur MTM horaire quand les marks sont disponibles — le DD
+    # published est désormais celui que le compte AURAIT VÉCU heure par heure
+    marks = _fetch_marks(db_path, spec["data"]["symbols"],
+                         view.start_ms, view.end_ms)
+    if marks:
+        wallet = run_wallet_mtm(events, marks, capital=capital,
+                                cap_pct=cap_pct, lev=lev)
+    else:
+        wallet = run_wallet(events, capital=capital, cap_pct=cap_pct, lev=lev)
     baseline = baseline_hold(spec, view, db_path=db_path, capital=capital)
     out = {"run_id": run_id, "view": vk, "capital": capital,
            "cap_pct": cap_pct, "lev": lev, "frozen_src": frozen_src,
@@ -371,7 +592,7 @@ def wallet_report_block(w: dict) -> str:
              f"| trades pris / events bruts | {wl['trades']} / {w['n_events']} |",
              f"| solde final | ${wl['solde']:.2f} |",
              f"| ROI période | {wl['roi_pct']:+.2f} % |",
-             f"| DD max | {wl['max_dd_pct']:.2f} % |",
+             f"| DD max (MTM horaire) | {wl['max_dd_pct']:.2f} % |",
              f"| liquidations | {wl['liqs']} |",
              f"| WR | {wl['wr_pct']:.1f} % |",
              f"| mois négatifs | {wl['months_neg']} / {wl['months_total']} |",
@@ -380,6 +601,13 @@ def wallet_report_block(w: dict) -> str:
              f"| ret/DD | {wl['ret_dd']:.1f} |",
              f"| frais payés | ${wl['fees']:.2f} · funding net "
              f"${wl['funding_net']:+.2f} |"]
+    if wl.get("mtm"):
+        lines += [
+            f"| DD worst intrabar / close-seul | {wl['max_dd_mtm_worst']:.2f} %"
+            f" / {wl['max_dd_close']:.2f} % |",
+            f"| concurrence max / marge max engagée | "
+            f"{wl['max_concurrency']} positions / "
+            f"{wl['max_margin_used_pct']:.1f} % de l'équité |"]
     if bl and bl.get("solde") == bl.get("solde"):
         lines.append(
             f"| baseline long-and-hold 1x | ${bl['solde']:.2f} "
