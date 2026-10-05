@@ -985,3 +985,47 @@ re-dériver sur données fixées) + le vol_spike en décorrélation, le tout sou
 cap de marge. La cascade est re-catégorisée CONTEXTE (le signal existe peut-
 être sur XRP/DOGE, mais pas investable en l'état). Le forward paper des
 survivants reste le juge vivant.
+
+## 2026-10-05 (quater) — W42-RECON-1 : LA RECONSTRUCTION RÉFUTÉE (FAIL, budget consommé, STOP)
+
+L'expérience pré-enregistrée (gel 12465ab, amendements #103/#106), codée avant
+le run, exécutée le 05/10 au petit matin sur le moteur ET les collecteurs
+post-audit-v3 (ATR réel, atr[t], p90 expanding, funding as-of, DD MtM,
+bookage à la sortie). Split 2025-03-30, cap de marge 1 % APPARIÉ aux deux
+côtés. Verdict sur les critères gelés : **FAIL (C1 KO, C2 KO, C3 OK, C4 KO)**
+— loggé au ledger (W41 1/20).
+
+| wallet (VAL) | n | solde | DD | mois nég | ret/DD |
+|---|---|---|---|---|---|
+| survivor_long solo | 89 | $101.37 | 0.74 % | 4 | **2.0** |
+| vol_spike_6h solo | 971 | $99.20 | 2.40 % | 11 | **-0.2** |
+| JOINT | 1060 | $100.55 | 2.11 % | 11 | 0.2 |
+| JOINT coûts ×1,5 | 1060 | $99.07 | 2.83 % | 13 | -0.2 |
+
+**LA LECTURE HONNÊTE (3 morts et 1 survie)** :
+1. **LE VOL_SPIKE EST MORT POST-FIX** — au cap 1 % avec les coûts honnêtes,
+   le flux re-collecté (ATR réel, atr[t], p90 expanding) est NET NÉGATIF en
+   VAL (-0,2 ret/DD). Le « +0,0161 $/trade » du re-cost 04/10 est un ABSOLU
+   pré-fix de plus qui meurt avec le collecteur corrigé. La piste n°2 du
+   grand audit ne survit pas à son propre collecteur corrigé.
+2. **LE SURVIVOR LONG RESTE LE SEUL EDGE VIVANT** — solo VAL $101.37, DD
+   0,74 %, 0 liq, contrôle inverse confirmé ($98.10, pire). Mais à 89 trades
+   en 18 mois et +1,4 % de période au cap 1 %, c'est un edge MINUSCULE, pas
+   une stratégie : le notional et le sizing restent à re-dériver AVANT tout
+   claim.
+3. **LA DÉCORRÉLATION PRÉDITE N'EST PAS LÀ** — corr mensuelle survivor/
+   vol_spike = 0,38 (> 0,30 prédit) : le joint traîne le vol_spike mort vers
+   le bas (C1, C2 KO).
+4. **LA DÉPENDANCE QUEUE EST EXTRÊME** — le top 5 % des trades du joint =
+   1 384 % du pnl total : le reste est net négatif. Le C4 (coûts ×1,5 → sous
+   l'eau) enterrait de toute façon le portefeuille.
+
+**CE QUE ÇA N'EST PAS** : un bug (le run a suivi le pré-enregistrement, le
+moteur vérifié 889 tests, le premier tir a crashé sur une colonne et a été
+corrigé avant tout log — budget intact). **CE QUE ÇA EST** : la fin de la
+reconstruction en deux flux tels que conçus. La règle s'applique : FAIL —
+hypothèse réfutée, budget consommé, STOP, aucune réparation par filtre.
+La voie restante (décision user) : le survivor SOLO comme candidat paper
+forward (la promotion reste gelée T3), ou la re-dérivation du vol_spike
+(une nouvelle définition de collecte = une NOUVELLE hypothèse pré-enregistrée,
+pas un patch de celle-ci).
