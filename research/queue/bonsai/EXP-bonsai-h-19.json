@@ -1,0 +1,46 @@
+{
+ "domain": "aster",
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "id": "EXP-bonsai-h-19",
+ "family": "bonsai_fund_H",
+ "strategy": "H-19",
+ "hypothesis": "Funding Crowding Long",
+ "signal": {
+  "conditions": [
+   {
+    "feature": "fund_last",
+    "op": "<",
+    "threshold": -0.04
+   },
+   {
+    "feature": "ret_1h",
+    "op": ">",
+    "threshold": 0.3
+   }
+  ],
+  "side": 1
+ },
+ "horizons": [
+  6
+ ],
+ "compute": {
+  "class": "tiny"
+ }
+}

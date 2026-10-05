@@ -1,0 +1,46 @@
+{
+ "compute": {
+  "class": "tiny"
+ },
+ "cost_pct": 0.28,
+ "criteria": {
+  "min_mean": 0.02,
+  "min_n": 50
+ },
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT"
+  ],
+  "timeframe": "1h",
+  "train_end": 1756684800000,
+  "train_start": 1609459200000,
+  "validation_end": 1790000000000,
+  "validation_start": 1756684800000
+ },
+ "domain": "aster",
+ "family": "bonsai_range_pct",
+ "horizons": [
+  6
+ ],
+ "hypothesis": "Volatility Squeeze Short",
+ "id": "EXP-bonsai-h-18",
+ "mode": "discovery",
+ "signal": {
+  "conditions": [
+   {
+    "feature": "range_pct",
+    "op": "<",
+    "threshold": 2.0
+   },
+   {
+    "feature": "ret_1h",
+    "op": "<",
+    "threshold": -0.3
+   }
+  ],
+  "side": -1
+ },
+ "strategy": "H-18"
+}
