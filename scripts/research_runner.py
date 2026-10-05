@@ -792,6 +792,35 @@ def cmd_portfolio(a) -> int:
     return cli_portfolio(a)
 
 
+def cmd_forward(a) -> int:
+    """La 3e étape du protocole : la maturation des confirmés (PAPER)."""
+    from scripts import research_forward
+    if a.collect:
+        ids = [a.id] if a.id else research_forward.confirmed_runs()
+        for rid in ids:
+            r = research_forward.collect(rid, db_path=Path(a.db))
+            print(f"[forward] {rid} : {r['collected']} nouvel(s) event(s) · "
+                  f"total {r.get('journal_total', '?')}")
+        return 0
+    ids = [a.id] if a.id else research_forward.confirmed_runs()
+    for rid in ids:
+        s = research_forward.status(rid, db_path=Path(a.db))
+        m = s["maturation"]
+        tr = s["trades_closed"]
+        line = (f"{rid} : {s['events_journaled']} events · "
+                f"{tr['n']} trades fermés")
+        if tr["mean"] is not None:
+            line += f" · mean {tr['mean']:+.3f} %/trade · WR {tr['wr']:.1f} %"
+            if s["wallet"]:
+                w = s["wallet"]
+                line += (f" · wallet ${w['solde']:.2f} (DD "
+                         f"{w['max_dd_pct']:.2f} %, liq {w['liqs']})")
+        line += (f" · maturation {m['days']:.1f}/{m['days_required']:.0f} j · "
+                 f"{'READY pour review' if m['ready'] else 'en cours'}")
+        print(line)
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -820,11 +849,16 @@ def main() -> int:
     pf.add_argument("--baseline", action="store_true",
                     help="baseline equal-weight long-and-hold uniquement")
     pf.add_argument("--db", default=str(KDB))
+    fw = sub.add_parser("forward",
+                        help="la maturation des confirmés (collect/status)")
+    fw.add_argument("--collect", action="store_true")
+    fw.add_argument("--id", default=None)
+    fw.add_argument("--db", default=str(KDB))
     a = ap.parse_args()
     return {"discovery": cmd_discovery, "confirm": cmd_confirm,
             "compare": cmd_compare, "status": cmd_status,
             "grind": cmd_grind, "select": cmd_select,
-            "portfolio": cmd_portfolio}[a.cmd](a)
+            "portfolio": cmd_portfolio, "forward": cmd_forward}[a.cmd](a)
 
 
 if __name__ == "__main__":

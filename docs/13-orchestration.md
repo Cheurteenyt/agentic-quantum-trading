@@ -205,3 +205,33 @@ report.md du run.
 - **moyenne agrégée pondérée par n** : un symbole à 3 events ne pèse plus
   autant qu'un symbole à 3 000.
 - `grind` est récursif (les sous-dossiers de la queue sont traités).
+
+## Le forward du Research OS — la 3e étape (05/10)
+
+La confirmation a jugé sur les fenêtres gelées ; le protocole exige ensuite la
+MATURATION : 30 jours de données inédites (`forward_confirmation` d'active.yaml
+: min_forward_sharpe 0.5, min_forward_trades 100, min_vs_discovery 0.5). Le
+module `scripts/research_forward.py` fait vivre les candidats CONFIRMÉS :
+
+```bash
+python3 scripts/research_forward.py --collect        # tous les confirmés (nocturne 03:00)
+python3 scripts/research_forward.py --status         # l'horloge de maturation
+python3 scripts/research_runner.py forward --collect # la même porte (porte unique)
+```
+
+- **COLLECT** (branché au nocturne après le fetch klines, `ExecStart=-`) :
+  évalue le masque GELÉ sur les barres 1h fermées postérieures au
+  `validation_end` — les données qu'aucun fitting n'a jamais vues — et
+  journalise `research/forward/<run_id>.jsonl` (append-only, idempotent par
+  (symbole, open_time) : une nuit manquée ne perd rien, rejouée ne double rien).
+- **STATUS** : les trades fermés mesurés depuis les klines brutes (mêmes
+  conventions que le kernel), stats courantes, mini-wallet (run_wallet),
+  horloge de maturation (jours depuis le manifest de confirmation + trades).
+- Le forward opère VOLONTAIREMENT hors DataScope (les fenêtres gelées
+  s'arrêtent au validation_end — tout ce qui suit est le test en cours).
+  Aucun seuil n'y est re-calibré JAMAIS. READY (30 j + 100 trades) ⇒ review
+  de protocole, JAMAIS promote automatique.
+
+Collecte initiale (05/10) : crash-short-6h 49 trades fermés à +0,801 %/trade
+(WR 87,8 %), h-18 155 trades à +0,385 %/trade (WR 65,8 %) — les deux tiennent
+leur edge hors échantillon dès les premières semaines.
