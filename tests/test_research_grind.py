@@ -68,8 +68,15 @@ class TestGrindHalving(unittest.TestCase):
         return f, spec
 
     def test_le_grind_ecrit_les_candidats_et_les_morts(self):
-        f1, _ = self._spec("EXP-good-001", kill_pct=-3.0)   # un vrai crash
-        f2, _ = self._spec("EXP-flat-002", kill_pct=0.0)    # du bruit plat
+        # _db fabrique un crash de -3 %/barre (barres 100-120) : le short
+        # (EXP-good) doit survivre au funnel, le long (EXP-flat, le contrôle
+        # inverse) doit être éliminé au screen — mean < min_mean.
+        f1, _ = self._spec("EXP-good-001", kill_pct=-3.0)
+        f2, spec2 = self._spec("EXP-flat-002", kill_pct=0.0)
+        spec2["signal"] = {"feature": "ret_1h", "op": ">=", "quantile": 0.10,
+                           "side": 1}
+        spec2["criteria"] = {"min_n": 5, "min_mean": 0.0}
+        f2.write_text(json.dumps(spec2), encoding="utf-8")
         a = argparse.Namespace(queue=str(self.queue), db=str(self.db))
         rr.cmd_grind(a)
         runs = list(rr.RUNS.glob("*/summary_discovery.json"))

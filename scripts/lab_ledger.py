@@ -54,7 +54,10 @@ DEFAULT_POLICY = ROOT / "agent" / "policy.yaml"
 DEFAULT_STATE = ROOT / "research" / "STATE.md"
 
 CONSUMING = {"PASS", "FAIL", "NUL", "SOUS_PUISSANT", "INCONCLU"}
-VERDICTS = CONSUMING | {"PREREG"}
+VERDICTS = CONSUMING | {"PREREG", "DISCOVERY_PASS", "DISCOVERY_FAIL"}
+# v3 : les verdicts DISCOVERY_* sont loggés en mode discovery (hors budget
+# scientifique, jamais promote) — ils TRACENT la pression de sélection
+# (N_discovery, brief V3 §75) sans toucher le budget de confirmation.
 DEFAULT_BUDGET = {"total_experiments": 20, "per_family": 5, "per_strategy": 3, "max_parameter_variants": 12}
 EXIT_OK, EXIT_ERR, EXIT_DUP, EXIT_STOP = 0, 2, 3, 4
 BEGIN, END = "<!-- LEDGER:BEGIN (généré par lab_ledger.py sync-state — ne pas éditer à la main) -->", "<!-- LEDGER:END -->"
