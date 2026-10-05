@@ -53,13 +53,10 @@ HORIZONS = (1, 2, 4, 6, 12, 24, 48, 72)  # heures
 
 def snapshot_id(db_path: Path = KDB) -> str:
     """L'identité de l'état des données : un hash du CONTENU 1h
-    (symbol|open_time|open|high|low|close|volume de chaque barre).
-
-    FIX v6 : l'ancien hash (symbol|open_time|close) laissait un backfill de
-    HIGHS / LOWS / VOLUMES — qui change les labels hi/lo et les features de
-    volume — INVISIBLE : le cache servait des labels périmés en silence.
-    FIX précédent : l'identité paresseuse (rows + min + max open_time)
-    collait entre deux datasets différents de mêmes statistiques."""
+    (symbol|open_time|open|high|low|close|volume) ET du funding_history
+    (fix v8, rapport GLM 5.3 №3 : les labels fund_H viennent de
+    funding_history — un changement de funding doit invalider le cache des
+    labels, l'ancien snapshot ne voyait que les prix)."""
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
         h = hashlib.sha256()
@@ -67,6 +64,13 @@ def snapshot_id(db_path: Path = KDB) -> str:
                 "SELECT symbol, open_time, open, high, low, close, volume "
                 "FROM klines WHERE interval='1h' ORDER BY symbol, open_time"):
             h.update(f"{sym}|{ots}|{o}|{hi}|{lo}|{cl}|{v};".encode())
+        try:
+            for sym, ft, rate in con.execute(
+                    "SELECT symbol, funding_time, rate FROM funding_history "
+                    "ORDER BY symbol, funding_time"):
+                h.update(f"F|{sym}|{ft}|{rate};".encode())
+        except sqlite3.Error:
+            h.update(b"F|absent;")
         n = h.hexdigest()[:16]
     finally:
         con.close()
@@ -102,14 +106,24 @@ def _build_symbol(con: sqlite3.Connection, sym: str,
         ret = np.full(n, np.nan)
         hi = np.full(n, np.nan)
         lo = np.full(n, np.nan)
-        if n > H:
-            # close(i+H-1) / open(i) - 1 : la convention de sortie du repo
-            # (closes[ei+hold-1]) — entrée à l'open(i), H barres détenues.
-            ret[:n - H] = (close[H - 1: n - 1] / open_[:n - H] - 1.0) * 100.0
-            w_h = sliding_window_view(high, H)[:n - H]   # [i, i+H-1]
-            w_l = sliding_window_view(low, H)[:n - H]
-            hi[:n - H] = w_h.max(axis=1) / open_[:n - H] - 1.0
-            lo[:n - H] = w_l.min(axis=1) / open_[:n - H] - 1.0
+        if n >= H:
+            # FIX v8 (2 corrections du rapport GLM 5.3) :
+            # 1. le DERNIER event H est valide — i = n-H dispose encore des
+            #    H barres i..n-1 (l'ancien code s'arrêtait une ligne trop tôt) ;
+            # 2. un label n'est légal que si ses H barres sont CONTIGUËS
+            #    (pas de trou horaire traversant le label — un gap ferait
+            #    « 6 barres » d'un horizon 6h qui en vaut 8 en temps réel).
+            valid_n = n - H + 1
+            # ts est en NANOSECONDES : l'écart contigu attendu = (H-1) heures
+            gapless = (ts[H - 1:] - ts[:valid_n]) == (H - 1) * 3_600_000_000_000
+            ret[:valid_n] = np.where(
+                gapless, (close[H - 1:] / open_[:valid_n] - 1.0) * 100.0, np.nan)
+            w_h = sliding_window_view(high, H)[:valid_n]   # [i, i+H-1]
+            w_l = sliding_window_view(low, H)[:valid_n]
+            hi[:valid_n] = np.where(gapless, w_h.max(axis=1) / open_[:valid_n] - 1.0,
+                                    np.nan)
+            lo[:valid_n] = np.where(gapless, w_l.min(axis=1) / open_[:valid_n] - 1.0,
+                                    np.nan)
         out[f"ret_{H}"] = ret
         out[f"hi_{H}"] = hi
         out[f"lo_{H}"] = lo

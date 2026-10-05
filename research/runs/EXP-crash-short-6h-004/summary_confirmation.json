@@ -2,10 +2,12 @@
  "verdict": "CONFIRMED",
  "n": 1908,
  "mean": 1.014251690736629,
- "train_mean": 1.050056107267495,
- "degradation_pct": 3.4097622291858185,
+ "train_mean": 1.0497973314582407,
+ "degradation_pct": 3.38595266500024,
  "stress_mean": 0.8742516907366293,
  "stress_multiplier": 1.5,
+ "fund_coverage": 1.0,
+ "protocol_id": "protocol-v2",
  "per_window": {
   "2025-09": {
    "n": 291,
@@ -55,8 +57,8 @@
  "embargo_ms": 1756944000000,
  "frozen_src": "discovery_artifact",
  "slots_consumed": 1,
- "label_hash": "c6789f1de492e40d",
- "snapshot": "k1h-8df3d3b694401749",
+ "label_hash": "444074b98586042b",
+ "snapshot": "k1h-83424f79e713e8c6",
  "validation_window": [
   1756684800000,
   1790000000000

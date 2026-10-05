@@ -1,0 +1,57 @@
+{
+ "bonsai": {
+  "mask_text": "Pic de volume sans tendance forte",
+  "novelty": 0.9
+ },
+ "compute": {
+  "class": "tiny"
+ },
+ "cost_pct": 0.28,
+ "criteria": {
+  "min_mean": 0.02,
+  "min_n": 50
+ },
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_end": 1756684800000,
+  "train_start": 1609459200000,
+  "validation_end": 1790000000000,
+  "validation_start": 1756684800000
+ },
+ "domain": "aster",
+ "family": "bonsai_volume_z",
+ "horizons": [
+  2
+ ],
+ "hypothesis": "[H-22] Volume Surge Reversion — ret_2h < 0.1 (falsification : ret_2h > 0.5)",
+ "id": "EXP-bonsai-h-22",
+ "mode": "discovery",
+ "signal": {
+  "conditions": [
+   {
+    "feature": "volume_z",
+    "op": ">=",
+    "quantile": 0.9
+   },
+   {
+    "feature": "ret_1h",
+    "op": "<=",
+    "quantile": 0.3
+   }
+  ],
+  "side": -1
+ },
+ "strategy": "volume_surge_reversion"
+}

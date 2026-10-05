@@ -22,6 +22,24 @@ frozen_windows:
 embargo_hours: 72
 windows_pass_required: 5        # 5/6 fenêtres PASS minimum
 
+# ——— les gates du Research OS (ajoutés le 05/10, fix v8 rapport GLM 5.3 —
+#      validés propriétaire ; AUCUN seuil de jugement ne vit ailleurs que
+#      dans CE fichier ou dans une spec pré-enregistrée) ———
+# La spec pré-enregistrée garde SES critères min_n/min_mean : ils sont gelés
+# AVANT le run (le pré-enregistrement en fait des seuils de protocole à part
+# entière). Tout seuil qui n'est ni dans la spec ni ici est interdit.
+discovery_gate:
+  min_edge_advantage_pct: 0.0   # le contrôle inverse devient un GATE : le
+                                # sens codé doit battre le sens inversé
+                                # (mean − mean_inverse > seuil)
+
+confirmation_gate:
+  min_window_events: 5          # plancher d'events pour qu'une fenêtre
+                                # gelée démontre un signe (ex WINDOW_MIN_N)
+  min_fund_coverage: 0.5        # part d'events dont le funding est CONNU —
+                                # plancher anti-trou ; la couverture réelle
+                                # est rapportée à chaque run (fund_coverage)
+
 # ——— STAGE backtest gate (backend/services/backtest_v2/gates.py) ———
 backtest_gate:
   min_sharpe_oos: 0.8           # la valeur actuelle de gates.py, désormais déclarée ICI

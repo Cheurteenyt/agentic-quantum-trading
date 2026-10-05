@@ -70,7 +70,8 @@ def _make_run(runs_dir: Path, run_id="EXP-fwd-001"):
         "verdict": "DISCOVERY_PASS", "n": 20, "mean": 8.0,
         "frozen_thresholds": {"BTCUSDT": [-1.0]}}), encoding="utf-8")
     (rdir / "summary_confirmation.json").write_text(json.dumps({
-        "verdict": "CONFIRMED", "n": 10, "mean": 5.0}), encoding="utf-8")
+        "verdict": "CONFIRMED", "n": 10, "mean": 5.0,
+        "protocol_id": "protocol-v2"}), encoding="utf-8")
     (rdir / "manifest.json").write_text(json.dumps({
         "run_id": run_id, "kind": "confirmation",
         "timestamp": "2026-10-05T12:00:00+00:00"}), encoding="utf-8")
@@ -97,7 +98,15 @@ class TestForward(unittest.TestCase):
         rdir = self.runs / "EXP-rej-002"
         rdir.mkdir()
         (rdir / "summary_confirmation.json").write_text(
-            json.dumps({"verdict": "REJECTED"}), encoding="utf-8")
+            json.dumps({"verdict": "REJECTED",
+                        "protocol_id": "protocol-v2"}), encoding="utf-8")
+        self.assertEqual(rf.confirmed_runs(self.runs), ["EXP-fwd-001"])
+        # v8 (GLM 5.3 №16) : un run confirmé SANS stamp protocole (legacy)
+        # n'entre pas en maturation non plus
+        rdir = self.runs / "EXP-legacy-003"
+        rdir.mkdir()
+        (rdir / "summary_confirmation.json").write_text(
+            json.dumps({"verdict": "CONFIRMED"}), encoding="utf-8")
         self.assertEqual(rf.confirmed_runs(self.runs), ["EXP-fwd-001"])
 
     def test_collect_journaise_les_events_inedits(self):

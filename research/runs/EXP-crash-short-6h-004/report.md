@@ -2,7 +2,7 @@
 
 Hypothèse : Une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à 6h — le flux forcé vendeur ne s'épuise pas en une bougie.
 
-- spec_sha 08b7cf90e1fa7a25 · git 10ba7ae · snapshot k1h-8df3d3b694401749
+- spec_sha 08b7cf90e1fa7a25 · git c162faa · snapshot k1h-83424f79e713e8c6
 - verdict : **CONFIRMED** · n 1908 · mean 1.014251690736629
 
 - BTCUSDT@6h : n 728 · mean 0.635

@@ -56,7 +56,11 @@ H_MS = 3_600_000
 
 # ------------------------------------------------------------------ runs
 def confirmed_runs(runs_dir: Path = RUNS) -> list[str]:
-    """Tous les runs dont la confirmation sous protocole est CONFIRMED."""
+    """Tous les runs dont la confirmation est CONFIRMED **sous le protocole
+    actif** (fix v8, rapport GLM 5.3 №16 : un run sans stamp protocol_id —
+    ou estampillé d'un autre protocole — n'entre pas en maturation)."""
+    from scripts.research_os import load_confirmation_protocol as _lcp
+    active_proto = str(_lcp().get("protocol_id", "protocol-v2"))
     out = []
     if not runs_dir.exists():
         return out
@@ -65,7 +69,8 @@ def confirmed_runs(runs_dir: Path = RUNS) -> list[str]:
             s = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if s.get("verdict") == "CONFIRMED":
+        if (s.get("verdict") == "CONFIRMED"
+                and str(s.get("protocol_id", "")) == active_proto):
             out.append(f.parent.name)
     return out
 
@@ -134,7 +139,7 @@ def collect(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
             if fz is None:
                 fz = [None] * len(rr._signal_conditions(spec["signal"]))
             mask = rr.event_mask(spec, feats, view, frozen=fz,
-                                 thr_key=(str(db_path), sym))
+                                 thr_key=(*rr._db_key(db_path), sym))
             idx = [i for i in range(len(mask)) if mask[i]
                    and (sym, int(feats["open_time_ns"][i] // 10**6)) not in seen]
             for i in idx:
@@ -171,11 +176,14 @@ def _closed_trades(spec: dict, events: list[dict], db_path: Path,
     side = int(spec["signal"].get("side", -1))
     cost = float(spec.get("cost_pct", 0.28))
     try:
+        from scripts.funding_series import funding_series_for
         out = []
         for e in events:
             ot = e["open_time_ms"]
-            if ot + h1 * H_MS > now_ms - H_MS:
-                continue          # horizon pas encore écoulé
+            # FIX v8 (rapport GLM 5.3 №14) : le trade est closable dès que
+            # sa dernière barre (i+H-1) est fermée, i.e. open(i)+H*h <= now
+            if ot + h1 * H_MS > now_ms:
+                continue
             rows = con.execute(
                 "SELECT open_time, open, high, low, close FROM klines "
                 "WHERE symbol=? AND interval='1h' AND open_time>=? "
@@ -188,24 +196,29 @@ def _closed_trades(spec: dict, events: list[dict], db_path: Path,
             hi = max(float(r[2]) for r in rows)
             lo = min(float(r[3]) for r in rows)
             ret = (exit_c / entry - 1.0) * 100.0 if entry else float("nan")
-            mae = ((hi / entry - 1.0) if side == -1 else (lo / entry - 1.0)) * 100.0
+            # FIX v8 (rapport GLM 5.3 №12) : la MAE est une DISTANCE adverse
+            # POSITIVE — le low d'un long donne (1 - lo/entry), pas
+            # (lo/entry - 1) qui est négatif et rendait la liquidation
+            # impossible côté long
+            mae = ((hi / entry - 1.0) if side == -1
+                   else (1.0 - lo / entry)) * 100.0
+            # FIX v8 (rapport GLM 5.3 №13) : le funding vient de la DB du
+            # run, et un échec n'est plus un 0.0 silencieux
+            fund = None
             try:
-                from scripts.funding_series import funding_series_for as _fsf
-                fs = _fsf(e["symbol"])
+                fs = funding_series_for(e["symbol"], db_path=db_path)
                 if fs is not None and len(fs.times_ms):
                     import numpy as np
                     k0 = int(np.searchsorted(fs.times_ms / 1e6, ot, side="right"))
                     k1 = int(np.searchsorted(fs.times_ms / 1e6,
                                              ot + h1 * H_MS, side="right"))
                     fund = float(fs.rates_pct[k0:k1].sum())
-                else:
-                    fund = 0.0
             except Exception:
-                fund = 0.0
+                fund = None
             out.append({"sym": e["symbol"], "t_ms": ot,
                         "exit_ms": ot + h1 * H_MS, "side": side,
                         "ret_pct": ret, "mae_pct": mae, "fund_pct": fund,
-                        "cost_pct": cost})
+                        "fund_known": fund is not None, "cost_pct": cost})
         return out
     finally:
         con.close()
@@ -228,15 +241,23 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
         except ValueError:
             pass
     trades = _closed_trades(spec, journal, db_path, now)
-    stats = {"n": len(trades), "mean": None, "wr": None, "sharpe": None}
+    stats = {"n": len(trades), "mean": None, "wr": None, "sharpe": None,
+             "fund_known_pct": None}
     if trades:
-        rets = [t["side"] * t["ret_pct"] + t["fund_pct"] * (1 if t["side"] == -1 else -1)
-                - t["cost_pct"] for t in trades]
+        n_known = sum(1 for t in trades if t.get("fund_known"))
+        stats["fund_known_pct"] = n_known / len(trades) * 100.0
+        # FIX v8 : un funding inconnu contribue 0 (compté à part ci-dessus),
+        # il n'est jamais inventé
+        rets = [t["side"] * t["ret_pct"]
+                + (t["fund_pct"] if t.get("fund_known") else 0.0)
+                * (1 if t["side"] == -1 else -1) - t["cost_pct"]
+                for t in trades]
         stats["mean"] = sum(rets) / len(rets)
         stats["wr"] = sum(1 for r in rets if r > 0) / len(rets) * 100.0
         stats["sharpe"] = _sharpe_trades(rets, now, trades[0]["t_ms"])
-        wallet = run_wallet(trades, capital=100.0,
-                            cap_pct=1.0, lev=1.0)
+        wallet = run_wallet([{**t, "fund_pct": t["fund_pct"] if t.get("fund_known") else 0.0}
+                             for t in trades],
+                            capital=100.0, cap_pct=1.0, lev=1.0)
         wallet = {k: wallet[k] for k in ("solde", "roi_pct", "max_dd_pct",
                                          "liqs", "trades", "wr_pct",
                                          "months_neg", "months_total",
@@ -245,13 +266,34 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
         wallet = None
     need_days = float(fc.get("maturation_days", 30))
     need_trades = int(fc.get("min_forward_trades", 100))
-    ready = bool(days is not None and days >= need_days
-                 and stats["n"] >= need_trades)
+    # FIX v8 (rapport GLM 5.3 №11) : READY exige les QUATRE gates du
+    # protocole — jours, trades, Sharpe forward ET vs-discovery. Un beau
+    # compte de trades avec un Sharpe négatif n'est plus « ready ».
+    days_pass = days is not None and days >= need_days
+    trades_pass = stats["n"] >= need_trades
+    sharpe_pass = (stats["sharpe"] is not None
+                   and stats["sharpe"] >= float(fc.get("min_forward_sharpe",
+                                                       0.5)))
+    disc_mean = None
+    sfile = runs_dir / run_id / "summary_discovery.json"
+    if sfile.exists():
+        try:
+            disc_mean = json.loads(sfile.read_text(encoding="utf-8")).get("mean")
+        except (OSError, json.JSONDecodeError):
+            disc_mean = None
+    vs_pass = (stats["mean"] is not None and disc_mean is not None
+               and stats["mean"] >= float(fc.get("min_vs_discovery", 0.5))
+               * float(disc_mean))
+    ready = bool(days_pass and trades_pass and sharpe_pass and vs_pass)
     return {"run_id": run_id, "confirmed_at": confirmed_at,
             "events_journaled": len(journal), "trades_closed": stats,
             "wallet": wallet,
             "maturation": {"days": days, "days_required": need_days,
                            "trades": stats["n"], "trades_required": need_trades,
+                           "days_pass": days_pass, "trades_pass": trades_pass,
+                           "sharpe_pass": sharpe_pass,
+                           "vs_discovery_pass": vs_pass,
+                           "discovery_mean": disc_mean,
                            "ready": ready,
                            "note": "ready ⇒ review de protocole, JAMAIS promote "
                                    "automatique" if ready else
