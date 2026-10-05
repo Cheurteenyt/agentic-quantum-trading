@@ -52,17 +52,25 @@ HORIZONS = (1, 2, 4, 6, 12, 24, 48, 72)  # heures
 
 
 def snapshot_id(db_path: Path = KDB) -> str:
-    """L'identité paresseuse de l'état des données : (min_ts, max_ts, rows,
-    max open_time) par la table klines 1h — déterministe, bon marché, et un
-    refresh de collecteur le change (les labels se re-hachent alors)."""
+    """L'identité de l'état des données : un hash du CONTENU 1h
+    (symbol|open_time|close de chaque barre).
+
+    FIX : l'ancienne identité paresseuse (rows + min + max open_time)
+    COLLAIT entre deux datasets différents de mêmes statistiques — les
+    fixtures de test empoisonnaient le cache de la vraie recherche (ret_6
+    réduit à 1 valeur finie). Un sha256 du contenu est déterministe,
+    sensible à toute ligne, et coûte quelques secondes sur 1,7 M barres."""
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
-        r = con.execute(
-            "SELECT COUNT(*), MIN(open_time), MAX(open_time) FROM klines "
-            "WHERE interval='1h'").fetchone()
+        h = hashlib.sha256()
+        for sym, ots, cl in con.execute(
+                "SELECT symbol, open_time, close FROM klines "
+                "WHERE interval='1h' ORDER BY symbol, open_time"):
+            h.update(f"{sym}|{ots}|{cl};".encode())
+        n = h.hexdigest()[:16]
     finally:
         con.close()
-    return f"k1h-{r[0]}-{r[1]}-{r[2]}"
+    return f"k1h-{n}"
 
 
 def label_hash(snapshot: str, horizons: tuple[int, ...]) -> str:
@@ -124,13 +132,19 @@ def _build_symbol(con: sqlite3.Connection, sym: str,
 
 
 def build_matrix(symbols: list[str], horizons: tuple[int, ...] = HORIZONS,
-                 db_path: Path = KDB, use_cache: bool = True
+                 db_path: Path = KDB, use_cache: bool = True,
+                 cache_dir: Path | None = None
                  ) -> tuple[str, dict[str, dict[str, np.ndarray]]]:
     """Construit (ou recharge du cache) la matrice de labels. Retourne
-    (label_hash, {symbole: {colonne: array}})."""
+    (label_hash, {symbole: {colonne: array}}).
+
+    cache_dir : par défaut le cache partagé du warehouse — les appelants sur
+    une DB temporaire (tests, études ad hoc) passent use_cache=False ou un
+    cache_dir dédié pour ne jamais polluer le cache de la vraie recherche.
+    """
     snap = snapshot_id(db_path)
     lh = label_hash(snap, horizons)
-    cdir = CACHE / lh
+    cdir = Path(cache_dir) if cache_dir else CACHE / lh
     out: dict[str, dict[str, np.ndarray]] = {}
     missing = []
     if use_cache and cdir.exists():
