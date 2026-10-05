@@ -176,8 +176,9 @@ def _attach_marks(con: sqlite3.Connection, events: list[dict]) -> None:
         sym = e["sym"]
         if sym not in closes:
             rows = con.execute(
-                "SELECT ts, close FROM klines WHERE symbol=? AND interval='1h' "
-                "ORDER BY ts", (sym,)).fetchall()
+                "SELECT open_time, close FROM klines "
+                "WHERE symbol=? AND interval='1h' "
+                "ORDER BY open_time", (sym,)).fetchall()
             if rows:
                 ts_ns = np.array(
                     [r[0] * 10**6 if r[0] > 10**11 else r[0] * 10**9
