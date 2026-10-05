@@ -23,8 +23,11 @@ Stdlib pure.
 from __future__ import annotations
 
 import json
+import sqlite3
 import time
 from dataclasses import dataclass, field
+
+from scripts.funding_series import FundingSeries, funding_series_for
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -156,13 +159,13 @@ def load_funding_series(symbol: str, db_path: Path | None = None) -> "FundingSer
     si la série est absente (l'appelant décide du 0.0 explicite).
     """
     try:
-        from scripts.funding_series import funding_series_for
-    except ImportError as exc:  # pragma: no cover - layout
-        raise CostDataUnavailable(f"série funding indisponible: {exc}") from exc
-    try:
         return funding_series_for(symbol, db_path)
-    except ValueError as exc:
-        raise CostDataUnavailable(str(exc)) from exc
+    except Exception as exc:
+        # FIX CI : la DB warehouse n'existe pas chez le runner CI — un
+        # OperationalError ne doit JAMAIS traverser (46 erreurs de tests) :
+        # l'appelant dégrade en funding 0.0 explicite + flag, comme pour un
+        # cache absent. Catch large délibéré : c'est une frontière d'infra.
+        raise CostDataUnavailable(f"série funding indisponible: {exc}") from exc
 
 
 def funding_cost_usd(
