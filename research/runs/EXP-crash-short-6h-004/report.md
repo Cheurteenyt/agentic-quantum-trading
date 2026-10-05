@@ -2,16 +2,16 @@
 
 Hypothèse : Une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à 6h — le flux forcé vendeur ne s'épuise pas en une bougie.
 
-- spec_sha 08b7cf90e1fa7a25 · git c2fadaf · snapshot k1h-c22625d61aca89cf
-- verdict : **CONFIRMED** · n 1908 · mean 1.0151491619106334
+- spec_sha 36fd7202eb96c4e4 · git ea993a8 · snapshot k1h-bbb04c32ed0e1c22
+- verdict : **CONFIRMED** · n 1855 · mean 1.0178233452021221
 
-- BTCUSDT@6h : n 728 · mean 0.637
-- ETHUSDT@6h : n 734 · mean 1.093
-- SOLUSDT@6h : n 446 · mean 1.503
+- BTCUSDT@6h : n 708 · mean 0.639
+- ETHUSDT@6h : n 714 · mean 1.093
+- SOLUSDT@6h : n 433 · mean 1.513
 
 ## WALLET (couche portefeuille)
 
-Vue validation · 100$ · marge ≤ 1.0 %/trade · lev 1x · une position par symbole · bookage au mois de sortie · seuils gelés (discovery_artifact)
+Vue validation · 100$ · marge ≤ 1.0 %/trade · lev 1x · une position par symbole · bookage au mois de sortie · seuils gelés (recomputed_train)
 
 | métrique | valeur |
 |---|---|
@@ -27,5 +27,13 @@ Vue validation · 100$ · marge ≤ 1.0 %/trade · lev 1x · une position par sy
 | frais payés | $3.51 · funding net $+0.01 |
 | DD worst intrabar / close-seul | 0.21 % / 0.19 % |
 | concurrence max / marge max engagée | 3 positions / 3.0 % de l'équité |
+| CAGR / Sharpe portefeuille / Sortino portefeuille | +12.1 % / 9.97 / 19.90 |
+| profit factor / Sortino trade-level (secondaire) | 5.01 / 48.1 |
+| concentration PnL sans top 1 / 5 / 10 % | $111.75 / $109.05 / $106.63 |
+| CONTRE-FACTUEL sans top 10 % (re-joué, tailles recalculées) | $109.96 (liq 0) |
+| n brut / sans chevauchement / effectif | 1173 / 525 / 374.3 (autocorr +0.516 · 688 buckets horaires) |
+| bootstrap mean CI95 | [+0.000, +0.000] |
+| bootstrap Sharpe portefeuille CI95 / t-stat CI95 | [+8.41, +11.53] / [+8.6, +11.8] |
+| masse bootstrap mean > 0 | 0 réplications négatives / 2000 (blocs 24 h) |
 | baseline long-and-hold 1x | $66.78 (ROI -33.22 %, DD 63.69 %) — l'edge doit BATTRE ça |
-| DD par fenêtre gelée | 2025-09 0.15 % · 2025-11 0.10 % · 2026-01 0.06 % · 2026-03 0.18 % · 2026-05 0.10 % · 2026-07 0.05 % (plafond 15 %) |
+| DD par fenêtre gelée | 2025-09 0.17 % · 2025-11 0.17 % · 2026-01 0.13 % · 2026-03 0.20 % · 2026-05 0.14 % · 2026-07 0.10 % (plafond 15 %) |

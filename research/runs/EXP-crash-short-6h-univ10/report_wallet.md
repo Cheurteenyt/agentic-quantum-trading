@@ -1,7 +1,7 @@
 
 ## WALLET (couche portefeuille)
 
-Vue validation · 100$ · marge ≤ 1.0 %/trade · lev 1x · une position par symbole · bookage au mois de sortie · seuils gelés (discovery_artifact)
+Vue validation · 100$ · marge ≤ 1.0 %/trade · lev 1x · une position par symbole · bookage au mois de sortie · seuils gelés (recomputed_train)
 
 | métrique | valeur |
 |---|---|

@@ -1,9 +1,14 @@
 {
  "run_id": "EXP-bonsai-h-22",
- "kind": "discovery",
- "spec_sha": "92f53ea4f3bc6075",
- "git_sha": "13cc659",
- "label_hash": "bea2470c7ac70a6e",
- "snapshot": "k1h-c22625d61aca89cf",
- "timestamp": "2026-10-05T17:48:46.243836+00:00"
+ "kind": "confirmation",
+ "spec_sha": "be684a693c7e0f45",
+ "attempt": 2,
+ "git_sha": "ea993a80df438617dd388409b1895ebaa5bcaf5d",
+ "git_dirty": true,
+ "diff_sha": "56f5b05e10943526",
+ "label_hash": "bc417b69e5be8ddf",
+ "snapshot": "k1h-8425ef597534f306",
+ "label_version": "v2",
+ "protocol_id": "protocol-v2",
+ "timestamp": "2026-10-05T21:06:35.989094+00:00"
 }
