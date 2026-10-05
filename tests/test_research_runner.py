@@ -94,7 +94,8 @@ class TestRunner(unittest.TestCase):
         self.assertIn(res["verdict"], ("DISCOVERY_PASS", "DISCOVERY_FAIL"))
         self.assertGreater(res["n"], 0)
         self.assertIn("label_hash", res)
-        rdir = rr.write_artifacts(self.spec["id"], self.spec, res, "discovery")
+        rdir = rr.write_artifacts(self.spec["id"], self.spec, res, "discovery",
+                                  db_path=self.db)
         self.assertTrue((rdir / "manifest.json").exists())
         self.assertTrue((rdir / "spec.json").exists())
         s = json.loads((rdir / "summary_discovery.json").read_text(encoding="utf-8"))

@@ -235,10 +235,15 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
     (rdir / "spec.json").write_text(
         json.dumps(spec, ensure_ascii=False, indent=1, sort_keys=True),
         encoding="utf-8")
+    snap = result.get("snapshot")
+    if snap is None:
+        try:
+            snap = snapshot_id(db_path)
+        except sqlite3.Error:
+            snap = "unknown"   # DB absente (CI) : le manifest reste écrit
     (rdir / "manifest.json").write_text(json.dumps({
         "run_id": run_id, "kind": kind, "spec_sha": sha, "git_sha": _git(),
-        "label_hash": result.get("label_hash"),
-        "snapshot": result.get("snapshot", snapshot_id(db_path)),
+        "label_hash": result.get("label_hash"), "snapshot": snap,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }, ensure_ascii=False, indent=1), encoding="utf-8")
     summary = {k: v for k, v in result.items() if k != "per_symbol"}
@@ -249,8 +254,7 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
         encoding="utf-8")
     lines = [f"# {run_id} — {kind}", "",
              f"Hypothèse : {spec.get('hypothesis', '')}", "",
-             f"- spec_sha {sha} · git {_git()} · snapshot "
-             f"{result.get('snapshot', snapshot_id(db_path))}",
+             f"- spec_sha {sha} · git {_git()} · snapshot {snap}",
              f"- verdict : **{result.get('verdict')}** · n {result.get('n')} · "
              f"mean {result.get('mean')}", ""]
     for key, st in result.get("per_symbol", {}).items():
