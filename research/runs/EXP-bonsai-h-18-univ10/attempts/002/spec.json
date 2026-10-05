@@ -1,0 +1,54 @@
+{
+ "compute": {
+  "class": "tiny"
+ },
+ "cost_pct": 0.28,
+ "criteria": {
+  "min_mean": 0.02,
+  "min_n": 50
+ },
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_end": 1756684800000,
+  "train_start": 1609459200000,
+  "validation_end": 1790000000000,
+  "validation_start": 1756684800000
+ },
+ "domain": "aster",
+ "family": "bonsai_range_pct",
+ "horizons": [
+  6
+ ],
+ "hypothesis": "RÉPLICATION UNIVERSE : le squeeze (range_pct < 2.0 ET ret_1h < -0.3) porte un short 6h sur les 10 majeures",
+ "id": "EXP-bonsai-h-18-univ10",
+ "mode": "confirmation",
+ "signal": {
+  "conditions": [
+   {
+    "feature": "range_pct",
+    "op": "<",
+    "threshold": 2.0
+   },
+   {
+    "feature": "ret_1h",
+    "op": "<",
+    "threshold": -0.3
+   }
+  ],
+  "side": -1
+ },
+ "strategy": "h-18-univ10",
+ "universe": "univ10"
+}

@@ -37,7 +37,7 @@
  ],
  "hypothesis": "[H-31] High Volume Low Return Mean Reversion — ret_1h < 0.1 (falsification : ret_1h > 0.5)",
  "id": "EXP-bonsai-h-31",
- "mode": "confirmation",
+ "mode": "discovery",
  "signal": {
   "conditions": [
    {
@@ -53,6 +53,5 @@
   ],
   "side": -1
  },
- "strategy": "high_volume_low_return_mean_reversion",
- "universe": "univ10"
+ "strategy": "high_volume_low_return_mean_reversion"
 }

@@ -1,0 +1,14 @@
+{
+ "run_id": "EXP-bonsai-h-29",
+ "kind": "confirmation",
+ "spec_sha": "9ec1c3969a778b85",
+ "attempt": 2,
+ "git_sha": "ea993a80df438617dd388409b1895ebaa5bcaf5d",
+ "git_dirty": true,
+ "diff_sha": "5749a77181ec8d69",
+ "label_hash": "acfac2865b1991e0",
+ "snapshot": "k1h-8425ef597534f306",
+ "label_version": "v2",
+ "protocol_id": "protocol-v2",
+ "timestamp": "2026-10-05T21:12:57.720063+00:00"
+}

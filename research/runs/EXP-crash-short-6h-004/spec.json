@@ -26,13 +26,12 @@
  ],
  "hypothesis": "Une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à 6h — le flux forcé vendeur ne s'épuise pas en une bougie.",
  "id": "EXP-crash-short-6h-004",
- "mode": "confirmation",
+ "mode": "discovery",
  "signal": {
   "feature": "ret_1h",
   "op": "<=",
   "quantile": 0.1,
   "side": -1
  },
- "strategy": "ret1h_p10_short",
- "universe": "univ10"
+ "strategy": "ret1h_p10_short"
 }

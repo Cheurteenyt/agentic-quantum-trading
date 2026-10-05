@@ -37,7 +37,7 @@
  ],
  "hypothesis": "[H-29] Momentum-Range Confirmation — ret_6h > 0.5 (falsification : ret_6h < 0.3)",
  "id": "EXP-bonsai-h-29",
- "mode": "confirmation",
+ "mode": "discovery",
  "signal": {
   "conditions": [
    {
@@ -53,6 +53,5 @@
   ],
   "side": 1
  },
- "strategy": "momentum-range_confirmation",
- "universe": "univ10"
+ "strategy": "momentum-range_confirmation"
 }
