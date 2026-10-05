@@ -783,8 +783,10 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
         per_window = wallet_per_window(events, proto, capital, cap_pct, lev,
                                        marks=marks)
         for wsub in per_window.values():
-            wsub.pop("trade_pnls", None)   # le détail trade-par-trade ne
-            # se persiste pas (les métriques agrégées suffisent au rapport)
+            # le détail trade-par-trade et la courbe horaire ne se
+            # persistent pas (les métriques agrégées suffisent au rapport)
+            wsub.pop("trade_pnls", None)
+            wsub.pop("equity_hourly", None)
     # le moteur MTM quand les marks sont disponibles
     if marks:
         wallet = run_wallet_mtm(events, marks, capital=capital,
@@ -794,8 +796,8 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
         wallet = run_wallet(events, capital=capital, cap_pct=cap_pct, lev=lev)
     # PR-6/7 : effective-N + bootstrap TEMPOREL sur les rendements horaires
     tpnls = wallet.pop("trade_pnls", [])
+    eqh = np.array([e for _, e in wallet.pop("equity_hourly", [])])
     eff = effective_sample_size(tpnls)
-    eqh = np.array([e for _, e in wallet.get("equity_hourly", [])])
     if len(eqh) > 24:
         hr = eqh[1:] / eqh[:-1] - 1.0
         boot = block_bootstrap_hourly(hr, block_hours=24)
