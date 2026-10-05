@@ -1,0 +1,131 @@
+# LE REGISTRE DES FEATURES — Research OS PR 5 (brief V3 §12-13)
+
+Chaque feature du socle porte son **contrat causal** : quand elle est connue,
+de quoi elle dépend, quel est son warmup, et quels tests la verrouillent.
+Une feature qui n'est pas dans ce registre ne peut pas entrer dans une
+expérience confirmatoire. La sémantique ne change plus silencieusement :
+une modification de formule = version + 1 et invalidation du cache
+descendant (brief §38).
+
+> ⚠️ Les versions ci-dessous sont celles du 05/10/2026, après l'audit v3
+> (ATR passé de moyenne des |Δclose| à True Range + Wilder = v2, RSI passé
+> en Wilder strict = v2, funding passé as-of = v2). Toute mesure antérieure
+> au 05/10 porte des features v1 — les ABSOLUS pré-fix sont morts (loi).
+
+```yaml
+- name: atr_wilder
+  version: 2
+  unit: prix (via /close → %)
+  formula: EWM(alpha=1/n) du True Range = max(high-low, |high-close_prev|, |low-close_prev|)
+  inputs: [high, low, close, close_prev]
+  availability: {signal_time: close_t}
+  warmup_bars: n
+  causal: true
+  asof: false
+  dependencies: []
+  impl: scripts/aster_indicators.py::atr
+  tests: [test_lot6_prefix_invariance.py, test_lot6_prefix_invariance.py::TestIndicatorsCausalite]
+
+- name: rsi_wilder
+  version: 2
+  unit: 0-100
+  formula: seed SMA des n premiers deltas puis lissage moyenne-alpha ; pertes nulles → 100 ; gains nuls → 0
+  inputs: [close]
+  availability: {signal_time: close_t}
+  warmup_bars: n+1 (NaN honnête avant le seed)
+  causal: true
+  asof: false
+  dependencies: []
+  impl: scripts/aster_indicators.py::rsi
+  tests: [test_lot6_prefix_invariance.py, test_feature_golden.py]
+
+- name: funding_asof
+  version: 2
+  unit: points de % (rate × 100)
+  formula: Σ des prints de funding sur (entrée, sortie] — JAMAIS une moyenne × durée
+  inputs: [funding_history(symbol, funding_time, rate)]
+  availability: {signal_time: dernier print ≤ t (as-of strict, searchsorted right - 1)}
+  warmup_bars: n/a
+  causal: true
+  asof: true
+  dependencies: []
+  impl: scripts/funding_series.py::FundingSeries (sum_pct_between, rate_asof)
+  tests: [test_lot2_funding_asof.py, test_lot4_funding_causality.py, test_lot6_prefix_invariance.py]
+
+- name: ema
+  version: 1
+  unit: prix
+  formula: ewm(span=n, adjust=False)
+  inputs: [close]
+  availability: {signal_time: close_t}
+  warmup_bars: 1 (seed = première valeur)
+  causal: true
+  asof: false
+  dependencies: []
+  impl: scripts/aster_indicators.py::ema
+  tests: [test_backtest_v2_strat_momentum.py::TestEMA]
+
+- name: macd
+  version: 1
+  formula: ema(fast) - ema(slow) ; signal = ema9(line)
+  inputs: [close]
+  availability: {signal_time: close_t}
+  warmup_bars: ~slow
+  causal: true
+  asof: false
+  dependencies: [ema]
+  impl: scripts/aster_indicators.py::macd
+  tests: [test_feature_golden.py]
+
+- name: bollinger
+  version: 1
+  formula: mid = rolling(n).mean ; bandes = mid ± k·rolling(n).std ; bandwidth = (hi-lo)/mid
+  inputs: [close]
+  availability: {signal_time: close_t}
+  warmup_bars: n
+  causal: true
+  asof: false
+  dependencies: []
+  impl: scripts/aster_indicators.py::bollinger / bandwidth
+  tests: [test_feature_golden.py]
+
+- name: volume_z
+  version: 1
+  formula: (volume - rolling(n).mean) / rolling(n).std (std=0 → NaN, jamais 0)
+  inputs: [volume]
+  availability: {signal_time: close_t}
+  warmup_bars: n
+  causal: true
+  asof: false
+  dependencies: []
+  impl: scripts/aster_indicators.py::volume_z
+  tests: [test_feature_golden.py]
+
+- name: label_matrix
+  version: 1
+  unit: % prix (côté appliqué par l'appelant)
+  formula: ret_H = close(i+H-1)/open(i)-1 · hi_H/lo_H = extremes de [i, i+H-1] · fund_H = Σ as-of
+  inputs: [klines 1h, funding_history]
+  availability: {signal_time: open_i (l'exécution)}
+  warmup_bars: H (le futur inexistant = NaN, jamais fabriqué)
+  causal: true
+  asof: true
+  dependencies: [funding_asof]
+  impl: scripts/label_matrix.py::build_matrix
+  tests: [test_label_matrix.py]
+  cache: data/cache/labels/<label_hash>/ (label_hash = sha256(snapshot + horizons + version))
+
+# ——— les DONNÉES EXTERNES (as-of obligatoire) ———
+- name: btc_regime
+  version: 1
+  formula: dernier rendement BTC CONNU à t (as-of strict, searchsorted)
+  availability: {signal_time: t (join as-of)}
+  causal: true
+  asof: true
+  impl: scripts/full_arsenal_2.py (contagion, fix C7)
+  tests: [test_lot4_funding_causality.py]
+
+# ——— À COMPLÉTER (le brief §12 : le registre devient obligatoire) ———
+# donchian, stoch, roc, obv : implémentés, causaux par lecture, SANS golden
+# test ni test d'invariance — à couvrir avant usage en confirmation.
+```
