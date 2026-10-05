@@ -332,6 +332,26 @@ def event_mask(spec: dict, feats: dict, view, frozen=None,
     return mask
 
 
+def apply_universe(spec: dict, sym: str, mask: np.ndarray,
+                   feats: dict, horizon_h: int) -> np.ndarray:
+    """LA primitive anti-survivorship (PR-147, audit GLM 5.3 №4) : entry et
+    sortie (entry + horizon) dans le span tradable du manifest. Une SEULE
+    interprétation de l'univers pour discovery/confirmation/wallet/forward."""
+    if not spec.get("universe"):
+        return mask
+    from scripts.universe import load as _uload, tradable_window_ms
+    try:
+        tw = tradable_window_ms(_uload(str(spec["universe"])), sym)
+    except FileNotFoundError:
+        return mask
+    if tw is None:
+        return mask
+    t0, t1 = tw
+    ns = feats["open_time_ns"]
+    return mask & (ns >= t0 * 10**6) & \
+        (ns + horizon_h * 3_600_000 * 10**6 <= t1 * 10**6)
+
+
 def _features_by_sym(spec: dict, db_path: Path) -> dict[str, dict]:
     """Les features causales par symbole, calculées UNE fois par run —
     la confirmation multiplie les études (train, fenêtres, stress)."""
@@ -394,20 +414,10 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
         mask = event_mask(spec, feats, view, frozen=fz,
                           min_event_ms=min_event_ms,
                           thr_key=(*_db_key(db_path), sym))
-        # FIX v14 (audit GLM 5.3 №8) : l'univers déclaré devient une
-        # CONTRAINTE du masque — entry ET sortie dans le span tradable
-        if spec.get("universe"):
-            from scripts.universe import load as _uload, tradable_window_ms
-            try:
-                uman = _uload(str(spec["universe"]))
-                tw = tradable_window_ms(uman, sym)
-            except FileNotFoundError:
-                tw = None
-            if tw is not None:
-                t0, t1 = tw
-                ns = feats["open_time_ns"]
-                in_span = (ns >= t0 * 10**6) &                     (ns + horizons[0] * 3_600_000 * 10**6 <= t1 * 10**6)
-                mask = mask & in_span
+        # PR-147 : la primitive UNIQUE anti-survivorship (entry + sortie
+        # dans le span tradable du manifest — une seule interprétation de
+        # l'univers pour discovery/confirmation/wallet/forward)
+        mask = apply_universe(spec, sym, mask, feats, horizons[0])
         if mask.any():
             view.assert_range(
                 int(feats["open_time_ns"][mask][0]) // 10**6,

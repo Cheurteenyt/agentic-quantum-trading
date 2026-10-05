@@ -171,8 +171,9 @@ fenêtre tronquée est tracée `coverage_pct` et INÉLIGIBLE au PASS) →
 preflight (0 slot sur échec d'infra) → étude **par fenêtre gelée** avec
 seuils gelés + embargo 72h à la frontière train→validation → verdict :
 `windows_pass ≥ windows_pass_required` (5/6) ET moyenne pondérée par n >
-min_mean ET stress de coûts ×1,5 > 0 ET dégradation train→validation ≤ 70 %.
-
+min_mean ET **chaque fenêtre** : mean > 0 ∧ stress ×1,5 > 0 ∧ DD MTM ≤
+max_window_loss_pct (15 %) ET couverture funding ≥ min_fund_coverage ET
+dégradation train→validation ≤ 70 %.
 **CONFIRMED ≠ promote.** Le verdict ouvre le droit au wallet et au forward
 (maturation 30 jours, seuils forward_confirmation d'active.yaml).
 

@@ -1,6 +1,6 @@
 # STATE — l'état de la recherche (≤ 2 Ko) · à lire EN PREMIER
 
-MAJ manuelle : 2026-10-05. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/lab_ledger.py sync-state`
+MAJ manuelle : 2026-10-06. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/lab_ledger.py sync-state`
 (audit_check F5 échoue s'il est périmé). Tout chiffre ici doit avoir sa commande de reproduction.
 
 ## Ledger & budget

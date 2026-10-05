@@ -1,9 +1,6 @@
 version: 1
-generated: 2026-10-06   # mis à jour à chaque édition (les verdicts datent
-                        # du jour de leur mesure — voir research/runs/)
-protocol: harnais-v5 (baseline anti-dérive, horizons muraux, split chrono strict)
-execution_convention: signal=close(t) → entry=open(t+1) → exit=plan du signal, stop
-  prioritaire intrabar
+generated: '2026-10-06'
+execution_convention: signal=close(t) → entry=open(t+1) → exit=plan du signal, stop prioritaire intrabar
 cost_model: taker 0.18 % RT (murs), maker mesuré pour les variantes MK
 statuses:
 - EXPERIMENTAL
@@ -19,19 +16,17 @@ strategies:
   family: cascade
   status: SHADOW
   timeframe: 1h
-  hypothesis: la cascade accélérée (3 bougies de baisse + accélération) porte un short
-    edge structurel sur les majeures, gated AL p66
+  hypothesis: la cascade accélérée (3 bougies de baisse + accélération) porte un short edge structurel
+    sur les majeures, gated AL p66
   levier: 10x gated (MAE max 7.84 %), sizing vol-inverse base 0.24, corr-tilt ×2/×0.5
-  result_forward: fenêtre sept −5.5 % (WR 33 %) — régime T3, dérisqué ×0.75 par l'adaptateur
-    90 j
+  result_forward: fenêtre sept −5.5 % (WR 33 %) — régime T3, dérisqué ×0.75 par l'adaptateur 90 j
   notes: le flux à plus longue histoire ; verdict continu au forward nocturne
 - id: machine_cascade_meme
   family: cascade
   status: SHADOW
   timeframe: 1h
   hypothesis: la cascade se transfère aux memecoins à 1x
-  result_forward: 0/9 significatif (p=0.0015) → DÉGRADÉ ; forward sept 5 joués/45
-    bloqués
+  result_forward: 0/9 significatif (p=0.0015) → DÉGRADÉ ; forward sept 5 joués/45 bloqués
   decision_pending: user ×0 vs ×0.5 (28/09) — SANS_MEME mène le tracker des 3 wallets
 - id: machine_survivor_long
   family: survivor
@@ -39,14 +34,13 @@ strategies:
   timeframe: 1h
   hypothesis: le LONG 1x inliquidable capte la queue de rebond des memecoins
   levier: 1x notional 20 %, gate ATR p90 intouchable
-  notes: TAIL = CONTEXTE (LABUSDT = 278 % de la contribution — jamais assouplir le
-    gate)
+  notes: TAIL = CONTEXTE (LABUSDT = 278 % de la contribution — jamais assouplir le gate)
 - id: machine_vol_spike_6h
   family: fade
   status: SHADOW
   timeframe: 1h
-  hypothesis: le fade du range ≥ 4× médiane 14j porte une espérance positive décorrelée
-    (corr cascade −0.22)
+  hypothesis: le fade du range ≥ 4× médiane 14j porte une espérance positive décorrelée (corr cascade
+    −0.22)
   levier: 1x (MAE p99 49 % → plafond 1.05x), promotion après ~30 trades forward
 - id: survivors_breakout_don168
   family: breakout
@@ -103,8 +97,7 @@ strategies:
 - id: cascade_mechanism_rearm
   family: cascade
   status: REJECTED
-  rejected: '02/10 — chapitre FERMÉ (prior négatif : tout gate/sizing conditionnel
-    a échoué au wallet)'
+  rejected: '02/10 — chapitre FERMÉ (prior négatif : tout gate/sizing conditionnel a échoué au wallet)'
 - id: funding_carry_wallet
   family: funding
   status: REJECTED
@@ -116,8 +109,7 @@ strategies:
 - id: tpsl_toutes_configs
   family: exit
   status: REJECTED
-  rejected: 01/10 T23 — 0/30 configs battent le hold pur en TRAIN+VAL, stop = poison
-    monotone
+  rejected: 01/10 T23 — 0/30 configs battent le hold pur en TRAIN+VAL, stop = poison monotone
 - id: fdiv_short
   family: funding
   status: REJECTED
@@ -145,560 +137,483 @@ strategies:
 - id: qubo_poids_levier_joint
   family: portfolio
   status: RETIRED
-  reason: recherche-only (audit 02/10 §41) — la comparaison equal-weight/risk-parity/QUBO
-    reste à faire sur les mêmes stratégies validées ; point officiel jamais déployé
+  reason: recherche-only (audit 02/10 §41) — la comparaison equal-weight/risk-parity/QUBO reste à faire
+    sur les mêmes stratégies validées ; point officiel jamais déployé
 - id: concentration_rotation_herfindahl
   family: regime
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-b-concentration-rotation-2026-10.md)
-  hypothesis: après un pic de concentration du volume 24h (H_t Herfindahl des 6 majeures
-    >= q95 TRAIN), rotation sur 24-72h — les 5 non-concentrées surperforment la concentrée
-  rejected: '02/10 — FAIL réfutation unilatérale : 268 evts TRAIN (tous BTC concentrée)
-    REL_gross mean -1.26 % (la concentrée CONTINUE de gagner, l''inverse du signal),
-    net -1.62 %, WR_net 24.6 %, gradient terciles inversé, 4/4 mois négatifs, cumul
-    -433.84 % ; VAL 0 événement (H_val max 0.522 < q95 0.622 — régime oct-nov 2025
-    sans récurrence). Budget consommé, STOP, pas de 2e quantile ni fenêtre'
-  notes: observation NON exploitable en l'état — la continuation de la concentrée
-    est directionnellement positive en brut sur TRAIN mais portée par le seul régime
-    oct-nov 2025 et invérifiable en VAL au seuil pré-déclaré ; toute réutilisation
-    = nouveau pré-enregistrement + budget
+  hypothesis: après un pic de concentration du volume 24h (H_t Herfindahl des 6 majeures >= q95 TRAIN),
+    rotation sur 24-72h — les 5 non-concentrées surperforment la concentrée
+  rejected: '02/10 — FAIL réfutation unilatérale : 268 evts TRAIN (tous BTC concentrée) REL_gross mean
+    -1.26 % (la concentrée CONTINUE de gagner, l''inverse du signal), net -1.62 %, WR_net 24.6 %, gradient
+    terciles inversé, 4/4 mois négatifs, cumul -433.84 % ; VAL 0 événement (H_val max 0.522 < q95 0.622
+    — régime oct-nov 2025 sans récurrence). Budget consommé, STOP, pas de 2e quantile ni fenêtre'
+  notes: observation NON exploitable en l'état — la continuation de la concentrée est directionnellement
+    positive en brut sur TRAIN mais portée par le seul régime oct-nov 2025 et invérifiable en VAL au seuil
+    pré-déclaré ; toute réutilisation = nouveau pré-enregistrement + budget
 - id: inv_a_majeure_deviante
   family: deviance-pack
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-a-majeure-deviante-2026-10.md,
     seal sha256 0a59f1651e169c110c6198cc085a3dbd843cdc43b077f41bdcfe19421b0c21bc)
-  hypothesis: la majeure à |z| >= 2 sur ret24 vs médiane du pack des 6 (BTC/ETH/SOL/BNB/XRP/DOGE)
-    décrote (z haut) ou rebondit (z bas) vs le pack en 24-72h (réversion relative)
-  rejected: '02/10 — FAIL réfuté : net 48h TRAIN +3.5 bps (n=1129, WR 49.4 %, brut
-    ~+40 bps mangé par 36 bps RT) vs VAL -39.5 bps (n=895, WR 38.0 %) ; gradient terciles
-    |z| inversé en TRAIN (T3 -8.8 < T1 +9.4) et non monotone en VAL ; contrôle inverse
-    battu en TRAIN (+3.5 vs -75.5) mais PAS en VAL (continuation -32.5 > réversion
-    -39.5 = artefact) ; VAL négatif aux 3 horizons (24h -39.0 / 48h -39.5 / 72h -42.7)
-    ; robustesse |z| >= 2.2 TRAIN -6.9 bps, gradient encore plus inversé'
+  hypothesis: la majeure à |z| >= 2 sur ret24 vs médiane du pack des 6 (BTC/ETH/SOL/BNB/XRP/DOGE) décrote
+    (z haut) ou rebondit (z bas) vs le pack en 24-72h (réversion relative)
+  rejected: '02/10 — FAIL réfuté : net 48h TRAIN +3.5 bps (n=1129, WR 49.4 %, brut ~+40 bps mangé par
+    36 bps RT) vs VAL -39.5 bps (n=895, WR 38.0 %) ; gradient terciles |z| inversé en TRAIN (T3 -8.8 <
+    T1 +9.4) et non monotone en VAL ; contrôle inverse battu en TRAIN (+3.5 vs -75.5) mais PAS en VAL
+    (continuation -32.5 > réversion -39.5 = artefact) ; VAL négatif aux 3 horizons (24h -39.0 / 48h -39.5
+    / 72h -42.7) ; robustesse |z| >= 2.2 TRAIN -6.9 bps, gradient encore plus inversé'
   report: reports/aster/inv-a-majeure-deviante-2026-10.md
-  notes: la déviante-bas rebondit en TRAIN (+43.9 bps, n=454) mais s'effondre en VAL
-    (-52.1 bps, n=297) — mirage de régime, pas un edge ; budget 1 expérience consommée,
-    STOP, aucun 2e seuil ni fenêtre ; 0 liq (1x relatif), 0 heure multi-déviantes
-    (2034 evts / 2034 heures)
+  notes: la déviante-bas rebondit en TRAIN (+43.9 bps, n=454) mais s'effondre en VAL (-52.1 bps, n=297)
+    — mirage de régime, pas un edge ; budget 1 expérience consommée, STOP, aucun 2e seuil ni fenêtre ;
+    0 liq (1x relatif), 0 heure multi-déviantes (2034 evts / 2034 heures)
 - id: inv_d_asymetrie_vitesse
   family: temps-structure
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-d-asymetrie-vitesse-2026-10.md,
     seal sha256 b73bc5d30da139963620645888e632c84a65c152b4decc0cdc847c36f6f11898)
-  hypothesis: la capitulation PAR LE TEMPS (A_t = fraction des 24 closes passés au-dessus
-    du close courant, événement A_t <= q10 TRAIN = 0.0417, un seul seuil) est suivie
-    d'un REBOND — espérance nette 24-72h positive, contrôle continuation battu, gradient
-    déciles monotone
-  rejected: '02/10 — FAIL réfutation TRIPLE : (1) bloc 24-72 net TRAIN +4.8 bps (brut
-    +22.8 mangé par 18 bps RT) vs VAL -1.4 bps (h72 meurt +30.4 -> -7.0 = mirage de
-    régime) ; (2) contrôle inverse NON battu en TRAIN (h24 long -19.3 < short -16.7
-    bps = la continuation gagne à 24h) ; (3) gradient déciles NON monotone (TRAIN
-    6 inversions, d1 = PIRE décile -0.174 % — sens inversé ; VAL 4 inversions, tous
-    déciles négatifs) ; n=11903 TRAIN / 12526 VAL (puissant, pas sous-puissant) ;
-    miroir A>=q90 aussi mort (bloc net -13.3 / -10.6 bps) ; wallet premier-arrivé
-    3598 trades WR 43.9 %, cumul -279.35 % notionnel fixe, ROI/an -55.1 %, DD 512
-    %, 34/61 mois négatifs, 0 liq (1x)'
+  hypothesis: la capitulation PAR LE TEMPS (A_t = fraction des 24 closes passés au-dessus du close courant,
+    événement A_t <= q10 TRAIN = 0.0417, un seul seuil) est suivie d'un REBOND — espérance nette 24-72h
+    positive, contrôle continuation battu, gradient déciles monotone
+  rejected: '02/10 — FAIL réfutation TRIPLE : (1) bloc 24-72 net TRAIN +4.8 bps (brut +22.8 mangé par
+    18 bps RT) vs VAL -1.4 bps (h72 meurt +30.4 -> -7.0 = mirage de régime) ; (2) contrôle inverse NON
+    battu en TRAIN (h24 long -19.3 < short -16.7 bps = la continuation gagne à 24h) ; (3) gradient déciles
+    NON monotone (TRAIN 6 inversions, d1 = PIRE décile -0.174 % — sens inversé ; VAL 4 inversions, tous
+    déciles négatifs) ; n=11903 TRAIN / 12526 VAL (puissant, pas sous-puissant) ; miroir A>=q90 aussi
+    mort (bloc net -13.3 / -10.6 bps) ; wallet premier-arrivé 3598 trades WR 43.9 %, cumul -279.35 % notionnel
+    fixe, ROI/an -55.1 %, DD 512 %, 34/61 mois négatifs, 0 liq (1x)'
   report: reports/aster/inv-d-asymetrie-vitesse-2026-10.md
-  notes: la statistique de CHEMIN temporel (sans magnitude) ne encode pas la direction
-    des majeures 1h — les DEUX queues de A_t perdent net aux deux splits ; A_t discret
-    (multiples de 1/24), atome à 1/24 => taux d'événements ~15 % (déclaré honnête,
-    seuil pré-enregistré appliqué tel quel) ; BNB/XRP/DOGE 100 % VAL (panel 5 ans
-    vs 1 an, split global 2024-09-19) ; budget 1 expérience consommée, STOP, aucun
+  notes: la statistique de CHEMIN temporel (sans magnitude) ne encode pas la direction des majeures 1h
+    — les DEUX queues de A_t perdent net aux deux splits ; A_t discret (multiples de 1/24), atome à 1/24
+    => taux d'événements ~15 % (déclaré honnête, seuil pré-enregistré appliqué tel quel) ; BNB/XRP/DOGE
+    100 % VAL (panel 5 ans vs 1 an, split global 2024-09-19) ; budget 1 expérience consommée, STOP, aucun
     2e quantile ni fenêtre ni filtre
 - id: inv_e_rythme_funding_runlength
   family: funding-persistence
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-e-rythme-funding-2026-10.md,
     seal sha256 501c47979d2f833caecb2b39899b9bcc38634604de8eaa87aa5106b31abb2d5b)
-  hypothesis: MAGNITUDE pas direction (leçon OI vague 10) — après une séquence de
-    funding exceptionnellement longue (run-length R_t >= q90 TRAIN, un seul seuil),
-    l'amplitude forward 48-96h (somme des |ret| 1h) dépasse la médiane inconditionnelle
-    de plus que l'étalon 12,2 bps A/R taker ; conditionneur de taille, SENS=0, jamais
-    un signal
-  rejected: '02/10 — FAIL réfuté : TRAIN Delta -327,5 bps (medA 393 evts 1835,8 vs
-    médiane toutes 2163,2 — SOUS la médiane, étalon 12,2 non approché) ; VAL +443,3
-    bps = signe INVERSÉ vs train (artefact de régime, mois volatils mai-sept 2026)
-    ; gradient quintiles non monotone (Q5 2023,9 < Q4 2382,1 ; Q1 vide par discrétisation
-    q20=1) ; contrôle inverse NON battu en TRAIN (R<=1 : 2202,2 > 1835,8 — les séquences
-    les plus courtes sont PLUS amples) ; n=393 train / 1005 val, 100 % run+ (0 run
-    négatif n''atteint jamais q90=51 périodes ≈ 17 j — financement Aster structurellement
-    long-biais) ; R max 212 train / 359 val ; dépendance forte : 393 evts train issus
-    de ~15 runs distincts'
+  hypothesis: MAGNITUDE pas direction (leçon OI vague 10) — après une séquence de funding exceptionnellement
+    longue (run-length R_t >= q90 TRAIN, un seul seuil), l'amplitude forward 48-96h (somme des |ret| 1h)
+    dépasse la médiane inconditionnelle de plus que l'étalon 12,2 bps A/R taker ; conditionneur de taille,
+    SENS=0, jamais un signal
+  rejected: '02/10 — FAIL réfuté : TRAIN Delta -327,5 bps (medA 393 evts 1835,8 vs médiane toutes 2163,2
+    — SOUS la médiane, étalon 12,2 non approché) ; VAL +443,3 bps = signe INVERSÉ vs train (artefact de
+    régime, mois volatils mai-sept 2026) ; gradient quintiles non monotone (Q5 2023,9 < Q4 2382,1 ; Q1
+    vide par discrétisation q20=1) ; contrôle inverse NON battu en TRAIN (R<=1 : 2202,2 > 1835,8 — les
+    séquences les plus courtes sont PLUS amples) ; n=393 train / 1005 val, 100 % run+ (0 run négatif n''atteint
+    jamais q90=51 périodes ≈ 17 j — financement Aster structurellement long-biais) ; R max 212 train /
+    359 val ; dépendance forte : 393 evts train issus de ~15 runs distincts'
   report: reports/aster/inv-e-rythme-funding-2026-10.md
-  notes: observation CONTEXTE non actionnable (SENS=0 pré-déclaré) — dérive forward
-    48-96h médiane -0,43 %/-0,45 % (train/val, WR 42/44 %) après run long positif,
-    cohérente mais sous les coûts et jamais un signal ; le run-length du funding n'est
-    pas un conditionneur symétrique sur Aster (persistance extrême unilatérale) ;
-    budget 1 expérience consommée, STOP, aucun 2e quantile ni fenêtre
+  notes: observation CONTEXTE non actionnable (SENS=0 pré-déclaré) — dérive forward 48-96h médiane -0,43
+    %/-0,45 % (train/val, WR 42/44 %) après run long positif, cohérente mais sous les coûts et jamais
+    un signal ; le run-length du funding n'est pas un conditionneur symétrique sur Aster (persistance
+    extrême unilatérale) ; budget 1 expérience consommée, STOP, aucun 2e quantile ni fenêtre
 - id: inv_f_codeformation_regime_transition
   family: regime-transition
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-f-codeformation-2026-10.md,
     seal sha256 8e6fa1bf0e64b5e073c12e8bb86355b451da24ab4493b3030f58f6a5c2ded665)
-  hypothesis: MAGNITUDE pas direction (leçon OI vague 10) — après un ÉVÉNEMENT de
-    co-déformation du pack des 6 majeures (V_t = vol moyenne cross-sectionnelle des
-    ret24 doublée en <= 72 h ET C_t = corrélation moyenne pairwise 72 h des ret24
-    traversant son q80 TRAIN dans la même heure — une TRANSITION, pas un niveau),
-    l'amplitude forward 7-14 j (moyenne des |ret| 1h) dépasse la baseline sans événement
-    de plus que l'étalon 12,2 bps A/R taker ; gate de régime, SENS=0, jamais un signal
-  rejected: '02/10 — SOUS-PUISSENT : n_train 8 événements < 30 gelés (12 épisodes
-    distincts sur 373 j de panel, q80(C) TRAIN 0,926 — le doublement de V fait la
-    rareté) ; aucun PASS possible, et les checks descriptifs hors puissance ne soutiennent
-    RIEN : Delta TRAIN -2,3 bps (medA evts 29,9 vs sans événement 32,2 — étalon 12,2
-    non approché, mauvais signe), Delta VAL -0,6 bps, gradient terciles J décroissant
-    (T1 33,8 = T2 33,8 > T3 29,4, non évaluable 3/2/3 < 5), contrôle inverse NON battu
-    TRAIN ET VAL ; bloc mensuel sans signal (seul +27,8 VAL = 1 événement, zéro poids)
-    ; 0 liq par construction (gate, pas de trade)'
+  hypothesis: MAGNITUDE pas direction (leçon OI vague 10) — après un ÉVÉNEMENT de co-déformation du pack
+    des 6 majeures (V_t = vol moyenne cross-sectionnelle des ret24 doublée en <= 72 h ET C_t = corrélation
+    moyenne pairwise 72 h des ret24 traversant son q80 TRAIN dans la même heure — une TRANSITION, pas
+    un niveau), l'amplitude forward 7-14 j (moyenne des |ret| 1h) dépasse la baseline sans événement de
+    plus que l'étalon 12,2 bps A/R taker ; gate de régime, SENS=0, jamais un signal
+  rejected: '02/10 — SOUS-PUISSENT : n_train 8 événements < 30 gelés (12 épisodes distincts sur 373 j
+    de panel, q80(C) TRAIN 0,926 — le doublement de V fait la rareté) ; aucun PASS possible, et les checks
+    descriptifs hors puissance ne soutiennent RIEN : Delta TRAIN -2,3 bps (medA evts 29,9 vs sans événement
+    32,2 — étalon 12,2 non approché, mauvais signe), Delta VAL -0,6 bps, gradient terciles J décroissant
+    (T1 33,8 = T2 33,8 > T3 29,4, non évaluable 3/2/3 < 5), contrôle inverse NON battu TRAIN ET VAL ;
+    bloc mensuel sans signal (seul +27,8 VAL = 1 événement, zéro poids) ; 0 liq par construction (gate,
+    pas de trade)'
   report: reports/aster/inv-f-codeformation-2026-10.md
-  notes: 'observations CONTEXTE non actionnable (SENS=0 pré-déclaré) — (1) la corr
-    72 h du pack des 6 majeures est >= 0,93 un cinquième du temps : le NIVEAU de corr
-    est saturé, seul un événement conjoint pouvait porter de l''information ; (2)
-    l''événement conjoint arrive POST-pic (queue de bouffée de vol) : la transition
-    se lit au plus tôt dans le doublement de V SEUL (J = 2,06 dès le 10-11/10/2025
-    cascade), la corrélation ne confirme qu''ensuite — dérive forward 7-14 j des événements
-    -0,86 %/-3,49 % (train/val, BTC, descriptif) ; budget 1 expérience consommée,
-    STOP, aucun 2e quantile ni fenêtre ni détente du doublement'
+  notes: 'observations CONTEXTE non actionnable (SENS=0 pré-déclaré) — (1) la corr 72 h du pack des 6
+    majeures est >= 0,93 un cinquième du temps : le NIVEAU de corr est saturé, seul un événement conjoint
+    pouvait porter de l''information ; (2) l''événement conjoint arrive POST-pic (queue de bouffée de
+    vol) : la transition se lit au plus tôt dans le doublement de V SEUL (J = 2,06 dès le 10-11/10/2025
+    cascade), la corrélation ne confirme qu''ensuite — dérive forward 7-14 j des événements -0,86 %/-3,49
+    % (train/val, BTC, descriptif) ; budget 1 expérience consommée, STOP, aucun 2e quantile ni fenêtre
+    ni détente du doublement'
 - id: inv_g_densite_silence
   family: temps-structure
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-g-densite-silence-2026-10.md,
     seal sha256 14f311c2ed4dd4a0bdb5c8772219905243712a18c42cf6a2a8a5469ce63f4668)
-  hypothesis: MAGNITUDE pas direction (leçon OI vague 10) — la densité de silence
-    (S_t = fraction des 72 dernières bougies 1h avec |ret| < 0,05 %, événement S_t
-    >= q90 TRAIN = 0,197183, un seul seuil, zéro grille) précède des QUEUES plus épaisses
-    — l'amplitude forward 48-96h (somme des |ret|) dépasse la médiane inconditionnelle
-    de plus que l'étalon 12,2 bps A/R taker ; conditionneur de taille, SENS=0, jamais
-    un signal
-  rejected: '02/10 — FAIL réfutation RÉPLIQUÉE et MONOTONE INVERSÉE : TRAIN Delta
-    -945,0 bps (medA 8965 evts 1247,2 vs médiane toutes 2192,2 — SOUS la médiane de
-    -43 %) ; VAL Delta -413,1 bps (même signe que train mais négatif = la réplication
-    est celle de la RÉFUTATION, pas de l''hypothèse) ; gradient quintiles STRICTEMENT
-    DÉCROISSANT dans les DEUX splits (TRAIN 3440,6 -> 1370,1 ; VAL descriptif 3934,6
-    -> 1964,5) = l''amplitude forward DÉCROÎT monotoniquement avec le silence (vol
-    clustering élémentaire) ; contrôle inverse NON battu (S_t <= q10 : TRAIN 3440,6
-    vs 1247,2 = 2,8x PLUS ample ; VAL 3934,6 vs 1974,8) ; n=8965 train / 86286 val
-    (337042 périodes mesurables, 0 exclue, 33 symboles >= 2000 barres) ; 47/56 mois
-    à Delta négatif, 9 positifs jamais répliqués (sauf 2023-02/03) ; limitation :
-    seuil q90 calibré sur les 3 majeures TRAIN -> 33,5 % d''heures événements en VAL
-    (panel 33 symboles plus plats) — la réfutation vaut déjà sur TRAIN seul'
+  hypothesis: MAGNITUDE pas direction (leçon OI vague 10) — la densité de silence (S_t = fraction des
+    72 dernières bougies 1h avec |ret| < 0,05 %, événement S_t >= q90 TRAIN = 0,197183, un seul seuil,
+    zéro grille) précède des QUEUES plus épaisses — l'amplitude forward 48-96h (somme des |ret|) dépasse
+    la médiane inconditionnelle de plus que l'étalon 12,2 bps A/R taker ; conditionneur de taille, SENS=0,
+    jamais un signal
+  rejected: '02/10 — FAIL réfutation RÉPLIQUÉE et MONOTONE INVERSÉE : TRAIN Delta -945,0 bps (medA 8965
+    evts 1247,2 vs médiane toutes 2192,2 — SOUS la médiane de -43 %) ; VAL Delta -413,1 bps (même signe
+    que train mais négatif = la réplication est celle de la RÉFUTATION, pas de l''hypothèse) ; gradient
+    quintiles STRICTEMENT DÉCROISSANT dans les DEUX splits (TRAIN 3440,6 -> 1370,1 ; VAL descriptif 3934,6
+    -> 1964,5) = l''amplitude forward DÉCROÎT monotoniquement avec le silence (vol clustering élémentaire)
+    ; contrôle inverse NON battu (S_t <= q10 : TRAIN 3440,6 vs 1247,2 = 2,8x PLUS ample ; VAL 3934,6 vs
+    1974,8) ; n=8965 train / 86286 val (337042 périodes mesurables, 0 exclue, 33 symboles >= 2000 barres)
+    ; 47/56 mois à Delta négatif, 9 positifs jamais répliqués (sauf 2023-02/03) ; limitation : seuil q90
+    calibré sur les 3 majeures TRAIN -> 33,5 % d''heures événements en VAL (panel 33 symboles plus plats)
+    — la réfutation vaut déjà sur TRAIN seul'
   report: reports/aster/inv-g-densite-silence-2026-10.md
-  notes: 'leçon gravée : sur Aster 1h l''ABSENCE précède l''ABSENCE — la volatilité
-    est la seule chose qui prédit la volatilité ; S_t est un normaliseur de régime
-    de volatilité (l''heure plate appelle l''heure plate), jamais un détecteur de
-    queue à venir ; cohérent avec T20 par la négative (la densité EST le mouvement,
-    pas son orientation — ici la platitude EST le calme, pas l''expansion) ; contexte
-    directionnel descriptif sous les coûts (TRAIN +0,027 % / VAL -0,000 %, signe instable,
-    SENS=0 respecté) ; adjacence T20 déclarée au pré-enregistrement (prints du tape
-    BTC/ETH 90 j descriptif ≠ retours nuls 1h par symbole sur klines profonds + prédiction
-    forward de magnitude jamais formulée) ; 2 incidents de code de RAPPORT documentés
-    (crash bloc mensuel, dict d''attribution écrasé), calcul gelé bit-identique ;
-    budget 1 expérience consommée, STOP, aucun 2e quantile ni fenêtre ; 0 liq par
-    construction (pas de trade, pas de levier)'
+  notes: 'leçon gravée : sur Aster 1h l''ABSENCE précède l''ABSENCE — la volatilité est la seule chose
+    qui prédit la volatilité ; S_t est un normaliseur de régime de volatilité (l''heure plate appelle
+    l''heure plate), jamais un détecteur de queue à venir ; cohérent avec T20 par la négative (la densité
+    EST le mouvement, pas son orientation — ici la platitude EST le calme, pas l''expansion) ; contexte
+    directionnel descriptif sous les coûts (TRAIN +0,027 % / VAL -0,000 %, signe instable, SENS=0 respecté)
+    ; adjacence T20 déclarée au pré-enregistrement (prints du tape BTC/ETH 90 j descriptif ≠ retours nuls
+    1h par symbole sur klines profonds + prédiction forward de magnitude jamais formulée) ; 2 incidents
+    de code de RAPPORT documentés (crash bloc mensuel, dict d''attribution écrasé), calcul gelé bit-identique
+    ; budget 1 expérience consommée, STOP, aucun 2e quantile ni fenêtre ; 0 liq par construction (pas
+    de trade, pas de levier)'
 - id: inv_h_superposition_regimes_hmm
   family: regime
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-h-superposition-regimes-2026-10.md,
     seal sha256 d9d1fb829ca98223e201f796a603930b0cba7d625c6e8919f991970fb9dd523f)
-  hypothesis: superposition HMM gaussien 3 états diagonal par série (features ret
-    1h + rv24, Baum-Welch main numpy, fit EM TRAIN only, split 60/40 chrono global
-    T_split 2024-09-19 17:24 UTC, crisp = argmax si posterior >= 0.8) — le HMM (argmax
-    de pi_t @ A^168) prédit l'état crisp à t+7j avec une précision STRICTEMENT supérieure
-    au naïf (crisp à t = crisp à t+7j, hypothèse implicite de l'adaptateur 90 j),
-    en TRAIN ET VAL, écart >= 5 pts dans les deux splits, avantage tenu sur les 3
-    états canoniques (CRISE/TENDANCE/CHOP)
-  rejected: '02/10 — FAIL réfutation par ÉTAT (critère 3) : critères 1-2 OK et répliqués
-    (TRAIN +15.92 pts n=46874, naïf 25.18 vs HMM 41.10 ; VAL +16.44 pts n=31052, 25.15
-    vs 41.59 ; par série +13.8 à +19.1 pts) MAIS l''avantage est un ARTEFACT de base-rate
-    DÉGÉNÉRÉ — auto-transitions apprises 0.966-0.978/h => mémoire morte à 168 h (0.9776^168
-    ≈ 0.02), A^168 ≈ stationnaire et le HMM prédit CHOP (état majoritaire stationnaire
-    42 %) pour 100 % des heures TRAIN et VAL : 0.00 % sur CRISE (naïf 13.78/17.48)
-    et 0.00 % sur TENDANCE (naïf 29.76/30.70) vs 100 % sur CHOP ; précision HMM 41.10
-    % = EXACTEMENT la fréquence base-rate de CHOP ; le naïf 25.2 % est SOUS le hasard
-    aux marges (~35/37 %) = persistance crisp à 7 j ANTI-corrélée (rv24 mean-reverting
-    hebdo) ; 54/62 lignes mois-split à écart positif (l''artefact), 8 négatives ;
-    0 liq par construction (pas de trade, pas de levier)'
+  hypothesis: superposition HMM gaussien 3 états diagonal par série (features ret 1h + rv24, Baum-Welch
+    main numpy, fit EM TRAIN only, split 60/40 chrono global T_split 2024-09-19 17:24 UTC, crisp = argmax
+    si posterior >= 0.8) — le HMM (argmax de pi_t @ A^168) prédit l'état crisp à t+7j avec une précision
+    STRICTEMENT supérieure au naïf (crisp à t = crisp à t+7j, hypothèse implicite de l'adaptateur 90 j),
+    en TRAIN ET VAL, écart >= 5 pts dans les deux splits, avantage tenu sur les 3 états canoniques (CRISE/TENDANCE/CHOP)
+  rejected: '02/10 — FAIL réfutation par ÉTAT (critère 3) : critères 1-2 OK et répliqués (TRAIN +15.92
+    pts n=46874, naïf 25.18 vs HMM 41.10 ; VAL +16.44 pts n=31052, 25.15 vs 41.59 ; par série +13.8 à
+    +19.1 pts) MAIS l''avantage est un ARTEFACT de base-rate DÉGÉNÉRÉ — auto-transitions apprises 0.966-0.978/h
+    => mémoire morte à 168 h (0.9776^168 ≈ 0.02), A^168 ≈ stationnaire et le HMM prédit CHOP (état majoritaire
+    stationnaire 42 %) pour 100 % des heures TRAIN et VAL : 0.00 % sur CRISE (naïf 13.78/17.48) et 0.00
+    % sur TENDANCE (naïf 29.76/30.70) vs 100 % sur CHOP ; précision HMM 41.10 % = EXACTEMENT la fréquence
+    base-rate de CHOP ; le naïf 25.2 % est SOUS le hasard aux marges (~35/37 %) = persistance crisp à
+    7 j ANTI-corrélée (rv24 mean-reverting hebdo) ; 54/62 lignes mois-split à écart positif (l''artefact),
+    8 négatives ; 0 liq par construction (pas de trade, pas de levier)'
   report: reports/aster/inv-h-superposition-regimes-2026-10.md
-  notes: 'leçon gravée : à l''horizon 7 j la matrice de transition APPRISE dit elle-même
-    que le régime ne persiste pas — pi_t @ A^168 oublie la superposition et retombe
-    sur la stationnaire ; l''adaptateur 90 j n''est pas battu par un HMM sur sa propre
-    cible, et la persistance crisp à 7 j est anti-persistante pour les DEUX prédicteurs
-    ; le critère par état pré-déclaré a attrapé exactement l''artefact qu''il visait
-    (un prédicteur constant ''toujours CHOP'' passait les critères 1-2) ; tout usage
-    futur d''un régime HMM = horizons << 1/(1-a_ii) (~30-40 h ici) ET critère par
-    état contre le base-rate obligatoire ; un incident de code d''étiquetage (crash
-    AVANT toute statistique, fits déterministes bit-identiques) documenté au rapport
-    ; budget 1 expérience consommée, STOP, pas de 4 états, pas d''autres features,
+  notes: 'leçon gravée : à l''horizon 7 j la matrice de transition APPRISE dit elle-même que le régime
+    ne persiste pas — pi_t @ A^168 oublie la superposition et retombe sur la stationnaire ; l''adaptateur
+    90 j n''est pas battu par un HMM sur sa propre cible, et la persistance crisp à 7 j est anti-persistante
+    pour les DEUX prédicteurs ; le critère par état pré-déclaré a attrapé exactement l''artefact qu''il
+    visait (un prédicteur constant ''toujours CHOP'' passait les critères 1-2) ; tout usage futur d''un
+    régime HMM = horizons << 1/(1-a_ii) (~30-40 h ici) ET critère par état contre le base-rate obligatoire
+    ; un incident de code d''étiquetage (crash AVANT toute statistique, fits déterministes bit-identiques)
+    documenté au rapport ; budget 1 expérience consommée, STOP, pas de 4 états, pas d''autres features,
     pas d''autre horizon ni seuil crisp'
 - id: inv_i_trace_baleine
   family: institutions
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-i-trace-baleine-2026-10.md,
     seal sha256 0deb85f1aa49eafdb1db7866dc2be9068eca6481022c8159745ee7869d3ebba3)
-  hypothesis: 'le print INDIVIDUEL >= q99 des tailles TRAIN (un seul seuil par symbole,
-    zéro grille — BTC 1,876 / ETH 50,0 en base, 123 048 événements sur 90 j de tape
-    BTC+ETH 11,6 M prints), classé à +5 min par sa réponse de prix : AVALÉ (|ret|
-    <= 0,10 %) => mouvement CONTRE la baleine sur 4-24 h (le mur a mangé la baleine
-    = contrepartie réelle), IMPACTANT (>= 0,30 % dans son sens) => CONTINUATION ;
-    UNE hypothèse de classification à deux branches, contrôle inverse obligatoire
-    ; split 60/40 chrono global (T_split 2026-08-24 03:22:42 UTC), entrée à p+5min,
-    sortie +24 h sur le tape, 1x, coûts 18 bps RT, 0 liq par construction'
-  rejected: '02/10 — FAIL réfutation en PLEINE PUISSANCE, 3 critères sur 4 échoués
-    (n train 35 302 AVALÉ / 5 404 IMPACTANT, VAL 22 578 / 5 289) : C2 ECHEC 3/4 —
-    AVALÉ -0,201 % TRAIN (t -13,5) ET -0,136 % VAL (t -9,5), la baleine avalée N''annonce
-    PAS de mouvement contre son sens (dérive brute 24 h dans son sens +2 bps TRAIN
-    / -4 bps VAL, signe instable, 5-10x sous l''étalon 18 bps) ; IMPACTANT +0,242
-    % TRAIN (t +4,2) mais -0,171 % VAL (t -6,0) — la continuation s''INVERSE hors
-    train (dérive brute +42 bps TRAIN vs +1 bp VAL) ; C3 ECHEC — quintiles de taille
-    PLATS non monotones dans les DEUX splits (TRAIN -0,103/-0,186/-0,127/-0,159/-0,134
-    %, VAL -0,153/-0,169/-0,163/-0,127/-0,108 %), la taille ne gradient rien ; C4
-    seul OK (poolé TRAIN -0,142 vs inverse -0,218 %, VAL -0,143 vs -0,217 %, écart
-    porté par IMPACTANT TRAIN) ; +4 h secondaire négatif PARTOUT (même IMPACTANT TRAIN
-    -0,205 % — l''effet TRAIN est tardif et non robuste) ; bloc mensuel 4/4 lignes
-    mois-split négatives, wallet non-chevauchant TRAIN -16,3 % (n 52, WR 42,3 %, DD
-    22,3 %) VAL -8,1 % (n 38, WR 50,0 %) ; 0 liq (1x)'
+  hypothesis: 'le print INDIVIDUEL >= q99 des tailles TRAIN (un seul seuil par symbole, zéro grille —
+    BTC 1,876 / ETH 50,0 en base, 123 048 événements sur 90 j de tape BTC+ETH 11,6 M prints), classé à
+    +5 min par sa réponse de prix : AVALÉ (|ret| <= 0,10 %) => mouvement CONTRE la baleine sur 4-24 h
+    (le mur a mangé la baleine = contrepartie réelle), IMPACTANT (>= 0,30 % dans son sens) => CONTINUATION
+    ; UNE hypothèse de classification à deux branches, contrôle inverse obligatoire ; split 60/40 chrono
+    global (T_split 2026-08-24 03:22:42 UTC), entrée à p+5min, sortie +24 h sur le tape, 1x, coûts 18
+    bps RT, 0 liq par construction'
+  rejected: '02/10 — FAIL réfutation en PLEINE PUISSANCE, 3 critères sur 4 échoués (n train 35 302 AVALÉ
+    / 5 404 IMPACTANT, VAL 22 578 / 5 289) : C2 ECHEC 3/4 — AVALÉ -0,201 % TRAIN (t -13,5) ET -0,136 %
+    VAL (t -9,5), la baleine avalée N''annonce PAS de mouvement contre son sens (dérive brute 24 h dans
+    son sens +2 bps TRAIN / -4 bps VAL, signe instable, 5-10x sous l''étalon 18 bps) ; IMPACTANT +0,242
+    % TRAIN (t +4,2) mais -0,171 % VAL (t -6,0) — la continuation s''INVERSE hors train (dérive brute
+    +42 bps TRAIN vs +1 bp VAL) ; C3 ECHEC — quintiles de taille PLATS non monotones dans les DEUX splits
+    (TRAIN -0,103/-0,186/-0,127/-0,159/-0,134 %, VAL -0,153/-0,169/-0,163/-0,127/-0,108 %), la taille
+    ne gradient rien ; C4 seul OK (poolé TRAIN -0,142 vs inverse -0,218 %, VAL -0,143 vs -0,217 %, écart
+    porté par IMPACTANT TRAIN) ; +4 h secondaire négatif PARTOUT (même IMPACTANT TRAIN -0,205 % — l''effet
+    TRAIN est tardif et non robuste) ; bloc mensuel 4/4 lignes mois-split négatives, wallet non-chevauchant
+    TRAIN -16,3 % (n 52, WR 42,3 %, DD 22,3 %) VAL -8,1 % (n 38, WR 50,0 %) ; 0 liq (1x)'
   report: reports/aster/inv-i-trace-baleine-2026-10.md
-  notes: 'leçon gravée : sur le tape Aster la trace de la baleine individuelle ne
-    prédit RIEN de tradable à 4-24 h — ni retournement (absorption) ni continuation
-    ne répliquent hors train, la taille ne gradient rien ; avec H1 (agrégats CVD NUL)
-    et les clusters block trades (fade +30 min CONTEXTE), le tape ne porte l''information
-    ni en agrégat, ni en cluster, ni en print individuel — le >= q99 est majoritairement
-    du DÉCOUPAGE d''ordre (84 % d''AVALÉ, rafales corrélées, n effectif << n brut)
-    ; convention is_buyer_maker vérifiée contre le prix au pré-enregistrement (corr
-    1-min flow/prix +0,2484 BTC / +0,2057 ETH, gros prints déplacent le prix dans
-    leur sens), tri canonique (ts_ms, agg_id) avec reculs 759/476 confirmés ; incidents
-    documentés : v1 bornage len(idx) vs len(ts) (fausse exclusion de masse, corrigé
-    AVANT exploitation, aucun seuil/critère/fenêtre touché, exécution corrigée = référence
-    unique) + ré-exécution bit-à-bit de contrôle (diff nul) ; budget 1 expérience
-    consommée, STOP — pas de 2e quantile, pas d''horizon alternatif, pas de filtre
-    de réparation ; famille institutions 1/5'
+  notes: 'leçon gravée : sur le tape Aster la trace de la baleine individuelle ne prédit RIEN de tradable
+    à 4-24 h — ni retournement (absorption) ni continuation ne répliquent hors train, la taille ne gradient
+    rien ; avec H1 (agrégats CVD NUL) et les clusters block trades (fade +30 min CONTEXTE), le tape ne
+    porte l''information ni en agrégat, ni en cluster, ni en print individuel — le >= q99 est majoritairement
+    du DÉCOUPAGE d''ordre (84 % d''AVALÉ, rafales corrélées, n effectif << n brut) ; convention is_buyer_maker
+    vérifiée contre le prix au pré-enregistrement (corr 1-min flow/prix +0,2484 BTC / +0,2057 ETH, gros
+    prints déplacent le prix dans leur sens), tri canonique (ts_ms, agg_id) avec reculs 759/476 confirmés
+    ; incidents documentés : v1 bornage len(idx) vs len(ts) (fausse exclusion de masse, corrigé AVANT
+    exploitation, aucun seuil/critère/fenêtre touché, exécution corrigée = référence unique) + ré-exécution
+    bit-à-bit de contrôle (diff nul) ; budget 1 expérience consommée, STOP — pas de 2e quantile, pas d''horizon
+    alternatif, pas de filtre de réparation ; famille institutions 1/5'
 - id: inv_k_asymetrie_queues
   family: structure-meches
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-k-asymetrie-queues-2026-10.md,
     seal sha256 58d01ce0380bae3539c1bf280262815c72fe01f215c78766db2b792783bc290c)
-  hypothesis: 'l''état roulant de structure de mèches (Q_t = moyenne des (high-close)
-    des 24 dernières bougies 1h ÷ moyenne des (close-low), même fenêtre, panel 6 majeures
-    BTC/ETH/SOL/BNB/XRP/DOGE ; événement Q_t >= q95 TRAIN = 1.4836, un seul seuil,
-    un seul côté) encode un rejet persistant du haut — espérance forward 24-72h NÉGATIVE
-    (short structurel), contrôle inverse obligatoire (la continuation haussière doit
-    être pire), gradient quintiles monotone ; adjacence déclarée : wick_retrace T21
-    = fade d''une mèche ISOLÉE (fraction de range single-bar), ici un ÉTAT roulant
-    24h — delta réel'
-  rejected: '02/10 — FAIL réfutation TRIPLE (n train 3991, puissante) : (1) espérance
-    nette < 0 NON — le drift net dénommé long est POSITIF aux deux splits (bloc 24-72
-    +28.1 bps TRAIN / +8.4 bps VAL, brut +46.1/+26.5) = signe INVERSÉ, le trade SHORT
-    perd net (-64.1/-44.4 bps) ; (2) contrôle inverse NON battu — le SHORT est PIRE
-    que le LONG aux 3 horizons et aux 2 splits (train S/L -58.3/+22.3, -60.1/+24.1,
-    -73.7/+37.7 ; val -29.2/-6.8, -48.8/+12.8, -55.4/+19.4) : c''est la CONTINUATION
-    haussière qui gagne ; (3) gradient quintiles NON monotone (TRAIN 3 inversions
-    adjacentes, Q5 -0.353 % vs max Q1 -0.100 % ; VAL Q5 non-max) ; wallet premier-arrivé
-    1212 trades WR_net 45.5 %, cumul -363.66 %, ROI/an -71.9 %, DD 393.30 %, 41/61
-    mois négatifs, record 2025-02 +64.1 %, pire 2021-11 -57.3 %, 0 liq (1x par construction)'
+  hypothesis: 'l''état roulant de structure de mèches (Q_t = moyenne des (high-close) des 24 dernières
+    bougies 1h ÷ moyenne des (close-low), même fenêtre, panel 6 majeures BTC/ETH/SOL/BNB/XRP/DOGE ; événement
+    Q_t >= q95 TRAIN = 1.4836, un seul seuil, un seul côté) encode un rejet persistant du haut — espérance
+    forward 24-72h NÉGATIVE (short structurel), contrôle inverse obligatoire (la continuation haussière
+    doit être pire), gradient quintiles monotone ; adjacence déclarée : wick_retrace T21 = fade d''une
+    mèche ISOLÉE (fraction de range single-bar), ici un ÉTAT roulant 24h — delta réel'
+  rejected: '02/10 — FAIL réfutation TRIPLE (n train 3991, puissante) : (1) espérance nette < 0 NON —
+    le drift net dénommé long est POSITIF aux deux splits (bloc 24-72 +28.1 bps TRAIN / +8.4 bps VAL,
+    brut +46.1/+26.5) = signe INVERSÉ, le trade SHORT perd net (-64.1/-44.4 bps) ; (2) contrôle inverse
+    NON battu — le SHORT est PIRE que le LONG aux 3 horizons et aux 2 splits (train S/L -58.3/+22.3, -60.1/+24.1,
+    -73.7/+37.7 ; val -29.2/-6.8, -48.8/+12.8, -55.4/+19.4) : c''est la CONTINUATION haussière qui gagne
+    ; (3) gradient quintiles NON monotone (TRAIN 3 inversions adjacentes, Q5 -0.353 % vs max Q1 -0.100
+    % ; VAL Q5 non-max) ; wallet premier-arrivé 1212 trades WR_net 45.5 %, cumul -363.66 %, ROI/an -71.9
+    %, DD 393.30 %, 41/61 mois négatifs, record 2025-02 +64.1 %, pire 2021-11 -57.3 %, 0 liq (1x par construction)'
   report: reports/aster/inv-k-asymetrie-queues-2026-10.md
-  notes: 'leçon gravée : la queue haute écrasante ne encode pas un rejet persistant
-    — un état 24h où la mèche haute moyenne écrase la basse = ABSORPTION acheteuse
-    des replis (les attaques sont mangées, la dynamique traverse), cohérent avec la
-    lecture absorption déjà gravée (docs/20 : les attaques acheteuses absorbées précèdent
-    la CONTINUATION haussière) ; l''observation inverse (drift haussier) est descriptive
-    NON actionnable : le LONG brut +46.1/+26.5 bps porte à peine les coûts 18 bps
-    RT et l''étalon 12.2 bps ; honêteté panel : BNB/XRP/DOGE 0 événement TRAIN (~1
-    an de données, 100 % VAL), 1 bougie BTC rejetée par le contrôle d''intégrité mèches,
-    6 points dénominateur nul exclus, split 2024-09-19 08:24 UTC ; budget 1 expérience
-    consommée, STOP — aucun miroir q05, aucun autre côté/fenêtre/seuil (PARAMETER_MUTATION)
+  notes: 'leçon gravée : la queue haute écrasante ne encode pas un rejet persistant — un état 24h où la
+    mèche haute moyenne écrase la basse = ABSORPTION acheteuse des replis (les attaques sont mangées,
+    la dynamique traverse), cohérent avec la lecture absorption déjà gravée (docs/20 : les attaques acheteuses
+    absorbées précèdent la CONTINUATION haussière) ; l''observation inverse (drift haussier) est descriptive
+    NON actionnable : le LONG brut +46.1/+26.5 bps porte à peine les coûts 18 bps RT et l''étalon 12.2
+    bps ; honêteté panel : BNB/XRP/DOGE 0 événement TRAIN (~1 an de données, 100 % VAL), 1 bougie BTC
+    rejetée par le contrôle d''intégrité mèches, 6 points dénominateur nul exclus, split 2024-09-19 08:24
+    UTC ; budget 1 expérience consommée, STOP — aucun miroir q05, aucun autre côté/fenêtre/seuil (PARAMETER_MUTATION)
     ; famille structure-meches 1/5'
 - id: inv_l_accord_horizons
   family: convergence-horizons
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-l-accord-horizons-2026-10.md,
     seal sha256 5f6a942d14fd60f943854f3ff25d3d0d5adb998a9562052ce4cf0d48bf11be20)
-  hypothesis: à chaque close 1h des 6 majeures, l'ACCORD COMPLET des signes de ret24/ret72/ret168
-    prédit la CONTINUATION dans le sens de l'accord sur 24-72h (LONG sur accord haussier,
-    SHORT sur accord baissier, branches nettes > 0 train et val) ; contrôle inverse
-    = épuisement, doit être pire ; gradient complet 3/3 > partiel 2/3 ; aucun seuil
-    (accord binaire, ~50 % des heures attendu), 1x, 18 bps RT, split 60/40 chrono
-    global
-  rejected: '02/10 — FAIL asymétrique (n train 19598 bull / 19883 bear, puissant)
-    : (1) branche baissière MORTE — SHORT net -13.2 bps TRAIN (drift -22.8 confirmé
-    mais sous les 18 bps RT) et -44.9 bps VAL (drift INVERSÉ +8.9 : la continuation
-    est haussière) ; (2) gradient tenu sur la branche haussière aux 2 splits (train
-    +28.7 vs -4.5 ; val +6.8 vs -47.0) mais INVERSÉ sur la baissière en VAL (complet
-    -44.9 < partiel +3.8) ; (3) contrôle inverse NON battu globalement (perdu sur
-    la baissière en VAL : LONG +8.9 > SHORT -44.9) ; seule la branche haussière tient
-    (LONG net +28.7/+6.8 train/val, contrôle battu 2/2) mais VAL +6.8 bps ≈ à peine
-    au-dessus des coûts = non actionnable ; wallet premier-arrivé 5164 trades (long
-    2529/short 2635) WR_net 43.8 %, cumul -771.10 %, ROI/an -152.5 %, DD 794.29 %,
-    40/61 mois négatifs, record 2026-08 +94.1 %, pire 2026-03 -136.5 %, 0 liq (1x)'
+  hypothesis: à chaque close 1h des 6 majeures, l'ACCORD COMPLET des signes de ret24/ret72/ret168 prédit
+    la CONTINUATION dans le sens de l'accord sur 24-72h (LONG sur accord haussier, SHORT sur accord baissier,
+    branches nettes > 0 train et val) ; contrôle inverse = épuisement, doit être pire ; gradient complet
+    3/3 > partiel 2/3 ; aucun seuil (accord binaire, ~50 % des heures attendu), 1x, 18 bps RT, split 60/40
+    chrono global
+  rejected: '02/10 — FAIL asymétrique (n train 19598 bull / 19883 bear, puissant) : (1) branche baissière
+    MORTE — SHORT net -13.2 bps TRAIN (drift -22.8 confirmé mais sous les 18 bps RT) et -44.9 bps VAL
+    (drift INVERSÉ +8.9 : la continuation est haussière) ; (2) gradient tenu sur la branche haussière
+    aux 2 splits (train +28.7 vs -4.5 ; val +6.8 vs -47.0) mais INVERSÉ sur la baissière en VAL (complet
+    -44.9 < partiel +3.8) ; (3) contrôle inverse NON battu globalement (perdu sur la baissière en VAL
+    : LONG +8.9 > SHORT -44.9) ; seule la branche haussière tient (LONG net +28.7/+6.8 train/val, contrôle
+    battu 2/2) mais VAL +6.8 bps ≈ à peine au-dessus des coûts = non actionnable ; wallet premier-arrivé
+    5164 trades (long 2529/short 2635) WR_net 43.8 %, cumul -771.10 %, ROI/an -152.5 %, DD 794.29 %, 40/61
+    mois négatifs, record 2026-08 +94.1 %, pire 2026-03 -136.5 %, 0 liq (1x)'
   report: reports/aster/inv-l-accord-horizons-2026-10.md
-  notes: 'leçon gravée : l''accord complet des 3 horizons est l''ÉTAT PAR DÉFAUT d''un
-    marché à dérive (~50 % des heures panel, 78 727 heures-événements en 4 379+4 701
-    runs, run max 108/141 h — dépendance forte, le wallet premier-arrivé est l''estimateur
-    honnête), pas une anomalie : il n''encode pas d''information rare ; sa valeur
-    est ASYMÉTRIQUE — continuation haussière faiblement confirmée puis mangée par
-    les coûts en VAL, continuation baissière INEXISTANTE (l''état baissier persistant
-    précède l''absorption des vendeurs et la reprise haussière, cohérent avec INV-K
-    : les états baissiers persistants ne délivrent jamais de short net sur Aster 1h)
-    ; incident de code de RAPPORT documenté (compteur de runs v1 comptait les symboles
-    au lieu des runs, corrigé, chemin du verdict ré-exécuté bit-identique, diff nul)
-    ; honêteté panel : BNB/XRP/DOGE 0 événement TRAIN (~1 an de données, 100 % VAL),
-    1 bougie BTC rejetée par contrôle d''intégrité, 394 heures à ret nul exclues ;
-    adjacence déclarée au pré-enregistrement (trend_long_ema50x200 / momentum_bear_lb48
-    PAPER_FORWARD non recodés, confluence v5 = accel+vwap, INV-D = chemin intraday
-    quantilé — construits distincts) ; budget 1 expérience consommée, STOP — aucun
-    side unique, aucune autre fenêtre d''accord ni seuil de magnitude (PARAMETER_MUTATION)
-    ; famille convergence-horizons 1/5'
+  notes: 'leçon gravée : l''accord complet des 3 horizons est l''ÉTAT PAR DÉFAUT d''un marché à dérive
+    (~50 % des heures panel, 78 727 heures-événements en 4 379+4 701 runs, run max 108/141 h — dépendance
+    forte, le wallet premier-arrivé est l''estimateur honnête), pas une anomalie : il n''encode pas d''information
+    rare ; sa valeur est ASYMÉTRIQUE — continuation haussière faiblement confirmée puis mangée par les
+    coûts en VAL, continuation baissière INEXISTANTE (l''état baissier persistant précède l''absorption
+    des vendeurs et la reprise haussière, cohérent avec INV-K : les états baissiers persistants ne délivrent
+    jamais de short net sur Aster 1h) ; incident de code de RAPPORT documenté (compteur de runs v1 comptait
+    les symboles au lieu des runs, corrigé, chemin du verdict ré-exécuté bit-identique, diff nul) ; honêteté
+    panel : BNB/XRP/DOGE 0 événement TRAIN (~1 an de données, 100 % VAL), 1 bougie BTC rejetée par contrôle
+    d''intégrité, 394 heures à ret nul exclues ; adjacence déclarée au pré-enregistrement (trend_long_ema50x200
+    / momentum_bear_lb48 PAPER_FORWARD non recodés, confluence v5 = accel+vwap, INV-D = chemin intraday
+    quantilé — construits distincts) ; budget 1 expérience consommée, STOP — aucun side unique, aucune
+    autre fenêtre d''accord ni seuil de magnitude (PARAMETER_MUTATION) ; famille convergence-horizons
+    1/5'
 - id: inv_m_retard_eth_leadlag
   family: lead-lag-intrapack
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-m-retard-eth-2026-10.md,
     seal sha256 d2b8b846f90d9e44f358076097347d610b0699da572d0a197120193e02df223b)
-  hypothesis: après un RETARD directionnel (BTC |ret1h| >= q95 TRAIN 1,1939 % ET ETH
-    a suivi < 40 % du mouvement BTC dans les 60 minutes suivantes — f < 0,4, seul
-    seuil gelé), ETH rattrape DANS LE SENS du mouvement de BTC sur 4 h (entrée close
-    t+1, sortie close t+5, 1x, 18 bps RT) — espérance nette positive en TRAIN ET VAL
-    sur les branches haussière (LONG) et baissière (SHORT), gradient quintiles monotone
-    sur l'ampleur du retard, contrôle inverse (divergence continue f < 0) battu ;
-    adjacence déclarée (corr-tilt = NIVEAU, cascade = couplage fermé, INV-F = événement
-    vol×corr conjoint — ici l'événement de retard directionnel d'un actif précis)
-  rejected: '02/10 — FAIL réfutation QUADRUPLE (n train 1333, puissant) : (1) haussière
-    net -16.7 bps TRAIN (brut +1.3 = catch-up GROSS 13x sous l''étalon) et -33.2 VAL
-    (brut -15.2 = signe INVERSÉ, mirage de régime) ; (2) baissière net -29.3 / -24.0
-    bps (bruts -11.3/-6.0 = ETH dérive UP après le choc baissier = ANTI-catch-up constant,
-    le short perd aux DEUX splits) ; (3) gradient NON monotone (TRAIN Q1 -5.7 / Q2
-    -7.0 / Q3 -28.4 / Q4 -23.0 / Q5 -48.2 bps, 1 inversion adjacente, toutes médianes
-    négatives) ; (4) contrôle NON battu en substance (f<0 : -21.8/-27.5 vs ensemble
-    -21.4/-27.2 = écart 0.3-0.4 bp de bruit) ; wallet premier-arrivé 1279 trades WR
-    42.5 %, cumul -89.30 %, DD 98.5 %, 37/61 mois négatifs, record 2022-02 +48.2 %,
-    pire 2022-11 -34.2 %, 0 liq (1x, MAE max -17.29 %)'
+  hypothesis: après un RETARD directionnel (BTC |ret1h| >= q95 TRAIN 1,1939 % ET ETH a suivi < 40 % du
+    mouvement BTC dans les 60 minutes suivantes — f < 0,4, seul seuil gelé), ETH rattrape DANS LE SENS
+    du mouvement de BTC sur 4 h (entrée close t+1, sortie close t+5, 1x, 18 bps RT) — espérance nette
+    positive en TRAIN ET VAL sur les branches haussière (LONG) et baissière (SHORT), gradient quintiles
+    monotone sur l'ampleur du retard, contrôle inverse (divergence continue f < 0) battu ; adjacence déclarée
+    (corr-tilt = NIVEAU, cascade = couplage fermé, INV-F = événement vol×corr conjoint — ici l'événement
+    de retard directionnel d'un actif précis)
+  rejected: '02/10 — FAIL réfutation QUADRUPLE (n train 1333, puissant) : (1) haussière net -16.7 bps
+    TRAIN (brut +1.3 = catch-up GROSS 13x sous l''étalon) et -33.2 VAL (brut -15.2 = signe INVERSÉ, mirage
+    de régime) ; (2) baissière net -29.3 / -24.0 bps (bruts -11.3/-6.0 = ETH dérive UP après le choc baissier
+    = ANTI-catch-up constant, le short perd aux DEUX splits) ; (3) gradient NON monotone (TRAIN Q1 -5.7
+    / Q2 -7.0 / Q3 -28.4 / Q4 -23.0 / Q5 -48.2 bps, 1 inversion adjacente, toutes médianes négatives)
+    ; (4) contrôle NON battu en substance (f<0 : -21.8/-27.5 vs ensemble -21.4/-27.2 = écart 0.3-0.4 bp
+    de bruit) ; wallet premier-arrivé 1279 trades WR 42.5 %, cumul -89.30 %, DD 98.5 %, 37/61 mois négatifs,
+    record 2022-02 +48.2 %, pire 2022-11 -34.2 %, 0 liq (1x, MAE max -17.29 %)'
   report: reports/aster/inv-m-retard-eth-2026-10.md
-  notes: 'leçon gravée : le retard d''ETH derrière BTC n''est PAS un événement d''information
-    — après un choc BTC >= q95, la fraction f du mouvement suivie par ETH ne prédit
-    ni direction ni amplitude du 4 h suivant (retards, retard pur, divergence continue
-    perdent les MÊMES montants nets aux deux splits) ; la structure cross-asset BTC/ETH
-    1h ne délivre rien sous AUCUNE forme (NIVEAU corr-tilt = seul module prod, COUPLAGE
-    cascade fermé, ÉVÉNEMENT retard INV-M réfuté) ; observation CONTEXTE non actionnable
-    : dérive haussière post-choc baissier +11.3/+6.0 bps bruts 4h (les 2 splits, cohérente
-    avec l''absorption acheteuse INV-K/INV-L) mais 2-3x sous l''étalon 18 bps RT ;
-    honêteté panel : grille commune 44 424 h contiguë 0 trou (ts_ms vérifié), q95
-    gelé TRAIN, 0 exclusion hors grille, ret ETH nuls conservés (f=0 = retard extrême,
-    information), 588 chevauchements sautés au wallet (chocs BTC en rafales) ; budget
-    1 expérience consommée, STOP — aucun autre seuil, aucun horizon alternatif, aucun
+  notes: 'leçon gravée : le retard d''ETH derrière BTC n''est PAS un événement d''information — après
+    un choc BTC >= q95, la fraction f du mouvement suivie par ETH ne prédit ni direction ni amplitude
+    du 4 h suivant (retards, retard pur, divergence continue perdent les MÊMES montants nets aux deux
+    splits) ; la structure cross-asset BTC/ETH 1h ne délivre rien sous AUCUNE forme (NIVEAU corr-tilt
+    = seul module prod, COUPLAGE cascade fermé, ÉVÉNEMENT retard INV-M réfuté) ; observation CONTEXTE
+    non actionnable : dérive haussière post-choc baissier +11.3/+6.0 bps bruts 4h (les 2 splits, cohérente
+    avec l''absorption acheteuse INV-K/INV-L) mais 2-3x sous l''étalon 18 bps RT ; honêteté panel : grille
+    commune 44 424 h contiguë 0 trou (ts_ms vérifié), q95 gelé TRAIN, 0 exclusion hors grille, ret ETH
+    nuls conservés (f=0 = retard extrême, information), 588 chevauchements sautés au wallet (chocs BTC
+    en rafales) ; budget 1 expérience consommée, STOP — aucun autre seuil, aucun horizon alternatif, aucun
     filtre (PARAMETER_MUTATION) ; famille lead-lag-intrapack 1/5'
 - id: inv_o_entree_quinzaine
   family: execution
   status: REJECTED
   pre_registered: 02/10/2026 — critères PASS/FAIL écrits avant exécution (reports/aster/inv-o-entree-quinzaine-2026-10.md,
     seal sha256 df11bc059048797c84cc1e666858bfe52778052177699caa1233850813fa85a9)
-  hypothesis: 'étude d''EXÉCUTION (amplificateur, pas un signal nouveau) — le raffinement
-    15m améliore l''espérance nette d''au moins +3 bps/entrée vs l''open 1h SANS augmenter
-    le MAE max gated (règle 0-liq tient) ; UNE règle pré-déclarée zéro grille : entrer
-    au close du 1er/2e/3e 15m natif dont le close est du côté de l''open 1h, sinon
-    rester à l''open ; population = entrées des flux machine 1h (cascade gated + vol_spike,
-    modules the_machine rejoués en lecture, exits bit-exacts), coûts 18 bps RT des
-    deux côtés, split 60/40 chrono global, n >= 100 train'
-  rejected: '02/10 — FAIL réfutation RÉPLIQUÉE et MONOTONE (n train 2497 / val 1665,
-    puissante) : (1) C1 ECHEC — Δespérance variante−référence -38.98 bps TRAIN et
-    -40.97 bps VAL (même magnitude aux deux splits = pas un artefact de régime ; dégradation
-    des DEUX flux : gated -20.5/-12.7, vol_spike -45.0/-45.7) ; (2) C2 ECHEC — MAE
-    max gated TRAIN MONTE 22.58 → 24.13 % (le 0-liq se dégrade, VAL 15.79 → 16.25)
-    ; (3) C3 ECHEC — le contrôle inverse bat la référence d''AUSSI LOIN (+41.1/+41.0
-    bps) : entrer quand le 1er quart d''heure va CONTRE le trade est un MEILLEUR prix,
-    le « bon côté confirmé » un dégénérateur ; bloc mensuel : la variante dégrade
-    40/43 mois TRAIN et 18/20 VAL ; WR variante 42.5/42.0 % vs référence 48.8/48.9
-    % ; référence bit-à-bit contre les champs machine 4162/4162, MAE référence = max
-    mae_adverse machine 22.58 % exact'
+  hypothesis: 'étude d''EXÉCUTION (amplificateur, pas un signal nouveau) — le raffinement 15m améliore
+    l''espérance nette d''au moins +3 bps/entrée vs l''open 1h SANS augmenter le MAE max gated (règle
+    0-liq tient) ; UNE règle pré-déclarée zéro grille : entrer au close du 1er/2e/3e 15m natif dont le
+    close est du côté de l''open 1h, sinon rester à l''open ; population = entrées des flux machine 1h
+    (cascade gated + vol_spike, modules the_machine rejoués en lecture, exits bit-exacts), coûts 18 bps
+    RT des deux côtés, split 60/40 chrono global, n >= 100 train'
+  rejected: '02/10 — FAIL réfutation RÉPLIQUÉE et MONOTONE (n train 2497 / val 1665, puissante) : (1)
+    C1 ECHEC — Δespérance variante−référence -38.98 bps TRAIN et -40.97 bps VAL (même magnitude aux deux
+    splits = pas un artefact de régime ; dégradation des DEUX flux : gated -20.5/-12.7, vol_spike -45.0/-45.7)
+    ; (2) C2 ECHEC — MAE max gated TRAIN MONTE 22.58 → 24.13 % (le 0-liq se dégrade, VAL 15.79 → 16.25)
+    ; (3) C3 ECHEC — le contrôle inverse bat la référence d''AUSSI LOIN (+41.1/+41.0 bps) : entrer quand
+    le 1er quart d''heure va CONTRE le trade est un MEILLEUR prix, le « bon côté confirmé » un dégénérateur
+    ; bloc mensuel : la variante dégrade 40/43 mois TRAIN et 18/20 VAL ; WR variante 42.5/42.0 % vs référence
+    48.8/48.9 % ; référence bit-à-bit contre les champs machine 4162/4162, MAE référence = max mae_adverse
+    machine 22.58 % exact'
   report: reports/aster/inv-o-entree-quinzaine-2026-10.md
-  notes: 'leçon gravée : la loi « open = optimum entrée+sortie » survit à la sous-granularité
-    — mesurée à la granularité 1h, elle tient À L''INTÉRIEUR de la bougie : la confirmation
-    précoce 15m paie le prix de la confirmation (~39-41 bps/entrée, 2x l''étalon RT)
-    ; le bounce/fade machine se joue à l''open, pas après le premier quart d''heure
-    ; observation CONTEXTE non actionnable (c''était un CONTRÔLE, pas une hypothèse
-    — toute réutilisation = nouveau pré-enregistrement + budget) : le contrôle inverse
-    +41 bps aux 2 splits = mécanique d''ABSORPTION cohérente avec INV-K (les attaques
-    absorbées précèdent la continuation) et le fade des clusters de prints ; honêteté
-    panel : 4 627 entrées exclues sans 15m natif (les deux bras y seraient bit-identiques),
-    leçon ts_ms re-confirmée (ts_ms machine en NANOSECONDES vs open_time klines.db
-    en ms — normalisation avant tout join), désalignement 1h/15m résiduel max 1.39
-    % documenté (sans effet : les deux bras sur la même grille fine), incident de
-    code de RAPPORT documenté (variable morte retirée avant 1re exécution ; ajout
-    v2 descriptif MAE machine + histogramme k, verdict ré-exécuté bit-identique, diff
-    nul) ; 0 liq par construction (notionnel 1x, pas un wallet séquentiel) ; budget
-    1 expérience consommée, STOP — aucune autre fenêtre (1re/2e/3e séparées), aucun
-    autre flux, aucun seuil (PARAMETER_MUTATION) ; famille execution 1/5'
+  notes: 'leçon gravée : la loi « open = optimum entrée+sortie » survit à la sous-granularité — mesurée
+    à la granularité 1h, elle tient À L''INTÉRIEUR de la bougie : la confirmation précoce 15m paie le
+    prix de la confirmation (~39-41 bps/entrée, 2x l''étalon RT) ; le bounce/fade machine se joue à l''open,
+    pas après le premier quart d''heure ; observation CONTEXTE non actionnable (c''était un CONTRÔLE,
+    pas une hypothèse — toute réutilisation = nouveau pré-enregistrement + budget) : le contrôle inverse
+    +41 bps aux 2 splits = mécanique d''ABSORPTION cohérente avec INV-K (les attaques absorbées précèdent
+    la continuation) et le fade des clusters de prints ; honêteté panel : 4 627 entrées exclues sans 15m
+    natif (les deux bras y seraient bit-identiques), leçon ts_ms re-confirmée (ts_ms machine en NANOSECONDES
+    vs open_time klines.db en ms — normalisation avant tout join), désalignement 1h/15m résiduel max 1.39
+    % documenté (sans effet : les deux bras sur la même grille fine), incident de code de RAPPORT documenté
+    (variable morte retirée avant 1re exécution ; ajout v2 descriptif MAE machine + histogramme k, verdict
+    ré-exécuté bit-identique, diff nul) ; 0 liq par construction (notionnel 1x, pas un wallet séquentiel)
+    ; budget 1 expérience consommée, STOP — aucune autre fenêtre (1re/2e/3e séparées), aucun autre flux,
+    aucun seuil (PARAMETER_MUTATION) ; famille execution 1/5'
 - id: crowding_composite_conditioner
   family: crowding
   status: EXPERIMENTAL
   pre_registered: 02/10/2026 AVANT tout calcul (seal sha256 8df0b11b994b3bd68aea58164abed4b908142fcb1aca70d4fb4cefab8ab17d8c
-    — primitive scripts/crowding_composite.py, seuils T_CROWD=0.50 / T_LATE=0.80 /
-    flush densite-liq>=0.5%OI + dOI<=-1%/4h figes en docstring, zero grille)
-  hypothesis: conditionneur d'ETAT (SENS=0, JAMAIS un signal autonome) — composite
-    positionnement z-funding + dOI% + premium-z + volume-dirige + densite-liq, normalise
-    sur composantes presentes ; les entrees des flux machine 1h en etat LATE/EXHAUSTED
-    ont une esperance nette 24-72h INFERIEURE a FRESH aux deux splits chrono, chaque
-    etat separement SOUS le base-rate inconditionnel du flux (regle PAR ETAT, lecon
+    — primitive scripts/crowding_composite.py, seuils T_CROWD=0.50 / T_LATE=0.80 / flush densite-liq>=0.5%OI
+    + dOI<=-1%/4h figes en docstring, zero grille)
+  hypothesis: conditionneur d'ETAT (SENS=0, JAMAIS un signal autonome) — composite positionnement z-funding
+    + dOI% + premium-z + volume-dirige + densite-liq, normalise sur composantes presentes ; les entrees
+    des flux machine 1h en etat LATE/EXHAUSTED ont une esperance nette 24-72h INFERIEURE a FRESH aux deux
+    splits chrono, chaque etat separement SOUS le base-rate inconditionnel du flux (regle PAR ETAT, lecon
     INV-H)
-  test_locked: '2026-10-30 → 2027-01-30 (OI bulk atteint 30 j : 2.5 j au 02/10), split
-    chrono 70/30 interne, n>=60/etat TRAIN et >=30/etat VAL, criteres C1-C4 + controle
-    inverse + garde-fou compose-des-mois'
-  prior: NEGATIF — al_score_v2_composite REJECTED 28/09 (les composites ont deja inverse),
-    INV-A/K/L/M inverses train→val ; FAIL attendu honnetement, la valeur descriptive
-    survit meme en FAIL
-  notes: 'mode SMOKE seul jusqu''au 30/10 (couverture par composante/symbole, AUCUNE
-    stat de resultat, aucun join vers des resultats de trades dans le script) ; adjacences
-    declarees : funding-structure FAIL (funding = 1 composante parmi 5 d''un conditionneur),
-    cascade FERMEE (vehicule de test, pas re-testee), oi_quadrant_h4h5 EXPERIMENTAL
-    (evenements 90 min, complementaire) ; unites verifiees au run 02/10 : ts_ms =
-    ms, liq event_time = ms (auto-detect), bulk/(base*prix) mediane 2.000 sur 39 symboles
-    = bulk notional x2 USD confirmé'
+  test_locked: '2026-10-30 → 2027-01-30 (OI bulk atteint 30 j : 2.5 j au 02/10), split chrono 70/30 interne,
+    n>=60/etat TRAIN et >=30/etat VAL, criteres C1-C4 + controle inverse + garde-fou compose-des-mois'
+  prior: NEGATIF — al_score_v2_composite REJECTED 28/09 (les composites ont deja inverse), INV-A/K/L/M
+    inverses train→val ; FAIL attendu honnetement, la valeur descriptive survit meme en FAIL
+  notes: 'mode SMOKE seul jusqu''au 30/10 (couverture par composante/symbole, AUCUNE stat de resultat,
+    aucun join vers des resultats de trades dans le script) ; adjacences declarees : funding-structure
+    FAIL (funding = 1 composante parmi 5 d''un conditionneur), cascade FERMEE (vehicule de test, pas re-testee),
+    oi_quadrant_h4h5 EXPERIMENTAL (evenements 90 min, complementaire) ; unites verifiees au run 02/10
+    : ts_ms = ms, liq event_time = ms (auto-detect), bulk/(base*prix) mediane 2.000 sur 39 symboles =
+    bulk notional x2 USD confirmé'
 - id: oi_quadrant_h4h5
   family: institutions
   status: EXPERIMENTAL
   timeframe: 15min
-  pre_registered: 27/09/2026 AVANT tout calcul (docstring oi_quadrant_test.py — H4
-    dOI>=+0,5 % + chute → short cascade suivant MEILLEUR ; H5 dOI<=-0,5 % + chute
-    → short cascade DEGRADE)
-  fired: '02/10/2026 avancé de la fenêtre 06-07 (l''exigence de snapshots 5-7 j satisfaite
-    à 7,0 j, maturité verte : 44 sym, 84 snaps/j)'
-  result: INSUFFISANT en VAL — n=3/quadrant (critère pré-déclaré n>=10) ; TRAIN n=12
-    (Q1 WR 66,7 % +1,71 %, MAE med 0,66 % ; Q2 WR 100 % +1,39 %) ; VAL Q1 +5,61 %
-    vs Q2 +0,67 %, MAE 2,85 vs 3,22 — LA DIRECTION SUGGÈRE H4 (conforme) mais n ne
-    juge pas ; MAE Q1 max 17,95 % (base levier <= 5x)
-  notes: 'RE-TIR programmé 07-08/10 puis à maturité (~2 sem pour n>=10/quadrant VAL
-    au rythme 7,5 evts/j) — le garde-fou de maturité du script bloque tout calcul
-    prématuré || PRE-MORTEM (02/10 20h, red-team modèle local Bonsai AVANT le re-tir
-    07-08) — 3 additions de REPORTING (critères gelés inchangés) : (1) MAE MAX rapporté
-    en plus de la médiane (le piège short-squeeze : Q1 = début possible de cascade
-    de liquidations, un WR haut peut masquer un MAE catastrophique en V-shape) ; (2)
-    OVERLAP double-short contrôlé : les événements Q1 sont-ils les mêmes symboles/instants
-    que les shorts cascade DÉJÀ OUVERTS de la machine (la « meilleure qualité » serait
-    confondue avec un empilement) ; (3) sensibilité du seuil 0,5 % rapportée à 0,3/0,7/1
-    % (reporting only, aucun re-tuning — le primaire reste gelé). Source : /tmp/hikari_h45_rt.txt
-    (35 lignes, tronqué à la faille 3/5 — les 2 fatales sont livrées).'
-# PRE-MORTEM CONFIRMÉ (02/10 soir) : le MAE max Q1 = 17,95 % vs médiane 0,66 % (3,3×) — le short squeeze que le red-team Bonsai a prédit est VISIBLE dans les données. Le re-tir reste SOUS_PUISSANT (0 nouvel event cascade depuis le 01/10 03:00 — le flux est silencieux en T3). Le verdict final attend ~2 sem de plus de cascade events.
+  pre_registered: 27/09/2026 AVANT tout calcul (docstring oi_quadrant_test.py — H4 dOI>=+0,5 % + chute
+    → short cascade suivant MEILLEUR ; H5 dOI<=-0,5 % + chute → short cascade DEGRADE)
+  fired: '02/10/2026 avancé de la fenêtre 06-07 (l''exigence de snapshots 5-7 j satisfaite à 7,0 j, maturité
+    verte : 44 sym, 84 snaps/j)'
+  result: INSUFFISANT en VAL — n=3/quadrant (critère pré-déclaré n>=10) ; TRAIN n=12 (Q1 WR 66,7 % +1,71
+    %, MAE med 0,66 % ; Q2 WR 100 % +1,39 %) ; VAL Q1 +5,61 % vs Q2 +0,67 %, MAE 2,85 vs 3,22 — LA DIRECTION
+    SUGGÈRE H4 (conforme) mais n ne juge pas ; MAE Q1 max 17,95 % (base levier <= 5x)
+  notes: 'RE-TIR programmé 07-08/10 puis à maturité (~2 sem pour n>=10/quadrant VAL au rythme 7,5 evts/j)
+    — le garde-fou de maturité du script bloque tout calcul prématuré || PRE-MORTEM (02/10 20h, red-team
+    modèle local Bonsai AVANT le re-tir 07-08) — 3 additions de REPORTING (critères gelés inchangés) :
+    (1) MAE MAX rapporté en plus de la médiane (le piège short-squeeze : Q1 = début possible de cascade
+    de liquidations, un WR haut peut masquer un MAE catastrophique en V-shape) ; (2) OVERLAP double-short
+    contrôlé : les événements Q1 sont-ils les mêmes symboles/instants que les shorts cascade DÉJÀ OUVERTS
+    de la machine (la « meilleure qualité » serait confondue avec un empilement) ; (3) sensibilité du
+    seuil 0,5 % rapportée à 0,3/0,7/1 % (reporting only, aucun re-tuning — le primaire reste gelé). Source
+    : /tmp/hikari_h45_rt.txt (35 lignes, tronqué à la faille 3/5 — les 2 fatales sont livrées).'
 - id: EXP-crash-short-6h-004
   family: forced_flow
   status: REJECTED
   timeframe: 1h
-  hypothesis: une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à
-    6h — le flux forcé vendeur ne s'épuise pas
-  discovery: DISCOVERY_PASS 05/10 (grind stage 2, re-mesuré post-fix v6) —
-    n 8682, mean +1.050 %/trade, inverse -1.610 (le côté codé domine),
-    coûts 0.28 % RT inclus
-  confirmation: CONFIRMED 05/10 porte v6 (slot W41) — n 1908, mean +1.014
-    %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.874, dégradation ok
-  wallet_validation: $100 → $112.79 (+12.8 %/13 mois), WR 73.7 %, DD 0.18 %,
-    0 liq, 0 mois négatif, ret/DD 69.9 — baseline hold $66.78 (le short bat
-    un marché qui perd -33 %)
-  notes: 1er candidat CONFIRMÉ du Research OS sous protocole-v2 ; étape
-    suivante = forward confirmation (maturation 30 j, active.yaml)
-  notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
+  hypothesis: une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à 6h — le flux forcé vendeur
+    ne s'épuise pas
+  notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress
+    PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
+  invalidated_by: v14_lookahead
+  historical_measurement:
+    discovery: DISCOVERY_PASS 05/10 (grind stage 2, re-mesuré post-fix v6) — n 8682, mean +1.050 %/trade,
+      inverse -1.610 (le côté codé domine), coûts 0.28 % RT inclus
+    confirmation: CONFIRMED 05/10 porte v6 (slot W41) — n 1908, mean +1.014 %/trade, 6/6 fenêtres PASS,
+      stress ×1.5 +0.874, dégradation ok
+    wallet_validation: $100 → $112.79 (+12.8 %/13 mois), WR 73.7 %, DD 0.18 %, 0 liq, 0 mois négatif,
+      ret/DD 69.9 — baseline hold $66.78 (le short bat un marché qui perd -33 %)
 - id: EXP-bonsai-h-01
   family: bonsai_fund_H
   status: REJECTED
   timeframe: 1h
   hypothesis: Funding Crowding Reversal (hypothèse Bonsai H-01)
-  discovery: DISCOVERY_PASS 05/10 re-mesuré POST-fix funding-absent=NaN —
-    n 61978, mean +0.090 %/trade, inverse -0.650 (avant fix +0.095 — le fix
-    coûte 0.005 pt, le candidat tient)
-  confirmation: REJECTED 05/10 porte v6 (slot W41) — n 16961, mean +0.054,
-    5/5 fenêtres PASS MAIS stress ×1.5 mean -0.086 — l'edge MEURT sous coûts
-    majorés, exactement le filet que le protocole pose
-  notes: le funding crowding passe les fenêtres mais pas le stress de coûts ;
-    re-derivation = nouvelle hypothèse (un edge à +0.05 %/trade brut n'a pas
-    la marge)
+  notes: le funding crowding passe les fenêtres mais pas le stress de coûts ; re-derivation = nouvelle
+    hypothèse (un edge à +0.05 %/trade brut n'a pas la marge)
+  invalidated_by: v14_lookahead
+  historical_measurement:
+    discovery: DISCOVERY_PASS 05/10 re-mesuré POST-fix funding-absent=NaN — n 61978, mean +0.090 %/trade,
+      inverse -0.650 (avant fix +0.095 — le fix coûte 0.005 pt, le candidat tient)
+    confirmation: REJECTED 05/10 porte v6 (slot W41) — n 16961, mean +0.054, 5/5 fenêtres PASS MAIS stress
+      ×1.5 mean -0.086 — l'edge MEURT sous coûts majorés, exactement le filet que le protocole pose
 - id: EXP-bonsai-h-18
   family: bonsai_range_pct
   status: REJECTED
   timeframe: 1h
   hypothesis: Volatility Squeeze Short (hypothèse Bonsai H-18)
-  discovery: DISCOVERY_PASS 05/10 (re-mesuré post-fix v6) — n 22137,
-    mean +0.290 %/trade, inverse -0.850
-  confirmation: CONFIRMED 05/10 porte v6 (slot W41) — n 5181, mean +0.360
-    %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.220
-  wallet_validation: $100 → $109.08 (+9.1 %/13 mois), WR 60.9 %, DD 0.43 %,
-    0 liq, 0 mois négatif, ret/DD 21.3 — baseline hold $66.78
-  notes: le squeeze des majeures CONFIRMÉ sous protocole-v2 (l'ancien verdict
-    « réfuté sur 6 ans » portait sur un autre univers/un autre protocole) ;
-    étape suivante = forward confirmation (maturation 30 j)
-  notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
+  notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress
+    PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
+  invalidated_by: v14_lookahead
+  historical_measurement:
+    discovery: DISCOVERY_PASS 05/10 (re-mesuré post-fix v6) — n 22137, mean +0.290 %/trade, inverse -0.850
+    confirmation: CONFIRMED 05/10 porte v6 (slot W41) — n 5181, mean +0.360 %/trade, 6/6 fenêtres PASS,
+      stress ×1.5 +0.220
+    wallet_validation: $100 → $109.08 (+9.1 %/13 mois), WR 60.9 %, DD 0.43 %, 0 liq, 0 mois négatif, ret/DD
+      21.3 — baseline hold $66.78
 - id: EXP-crash-short-6h-univ10
   family: forced_flow
   status: REJECTED
   timeframe: 1h
-  hypothesis: RÉPLICATION UNIVERSE — le même flux forcé vendeur (ret_1h <= p10
-    expanding) continue de baisser à 6h sur les 10 majeures
-  discovery: DISCOVERY_PASS 05/10 (kernel v2 — LABEL_VERSION 2) — n 30022,
-    mean +1.041 %/trade, inverse -1.601
-  confirmation: CONFIRMED 05/10 re-run kernel v2 (slot W41) — n 6349 val,
-    mean +1.131 %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.991
-  wallet_validation: $100 → $155.93 (+55.9 %/13 mois), DD MTM 0.53 %,
-    0 liq, 0 mois négatif — l'extension d'universe MULTIPLIE les events sans
-    diluer l'edge (val 3-maj +1.014 → univ10 +1.130)
-  notes: le backfill fetch_deep_klines (version fixée) vérifié — les barres
-    0-volume sont des heures réellement sans trade (quote 0 aussi), pas la
-    corruption historique
-  notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
+  hypothesis: RÉPLICATION UNIVERSE — le même flux forcé vendeur (ret_1h <= p10 expanding) continue de
+    baisser à 6h sur les 10 majeures
+  notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress
+    PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
+  invalidated_by: v14_lookahead
+  historical_measurement:
+    discovery: DISCOVERY_PASS 05/10 (kernel v2 — LABEL_VERSION 2) — n 30022, mean +1.041 %/trade, inverse
+      -1.601
+    confirmation: CONFIRMED 05/10 re-run kernel v2 (slot W41) — n 6349 val, mean +1.131 %/trade, 6/6 fenêtres
+      PASS, stress ×1.5 +0.991
+    wallet_validation: $100 → $155.93 (+55.9 %/13 mois), DD MTM 0.53 %, 0 liq, 0 mois négatif — l'extension
+      d'universe MULTIPLIE les events sans diluer l'edge (val 3-maj +1.014 → univ10 +1.130)
 - id: EXP-bonsai-h-18-univ10
   family: bonsai_range_pct
   status: REJECTED
   timeframe: 1h
-  hypothesis: RÉPLICATION UNIVERSE — le squeeze (range_pct < 2.0 ET ret_1h <
-    -0.3) porte un short 6h sur les 10 majeures
-  discovery: DISCOVERY_PASS 05/10 (kernel v2) — n 74574, mean +0.248
-    %/trade, inverse -0.808
-  confirmation: CONFIRMED 05/10 re-run kernel v2 (slot W41) — n 19955 val,
-    mean +0.333 %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.193
-  wallet_validation: $100 → $134.79 (+34.8 %/13 mois), DD MTM 0.99 %, 0 liq,
-    0 mois négatif
-  notes: le squeeze tient sur l'univers élargi (val 3-maj +0.360 → univ10
-    +0.329, dilution minime)
-  notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
+  hypothesis: RÉPLICATION UNIVERSE — le squeeze (range_pct < 2.0 ET ret_1h < -0.3) porte un short 6h sur
+    les 10 majeures
+  notes: ⚠️ PR-3 (10/05... 05/10 soir) change le jugement (clamp validation au span protocole, gates DD/stress
+    PAR FENÊTRE, frontière <=) — re-run W42 obligatoire (budget W41 épuisé à 17/20)
+  invalidated_by: v14_lookahead
+  historical_measurement:
+    discovery: DISCOVERY_PASS 05/10 (kernel v2) — n 74574, mean +0.248 %/trade, inverse -0.808
+    confirmation: CONFIRMED 05/10 re-run kernel v2 (slot W41) — n 19955 val, mean +0.333 %/trade, 6/6
+      fenêtres PASS, stress ×1.5 +0.193
+    wallet_validation: $100 → $134.79 (+34.8 %/13 mois), DD MTM 0.99 %, 0 liq, 0 mois négatif
 - id: EXP-bonsai-h-22
   family: bonsai_volume_z
   status: REJECTED
   timeframe: 1h
-  hypothesis: '[H-22] Volume Surge Reversion — un pic de volume sur bougie
-    baissière marque l''épuisement : reversion à 2h'
-  discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 12963,
-    mean +0.969 %/trade, inverse -1.529
-  confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 3812 val, mean
-    +0.895 %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.755
-  wallet_validation: $100 → $135.32 (+35.3 %/13 mois), DD MTM 0.21 %,
-    0 liq, 0 mois négatif
+  hypothesis: '[H-22] Volume Surge Reversion — un pic de volume sur bougie baissière marque l''épuisement
+    : reversion à 2h'
   notes: 3e candidat CONFIRMÉ du batch-002 Bonsai ; forward en maturation
+  invalidated_by: v14_lookahead
+  historical_measurement:
+    discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 12963, mean +0.969 %/trade, inverse
+      -1.529
+    confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 3812 val, mean +0.895 %/trade, 6/6 fenêtres
+      PASS, stress ×1.5 +0.755
+    wallet_validation: $100 → $135.32 (+35.3 %/13 mois), DD MTM 0.21 %, 0 liq, 0 mois négatif
 - id: EXP-bonsai-h-29
   family: bonsai_range_pct
   status: REJECTED
   timeframe: 1h
-  hypothesis: '[H-29] Momentum-Range Confirmation — momentum confirmé par la
-    compression de range : continuation à 6h'
-  discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 24893,
-    mean +1.449 %/trade, inverse -2.009
-  confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 5631 val, mean
-    +1.124 %/trade, 6/6 fenêtres PASS, stress ×1.5 +0.984
-  wallet_validation: $100 → $150.82 (+50.8 %/13 mois), DD MTM 0.88 %,
-    0 liq, 0 mois négatif
+  hypothesis: '[H-29] Momentum-Range Confirmation — momentum confirmé par la compression de range : continuation
+    à 6h'
   notes: le plus massif des 3 candidats du batch-002 ; forward en maturation
+  invalidated_by: v14_lookahead
+  historical_measurement:
+    discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 24893, mean +1.449 %/trade, inverse
+      -2.009
+    confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 5631 val, mean +1.124 %/trade, 6/6 fenêtres
+      PASS, stress ×1.5 +0.984
+    wallet_validation: $100 → $150.82 (+50.8 %/13 mois), DD MTM 0.88 %, 0 liq, 0 mois négatif
 - id: EXP-bonsai-h-31
   family: bonsai_volume_z
   status: REJECTED
   timeframe: 1h
-  hypothesis: '[H-31] High-Volume Low-Return Mean Reversion — gros volume,
-    faible rendement : absorption, reversion à 1h'
-  discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 4210,
-    mean +1.845 %/trade, inverse -2.405
-  confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 1195 val, mean
-    +1.596 %/trade, 6/6 fenêtres PASS, stress ×1.5 +1.456 (le stress le
-    plus robuste du projet)
-  wallet_validation: $100 → $122.13 (+22.1 %/13 mois), DD MTM 0.04 %,
-    0 liq, 0 mois négatif
-  notes: le mean/trade le plus élevé du batch-002 mais n le plus faible ;
-    forward en maturation
-
-# ——— VERDICT POST-v14 (05/10 soir, PR-143) : LES 7 CANDIDATS PRÉCÉDENTS
-# SONT REJETÉS — le P0 look-ahead (close(i) connu à l'entrée open(i))
-# invalidait toutes les mesures : le trade mesurait sa propre bougie de
-# sélection. Le mutation test (tests/test_v14_causality.py) verrouille la
-# causalité. Les découvertes re-mesurées post-fix sont TOUTES
-# DISCOVERY_FAIL (crash -0.418, squeeze -0.290/-0.295, h-22 -0.329,
-# h-29 -0.208, h-31 en cours) — le « edge » était l'artefact. La recherche
-# repart de grounds honnêtes sur le moteur v14.
+  hypothesis: '[H-31] High-Volume Low-Return Mean Reversion — gros volume, faible rendement : absorption,
+    reversion à 1h'
+  notes: le mean/trade le plus élevé du batch-002 mais n le plus faible ; forward en maturation
+  invalidated_by: v14_lookahead
+  historical_measurement:
+    discovery: DISCOVERY_PASS 05/10 (grind batch-002, univ10) — n 4210, mean +1.845 %/trade, inverse -2.405
+    confirmation: CONFIRMED 05/10 porte v10 (slot W41) — n 1195 val, mean +1.596 %/trade, 6/6 fenêtres
+      PASS, stress ×1.5 +1.456 (le stress le plus robuste du projet)
+    wallet_validation: $100 → $122.13 (+22.1 %/13 mois), DD MTM 0.04 %, 0 liq, 0 mois négatif
+execution_harness: harnais-v5 (baseline anti-dérive, horizons muraux, split chrono strict)
+confirmation_protocol: protocol-v2

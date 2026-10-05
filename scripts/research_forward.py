@@ -116,6 +116,23 @@ def collect(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
     if frozen is None:
         return {"run_id": run_id, "collected": 0,
                 "reason": "pas de seuils gelés (summary_discovery absent)"}
+    # FIX v15 (audit GLM 5.3 №3) : la barrière est DANS la primitive, pas
+    # seulement dans la CLI — même appelé avec --id explicite, un run non
+    # confirmé sous le protocole actif ne journalise rien
+    cfile = runs_dir / run_id / "summary_confirmation.json"
+    if cfile.exists():
+        s = json.loads(cfile.read_text(encoding="utf-8"))
+        from scripts.research_os import load_confirmation_protocol as _lcp
+        active = str(_lcp().get("protocol_id", "protocol-v2"))
+        if (s.get("verdict") != "CONFIRMED"
+                or str(s.get("protocol_id", "")) != active):
+            return {"run_id": run_id, "collected": 0,
+                    "reason": (f"run non confirmé sous {active} "
+                               f"(verdict {s.get('verdict')}, protocole "
+                               f"{s.get('protocol_id')}) — collect refusé")}
+    else:
+        return {"run_id": run_id, "collected": 0,
+                "reason": "aucun summary_confirmation — collect refusé"}
     d = spec["data"]
     h1 = int(spec.get("horizons", [24])[0])
     val_end = int(d["validation_end"])
@@ -143,6 +160,9 @@ def collect(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
                 fz = [None] * len(rr._signal_conditions(spec["signal"]))
             mask = rr.event_mask(spec, feats, view, frozen=fz,
                                  thr_key=(*rr._db_key(db_path), sym))
+            # FIX v15 (№4) : le masque anti-survivorship au forward aussi —
+            # la même primitive que le backtest
+            mask = rr.apply_universe(spec, sym, mask, feats, h1)
             idx = [i for i in range(len(mask)) if mask[i]
                    and (sym, int(feats["open_time_ns"][i] // 10**6)) not in seen]
             for i in idx:
@@ -216,7 +236,14 @@ def _closed_trades(spec: dict, events: list[dict], db_path: Path,
                     k0 = int(np.searchsorted(fs.times_ms, ot, side="right"))
                     k1 = int(np.searchsorted(fs.times_ms,
                                              ot + h1 * H_MS, side="right"))
-                    fund = float(fs.rates_pct[k0:k1].sum())
+                    # FIX v15 (№2) : distinguer « aucun print observé » d'un
+                    # « funding = 0 réel » — règle du kernel : connu si
+                    # (début ≥ 1er print OU prints dans la fenêtre) ET
+                    # fin ≤ dernier print
+                    in_era = (ot >= fs.times_ms[0]) or (k1 > k0)
+                    covered = (ot + h1 * H_MS) <= fs.times_ms[-1]
+                    if in_era and covered:
+                        fund = float(fs.rates_pct[k0:k1].sum())
             except Exception:
                 fund = None
             out.append({"sym": e["symbol"], "t_ms": ot,

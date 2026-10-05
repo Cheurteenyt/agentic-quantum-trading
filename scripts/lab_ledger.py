@@ -202,14 +202,20 @@ def assess(entries, budget, now, family, strategy, hypothesis, params,
     # kernel). Elle ne consomme PAS les plafonds famille/stratégie/total —
     # c'est la même idée pré-enregistrée, pas une exploration nouvelle ;
     # le N de multiplicité, lui, reste cumulatif.
+    # FIX v15 (audit GLM 5.3 post-#146 №1) : la re-vérification exige le
+    # MÊME snapshot — une REPLICATION (même spec, NOUVEAU snapshot) est une
+    # vraie mesure qui re-consomme les plafonds. L'ancien is_reverify sans
+    # snapshot permettait S1→S2→S3 de sortir des plafonds gratuitement.
     is_reverify = any(
         e["_hh"] == hh and e["_ph"] == ph
         and e.get("_mode", "confirmation") == mode
         and e.get("strategy") == strategy
+        and e.get("_snapshot", "default") == snapshot
         for e in entries)
     if is_reverify:
-        msgs.append("RE-VÉRIFICATION : même hypothèse/paramètres déjà "
-                    "confirmés — exemptée des plafonds (N cumulatif).")
+        msgs.append("RE-VÉRIFICATION : même hypothèse/params/SNAPSHOT déjà "
+                    "confirmés — exemptée des plafonds (N cumulatif). "
+                    "Un nouveau snapshot = REPLICATION = plafonds dus.")
     if d == "REPLICATION":
         msgs.append("REPLICATION : même spécification sur un NOUVEAU snapshot — "
                     "autorisé (le N de multiplicité reste cumulatif).")
@@ -324,6 +330,7 @@ def cmd_log(a) -> int:
         e.get("_hh") == hh and e.get("_ph") == ph
         and e.get("_mode", "confirmation") == a.mode
         and e.get("strategy") == strategy
+        and e.get("_snapshot", "default") == a.snapshot
         for e in entries)
     entry = {"date": ts.strftime("%Y-%m-%d"), "ts": ts.strftime("%Y-%m-%dT%H:%M:%SZ"), "domain": slug(a.domain),
              "mode": a.mode, "snapshot": a.snapshot,
