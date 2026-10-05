@@ -2,7 +2,7 @@
 title: Méthodologie — comment on évite de se mentir
 status: living
 owner: cheurteen
-updated: 2026-08-09
+updated: 2026-10-06
 ---
 
 # Méthodologie anti-faux-backtest
@@ -10,6 +10,20 @@ updated: 2026-08-09
 **Le doc le plus important du repo.** Il condense ce que la suite Aster legacy a
 coûté à apprendre : plus de 4000 $ de pertes réelles, ~6700 lanes testées,
 **0 promotion propre**.
+
+> ⚖️ **AUTORITÉ DES GATES (mis à jour le 06/10)** : les critères de
+> confirmation COURANTS sont ceux de `research/protocols/active.yaml`
+> (protocol-v2 : ≥ 5/6 fenêtres gelées PASS, stress de coûts ×1,5, DD MTM
+> par fenêtre ≤ 15 %, couverture funding, causalité v14
+> signal=close(t) → entry=open(t+1) verrouillée par mutation test, forward
+> 30 j à 5 gates). La table du §3 ci-dessous est le **LEGACY** — ses leçons
+> restent valides, ses seuils ne jugent plus rien.
+
+⚠️ **La leçon du 05/10 s'ajoute à ce doc** : le Research OS a produit 7
+candidats « confirmés » en une journée — tous morts le soir quand le
+mutation test a révélé que le signal regardait la bougie sur laquelle il
+entrait (look-ahead d'une bougie). Un moteur sans causalité verrouillée
+produit des candidats par construction, pas par découverte.
 
 Sources : `reference/aster-working-map.md`,
 `reference/core-equity-aster-research-archive.md`, `archive/` (rapports HTML).
@@ -75,7 +89,11 @@ résultat sans identité complète est jeté, pas rattrapé.
 
 ---
 
-## 3. Les gates — critères de rejet automatique
+## 3. Les gates LEGACY — critères de rejet automatique (historique)
+
+> ⚠️ Ces seuils ont été remplacés par protocol-v2 (active.yaml) le 05/10.
+> La table reste pour l'histoire et pour l'esprit : « un seul échec = rejet,
+> pas d'exception ».
 
 Une stratégie qui échoue à **un seul** de ces tests est rejetée. Pas de
 discussion, pas d'exception « mais celle-là est spéciale ».

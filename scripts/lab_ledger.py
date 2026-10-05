@@ -266,12 +266,21 @@ def status_md(entries, budget, now, effective) -> str:
     n_all = sum(1 for e in entries if e.get("verdict") != "PREREG")
     n_bf = sum(1 for e in entries if e["_backfill"] and e.get("verdict") != "PREREG")
     cap = [f"{f} {c}/{budget['per_family']}" for f, c in sorted(by_fam.items()) if c >= budget["per_family"]]
+    # FIX v14 (audit GLM 5.3 №15) : distinguer le RAW historique (avec les
+    # re-vérifications exemptées) du consommé hors reverify — les deux
+    # nombres dans le bloc, sinon un lecteur voit une « violation » qui
+    # n'en est pas une
+    raw_fam = Counter(e["family"] for e in entries
+                      if e.get("_week") == week and e.get("_consumes"))
+    raw_cap = [f"{f} {c}/{budget['per_family']}"
+               for f, c in sorted(raw_fam.items()) if c >= budget["per_family"]]
     lines = [BEGIN,
              f"- Ledger : **{len(entries)}** entrées ({n_all} essais, dont {n_bf} backfill hors budget) — "
              + " · ".join(f"{k} {v[k]}" for k in ("PASS", "FAIL", "NUL", "SOUS_PUISSANT", "INCONCLU", "PREREG") if v[k]),
              f"- Budget semaine {week} (effet policy : {effective.date() if effective else 'n/a'}) : "
-             f"**{total}/{budget['total_experiments']}** consommés, reste {max(0, budget['total_experiments'] - total)}",
-             f"- Familles au plafond : {', '.join(cap) if cap else 'aucune'}",
+             f"**{total}/{budget['total_experiments']}** consommés (hors re-vérifications exemptées), reste {max(0, budget['total_experiments'] - total)}",
+             f"- Familles bloquantes hors reverify : {', '.join(cap) if cap else 'aucune'}",
+             f"- Familles raw historiques (re-verifies incluses) : {', '.join(raw_cap) if raw_cap else 'aucune'}",
              f"- Seuil de preuve du prochain essai : |t| ≥ {tstar(n_all + 1):.2f} (Bonferroni, N={n_all + 1})",
              END]
     return "\n".join(lines)

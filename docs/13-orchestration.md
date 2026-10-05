@@ -187,8 +187,11 @@ python3 scripts/research_runner.py portfolio --id EXP-xxx --baseline         # b
 Un wallet sur la vue **validation** exige un run de confirmation existant
 (l'artefact fait foi) — la vue **train** est libre. Séquence : une position
 par symbole (anti-chevauchement), marge ≤ 1 % de l'équité courante, lev 1x
-défaut, liquidation ex ante (MAE ≥ 100/lev − 0,5), bookage au mois de
-sortie, DD par fenêtre gelée contre le plafond `max_window_loss_pct` (15 %).
+défaut, liquidation **simulée** (défaut PR-8 : mort au premier franchissement réel
+du seuil sur le chemin intrabar ; `liq_mode="stress"` garde la borne ex
+ante — MAE ≥ 100/lev − 0,5), bookage au mois de sortie, DD par fenêtre
+gelée contre le plafond `max_window_loss_pct` (15 %). Causalité v14 :
+signal=close(t) → entry=open(t+1), verrouillée par mutation test.
 Le rapport inclut la **baseline equal-weight long-and-hold** des mêmes
 symboles : un edge qui ne bat pas ses propres actifs tenus passifs est une
 narration. Sur CONFIRMED, le bloc WALLET est appendu automatiquement au

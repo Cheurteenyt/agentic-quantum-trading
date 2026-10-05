@@ -1,3 +1,12 @@
+> ⚖️ **SÉPARATION DES ÈRES (06/10)** : ce registre porte l'histoire de la
+> MACHINE legacy (pré-05/10) — ses verdicts ont été mesurés par des moteurs
+> successifs dont plusieurs bugs d'unité et un look-ahead ont été découverts
+> depuis (voir le journal du Research OS). **La source de vérité COURANTE
+> pour les candidats du Research OS est `research/registry.yaml` +
+> `research/runs/`** (protocol-v2, moteur v14 à causalité verrouillée). Les
+> chiffres legacy ci-dessous se lisent comme des leçons, pas comme des
+> edges exploitables.
+
 # 20 — Registre des indicateurs & stratégies
 
 **La règle de gestion** : chaque indicateur a UN statut (VALIDÉ / CANDIDAT /
