@@ -1,0 +1,37 @@
+{
+ "domain": "aster",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "id": "EXP-volexh-short-6h-001",
+ "family": "volatility_exhaustion",
+ "strategy": "range_p95_short",
+ "hypothesis": "Une mèche extrême (range >= p95 expanding) sur BTC/ETH/SOL est suivie d'une réversion baissière à 6h — l'épuisement haussier attire les vendeurs.",
+ "signal": {
+  "feature": "range_pct",
+  "op": ">=",
+  "quantile": 0.95,
+  "side": -1
+ },
+ "horizons": [
+  6
+ ],
+ "criteria": {
+  "min_n": 100,
+  "min_mean": 0.05
+ },
+ "compute": {
+  "class": "tiny"
+ }
+}

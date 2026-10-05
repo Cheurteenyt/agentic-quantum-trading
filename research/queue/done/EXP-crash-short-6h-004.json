@@ -1,0 +1,37 @@
+{
+ "domain": "aster",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "id": "EXP-crash-short-6h-004",
+ "family": "forced_flow",
+ "strategy": "ret1h_p10_short",
+ "hypothesis": "Une bougie de -X % (ret_1h <= p10 expanding) continue de baisser à 6h — le flux forcé vendeur ne s'épuise pas en une bougie.",
+ "signal": {
+  "feature": "ret_1h",
+  "op": "<=",
+  "quantile": 0.1,
+  "side": -1
+ },
+ "horizons": [
+  6
+ ],
+ "criteria": {
+  "min_n": 100,
+  "min_mean": 0.05
+ },
+ "compute": {
+  "class": "tiny"
+ }
+}
