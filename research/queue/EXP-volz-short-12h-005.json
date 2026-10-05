@@ -1,0 +1,37 @@
+{
+ "domain": "aster",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "id": "EXP-volz-short-12h-005",
+ "family": "volatility_exhaustion",
+ "strategy": "volumez_p95_short",
+ "hypothesis": "Un pic de volume anormal (volume_z >= p95) combiné à une bougie haussière marque le sommet de liquidité — short 12h.",
+ "signal": {
+  "feature": "volume_z",
+  "op": ">=",
+  "quantile": 0.95,
+  "side": -1
+ },
+ "horizons": [
+  12
+ ],
+ "criteria": {
+  "min_n": 100,
+  "min_mean": 0.05
+ },
+ "compute": {
+  "class": "small"
+ }
+}

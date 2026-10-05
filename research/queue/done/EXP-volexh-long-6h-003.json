@@ -1,0 +1,37 @@
+{
+ "domain": "aster",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "id": "EXP-volexh-long-6h-003",
+ "family": "volatility_exhaustion",
+ "strategy": "range_p95_long",
+ "hypothesis": "L'épuisement baissier (mèche extrême vers le bas, entrée long) produit la réversion haussière symétrique à 6h.",
+ "signal": {
+  "feature": "range_pct",
+  "op": ">=",
+  "quantile": 0.95,
+  "side": 1
+ },
+ "horizons": [
+  6
+ ],
+ "criteria": {
+  "min_n": 100,
+  "min_mean": 0.05
+ },
+ "compute": {
+  "class": "tiny"
+ }
+}
