@@ -44,7 +44,8 @@ KLINES_COLS = {"symbol", "interval", "open_time", "open", "high", "low", "close"
 
 
 def preflight(scope: DataScope, symbols: list[str],
-              db_path: Path = KDB, con: sqlite3.Connection | None = None) -> dict:
+              db_path: Path = KDB, con: sqlite3.Connection | None = None,
+              needs_funding: bool = True) -> dict:
     """Exécute les checks de santé des données. Ne juge pas, mesure —
     le verdict est PREFLIGHT_OK ou PREFLIGHT_FAILED avec les motifs."""
     checks: list[dict] = []
@@ -100,7 +101,15 @@ def preflight(scope: DataScope, symbols: list[str],
                 "SELECT COUNT(*) FROM funding_history WHERE symbol=? "
                 "AND funding_time BETWEEN ? AND ?",
                 (sym, lo, hi)).fetchone()[0]
-            check(f"couverture funding {sym}", frows > 0, f"{frows} prints")
+            # FIX v10 (GLM 5.3 №27) : le preflight est FEATURE-AWARE — un
+            # signal purement prix n'exige pas de funding ; l'absence est
+            # alors informative, pas bloquante (le PnL fund_cov le dit)
+            if needs_funding:
+                check(f"couverture funding {sym}", frows > 0,
+                      f"{frows} prints")
+            else:
+                check(f"couverture funding {sym}", True,
+                      f"{frows} prints — signal sans funding (informatif)")
 
         # 6. SMOKE RÉEL : le crash W42 (marks sur une vraie kline) ne peut
         #    plus passer inaperçu avant un run.

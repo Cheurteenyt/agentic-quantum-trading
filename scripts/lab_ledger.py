@@ -197,6 +197,19 @@ def assess(entries, budget, now, family, strategy, hypothesis, params,
             f"({mode}) déjà logués le {e.get('date') or e['_ts']:.10} "
             f"sous {where} → {e.get('verdict')}. NO-OP."]}
     msgs, status, code = [], "GO", EXIT_OK
+    # FIX v10 (audit GLM 5.3 post-#135) : RE-VÉRIFICATION = re-mesure du
+    # MÊME couple hypothèse/paramètres déjà confirmé (p. ex. après un fix
+    # kernel). Elle ne consomme PAS les plafonds famille/stratégie/total —
+    # c'est la même idée pré-enregistrée, pas une exploration nouvelle ;
+    # le N de multiplicité, lui, reste cumulatif.
+    is_reverify = any(
+        e["_hh"] == hh and e["_ph"] == ph
+        and e.get("_mode", "confirmation") == mode
+        and e.get("strategy") == strategy
+        for e in entries)
+    if is_reverify:
+        msgs.append("RE-VÉRIFICATION : même hypothèse/paramètres déjà "
+                    "confirmés — exemptée des plafonds (N cumulatif).")
     if d == "REPLICATION":
         msgs.append("REPLICATION : même spécification sur un NOUVEAU snapshot — "
                     "autorisé (le N de multiplicité reste cumulatif).")
@@ -209,13 +222,17 @@ def assess(entries, budget, now, family, strategy, hypothesis, params,
             status, code = "STOP", EXIT_STOP
             msgs.append(f"STOP : {variants + 1} variantes > max_parameter_variants={budget['max_parameter_variants']}.")
     week = iso_week(now)
-    total, by_fam, by_str = week_usage(entries, week)
+    cap_entries = [e for e in entries if not e.get("reverify")]
+    total, by_fam, by_str = week_usage(cap_entries, week)
     if mode == "discovery":
         # FIX v3 (brief §28) : la découverte ne consomme PAS le budget
         # scientifique — TRAIN only, jamais promote ; le compute est gouverné
         # par le resource guard, pas par ce plafond.
         msgs.append(f"DISCOVERY : hors budget scientifique (TRAIN only, jamais promote) "
                     f"— semaine {week} : {total}/{budget['total_experiments']} confirmations.")
+    elif is_reverify:
+        msgs.append(f"Semaine {week} : re-vérification hors plafonds · "
+                    f"{total}/{budget['total_experiments']} confirmations consommées.")
     else:
         msgs.append(f"Semaine {week} : total {total}/{budget['total_experiments']} · famille « {family} » "
                     f"{by_fam[family]}/{budget['per_family']} · stratégie « {strategy} » {by_str[strategy]}/{budget['per_strategy']}")
@@ -243,7 +260,8 @@ def assess(entries, budget, now, family, strategy, hypothesis, params,
 
 def status_md(entries, budget, now, effective) -> str:
     week = iso_week(now)
-    total, by_fam, by_str = week_usage(entries, week)
+    cap_entries = [e for e in entries if not e.get("reverify")]
+    total, by_fam, by_str = week_usage(cap_entries, week)
     v = Counter(e.get("verdict") for e in entries)
     n_all = sum(1 for e in entries if e.get("verdict") != "PREREG")
     n_bf = sum(1 for e in entries if e["_backfill"] and e.get("verdict") != "PREREG")
@@ -292,6 +310,12 @@ def cmd_log(a) -> int:
             print(f"⚠ {res['status']} au moment du log — enregistré quand même (le registre reflète ce qui a été exécuté) :")
             for m in res["msgs"]:
                 print("  " + m)
+    hh, ph = sha(norm_text(a.hypothesis)), sha(json.dumps(params, sort_keys=True))
+    is_reverify = any(
+        e.get("_hh") == hh and e.get("_ph") == ph
+        and e.get("_mode", "confirmation") == a.mode
+        and e.get("strategy") == strategy
+        for e in entries)
     entry = {"date": ts.strftime("%Y-%m-%d"), "ts": ts.strftime("%Y-%m-%dT%H:%M:%SZ"), "domain": slug(a.domain),
              "mode": a.mode, "snapshot": a.snapshot,
              "family": family, "strategy": strategy, "hypothesis": a.hypothesis.strip(),
@@ -301,6 +325,8 @@ def cmd_log(a) -> int:
         entry["params"] = params
     if a.backfill:
         entry["backfill"] = True
+    if is_reverify:
+        entry["reverify"] = True
     entry = {k: v for k, v in entry.items() if v is not None}
     p = Path(a.ledger)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -323,7 +349,8 @@ def cmd_status(a) -> int:
         print(status_md(entries, pol["budget"], now, pol["effective"]))
         return EXIT_OK
     week = iso_week(now)
-    total, by_fam, by_str = week_usage(entries, week)
+    cap_entries = [e for e in entries if not e.get("reverify")]
+    total, by_fam, by_str = week_usage(cap_entries, week)
     b = pol["budget"]
     print(f"Semaine {week} : {total}/{b['total_experiments']} consommés (effet policy : "
           f"{pol['effective'].date() if pol['effective'] else 'n/a'} ; avant = backfill hors budget)")
@@ -510,6 +537,8 @@ def build_parser() -> argparse.ArgumentParser:
             s.add_argument("--ref")
             s.add_argument("--notes")
             s.add_argument("--backfill", action="store_true")
+            s.add_argument("--check", action="store_true",
+                           help="dry-run : juge le budget sans écrire")
     stx = sub.add_parser("state")
     stx.add_argument("--experiment", required=True)
     stx.add_argument("--state", required=True)

@@ -235,3 +235,21 @@ python3 scripts/research_runner.py forward --collect # la même porte (porte uni
 Collecte initiale (05/10) : crash-short-6h 49 trades fermés à +0,801 %/trade
 (WR 87,8 %), h-18 155 trades à +0,385 %/trade (WR 65,8 %) — les deux tiennent
 leur edge hors échantillon dès les premières semaines.
+
+## Le portefeuille MTM (PR-2, 05/10)
+
+Le wallet du Research OS publie désormais TROIS drawdowns, au lieu d'un seul
+flaté : **MAX_DD_MTM** (équité horaire mark-to-market, marks = dernier prix
+clôturé connu), **MAX_DD_MTM_WORST** (marks intrabar hi/lo — la borne haute
+de l'excursion adverse, short au high / long au low) et **MAX_DD_CLOSE**
+(l'ancien, clôture-seule, conservé pour comparaison). La marge est
+dimensionnée sur l'équité MTM courante ; la liquidation ex ante absorbe la
+marge entière dès l'heure d'entrée ; la comptabilité se réconcilie exactement
+(Δequity = realized + funding − fees) ; la concurrence est mesurée
+(max/avg_concurrency, marge engagée, exposition gross/long/short).
+
+Fix kernel associé (trouvé par le test de complétude funding) : la série
+FundingSeries est en MILLISECONDS — l'ancien /1e6 parasitait fund_H (garbage
+≈ 0) et rendait fund_last constant. LABEL_VERSION bumpée v2 : tout le cache
+des labels a été reconstruit et les 4 candidats confirmés re-run (verdicts
+inchangés, DD légèrement plus honnêtes).

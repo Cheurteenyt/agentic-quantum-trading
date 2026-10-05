@@ -71,6 +71,10 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
     h1 = int(spec.get("horizons", [24])[0])
     events = []
     n_fund_known = 0
+    try:
+        from scripts.funding_series import funding_series_for
+    except Exception:
+        funding_series_for = None
     for sym in spec["data"]["symbols"]:
         if sym not in matrix or sym not in feats_by_sym:
             continue
@@ -81,12 +85,20 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
         mask = rr.event_mask(spec, feats, view, frozen=fz,
                              min_event_ms=min_event_ms,
                              thr_key=(*rr._db_key(db_path), sym))
+        # FIX v10 (audit GLM 5.3 post-#135) : le CALENDRIER réel des prints
+        # de funding du symbole — le moteur MTM accrue aux heures EXACTES
+        fser = None
+        if funding_series_for is not None:
+            try:
+                fser = funding_series_for(sym, db_path=db_path)
+            except Exception:
+                fser = None
         ret = cols[f"ret_{h1}"]
         # FIX v8 : la SORTIE (open(i) + H heures) doit rester dans la vue —
         # un trade dont l'horizon déborde simulerait au-delà de la fenêtre
         idx = np.flatnonzero(
             mask & np.isfinite(ret)
-            & (feats["open_time_ns"] < (view.end_ms - h1 * 3_600_000) * 10**6))
+            & (feats["open_time_ns"] <= (view.end_ms - h1 * 3_600_000) * 10**6))
         hi = cols[f"hi_{h1}"]
         lo = cols[f"lo_{h1}"]
         fund = cols.get(f"fund_{h1}")
@@ -102,11 +114,22 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
             mae_pct = (float(hi[i]) * 100.0) if side == -1 \
                 else (-float(lo[i]) * 100.0)
             t_ms = int(feats["open_time_ns"][i] // 10**6)
+            prints = []
+            if fser is not None and len(fser.times_ms):
+                import numpy as _np
+                k0 = int(_np.searchsorted(fser.times_ms, t_ms, side="right"))
+                k1 = int(_np.searchsorted(fser.times_ms, t_ms + h1 * 3_600_000,
+                                          side="right"))
+                signed = 1.0 if side == -1 else -1.0
+                prints = [(int(fser.times_ms[k]),
+                           float(fser.rates_pct[k]) * signed)
+                          for k in range(k0, k1)]
             events.append({
                 "sym": sym, "t_ms": t_ms, "exit_ms": t_ms + h1 * 3_600_000,
                 "side": side, "ret_pct": float(ret[i]),
                 "entry": float(entry_px[i]),
-                "mae_pct": mae_pct, "fund_pct": fv, "cost_pct": cost})
+                "mae_pct": mae_pct, "fund_pct": fv, "cost_pct": cost,
+                "fund_prints": prints})
     events.sort(key=lambda e: e["t_ms"])
     # FIX v8 (rapport GLM 5.3 №4) : la couverture de funding des events est
     # retournée — l'inconnu ne devient jamais 0 en silence sans être compté
@@ -200,7 +223,12 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
     t = (evs[0]["t_ms"] // H_MS) * H_MS
     t_end = max(e["exit_ms"] for e in evs)
     while t <= t_end:
-        # 1. les sorties réalisent leur PnL (hors funding déjà accru)
+        # 1. le funding s'accrue AUX HEURES EXACTES des prints réels —
+        #    AVANT les sorties : le print de l'heure de sortie est dû
+        for pos in open_pos.values():
+            while pos["fund_prints"] and pos["fund_prints"][0][0] <= t:
+                cash += pos["fund_prints"].pop(0)[1]
+        # 2. les sorties réalisent leur PnL (hors funding déjà accru)
         for sym, pos in list(open_pos.items()):
             if pos["exit_ms"] == t:
                 realized = (pos["side"] * pos["ret_pct"] / 100.0
@@ -243,15 +271,20 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                 cash -= fee
                 fees += fee
                 fund_signed = e["fund_pct"] * (1.0 if e["side"] == -1 else -1.0)
+                # FIX v10 : le chemin RÉEL du funding — les prints aux heures
+                # exactes (l'ancien lissage horaire déformait le trajet et
+                # donc le DD MTM) ; sans calendrier, accrual au sort
+                prints = [(pt, pct * notional / 100.0)
+                          for pt, pct in e.get("fund_prints", [])]
+                if not prints and e.get("fund_pct"):
+                    prints = [(e["exit_ms"], fund_signed * notional / 100.0)]
                 open_pos[e["sym"]] = {
                     "sym": e["sym"], "side": e["side"], "entry": e["entry"],
                     "notional": notional, "margin": margin,
                     "ret_pct": e["ret_pct"], "exit_ms": e["exit_ms"],
                     "fees": fee, "fund_total": fund_signed * notional / 100.0,
-                    "fund_hourly": fund_signed * notional / 100.0 / h1}
-        # 3. le funding accroît le cash heure par heure (payé au réel)
-        for pos in open_pos.values():
-            cash += pos["fund_hourly"]
+                    "fund_prints": prints}
+
         # 4. les marks de l'heure : le DERNIER prix clôturé connu (pas de
         #    look-ahead) ; worst = high intrabar (short) / low (long)
         for sym, pos in open_pos.items():
@@ -402,16 +435,28 @@ def run_wallet(events: list[dict], capital: float = 100.0,
 
 
 def wallet_per_window(events: list[dict], proto: dict, capital: float,
-                      cap_pct: float, lev: float) -> dict[str, dict]:
+                      cap_pct: float, lev: float,
+                      marks: dict | None = None) -> dict[str, dict]:
     """Le DD du wallet PAR FENÊTRE gelée — là où max_window_loss_pct
-    (15 %) s'applique. Une fenêtre = des events bornés, un wallet reset."""
+    (15 %) s'applique. FIX v10 : même moteur que le global (MTM quand les
+    marks sont fournis) — une seule définition du risque dans le rapport."""
     out = {}
     for w in proto.get("frozen_windows", []):
         ws = rr._month_ms(str(w["start"]))
         we = rr._month_ms(str(w["end"]))
         evs = [e for e in events if ws <= e["t_ms"] < we]
-        out[str(w["start"])] = run_wallet(evs, capital=capital,
-                                          cap_pct=cap_pct, lev=lev)
+        if marks:
+            mks = {s: m for s, m in marks.items()
+                   if len(m["t"]) and int(m["t"][0]) < we
+                   and int(m["t"][-1]) >= ws}
+            out[str(w["start"])] = (run_wallet_mtm(evs, mks, capital=capital,
+                                                   cap_pct=cap_pct, lev=lev)
+                                    if evs and mks else
+                                    run_wallet(evs, capital=capital,
+                                               cap_pct=cap_pct, lev=lev))
+        else:
+            out[str(w["start"])] = run_wallet(evs, capital=capital,
+                                              cap_pct=cap_pct, lev=lev)
     return out
 
 
@@ -427,7 +472,7 @@ def baseline_hold(spec: dict, view, db_path: Path = KDB,
         for sym in spec["data"]["symbols"]:
             rows = con.execute(
                 "SELECT open_time, close FROM klines WHERE symbol=? "
-                "AND interval='1h' AND open_time>=? AND open_time<=? "
+                "AND interval='1h' AND open_time>=? AND open_time<? "
                 "ORDER BY open_time",
                 (sym, view.start_ms, view.end_ms)).fetchall()
             if len(rows) < 2:
@@ -553,7 +598,8 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
                                           frozen=frozen,
                                           min_event_ms=embargo_ms,
                                           db_path=db_path)
-        per_window = wallet_per_window(events, proto, capital, cap_pct, lev)
+        per_window = wallet_per_window(events, proto, capital, cap_pct, lev,
+                                       marks=marks)
     # PR-2 : le moteur MTM horaire quand les marks sont disponibles — le DD
     # published est désormais celui que le compte AURAIT VÉCU heure par heure
     marks = _fetch_marks(db_path, spec["data"]["symbols"],

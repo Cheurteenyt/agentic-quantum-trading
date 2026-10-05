@@ -275,6 +275,11 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
     sharpe_pass = (stats["sharpe"] is not None
                    and stats["sharpe"] >= float(fc.get("min_forward_sharpe",
                                                        0.5)))
+    # FIX v10 (audit GLM 5.3 post-#135) : la couverture funding est un GATE —
+    # 100 trades dont 49 % à funding inconnu ne peuvent pas déclarer READY
+    fund_pass = (stats["fund_known_pct"] is None
+                 or stats["fund_known_pct"] >= float(
+                     fc.get("min_fund_coverage", 95.0)))
     disc_mean = None
     sfile = runs_dir / run_id / "summary_discovery.json"
     if sfile.exists():
@@ -285,7 +290,8 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
     vs_pass = (stats["mean"] is not None and disc_mean is not None
                and stats["mean"] >= float(fc.get("min_vs_discovery", 0.5))
                * float(disc_mean))
-    ready = bool(days_pass and trades_pass and sharpe_pass and vs_pass)
+    ready = bool(days_pass and trades_pass and sharpe_pass and vs_pass
+                 and fund_pass)
     return {"run_id": run_id, "confirmed_at": confirmed_at,
             "events_journaled": len(journal), "trades_closed": stats,
             "wallet": wallet,
@@ -294,6 +300,7 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
                            "days_pass": days_pass, "trades_pass": trades_pass,
                            "sharpe_pass": sharpe_pass,
                            "vs_discovery_pass": vs_pass,
+                           "fund_pass": fund_pass,
                            "discovery_mean": disc_mean,
                            "ready": ready,
                            "note": "ready ⇒ review de protocole, JAMAIS promote "

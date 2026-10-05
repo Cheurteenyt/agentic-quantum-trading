@@ -1,4 +1,4 @@
-> ⚖️ **STATUT (clarifié 2026-10-05)** : PROPOSITION scellée (tag `protocol-v2-ratified`, 02/10) mais **NON APPLIQUÉE** — le propriétaire a dit « pas pour l'instant », v1 reste la loi opérationnelle. La ratification explicite (décision du propriétaire) est un prérequis de toute comparaison inter-protocole — interdite en l'état.
+> ⚖️ **STATUT (mis à jour le 05/10 au soir, PR-3)** : **RATIFIÉE et APPLIQUÉE** depuis le 2026-10-05 (l'en-tête « NON APPLIQUÉE » ci-dessous décrivait la fenêtre 02/10 → 05/10, entre le scellement de la proposition et sa ratification explicite — conservé pour l'historique honnête, cf. F-036). v1 ne juge que les candidats antérieurs au 05/10 ; toute comparaison inter-protocole reste interdite.
 
 # PROTOCOL_V2 — le walk-forward fenêtre par fenêtre
 
