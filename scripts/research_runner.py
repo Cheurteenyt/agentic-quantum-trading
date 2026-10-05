@@ -145,7 +145,10 @@ def compute_features(con: sqlite3.Connection, sym: str,
         from scripts.funding_series import funding_series_for
         fser = funding_series_for(sym, db_path=db_path)
         if fser is not None and len(fser.times_ms):
-            k = np.searchsorted(fser.times_ms / 1e6, ts / 1e6, side="right") - 1
+            # FIX v9 : times_ms déjà en ms ; ts/1e6 (ns→ms) — l'ancien
+            # /1e6 double rendait fund_last CONSTANT (le dernier print
+            # jamais vu, pour toutes les barres)
+            k = np.searchsorted(fser.times_ms, ts / 1e6, side="right") - 1
             fund_last = np.where(k >= 0, fser.rates_pct[np.maximum(k, 0)], np.nan)
     except Exception:
         pass

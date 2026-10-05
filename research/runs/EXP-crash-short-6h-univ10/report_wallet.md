@@ -1,20 +1,3 @@
-# EXP-crash-short-6h-univ10 — confirmation
-
-Hypothèse : RÉPLICATION UNIVERSE : le même flux forcé vendeur (ret_1h <= p10 expanding) continue de baisser à 6h sur les 10 majeures, pas seulement BTC/ETH/SOL
-
-- spec_sha b7f9ce3286915a3a · git c2fadaf · snapshot k1h-c22625d61aca89cf
-- verdict : **CONFIRMED** · n 6349 · mean 1.1311968308639107
-
-- BTCUSDT@6h : n 728 · mean 0.637
-- ETHUSDT@6h : n 734 · mean 1.093
-- SOLUSDT@6h : n 446 · mean 1.503
-- XRPUSDT@6h : n 631 · mean 1.197
-- BNBUSDT@6h : n 692 · mean 0.841
-- DOGEUSDT@6h : n 546 · mean 1.411
-- ADAUSDT@6h : n 747 · mean 1.244
-- AVAXUSDT@6h : n 562 · mean 1.251
-- LINKUSDT@6h : n 643 · mean 1.336
-- LTCUSDT@6h : n 620 · mean 1.043
 
 ## WALLET (couche portefeuille)
 
