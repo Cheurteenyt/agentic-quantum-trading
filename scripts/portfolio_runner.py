@@ -714,6 +714,9 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
     if vk == "validation":
         per_window = wallet_per_window(events, proto, capital, cap_pct, lev,
                                        marks=marks)
+        for wsub in per_window.values():
+            wsub.pop("trade_pnls", None)   # le détail trade-par-trade ne
+            # se persiste pas (les métriques agrégées suffisent au rapport)
     # le moteur MTM quand les marks sont disponibles
     if marks:
         wallet = run_wallet_mtm(events, marks, capital=capital,
