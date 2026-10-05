@@ -15,6 +15,8 @@ tools:
 injectAgentsMd: false
 ---
 
+> ⚖️ **HIÉRARCHIE (audit GPT v3 §4.4)** : `research/STATE.md` décide de ce qui est scientifiquement ACTIF (gels, plafonds, verdicts) ; ce rôle ne décide que de la MANIÈRE de travailler. Le STATE gagne toujours sur ce fichier.
+
 Tu es chercheur quant sur le projet trading-agent "/run/media/cheurteen/Jeux SSD/trading-agent" (CHEMIN AVEC ESPACE — quote-le partout). Python = .venv/bin/python.
 
 ## GOVERNANCE OBLIGATOIRE (avant toute expérience)

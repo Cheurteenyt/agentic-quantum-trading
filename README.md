@@ -27,12 +27,24 @@ features), executed **maker-only at 10x** — where the leverage rule
 `lev ≤ 100/(maxMAE + 0.5)` guarantees **zero liquidations by
 construction** (observed max MAE 7.84% vs a 9.5% death line).
 
-Official 1-year backtest table (100 USD, maker costs, real funding):
-**+3,905%/yr at 24.8% max drawdown, 0 liquidations** (4 streams: majors
-cascade, memecoin cascade, long-only survivor, vol_spike_6h). Two QUBO
-candidates run in parallel paper-forward on the same live trades — best
-point of the table: **+5,082%/yr at 23.3% max drawdown, best month
-+83.7%** (QUBO joint weights×leverage, MAE margin under permanent watch).
+> **⛔ REFUTED — HISTORICAL ONLY (evidence F-033 / F-034, PRs #91-#95).
+> The figures below are DEAD: re-measured on fixed data (post
+> fetch_deep_klines fix), the QUBO joint cell yields 20 real liquidations,
+> DD 99.2%, final $1 — the entire cascade family (majors −0.058%/event,
+> memecoin −0.428%/event) is closed. Kept for the record only; do NOT
+> quote them as current results.**
+
+Historical 1-year backtest table (100 USD, maker costs, real funding) —
+**REFUTED**: *+3,905%/yr at 24.8% max drawdown, 0 liquidations* (4 streams).
+Best QUBO point — **REFUTED**: *+5,082%/yr at 23.3% max drawdown* (20 real
+liquidations on fixed data; the owner remembered "6").
+
+**Current truth (2026-10-05, post-audit-v3 engine + collectors — evidence
+F-034/F-035 + W42):** the only living edge is the **long-only survivor**
+(+1.127%/event pre-fix measurement, tiny at the 1% margin cap — W42
+REFUTED the two-stream reconstruction); vol_spike is **dead post-fix**
+(W42: net negative at honest costs). Zero strategy is proven profitable on
+clean data — the goal is one that survives paper forward.
 
 > **Honesty (T8, 2026-09-30):** these **absolute** ROI figures are
 > **window / DB warm-up artefacts**. The same engine on three warm-up states

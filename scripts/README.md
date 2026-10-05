@@ -107,8 +107,13 @@ jamais. Après tout fix d'échelle/unité : les ABSOLUS sont re-mesurés.
 
 ## 5. LES OUTILS
 
-`run_tests.py` (627 tests) · `housekeeping.py` · `html_to_pdf.py` ·
+`run_tests.py` (912 tests verts au 05/10 — toujours mesurer, jamais croire un compte écrit) · `housekeeping.py` · `html_to_pdf.py` ·
 `registre_board.py` · `save_aster_key.py` · `telegram_notify.py` ·
+`claim_verify.py` (Research Firewall, couche 4 — exit 1 si un fait du ledger
+est contredit) · `context_manifest.py` (LE brief d'entrée de session) ·
+`research_os.py` (DataScope/Mode/états — la séparation discovery/confirmation) ·
+`preflight.py` (santé données + smoke réel avant tout run — la leçon W42) ·
+`funding_series.py` (funding as-of, LE moteur unique) · `save_aster_key.py` ·
 `security/validate_tailscale_acl.py`
 
 `lab_ledger.py` : registre d'essais cumulatif (`research/ledger/trials.jsonl`) + gate de budget (`agent/policy.yaml`) —

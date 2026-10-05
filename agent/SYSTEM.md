@@ -1,3 +1,5 @@
+> ⛔ **LEGACY / NON-AUTHORITY (marqué 2026-10-05, audit GPT v3 §4.2).** Ce document décrit l'ancien dashboard Hermes (Hyperliquid, Firecrawl, /mnt/d — chemin mort). Il n'est PAS l'architecture actuelle et ne doit jamais être cité comme source : la hiérarchie de vérité est dans AGENTS.md §RESEARCH FIREWALL (evidence > ledger > STATE > docs > code).
+
 # Hermes Trading Control Center — System Reference
 
 ## Vision
