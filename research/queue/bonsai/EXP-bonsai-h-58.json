@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-58",
+ "domain": "aster",
+ "family": "bonsai_range_pct",
+ "strategy": "range_expansion_momentum",
+ "hypothesis": "[H-58] RANGE EXPANSION MOMENTUM — ret_6h > 0.6 (falsification : ret_6h < 0.1)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "range_pct",
+    "op": ">=",
+    "quantile": 0.8
+   },
+   {
+    "feature": "ret_1h",
+    "op": ">=",
+    "threshold": 1.2
+   }
+  ],
+  "side": 1
+ },
+ "horizons": [
+  6
+ ],
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "small"
+ },
+ "bonsai": {
+  "novelty": 0.7,
+  "mask_text": "Range large, les momentum traders amplifient le mouvement"
+ }
+}

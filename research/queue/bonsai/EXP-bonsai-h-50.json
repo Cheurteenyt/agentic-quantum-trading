@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-50",
+ "domain": "aster",
+ "family": "bonsai_ret_1h",
+ "strategy": "margin_call_lag",
+ "hypothesis": "[H-50] MARGIN CALL LAG — ret_2h < -0.8 (falsification : ret_2h > -0.1)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "ret_1h",
+    "op": "<=",
+    "threshold": -3.5
+   },
+   {
+    "feature": "range_pct",
+    "op": ">=",
+    "quantile": 0.7
+   }
+  ],
+  "side": -1
+ },
+ "horizons": [
+  2
+ ],
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "tiny"
+ },
+ "bonsai": {
+  "novelty": 0.85,
+  "mask_text": "Retour 1h proche du seuil de marge, les liquidations se produisent en retard"
+ }
+}
