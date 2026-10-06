@@ -548,8 +548,14 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
                                                                  {}).get("min_mean", 0.0))
                                     and advantage_ok)
                else "DISCOVERY_FAIL")
+    # FIX v19 (PR-155 №3) : publier le PIRE mean par symbole — la sélection
+    # Pareto en a besoin (l'ancien NaN silencieux cassait la dominance)
+    worst_sym = min((s["mean"] for s in per_symbol.values()
+                     if s.get("n", 0) >= min_n and np.isfinite(s.get("mean", float("nan")))),
+                    default=float("nan"))
     return {"verdict": verdict, "n": n_total, "mean": mean_all,
-            "inverse_mean": inv_mean, "edge_advantage": advantage, "per_symbol": per_symbol,
+            "inverse_mean": inv_mean, "edge_advantage": advantage,
+            "worst": worst_sym, "per_symbol": per_symbol,
             "frozen_thresholds": frozen,
             "label_hash": lh, "label_version": LABEL_VERSION,
             "universe": spec.get("universe"),
@@ -904,6 +910,9 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
         "label_hash": result.get("label_hash"), "snapshot": snap,
         "label_version": result.get("label_version"),
         "protocol_id": result.get("protocol_id") or proto_id,
+        "spec_execution_sha": result.get("spec_execution_sha"),
+        "universe_sha": result.get("universe_sha"),
+        "protocol_sha": result.get("protocol_sha"),
         "env": _env_versions(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -1117,6 +1126,12 @@ def _stage1_screen(spec: dict, db_path: Path) -> dict:
 
 
 def _passes(res: dict, spec: dict) -> bool:
+    """FIX v19 (PR-155 №2) : le VERDICT doit être DISCOVERY_PASS —
+    l'ancien code ne vérifiait que n et mean, un run rejeté par le gate
+    inverse (edge_advantage ≤ 0) ou par la couverture funding pouvait
+    ré-entrer la file de candidats."""
+    if res.get("verdict") != "DISCOVERY_PASS":
+        return False
     crit = spec.get("criteria", {})
     return (res.get("n", 0) >= int(crit.get("min_n", 30))
             and (res.get("mean", float("nan")) > float(crit.get("min_mean", 0.0))))
