@@ -1156,8 +1156,8 @@ def cmd_grind(a) -> int:
          .get("class", "small")), 1))
     ok_guard, why = _resource_guard()
     if not ok_guard:
-        print(f"grind : garde-fou ressources — {why} (pause, pas d'échec)")
-        return 0
+        print(f"grind : WAITING_RESOURCE — {why} (exit 42, pas un succès)")
+        return 42
     survivors = []
     for f in specs:
         spec = load_spec(f)
