@@ -114,13 +114,32 @@ def spec_sha(spec: dict) -> str:
         json.dumps(spec, sort_keys=True).encode()).hexdigest()[:16]
 
 
-def spec_core_sha(spec: dict) -> str:
-    """Le sha du CŒUR scientifique d'une spec — hors mode et déclaration
-    d'univers (PR-149 : la confirmation dérive de la découverte par un
-    changement de mode ; le pinning compare les cœurs, pas les enveloppes)."""
-    core = {k: v for k, v in spec.items() if k not in ("mode", "universe")}
+def spec_execution_sha(spec: dict) -> str:
+    """Le sha d'EXÉCUTION d'une spec — seule la mode sort (PR-150, audit
+    GLM 5.3 post-#149 №1 : l'ancien core excluaient AUSSI l'univers, donc
+    une découverte sur univ10 pouvait fonder une confirmation sur un autre
+    univers avec le même pin). L'univers change la population statistique :
+    il est scellé, complété par universe_sha (le hash du manifest)."""
+    body = {k: v for k, v in spec.items() if k != "mode"}
     return hashlib.sha256(
-        json.dumps(core, sort_keys=True).encode()).hexdigest()[:16]
+        json.dumps(body, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def universe_sha(name: str) -> str | None:
+    """Le sha du CONTENU du manifest d'univers — l'identifiant seul ne
+    scelle pas (un univ10.yaml modifié garde son nom)."""
+    from scripts.universe import UNIVERSE_DIR
+    f = Path(UNIVERSE_DIR) / f"{name}.yaml"
+    if not f.exists():
+        return None
+    return hashlib.sha256(f.read_text(encoding="utf-8").encode()).hexdigest()[:16]
+
+
+def protocol_sha() -> str:
+    """Le sha du CONTENU d'active.yaml (PR-150 №7 de l'audit : un seuil
+    peut changer sous le même protocol_id — le contenu est le sceau)."""
+    f = ROOT / "research" / "protocols" / "active.yaml"
+    return hashlib.sha256(f.read_text(encoding="utf-8").encode()).hexdigest()[:16]
 
 
 def _git() -> str:
@@ -520,7 +539,9 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
             "frozen_thresholds": frozen,
             "label_hash": lh, "label_version": LABEL_VERSION,
             "universe": spec.get("universe"),
-            "spec_core_sha": spec_core_sha(spec),
+            "spec_execution_sha": spec_execution_sha(spec),
+            "universe_sha": universe_sha(spec["universe"]) if spec.get("universe") else None,
+            "protocol_sha": protocol_sha(),
             "protocol_id": load_confirmation_protocol().get("protocol_id"),
             "snapshot": snapshot_id(db_path),
             "scope": {"mode": Mode.DISCOVERY.value,
@@ -636,9 +657,9 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
             # spec A + des seuils de découverte B ne fait pas une preuve)
             cur_snap = snapshot_id(db_path)
             problems = []
-            if s.get("spec_core_sha") != spec_core_sha(spec):
-                problems.append(f"cœur de spec {s.get('spec_core_sha')} ≠ "
-                                f"courant {spec_core_sha(spec)}")
+            if s.get("spec_execution_sha") != spec_execution_sha(spec):
+                problems.append(f"spec d'exécution {s.get('spec_execution_sha')} ≠ "
+                                f"courant {spec_execution_sha(spec)}")
             if s.get("snapshot") != cur_snap:
                 problems.append(f"snapshot {s.get('snapshot')} ≠ courant "
                                 f"{cur_snap}")
@@ -650,7 +671,9 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
                 return {"verdict": "CONFIRMATION_BLOCKED", "slots_consumed": 0,
                         "reason": ("l'artefact de découverte ne correspond "
                                    "pas au run courant : " + " ; ".join(problems))}
-            disc_meta = {"spec_core_sha": s.get("spec_core_sha"),
+            disc_meta = {"spec_execution_sha": s.get("spec_execution_sha"),
+                                 "universe_sha": s.get("universe_sha"),
+                                 "protocol_sha": s.get("protocol_sha"),
                          "snapshot": cur_snap,
                          "protocol_id": d_proto}
     if frozen is None and not repair:
@@ -710,6 +733,7 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
         _ns, stress_w = _aggregate({k: v for k, v in wst_s.items()
                                     if k.endswith(f"@{h1}h")},
                                    min_n=min_window_events)
+
         dd_w = None
         try:
             ev_w, _cov = collect_events(spec, matrix, feats_by_sym, wview,
@@ -723,6 +747,15 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
         except Exception:
             dd_w = None
         eligible = cov >= 99.9     # une fenêtre tronquée ne démontre rien
+        # FIX v17 (PR-150 №2) : la couverture funding est un gate PAR
+        # FENÊTRE — 5 fenêtres à 100 % + 1 à 0 % doit échouer sur la 6e
+        # (l'ancienne moyenne pondérée globale la laissait passer)
+        w_cov = [(float(v.get("fund_cov", 0.0)), int(v.get("n", 0)))
+                 for v in wst.values() if v.get("n", 0) >= min_window_events]
+        window_fund_cov = (sum(c * n for c, n in w_cov)
+                           / sum(n for _, n in w_cov)) if w_cov else 0.0
+        pass_funding = bool(eligible
+                            and window_fund_cov >= min_fund_cov)
         pass_base = bool(eligible and n_w >= min_window_events
                          and mean_w > 0.0)
         pass_stress = bool(eligible and stress_w > 0.0)
@@ -735,11 +768,12 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
         per_window[name] = {"n": n_w, "mean": mean_w,
                             "stress_mean": stress_w, "max_dd_mtm": dd_w,
                             "dd_status": dd_status,
+                            "fund_coverage": window_fund_cov,
                             "coverage_pct": cov, "eligible": eligible,
                             "pass_base": pass_base, "pass_stress": pass_stress,
-                            "pass_dd": pass_dd,
+                            "pass_dd": pass_dd, "pass_funding": pass_funding,
                             "pass": bool(pass_base and pass_stress
-                                         and pass_dd)}
+                                         and pass_dd and pass_funding)}
 
     # — la validation d'un bloc : l'agrégat + le stress de coûts —
     val_view_eval = DataView(snap, Mode.CONFIRMATION.value, vs, ve_eval)
@@ -981,10 +1015,13 @@ def _confirm_locked(spec: dict, a) -> int:
             if not c["ok"]:
                 print(f"  [ÉCHEC] {c['check']} — {c['detail']}")
         return 1
-    rdir = write_artifacts(spec["id"], spec, res, "confirmation",
-                           db_path=Path(a.db))
+    # FIX v18 (PR-150 №4) : l'ORDRE transactionnel — le ledger D'ABORD
+    # (fail-closed : pas de ligne = pas de verdict), puis le wallet
+    # (obligatoire, plus de except aval), puis les artefacts : CONFIRMED
+    # est un état terminal impossible à moitié écrit
     _log_ledger(spec, "FAIL" if res["verdict"] == "REJECTED" else "PASS",
-                Mode.CONFIRMATION.value, str(rdir / "report.md"),
+                Mode.CONFIRMATION.value,
+                str(rr.RUNS / spec["id"] / "report.md"),
                 snapshot=res.get("snapshot"), fail_closed=True)
     pw = res.get("windows_pass")
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
@@ -992,28 +1029,29 @@ def _confirm_locked(spec: dict, a) -> int:
           f"PASS · stress ×{res.get('stress_multiplier')} mean "
           f"{res.get('stress_mean', float('nan')):.3f} · fund_cov "
           f"{res.get('fund_coverage', 0.0):.2f} · slot consommé")
+    rdir = write_artifacts(spec["id"], spec, res, "confirmation",
+                           db_path=Path(a.db))
     if res["verdict"] == "CONFIRMED":
-        # PR-B + FIX v14 (№9) : le wallet écrit ATOMIQUEMENT avec le run
-        # (wallet.json + report_wallet.md + report.md) — un run confirmé
-        # sans son wallet.json est incomplet
-        try:
-            from scripts.portfolio_runner import wallet_for_run, wallet_report_block
-            w = wallet_for_run(spec["id"], db_path=Path(a.db))
-            (rdir / "wallet.json").write_text(
-                json.dumps(w, ensure_ascii=False, indent=1, default=float),
-                encoding="utf-8")
-            (rdir / "report_wallet.md").write_text(
-                wallet_report_block(w), encoding="utf-8")
-            block = wallet_report_block(w)
-            with open(rdir / "report.md", "a", encoding="utf-8") as fh:
-                fh.write(block)
-            wl = w["wallet"]
-            print(f"  WALLET {wl['capital']:.0f}$ cap {w['cap_pct']:.1f} % "
-                  f"lev {w['lev']:.0f}x : solde {wl['solde']:.2f}$ · DD "
-                  f"{wl['max_dd_pct']:.2f} % · liq {wl['liqs']} · mois nég "
-                  f"{wl['months_neg']}")
-        except Exception as exc:      # le wallet ne doit jamais masquer le verdict
-            print(f"  (wallet indisponible : {exc})")
+        # PR-B + FIX v18 (№4) : le wallet est OBLIGATOIRE — plus de except
+        # aval : un échec wallet = échec du confirm (exit non nul), les
+        # artefacts ne masquent plus un run incomplet
+        from scripts.portfolio_runner import wallet_for_run, wallet_report_block
+        # la vue validation est EXPLICITE : l'artefact summary_confirmation
+        # n'est pas encore écrit à ce stade de l'ordre transactionnel
+        w = wallet_for_run(spec["id"], db_path=Path(a.db),
+                           view_kind="validation")
+        (rdir / "wallet.json").write_text(
+            json.dumps(w, ensure_ascii=False, indent=1, default=float),
+            encoding="utf-8")
+        (rdir / "report_wallet.md").write_text(
+            wallet_report_block(w), encoding="utf-8")
+        with open(rdir / "report.md", "a", encoding="utf-8") as fh:
+            fh.write(wallet_report_block(w))
+        wl = w["wallet"]
+        print(f"  WALLET {wl['capital']:.0f}$ cap {w['cap_pct']:.1f} % "
+              f"lev {w['lev']:.0f}x : solde {wl['solde']:.2f}$ · DD "
+              f"{wl['max_dd_pct']:.2f} % · liq {wl['liqs']} · mois nég "
+              f"{wl['months_neg']}")
     return 0
 
 

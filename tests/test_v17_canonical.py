@@ -200,7 +200,7 @@ class TestDiscoveryPinning(unittest.TestCase):
             (rdir / "summary_discovery.json").write_text(json.dumps({
                 "verdict": "DISCOVERY_PASS", "n": 5, "mean": 1.0,
                 "protocol_id": "protocol-v2",
-                "spec_core_sha": rr.spec_core_sha(disc),
+                "spec_execution_sha": rr.spec_execution_sha(disc),
                 "frozen_thresholds": {"BTCUSDT": [-2.0]}}), encoding="utf-8")
             saved = rr.RUNS
             rr.RUNS = runs
@@ -223,7 +223,9 @@ class TestDiscoveryPinning(unittest.TestCase):
             finally:
                 rr.RUNS = saved
             self.assertEqual(res["verdict"], "CONFIRMATION_BLOCKED")
-            self.assertIn("cœur", res["reason"])
+            self.assertIn("spec d'exécution", res["reason"])
+            self.assertIn("snapshot None", res["reason"])   # l'artefact ne
+            # porte pas le snapshot courant (fixture minimale)
 
 
 class TestLedgerFailClosed(unittest.TestCase):

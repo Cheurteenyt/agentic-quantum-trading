@@ -68,8 +68,9 @@ class TestMtm(unittest.TestCase):
         le MTM la voit, le close-seul ne la voyait qu'à la sortie."""
         ev = [_ev(ret=-20.0, entry=100.0, mae=9.6, cost=0.0)]
         closes = [100.0] * 24
+        # la sémantique STRESS (borne ex ante) est testée explicitement
         w = run_wallet_mtm(ev, _marks(closes), capital=100.0, cap_pct=1.0,
-                           lev=10.0)
+                           lev=10.0, liq_mode="stress")
         self.assertEqual(w["liqs"], 1)
         self.assertAlmostEqual(w["solde"], 99.0, places=6)
         self.assertGreaterEqual(w["max_dd_mtm"], 0.99)   # 1 $ sur ~100 $

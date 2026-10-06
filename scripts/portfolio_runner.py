@@ -203,7 +203,10 @@ def _portfolio_time_metrics(equity_hourly: list[tuple[int, float]]
 
 
 def _unrealized(pos: dict, marks_map: dict[str, float]) -> float:
-    """Le PnL latent d'une position au dernier mark connu (entry si aucun)."""
+    """Le PnL latent d'une position au dernier mark connu (entry si aucun).
+    FIX v18 (PR-150 №3) : un symbole SANS mark est une COUVERTURE DE RISQUE
+    incomplète — le wallet publie mark_coverage_pct et le chemin officiel
+    est fail-closed (voir wallet_for_run)."""
     px = marks_map.get(pos["sym"], pos["entry"])
     return pos["side"] * (px / pos["entry"] - 1.0) * pos["notional"]
 
@@ -359,8 +362,12 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                     "exit_ms": e["exit_ms"],
                     "fees": fee, "fund_total": fund_signed * notional / 100.0,
                     "fund_prints": prints,
+                    # FIX v18 (PR-150 №5) : le mode SIMULÉ ne regarde
+                    # JAMAIS le MAE futur — la liquidation est décidée
+                    # uniquement par les marks observés heure par heure ;
+                    # le mode stress garde la borne ex ante (liq_pending)
                     "liq_pending": (e["mae_pct"] >= liq_thr
-                                    and liq_mode == "simulated")}
+                                    and liq_mode == "stress")}
 
         # 4. les marks de l'heure : le DERNIER prix clôturé connu (pas de
         #    look-ahead) ; worst = high intrabar (short) / low (long)
@@ -388,7 +395,8 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
             # FIX v14 (audit GLM 5.3 №6) : JAMAIS la bougie pré-entry — le
             # mark connu à l'heure d'entrée précède la position ; le premier
             # test de franchissement se fait à entry + 1h
-            if pos.get("liq_pending") and t > pos["entry_ms"]:
+            if ((liq_mode == "simulated"
+                 or pos.get("liq_pending")) and t > pos["entry_ms"]):
                 adverse = ((worst_px / pos["entry"] - 1.0)
                            if pos["side"] == -1
                            else (1.0 - worst_px / pos["entry"])) * 100.0
@@ -514,6 +522,11 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
             "stale_mark_hours": stale_mark_hours,
             "max_mark_gap_h": max_mark_gap_h,
             "liq_mode": liq_mode,
+            "mark_coverage_pct": (
+                len({p["sym"] for p in open_pos.values()} |
+                    {tp["sym"] for tp in trade_pnls}) /
+                max(len({e["sym"] for e in events}), 1) * 100.0)
+            if events else 100.0,
             "avg_concurrency": (conc_sum / conc_n) if conc_n else 0.0,
             "max_margin_used_pct": max_margin_pct,
             "avg_margin_used_pct": (margin_sum / conc_n) if conc_n else 0.0,
@@ -856,6 +869,15 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
     # par heure (le DD publié est celui que le compte AURAIT VÉCU)
     marks = _fetch_marks(db_path, spec["data"]["symbols"],
                          view.start_ms, view.end_ms)
+    # FIX v18 (PR-150 №3) : FAIL-CLOSED sur les marks partiels — un
+    # symbole sans mark serait valorisé à son entrée (un DD
+    # artificiellement faible) ; le chemin officiel exige 100 %
+    missing = [s for s in spec["data"]["symbols"] if s not in marks]
+    if vk == "validation" and missing:
+        raise ValueError(
+            f"{run_id} : marks partiels ({len(spec['data']['symbols']) - len(marks)}"
+            f" symbole(s) sans marks : {missing}) — DD_UNKNOWN, refus de "
+            "publier un risque officiel incomplet")
     if vk == "validation":
         per_window = wallet_per_window(events, proto, capital, cap_pct, lev,
                                        marks=marks)
