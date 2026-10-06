@@ -33,5 +33,6 @@
  },
  "compute": {
   "class": "tiny"
- }
+ },
+ "universe": "univ10"
 }

@@ -366,8 +366,10 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
     # compte de trades avec un Sharpe négatif n'est plus « ready ».
     days_pass = days is not None and days >= need_days
     trades_pass = stats["n"] >= need_trades
-    # FIX v16 (№7) : MTM indisponible = FORWARD_RISK_UNKNOWN — pas de READY
-    # (le fallback close-only est un diagnostic, pas une mesure officielle)
+    # FIX v18 (PR-150 №3/№7) : le gate de risque est COMPLET — MTM
+    # disponible ET zéro trou horaire dans les marks (la première version
+    # scientifique tolère 0 gap) ; le fallback close-only est un
+    # diagnostic, pas une mesure officielle
     risk_pass = mk_available
     sharpe_pass = (stats["sharpe"] is not None
                    and stats["sharpe"] >= float(fc.get("min_forward_sharpe",

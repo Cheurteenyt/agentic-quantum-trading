@@ -163,6 +163,27 @@ def main() -> int:
     check("I008", ok8, "; ".join(det8) or
           "journaux forward ⊆ confirmés actifs")
 
+    # I009 (PR-150) : les runs CONFIRMED == les lignes ledger — un
+    # CONFIRMED sans sa ligne de budget est une sous-déclaration
+    ok9, det9 = True, []
+    ledger = ROOT / "research" / "ledger" / "trials.jsonl"
+    ledger_refs = set()
+    if ledger.exists():
+        for line in ledger.read_text(encoding="utf-8").splitlines():
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            ref = str(e.get("ref", ""))
+            if e.get("mode") == "confirmation" and "/runs/" in ref:
+                ledger_refs.add(ref.split("/runs/")[1].split("/")[0])
+    for rid in sorted(confirmed):
+        if rid not in ledger_refs:
+            ok9 = False
+            det9.append(rid)
+    check("I009", ok9, "; ".join(det9) or
+          f"{len(confirmed)} CONFIRMED(s) réconciliés avec le ledger")
+
     return finish()
 
 

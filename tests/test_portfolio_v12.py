@@ -40,7 +40,8 @@ class TestLiqNormalisee(unittest.TestCase):
         """P1 : une liquidation produit le MÊME objet normalisé que les
         autres trades — PF, top-N, effective-N et bootstrap la consomment."""
         w = run_wallet_mtm([_ev(ret=50.0, mae=9.6)], _marks(),
-                           capital=100.0, cap_pct=1.0, lev=10.0)
+                           capital=100.0, cap_pct=1.0, lev=10.0,
+                           liq_mode="stress")
         self.assertEqual(w["liqs"], 1)
         self.assertEqual(len(w["trade_pnls"]), 1)
         tp = w["trade_pnls"][0]
