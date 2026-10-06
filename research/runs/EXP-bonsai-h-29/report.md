@@ -2,7 +2,7 @@
 
 Hypothèse : [H-29] Momentum-Range Confirmation — ret_6h > 0.5 (falsification : ret_6h < 0.3)
 
-- spec_sha 58b8dfab3e69440c · git b7f5a28 · snapshot k1h-1a509a56e4fba126
+- spec_sha 016c1f9f25df0b7a · git 5981934 · snapshot k1h-4370efdd061f40b6
 - verdict : **DISCOVERY_FAIL** · n 24893 · mean -0.20822640819200264
 
 - BTCUSDT@6h : n 2669 · mean -0.220

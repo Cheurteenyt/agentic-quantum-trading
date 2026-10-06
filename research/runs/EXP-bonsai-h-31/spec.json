@@ -53,5 +53,6 @@
   ],
   "side": -1
  },
- "strategy": "high_volume_low_return_mean_reversion"
+ "strategy": "high_volume_low_return_mean_reversion",
+ "universe": "univ10"
 }

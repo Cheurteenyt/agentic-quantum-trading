@@ -15,17 +15,21 @@
    -1.122316814989408
   ]
  },
- "label_hash": "acfac2865b1991e0",
+ "label_hash": "26653d971dfe190e",
  "label_version": "v2",
- "universe": null,
- "snapshot": "k1h-8425ef597534f306",
+ "universe": "univ10",
+ "spec_execution_sha": "cee6a09f8ab5c5eb",
+ "universe_sha": "d8128eb98a5387df",
+ "protocol_sha": "b61865b116bcf9a1",
+ "protocol_id": "protocol-v2",
+ "snapshot": "k1h-4370efdd061f40b6",
  "scope": {
   "mode": "discovery",
   "start": 1609459200000,
   "end": 1756684800000
  },
  "run_id": "EXP-crash-short-6h-004",
- "spec_sha": "c84dc5b17562de6c",
+ "spec_sha": "0a9647893306b133",
  "per_symbol": {
   "BTCUSDT@6h": {
    "n": 2874,
@@ -37,7 +41,7 @@
    "mae_mean": 0.013459720750075723,
    "worst": -10.102115384615393,
    "best": 10.180330717182331,
-   "fund_cov": 1.0
+   "fund_cov": 0.0
   },
   "ETHUSDT@6h": {
    "n": 2988,
@@ -49,7 +53,7 @@
    "mae_mean": 0.017272030670511907,
    "worst": -14.214370541476992,
    "best": 14.950769230769238,
-   "fund_cov": 1.0
+   "fund_cov": 0.0
   },
   "SOLUSDT@6h": {
    "n": 2816,
@@ -61,7 +65,7 @@
    "mae_mean": 0.027407998835920287,
    "worst": -40.63801464605371,
    "best": 34.32859329017069,
-   "fund_cov": 1.0
+   "fund_cov": 0.0
   }
  }
 }

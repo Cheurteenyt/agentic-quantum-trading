@@ -46,17 +46,21 @@
    -0.24476367490691153
   ]
  },
- "label_hash": "559b6b0c4b8b0eb4",
+ "label_hash": "a97f3840a797176b",
  "label_version": "v2",
- "universe": null,
- "snapshot": "k1h-1a509a56e4fba126",
+ "universe": "univ10",
+ "spec_execution_sha": "fbc8d4cc47c261d9",
+ "universe_sha": "d8128eb98a5387df",
+ "protocol_sha": "b61865b116bcf9a1",
+ "protocol_id": "protocol-v2",
+ "snapshot": "k1h-4370efdd061f40b6",
  "scope": {
   "mode": "discovery",
   "start": 1609459200000,
   "end": 1756684800000
  },
  "run_id": "EXP-bonsai-h-22",
- "spec_sha": "92f53ea4f3bc6075",
+ "spec_sha": "730b92071cbc6a81",
  "per_symbol": {
   "BTCUSDT@2h": {
    "n": 1382,

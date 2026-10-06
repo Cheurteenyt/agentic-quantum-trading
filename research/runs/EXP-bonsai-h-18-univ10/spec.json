@@ -49,5 +49,6 @@
   ],
   "side": -1
  },
- "strategy": "h-18-univ10"
+ "strategy": "h-18-univ10",
+ "universe": "univ10"
 }

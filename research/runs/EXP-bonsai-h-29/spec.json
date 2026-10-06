@@ -53,5 +53,6 @@
   ],
   "side": 1
  },
- "strategy": "momentum-range_confirmation"
+ "strategy": "momentum-range_confirmation",
+ "universe": "univ10"
 }

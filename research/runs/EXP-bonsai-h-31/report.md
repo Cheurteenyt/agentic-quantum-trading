@@ -2,7 +2,7 @@
 
 Hypothèse : [H-31] High Volume Low Return Mean Reversion — ret_1h < 0.1 (falsification : ret_1h > 0.5)
 
-- spec_sha 320bbf6ab1b20cb5 · git b7f5a28 · snapshot k1h-1a509a56e4fba126
+- spec_sha 9946b45166c3defd · git 5981934 · snapshot k1h-4370efdd061f40b6
 - verdict : **DISCOVERY_FAIL** · n 4210 · mean -0.3192361976751113
 
 - BTCUSDT@1h : n 488 · mean -0.253

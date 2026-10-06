@@ -1,0 +1,57 @@
+{
+ "bonsai": {
+  "mask_text": "Volume anormal avec rendement faible",
+  "novelty": 0.9
+ },
+ "compute": {
+  "class": "tiny"
+ },
+ "cost_pct": 0.28,
+ "criteria": {
+  "min_mean": 0.02,
+  "min_n": 50
+ },
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_end": 1756684800000,
+  "train_start": 1609459200000,
+  "validation_end": 1790000000000,
+  "validation_start": 1756684800000
+ },
+ "domain": "aster",
+ "family": "bonsai_volume_z",
+ "horizons": [
+  1
+ ],
+ "hypothesis": "[H-31] High Volume Low Return Mean Reversion — ret_1h < 0.1 (falsification : ret_1h > 0.5)",
+ "id": "EXP-bonsai-h-31",
+ "mode": "discovery",
+ "signal": {
+  "conditions": [
+   {
+    "feature": "volume_z",
+    "op": ">=",
+    "quantile": 0.95
+   },
+   {
+    "feature": "ret_1h",
+    "op": "<=",
+    "quantile": 0.1
+   }
+  ],
+  "side": -1
+ },
+ "strategy": "high_volume_low_return_mean_reversion"
+}
