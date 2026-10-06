@@ -79,6 +79,7 @@ def _spec(tmp, db, train_end_bar=150, mode="confirmation"):
 # 1970 des barres synthétiques) — le MÉCANISME est testé ici, les VALEURS
 # viennent d'active.yaml en production.
 PROTO_MINI = {
+    "protocol_id": "protocol-v2",
     "frozen_windows": [{"start": "1970-01", "end": "1970-02"}],
     "embargo_hours": 0,
     "windows_pass_required": 1,

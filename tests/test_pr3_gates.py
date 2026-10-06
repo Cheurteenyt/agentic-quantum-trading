@@ -158,7 +158,9 @@ class TestWindowGates(unittest.TestCase):
             rr.RUNS.mkdir(parents=True, exist_ok=True)
             rr.write_artifacts(spec["id"], spec, res_d, "discovery",
                                db_path=db)
-            proto = {"frozen_windows": [{"start": "1970-01", "end": "1970-02"}],
+            proto = {"protocol_id": "protocol-v2",
+                     "frozen_windows": [{"start": "1970-01",
+                                         "end": "1970-02"}],
                      "embargo_hours": 0, "windows_pass_required": 1,
                      "cost_stress_multiplier": 1.5,
                      "degradation_max_pct": 70, "max_window_loss_pct": 15}

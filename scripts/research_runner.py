@@ -114,6 +114,15 @@ def spec_sha(spec: dict) -> str:
         json.dumps(spec, sort_keys=True).encode()).hexdigest()[:16]
 
 
+def spec_core_sha(spec: dict) -> str:
+    """Le sha du CŒUR scientifique d'une spec — hors mode et déclaration
+    d'univers (PR-149 : la confirmation dérive de la découverte par un
+    changement de mode ; le pinning compare les cœurs, pas les enveloppes)."""
+    core = {k: v for k, v in spec.items() if k not in ("mode", "universe")}
+    return hashlib.sha256(
+        json.dumps(core, sort_keys=True).encode()).hexdigest()[:16]
+
+
 def _git() -> str:
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"],
@@ -511,6 +520,8 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
             "frozen_thresholds": frozen,
             "label_hash": lh, "label_version": LABEL_VERSION,
             "universe": spec.get("universe"),
+            "spec_core_sha": spec_core_sha(spec),
+            "protocol_id": load_confirmation_protocol().get("protocol_id"),
             "snapshot": snapshot_id(db_path),
             "scope": {"mode": Mode.DISCOVERY.value,
                       "start": view.start_ms, "end": view.end_ms}}
@@ -585,6 +596,23 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
     if pre["verdict"] != "PREFLIGHT_OK":
         return {"verdict": "PREFLIGHT_FAILED", "preflight": pre,
                 "slots_consumed": 0}       # §47 : 0 slot sur un échec d'infra
+    # FIX v16 (PR-149 Bloc B5) : le run_discovery doit avoir été mesuré
+    # SOUS le protocole actif — un artefact d'un ancien protocole ne fonde
+    # pas une confirmation courante (re-discovery obligatoire)
+    active_proto = proto.get("protocol_id")
+    d_proto_early = None
+    sfile_early = RUNS / str(spec["id"]) / "summary_discovery.json"
+    if sfile_early.exists():
+        try:
+            d_proto_early = json.loads(
+                sfile_early.read_text(encoding="utf-8")).get("protocol_id")
+        except json.JSONDecodeError:
+            d_proto_early = None
+    if d_proto_early != active_proto:
+        return {"verdict": "CONFIRMATION_BLOCKED", "slots_consumed": 0,
+                "reason": (f"la découverte a été mesurée sous le protocole "
+                           f"{d_proto_early!r}, l'actif est {active_proto!r} "
+                           "— re-discovery obligatoire (artefact pré-v16)")}
     use_cache = Path(db_path).resolve() == Path(KDB).resolve()
     lh, matrix = build_matrix(d["symbols"],
                               tuple(int(h) for h in spec.get("horizons", [24])),
@@ -597,10 +625,34 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
     #   le candidat). Le re-calcul ne survit qu'en mode réparation explicite.
     frozen, frozen_src = None, "missing"
     sfile = RUNS / str(spec["id"]) / "summary_discovery.json"
+    disc_meta = {}
     if sfile.exists():
         s = json.loads(sfile.read_text(encoding="utf-8"))
         if s.get("frozen_thresholds"):
             frozen, frozen_src = s["frozen_thresholds"], "discovery_artifact"
+            # FIX v16 (PR-149 Bloc B4) : la confirmation est LIÉE à
+            # l'artefact de découverte qui l'a fondée — même spec_sha, même
+            # snapshot, même protocole, sinon la porte est bloquée (une
+            # spec A + des seuils de découverte B ne fait pas une preuve)
+            cur_snap = snapshot_id(db_path)
+            problems = []
+            if s.get("spec_core_sha") != spec_core_sha(spec):
+                problems.append(f"cœur de spec {s.get('spec_core_sha')} ≠ "
+                                f"courant {spec_core_sha(spec)}")
+            if s.get("snapshot") != cur_snap:
+                problems.append(f"snapshot {s.get('snapshot')} ≠ courant "
+                                f"{cur_snap}")
+            d_proto = s.get("protocol_id")
+            cur_proto = load_confirmation_protocol().get("protocol_id")
+            if d_proto and d_proto != cur_proto:
+                problems.append(f"protocole {d_proto} ≠ actif {cur_proto}")
+            if problems:
+                return {"verdict": "CONFIRMATION_BLOCKED", "slots_consumed": 0,
+                        "reason": ("l'artefact de découverte ne correspond "
+                                   "pas au run courant : " + " ; ".join(problems))}
+            disc_meta = {"spec_core_sha": s.get("spec_core_sha"),
+                         "snapshot": cur_snap,
+                         "protocol_id": d_proto}
     if frozen is None and not repair:
         return {"verdict": "CONFIRMATION_BLOCKED", "slots_consumed": 0,
                 "reason": ("aucun artefact de découverte avec frozen_thresholds "
@@ -736,13 +788,7 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
             "protocol_id": proto.get("protocol_id"),
             "label_version": LABEL_VERSION,
             "discovery_artifact": {"frozen_src": frozen_src,
-                                   "spec_sha": (json.loads(
-                                       (RUNS / str(spec["id"]) /
-                                        "summary_discovery.json")
-                                       .read_text(encoding="utf-8")
-                                   ).get("spec_sha")
-                                   if frozen_src == "discovery_artifact"
-                                   else None)},
+                                   **disc_meta},
             "per_window": per_window, "windows_pass": n_pass,
             "windows_required": need, "embargo_ms": embargo_ms,
             "frozen_src": frozen_src, "per_symbol": val,
@@ -831,22 +877,31 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
 
 
 def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
-                snapshot: str | None = None) -> None:
-    """FIX v8 (rapport GLM 5.3 №21) : le snapshot du ledger est CELUI DU RUN
-    (result['snapshot']) — jamais recalculé implicitement sur une autre DB."""
+                snapshot: str | None = None,
+                fail_closed: bool = False) -> None:
+    """FIX v8 (№21) : le snapshot du ledger est CELUI DU RUN — jamais
+    recalculé implicitement sur une autre DB.
+    FIX v16 (PR-149 Bloc B6) : au CONFIRM, l'écriture au ledger est
+    FAIL-CLOSED — un CONFIRMED sans sa ligne de budget est une
+    sous-déclaration de gouvernance (l'ancien check=False laissait passer)."""
     if snapshot is None:
         try:
             snapshot = str(snapshot_id())
         except sqlite3.Error:
             snapshot = "unknown"
-    subprocess.run([
+    result = subprocess.run([
         sys.executable, "scripts/lab_ledger.py", "log",
         "--family", str(spec.get("family", "research")),
         "--strategy", str(spec.get("strategy", "runner")),
         "--hypothesis", str(spec.get("hypothesis", ""))[:300],
         "--verdict", verdict, "--mode", mode,
         "--snapshot", snapshot, "--ref", ref],
-        check=False, cwd=ROOT)
+        capture_output=fail_closed, text=fail_closed, cwd=ROOT)
+    if fail_closed and result.returncode != 0:
+        raise RuntimeError(
+            f"écriture au ledger ÉCHOUÉE (rc {result.returncode}) : "
+            f"{(result.stderr or result.stdout).strip()[:300]} — le verdict "
+            "n'est PAS publié (gouvernance fail-closed)")
 
 
 # ------------------------------------------------------------------ CLI
@@ -930,7 +985,7 @@ def _confirm_locked(spec: dict, a) -> int:
                            db_path=Path(a.db))
     _log_ledger(spec, "FAIL" if res["verdict"] == "REJECTED" else "PASS",
                 Mode.CONFIRMATION.value, str(rdir / "report.md"),
-                snapshot=res.get("snapshot"))
+                snapshot=res.get("snapshot"), fail_closed=True)
     pw = res.get("windows_pass")
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
           f"{res['mean']:.3f} · fenêtres {pw}/{res.get('windows_required')} "

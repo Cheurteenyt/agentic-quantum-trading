@@ -154,7 +154,18 @@ def _build_symbol(con: sqlite3.Connection, sym: str,
             # l'intervalle du calendrier, sans AUCUN print, est un trou de
             # données (un print aurait dû exister), pas « 0 connu »
             hole = (k1 <= k0) & (H >= fser.interval_h)
-            complete = known_start & ~hole & (
+            # FIX v16 (PR-149 №5) : le TROU PARTIEL — des segments
+            # [p_i, p_i+1) de longueur > 1,5 × intervalle médian qui
+            # intersectent la fenêtre rendent la couverture incertaine
+            # (un print attendu manque sans qu'on puisse le savoir)
+            diffs = np.diff(fts_ms)
+            bad = diffs > 1.5 * fser.interval_h * 3_600_000.0
+            bad_cum = np.concatenate(([0], np.cumsum(bad.astype(np.int64))))
+            # les segments intersectant (t, t+H] : indices k0-1 .. k1-1
+            lo = np.maximum(k0 - 1, 0)
+            hi = np.minimum(k1, len(bad))
+            partial = (bad_cum[hi] - bad_cum[lo]) > 0
+            complete = known_start & ~hole & ~partial & (
                 (ts / 1e6 + H * 3_600_000.0) <= fts_ms[-1])
             ok = complete & (k1 <= len(cum))
             f[ok] = (cum[np.minimum(k1[ok], len(cum) - 1)]

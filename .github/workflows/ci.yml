@@ -1,5 +1,8 @@
 name: CI
 on: [push, pull_request]
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,5 +16,7 @@ jobs:
         run: pip install -r requirements.txt --quiet
       - name: Run tests
         run: python scripts/run_tests.py --fast
-      - name: Audit check (informatif)
-        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F3,F4,F5
+      - name: Research integrity (invariants I001-I008)
+        run: python scripts/research_integrity.py
+      - name: Audit check (bloquant sur --fail-on)
+        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
