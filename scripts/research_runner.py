@@ -151,6 +151,20 @@ def _git() -> str:
         return "?"
 
 
+def _env_versions() -> dict:
+    """L'environnement NUMÉRIQUE scellé (PR-150 №13) — le git_sha seul ne
+    fige pas numpy/pandas : deux dates d'installation produisent des
+    chiffres différents du même commit."""
+    import platform
+    env = {"python": platform.python_version()}
+    for mod in ("numpy", "pandas", "yaml"):
+        try:
+            env[mod] = __import__(mod).__version__
+        except Exception:
+            env[mod] = "?"
+    return env
+
+
 def _provenance() -> dict:
     """La provenance COMPLÈTE du code exécuté (fix v10, audit GLM 5.3
     post-#135) : le manifest ne doit pas seulement citer le commit HEAD —
@@ -890,6 +904,7 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
         "label_hash": result.get("label_hash"), "snapshot": snap,
         "label_version": result.get("label_version"),
         "protocol_id": result.get("protocol_id") or proto_id,
+        "env": _env_versions(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }, ensure_ascii=False, indent=1), encoding="utf-8")
     summary = {k: v for k, v in result.items() if k != "per_symbol"}
