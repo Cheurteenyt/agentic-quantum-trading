@@ -17,6 +17,25 @@ if echo "$HEALTH" | grep -q '"is_processing": *true'; then
     exit 0
 fi
 
+# un worker de recherche actif ? (PR-157 — le lease du research_worker)
+WORKER_LEASE="/run/media/cheurteen/Jeux SSD/trading-agent/research/runtime/worker.json"
+if [ -f "$WORKER_LEASE" ]; then
+    HB=$(python3 -c "
+import json
+w = json.load(open('$WORKER_LEASE'))
+print(w.get('heartbeat_at', ''))" 2>/dev/null || echo "")
+    if [ -n "$HB" ]; then
+        AGE=$(python3 -c "
+from datetime import datetime, timezone
+hb = datetime.fromisoformat('$HB'.replace('Z', '+00:00'))
+print(int((datetime.now(timezone.utc) - hb).total_seconds()))" 2>/dev/null || echo 9999)
+        if [ "$AGE" -lt 150 ]; then
+            echo "$(date -Is) worker de recherche actif (heartbeat ${AGE}s) — stop différé"
+            exit 0
+        fi
+    fi
+fi
+
 # une requête complétée dans la fenêtre d'inactivité ?
 n=$(journalctl --user -u "$SERVICE" --since "-${IDLE_MIN} min" --no-pager 2>/dev/null | grep -c "print_timing")
 if [ "$n" -gt 0 ]; then
