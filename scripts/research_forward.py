@@ -160,8 +160,8 @@ def collect(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
                 fz = [None] * len(rr._signal_conditions(spec["signal"]))
             mask = rr.event_mask(spec, feats, view, frozen=fz,
                                  thr_key=(*rr._db_key(db_path), sym))
-            # FIX v15 (№4) : le masque anti-survivorship au forward aussi —
-            # la même primitive que le backtest
+            # FIX v15 (№4) + PR-149 : le masque anti-survivorship au
+            # forward — la même primitive que le backtest
             mask = rr.apply_universe(spec, sym, mask, feats, h1)
             idx = [i for i in range(len(mask)) if mask[i]
                    and (sym, int(feats["open_time_ns"][i] // 10**6)) not in seen]
@@ -228,6 +228,7 @@ def _closed_trades(spec: dict, events: list[dict], db_path: Path,
             # FIX v8 (rapport GLM 5.3 №13) : le funding vient de la DB du
             # run, et un échec n'est plus un 0.0 silencieux
             fund = None
+            prints = []
             try:
                 fs = funding_series_for(e["symbol"], db_path=db_path)
                 if fs is not None and len(fs.times_ms):
@@ -249,14 +250,40 @@ def _closed_trades(spec: dict, events: list[dict], db_path: Path,
                     # print aurait dû exister)
                     window_h = h1
                     hole = (k1 <= k0 and window_h >= max(fs.interval_h, 1.0))
+                    # FIX v16 (PR-149 №5) : le TROU PARTIEL — des prints
+                    # existent dans la fenêtre mais un attendu manque : les
+                    # segments [p_i, p_i+1) intersectant la fenêtre dont la
+                    # longueur > 1,5 × intervalle médian rendent la
+                    # couverture INCERTAINE (l'exemple de l'audit : calendrier
+                    # 8h, print 16h absent, fenêtre 8→32h)
+                    if not hole and len(fs.times_ms) >= 2:
+                        tol_ms = 1.5 * fs.interval_h * 3_600_000
+                        seg_lo = max(k0 - 1, 0)
+                        seg_hi = min(k1, len(fs.times_ms) - 1)
+                        for si in range(seg_lo, seg_hi):
+                            seg_len = fs.times_ms[si + 1] - fs.times_ms[si]
+                            if (fs.times_ms[si + 1] > ot
+                                    and fs.times_ms[si] < ot + h1 * H_MS
+                                    and seg_len > tol_ms):
+                                hole = True
+                                break
                     if in_era and covered and not hole:
                         fund = float(fs.rates_pct[k0:k1].sum())
+                        # PR-149 №2 : les PRINTS horodatés et signés — le
+                        # moteur MTM du forward les accrue aux heures
+                        # exactes (l'ancien fund_prints=[] forçait
+                        # l'accrual à la sortie : un autre trajet)
+                        signed = 1.0 if side == -1 else -1.0
+                        prints = [(int(fs.times_ms[k]),
+                                   float(fs.rates_pct[k]) * signed)
+                                  for k in range(k0, k1)]
             except Exception:
                 fund = None
             out.append({"sym": e["symbol"], "t_ms": ot,
                         "exit_ms": ot + h1 * H_MS, "side": side,
                         "ret_pct": ret, "mae_pct": mae, "fund_pct": fund,
                         "fund_known": fund is not None, "cost_pct": cost,
+                        "fund_prints": prints,
                         # FIX v15 (№7) : le prix d'entrée du journal —
                         # requis par le moteur MTM canonique
                         "entry": float(e.get("entry_open") or entry)})
@@ -282,6 +309,14 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
         except ValueError:
             pass
     trades = _closed_trades(spec, journal, db_path, now)
+    from scripts.portfolio_runner import _fetch_marks
+    mk_available = False
+    if trades:
+        syms0 = sorted({t["sym"] for t in trades})
+        mk0 = _fetch_marks(db_path, syms0,
+                           min(t["t_ms"] for t in trades),
+                           max(t["exit_ms"] for t in trades))
+        mk_available = bool(mk0)
     stats = {"n": len(trades), "mean": None, "wr": None, "sharpe": None,
              "fund_known_pct": None}
     if trades:
@@ -299,11 +334,10 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
         # FIX v15 (№7) : le moteur CANONIQUE (MTM horaire, le même que la
         # confirmation) — l'ancien wallet close-only pouvait dire « excellent
         # en confirmation, différent en maturation »
-        from scripts.portfolio_runner import _fetch_marks, run_wallet_mtm
-        syms = sorted({t["sym"] for t in trades})
+        from scripts.portfolio_runner import run_wallet_mtm
         span0 = min(t["t_ms"] for t in trades)
         span1 = max(t["exit_ms"] for t in trades)
-        mk = _fetch_marks(db_path, syms, span0, span1)
+        mk = _fetch_marks(db_path, syms0, span0, span1)
         if mk:
             evs = [{"sym": t["sym"], "t_ms": t["t_ms"],
                     "exit_ms": t["exit_ms"], "side": t["side"],
@@ -311,7 +345,8 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
                     "mae_pct": t["mae_pct"],
                     "fund_pct": t["fund_pct"] if t.get("fund_known") else 0.0,
                     "cost_pct": t["cost_pct"],
-                    "fund_prints": []} for t in trades]
+                    "fund_prints": t.get("fund_prints", [])
+                    } for t in trades]
             w = run_wallet_mtm(evs, mk, capital=100.0, cap_pct=1.0, lev=1.0,
                                span=(span0, span1))
         else:
@@ -331,6 +366,9 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
     # compte de trades avec un Sharpe négatif n'est plus « ready ».
     days_pass = days is not None and days >= need_days
     trades_pass = stats["n"] >= need_trades
+    # FIX v16 (№7) : MTM indisponible = FORWARD_RISK_UNKNOWN — pas de READY
+    # (le fallback close-only est un diagnostic, pas une mesure officielle)
+    risk_pass = mk_available
     sharpe_pass = (stats["sharpe"] is not None
                    and stats["sharpe"] >= float(fc.get("min_forward_sharpe",
                                                        0.5)))
@@ -350,7 +388,7 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
                and stats["mean"] >= float(fc.get("min_vs_discovery", 0.5))
                * float(disc_mean))
     ready = bool(days_pass and trades_pass and sharpe_pass and vs_pass
-                 and fund_pass)
+                 and fund_pass and risk_pass)
     return {"run_id": run_id, "confirmed_at": confirmed_at,
             "events_journaled": len(journal), "trades_closed": stats,
             "wallet": wallet,
@@ -360,6 +398,9 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
                            "sharpe_pass": sharpe_pass,
                            "vs_discovery_pass": vs_pass,
                            "fund_pass": fund_pass,
+                           "risk_pass": risk_pass,
+                           "wallet_engine": "mtm" if mk_available
+                           else "close_only_diagnostic",
                            "discovery_mean": disc_mean,
                            "ready": ready,
                            "note": "ready ⇒ review de protocole, JAMAIS promote "

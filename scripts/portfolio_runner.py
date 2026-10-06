@@ -85,6 +85,10 @@ def collect_events(spec: dict, matrix: dict, feats_by_sym: dict, view,
         mask = rr.event_mask(spec, feats, view, frozen=fz,
                              min_event_ms=min_event_ms,
                              thr_key=(*rr._db_key(db_path), sym))
+        # FIX v16 (PR-149, audit GLM 5.3 №1) : l'univers est une obligation
+        # INTERNE du chemin wallet — le DD du gate doit être calculé sur la
+        # MÊME population d'events que la statistique de confirmation
+        mask = rr.apply_universe(spec, sym, mask, feats, h1)
         # FIX v10 (audit GLM 5.3 post-#135) : le CALENDRIER réel des prints
         # de funding du symbole — le moteur MTM accrue aux heures EXACTES
         fser = None

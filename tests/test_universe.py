@@ -111,7 +111,10 @@ class TestUniverse(unittest.TestCase):
         uni.generate("test", ["BTCUSDT"], db_path=self.db)
         m = uni.load("test")
         m["symbols"]["BTCUSDT"]["delisted_at"] = "1970-01-20"
-        self.assertTrue(uni.tradable(m, "BTCUSDT", 19 * 24 * H))
+        # convention [start, end) : l'actif est tradable JUSQU'À la mort
+        # exclusive — le dernier instant tradable est 19/01 23:59:59.999
+        self.assertTrue(uni.tradable(m, "BTCUSDT", 19 * 24 * H - 1))
+        self.assertFalse(uni.tradable(m, "BTCUSDT", 19 * 24 * H))
         self.assertFalse(uni.tradable(m, "BTCUSDT", 25 * 24 * H))
 
 

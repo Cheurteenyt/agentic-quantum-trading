@@ -131,20 +131,20 @@ def tradable_window_ms(manifest: dict, symbol: str) -> tuple[int, int] | None:
     end = e.get("last_bar_ms")
     if end is not None:
         end = int(end) + 3_600_000     # la clôture de la dernière bougie
-    if e.get("delisted_at"):
+    if e.get("delisted_at_ms"):
+        end = int(e["delisted_at_ms"])   # №10 : la précision ms d'abord
+    elif e.get("delisted_at"):
         end = _iso_ms(e["delisted_at"])
     return (int(start), int(end))
 
 
 def tradable(manifest: dict, symbol: str, ts_ms: int) -> bool:
-    """L'actif existait-il à l'instant ts ? — le masque anti-survivorship :
-    avant observed_start (listing) ou après observed_end/delisted_at, NON."""
-    e = manifest.get("symbols", {}).get(symbol)
-    if not e or e.get("observed_start") is None:
+    """L'actif existait-il à l'instant ts ? — FIX v16 (№11) : un simple
+    wrapper de tradable_window_ms (UNE seule sémantique d'univers)."""
+    w = tradable_window_ms(manifest, symbol)
+    if w is None:
         return False
-    start = _iso_ms(e["observed_start"])
-    end = _iso_ms(e.get("delisted_at") or e["observed_end"])
-    return bool(start <= ts_ms <= end)
+    return bool(w[0] <= ts_ms < w[1])
 
 
 def check(manifest: dict, symbols: list[str]) -> tuple[list[str], list[str]]:
