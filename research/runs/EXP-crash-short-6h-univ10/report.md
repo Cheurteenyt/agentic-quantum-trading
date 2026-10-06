@@ -2,7 +2,7 @@
 
 Hypothèse : RÉPLICATION UNIVERSE : le même flux forcé vendeur (ret_1h <= p10 expanding) continue de baisser à 6h sur les 10 majeures, pas seulement BTC/ETH/SOL
 
-- spec_sha 824d8590dfbf0164 · git b7f5a28 · snapshot k1h-1a509a56e4fba126
+- spec_sha 6f2b63350b76086c · git 5981934 · snapshot k1h-4370efdd061f40b6
 - verdict : **DISCOVERY_FAIL** · n 30022 · mean -0.42611828730480195
 
 - BTCUSDT@6h : n 2874 · mean -0.352

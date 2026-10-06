@@ -53,5 +53,6 @@
   ],
   "side": -1
  },
- "strategy": "volume_surge_reversion"
+ "strategy": "volume_surge_reversion",
+ "universe": "univ10"
 }

@@ -33,5 +33,6 @@
   "quantile": 0.1,
   "side": -1
  },
- "strategy": "ret1h_p10_short"
+ "strategy": "ret1h_p10_short",
+ "universe": "univ10"
 }

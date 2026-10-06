@@ -1,0 +1,14 @@
+{
+ "run_id": "EXP-crash-short-6h-004",
+ "kind": "discovery",
+ "spec_sha": "c84dc5b17562de6c",
+ "attempt": 3,
+ "git_sha": "b7f5a28a52b270c68f51154fea8f15f79373bbf0",
+ "git_dirty": true,
+ "diff_sha": "11f02b7dfc50953c",
+ "label_hash": "acfac2865b1991e0",
+ "snapshot": "k1h-8425ef597534f306",
+ "label_version": "v2",
+ "protocol_id": "protocol-v2",
+ "timestamp": "2026-10-05T21:59:34.835615+00:00"
+}
