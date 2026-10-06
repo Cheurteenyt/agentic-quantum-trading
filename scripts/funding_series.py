@@ -45,6 +45,16 @@ class FundingSeries:
         rows = sorted(rows)
         if not rows:
             raise ValueError("FundingSeries vide : aucune observation funding")
+        # FIX v19 (№14) : dédupliquer les timestamps — deux lignes avec le
+        # même funding_time additionnaient le taux DEUX FOIS dans cumsum
+        seen = set()
+        deduped = []
+        for r in rows:
+            if r[0] not in seen:
+                seen.add(r[0])
+                deduped.append(r)
+            # sinon : doublon ignoré (le premier gagne)
+        rows = deduped
         t = np.array([float(r[0]) for r in rows], dtype=np.float64)
         v = np.array([float(r[1]) * 100.0 for r in rows], dtype=np.float64)
         gaps_h = np.diff(t)[np.diff(t) > 0] / 3_600_000.0

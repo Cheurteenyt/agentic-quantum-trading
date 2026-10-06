@@ -267,8 +267,15 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
     stale_mark_hours = 0
     max_mark_gap_h = 0
 
-    t = (evs[0]["t_ms"] // H_MS) * H_MS
-    t_end = max(e["exit_ms"] for e in evs)
+    # FIX v19 (№16) : la timeline démarre au span[0] de la VUE (pas du
+    # premier trade) — les heures plates avant le premier trade sont
+    # représentées à equity = capital
+    if span:
+        t = (span[0] // H_MS) * H_MS
+        t_end = max(span[1], max(e["exit_ms"] for e in evs))
+    else:
+        t = (evs[0]["t_ms"] // H_MS) * H_MS
+        t_end = max(e["exit_ms"] for e in evs)
     while t <= t_end:
         # 1. le funding s'accrue AUX HEURES EXACTES des prints réels —
         #    AVANT les sorties : le print de l'heure de sortie est dû
@@ -527,6 +534,10 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                     {tp["sym"] for tp in trade_pnls}) /
                 max(len({e["sym"] for e in events}), 1) * 100.0)
             if events else 100.0,
+            # FIX v19 (№13) : la couverture par les SYMBOLES REQUIS (pas
+            # les trades observés — un symbole sans mark mais avec des
+            # trades était faussement « couvert »)
+            "required_symbols": len({e["sym"] for e in events}),
             "avg_concurrency": (conc_sum / conc_n) if conc_n else 0.0,
             "max_margin_used_pct": max_margin_pct,
             "avg_margin_used_pct": (margin_sum / conc_n) if conc_n else 0.0,
@@ -713,14 +724,27 @@ def wallet_per_window(events: list[dict], proto: dict, capital: float,
             mks = {s: m for s, m in marks.items()
                    if len(m["t"]) and int(m["t"][0]) < we
                    and int(m["t"][-1]) >= ws}
-            out[str(w["start"])] = (run_wallet_mtm(evs, mks, capital=capital,
-                                                   cap_pct=cap_pct, lev=lev)
-                                    if evs and mks else
-                                    run_wallet(evs, capital=capital,
-                                               cap_pct=cap_pct, lev=lev))
+            # FIX v19 (PR-155 №12) : marks PARTIELS pour une fenêtre =
+            # DD_UNKNOWN (le fallback close-only n'est plus silencieux)
+            ev_syms = {e["sym"] for e in evs}
+            mk_syms = {s for s in ev_syms if s in mks and len(mks[s]["t"]) >= 2}
+            if ev_syms and mk_syms < ev_syms:
+                # des events sur des symboles sans marks suffisants
+                out[str(w["start"])] = run_wallet(
+                    evs, capital=capital, cap_pct=cap_pct, lev=lev)
+                out[str(w["start"])]["dd_status"] = "UNKNOWN"
+                out[str(w["start"])]["max_dd_pct"] = float("nan")
+            else:
+                out[str(w["start"])] = (run_wallet_mtm(evs, mks, capital=capital,
+                                                       cap_pct=cap_pct, lev=lev)
+                                        if evs and mks else
+                                        run_wallet(evs, capital=capital,
+                                                   cap_pct=cap_pct, lev=lev))
+                out[str(w["start"])]["dd_status"] = "MTM"
         else:
             out[str(w["start"])] = run_wallet(evs, capital=capital,
                                               cap_pct=cap_pct, lev=lev)
+            out[str(w["start"])]["dd_status"] = "CLOSE_ONLY"
     return out
 
 

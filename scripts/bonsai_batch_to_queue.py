@@ -27,7 +27,7 @@ QUEUE = ROOT / "research" / "queue" / "bonsai"
 
 ALLOWED_FEATURES = {"range_pct", "volume_z", "ret_1h", "fund_last"}
 ALLOWED_OPS = {">=", "<="}
-HORIZONS = {1, 2, 4, 6, 12, 24, 48, 72}
+HORIZONS = {1, 2, 4, 6, 8, 12, 24, 48, 72}   # 8h ajouté (PR-155 №6 : Bonsai le propose)
 # par classe de compute : la profondeur d'univers et les critères de découverte
 CLASS_RULES = {
     "tiny": {"min_n": 50, "min_mean": 0.02},
@@ -104,6 +104,7 @@ def convert(batch: dict, symbols: list[str],
             "criteria": {"min_n": int(rules["min_n"]),
                          "min_mean": float(rules["min_mean"])},
             "compute": {"class": cls},
+            "universe": __import__("os").environ.get("BONSAI_UNIVERSE", "univ10"),
             "bonsai": {"novelty": h.get("novelty"),
                        "mask_text": h.get("mask", "")},
         }
@@ -128,8 +129,12 @@ def main() -> int:
     specs, errors = convert(batch, symbols, a.min_n, a.min_mean)
     for e in errors:
         print(f"[rejet] {e}")
-    print(f"{len(specs)} spec(s) convertible(s) sur "
-          f"{len(batch.get('hypotheses', []))} hypothèse(s)")
+    expected = len(batch.get("hypotheses", []))
+    print(f"{len(specs)} spec(s) convertible(s) sur {expected} hypothèse(s)")
+    if len(specs) + len(errors) != expected:
+        print(f"[ERREUR] {expected} attendues ≠ {len(specs)} converties + "
+              f"{len(errors)} rejetées — des hypothèses ont disparu")
+        sys.exit(1)
     if a.dry_run:
         for s in specs:
             print(f"  {s['id']} : {s['strategy']} · {s['signal']['conditions']}")

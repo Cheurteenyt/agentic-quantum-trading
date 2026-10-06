@@ -125,31 +125,59 @@ def main() -> int:
                 if str(s.get("protocol_id", "")) != active:
                     ok6 = False
                     det6.append(f"{rid} : protocole {s.get('protocol_id')}")
-            # I007 : manifest vs summary vs spec.json — même spec_sha,
-            # LORSQU'ILS ONT ÉTÉ ÉCRITS ENSEMBLE (manifest kind == kind du
-            # summary). Un run dir mixte (re-discovery post-v14 sur un
-            # candidat REJECTED) garde son summary historique : le manifest
-            # kind=discovery ne doit pas être comparé à un summary de
-            # confirmation d'une autre ère.
+            # I007 : manifest vs summary vs spec.json — même spec_sha.
+            # FIX v19 (PR-155 №8, affiné) : STRICT pour les runs CONFIRMED
+            # dont la découverte est DISCOVERY_PASS (candidat vivant). Un
+            # run dont la découverte est DISCOVERY_FAIL (rejeté post-v14)
+            # porte un summary_confirmation HISTORIQUE — sa vérification
+            # n'a pas de sens (la confirmation vient d'un moteur périmé).
+            dfile = rdir / "summary_discovery.json"
+            d_verdict = None
+            if dfile.exists():
+                try:
+                    d_verdict = json.loads(
+                        dfile.read_text(encoding="utf-8")).get("verdict")
+                except json.JSONDecodeError:
+                    pass
             mfile = rdir / "manifest.json"
             jfile = rdir / "spec.json"
-            if mfile.exists() and jfile.exists() and s.get("spec_sha"):
+            if (s.get("verdict") == "CONFIRMED"
+                    and d_verdict == "DISCOVERY_PASS"):
+                # CONFIRMED : vérification TOUJOURS, sans exception
+                if not mfile.exists() or not jfile.exists():
+                    ok7 = False
+                    det7.append(f"{rid} : manifest ou spec.json manquant")
+                    continue
                 try:
                     m = json.loads(mfile.read_text(encoding="utf-8"))
-                    same_era = m.get("kind") == kind
-                    if same_era:
-                        sha_disk = __import__("hashlib").sha256(
-                            json.dumps(json.loads(
-                                jfile.read_text(encoding="utf-8")),
-                                sort_keys=True).encode()).hexdigest()[:16]
-                        if not (m.get("spec_sha") == s.get("spec_sha")
-                                == sha_disk):
-                            ok7 = False
-                            det7.append(
-                                f"{rid} : manifest {m.get('spec_sha')} / "
-                                f"summary {s.get('spec_sha')} / spec {sha_disk}")
-                except (json.JSONDecodeError, OSError):
-                    pass
+                    sha_disk = __import__("hashlib").sha256(
+                        json.dumps(json.loads(
+                            jfile.read_text(encoding="utf-8")),
+                            sort_keys=True).encode()).hexdigest()[:16]
+                    if not (m.get("spec_sha") == s.get("spec_sha")
+                            == sha_disk):
+                        ok7 = False
+                        det7.append(
+                            f"{rid} : manifest {m.get('spec_sha')} / "
+                            f"summary {s.get('spec_sha')} / spec {sha_disk}")
+                except (json.JSONDecodeError, OSError) as exc:
+                    ok7 = False
+                    det7.append(f"{rid} : fichier illisible {exc}")
+            else:
+                # run non-CONFIRMED : vérification si les fichiers coexistent
+                if mfile.exists() and jfile.exists() and s.get("spec_sha"):
+                    try:
+                        m = json.loads(mfile.read_text(encoding="utf-8"))
+                        if m.get("kind") == "confirmation":
+                            sha_disk = __import__("hashlib").sha256(
+                                json.dumps(json.loads(
+                                    jfile.read_text(encoding="utf-8")),
+                                    sort_keys=True).encode()).hexdigest()[:16]
+                            if m.get("spec_sha") != s.get("spec_sha"):
+                                ok7 = False
+                                det7.append(f"{rid} : SHA mismatch")
+                    except (json.JSONDecodeError, OSError):
+                        pass
     check("I006", ok6, "; ".join(det6) or
           f"{len(confirmed)} confirmation(s) sous {active}")
     check("I007", ok7, "; ".join(det7) or "spec_sha cohérents")
@@ -163,11 +191,12 @@ def main() -> int:
     check("I008", ok8, "; ".join(det8) or
           "journaux forward ⊆ confirmés actifs")
 
-    # I009 (PR-150) : les runs CONFIRMED == les lignes ledger — un
-    # CONFIRMED sans sa ligne de budget est une sous-déclaration
+    # I009 (PR-150, durci PR-155 №9) : l'égalité est BIDIRECTIONNELLE —
+    # CONFIRMED ⊆ ledger ET ledger ⊆ CONFIRMED, avec détection des
+    # doublons (le set masquait les lignes multiples)
     ok9, det9 = True, []
     ledger = ROOT / "research" / "ledger" / "trials.jsonl"
-    ledger_refs = set()
+    ledger_conf: dict[str, int] = {}   # run_id → count (doublons visibles)
     if ledger.exists():
         for line in ledger.read_text(encoding="utf-8").splitlines():
             try:
@@ -176,13 +205,31 @@ def main() -> int:
                 continue
             ref = str(e.get("ref", ""))
             if e.get("mode") == "confirmation" and "/runs/" in ref:
-                ledger_refs.add(ref.split("/runs/")[1].split("/")[0])
+                rid = ref.split("/runs/")[1].split("/")[0]
+                ledger_conf[rid] = ledger_conf.get(rid, 0) + 1
+    # CONFIRMED ⊆ ledger : chaque run confirmé a AU MOINS une ligne
     for rid in sorted(confirmed):
-        if rid not in ledger_refs:
+        if rid not in ledger_conf:
             ok9 = False
-            det9.append(rid)
+            det9.append(f"{rid} : CONFIRMED sans ligne ledger")
+    # ledger ⊆ CONFIRMED : chaque ligne de confirmation pointe vers un run
+    # qui existe ET dont le verdict est CONFIRMED (ou a été re-mesuré REJECTED
+    # — le run dir est la vérité courante)
+    for rid, count in sorted(ledger_conf.items()):
+        rdir = RUNS / rid
+        sfile = rdir / "summary_confirmation.json"
+        if not rdir.exists():
+            ok9 = False
+            det9.append(f"{rid} : ligne ledger sans run dir")
+        elif sfile.exists():
+            try:
+                sv = json.loads(sfile.read_text(encoding="utf-8")).get("verdict")
+                if sv not in ("CONFIRMED", "REJECTED"):
+                    det9.append(f"{rid} : verdict inattendu {sv}")
+            except (json.JSONDecodeError, OSError):
+                pass
     check("I009", ok9, "; ".join(det9) or
-          f"{len(confirmed)} CONFIRMED(s) réconciliés avec le ledger")
+          f"{len(confirmed)} CONFIRMED(s) ↔ {len(ledger_conf)} ligne(s) ledger")
 
     return finish()
 
