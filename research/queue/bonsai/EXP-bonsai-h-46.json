@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-46",
+ "domain": "aster",
+ "family": "bonsai_range_pct",
+ "strategy": "range_expansion_momentum_decay",
+ "hypothesis": "[H-46] Range Expansion Momentum Decay — ret_6h < -0.6 (falsification : ret_6h > 0.2)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "range_pct",
+    "op": ">=",
+    "quantile": 0.85
+   },
+   {
+    "feature": "ret_1h",
+    "op": ">=",
+    "threshold": 1.5
+   }
+  ],
+  "side": -1
+ },
+ "horizons": [
+  6
+ ],
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "small"
+ },
+ "bonsai": {
+  "novelty": 0.7,
+  "mask_text": "Range large après ret_1h positif, les vendeurs de profit réduisent la pression"
+ }
+}

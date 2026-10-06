@@ -1,0 +1,57 @@
+{
+ "id": "EXP-bonsai-h-43",
+ "domain": "aster",
+ "family": "bonsai_ret_1h",
+ "strategy": "stop-loss_cascade_tail",
+ "hypothesis": "[H-43] Stop-Loss Cascade Tail — ret_2h < -0.5 (falsification : ret_2h > 0.0)",
+ "data": {
+  "symbols": [
+   "BTCUSDT",
+   "ETHUSDT",
+   "SOLUSDT",
+   "XRPUSDT",
+   "BNBUSDT",
+   "DOGEUSDT",
+   "ADAUSDT",
+   "AVAXUSDT",
+   "LINKUSDT",
+   "LTCUSDT"
+  ],
+  "timeframe": "1h",
+  "train_start": 1609459200000,
+  "train_end": 1756684800000,
+  "validation_start": 1756684800000,
+  "validation_end": 1790000000000
+ },
+ "mode": "discovery",
+ "cost_pct": 0.28,
+ "signal": {
+  "conditions": [
+   {
+    "feature": "ret_1h",
+    "op": "<=",
+    "threshold": -2.0
+   },
+   {
+    "feature": "range_pct",
+    "op": "<=",
+    "quantile": 0.6
+   }
+  ],
+  "side": -1
+ },
+ "horizons": [
+  2
+ ],
+ "criteria": {
+  "min_n": 50,
+  "min_mean": 0.02
+ },
+ "compute": {
+  "class": "tiny"
+ },
+ "bonsai": {
+  "novelty": 0.6,
+  "mask_text": "Retour 1h proche du seuil de stop, les stops non déclenchés s'exécutent tardivement"
+ }
+}
