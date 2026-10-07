@@ -103,25 +103,6 @@ def _load_json(path: Path) -> dict:
                            "supprime-le manuellement ou utilise --reset") from exc
 
 
-def _resource_guard() -> tuple[bool, str]:
-    try:
-        mem = {}
-        for line in Path("/proc/meminfo").read_text().splitlines():
-            if ":" in line:
-                k, v = line.split(":", 1)
-                mem[k] = int(v.strip().split()[0])
-        avail_gb = mem.get("MemAvailable", 0) / 1024 / 1024
-        if avail_gb < 1.0:
-            return False, f"RAM disponible {avail_gb:.1f} Go < 1 Go"
-    except OSError:
-        pass
-    import shutil
-    du = shutil.disk_usage(ROOT)
-    if du.free / 1024**3 < 2.0:
-        return False, f"disque libre {du.free / 1024**3:.1f} Go < 2 Go"
-    return True, "OK"
-
-
 def _heartbeat(checkpoint: dict) -> None:
     """Deux écritures atomiques INDÉPENDANTES (checkpoint puis lease) —
     pas une transaction : un crash entre les deux laisse un lease frais
@@ -146,10 +127,13 @@ def _lease_heartbeat() -> None:
 def _queue_sha(queue_dir: Path) -> str:
     """Le hash de la queue LIÉ AUX CHEMINS (PR-161) — relative_path + NUL +
     bytes : deux files de noms différents avec le même contenu ne collodent
-    plus (l'ancien hash ne scellait que les bytes)."""
+    plus (l'ancien hash ne scellait que les bytes). PR-163 : même filtre
+    done/ que _load_specs — le sel et le manifeste décrivent le MÊME
+    ensemble (déplacer une spec en done/ ne changeait que l'un des deux)."""
     h = hashlib.sha256()
     for f in sorted(queue_dir.rglob("*")):
-        if f.is_file() and f.suffix in (".yaml", ".yml", ".json"):
+        if (f.is_file() and f.suffix in (".yaml", ".yml", ".json")
+                and "done" not in f.parts):
             h.update(str(f.relative_to(queue_dir)).encode())
             h.update(b"\0")
             h.update(f.read_bytes())
@@ -227,7 +211,7 @@ def _migrate_checkpoint(ck: dict, db_snap: str, engine_sha: str,
     tag = ck.get("job_id") or f"legacy-{int(time.time())}"
     arch = ARCHIVE / f"grind_checkpoint-{tag}.json"
     _atomic_write_json(arch, ck)
-    if ck.get("db_snapshot") and ck["db_snapshot"] == db_snap:
+    if ck.get("db_snapshot"):
         # PR-162 : le transport n'est autorisé que si le moteur du
         # checkpoint est PROUVÉ identique à celui d'aujourd'hui — le
         # checkpoint ère PR-160 ne stockait pas d'engine_sha, on le
@@ -251,37 +235,53 @@ def _migrate_checkpoint(ck: dict, db_snap: str, engine_sha: str,
         ck["queue_sha"] = queue_sha
         for it in ck.get("items", {}).values():
             it["migrated"] = True
+        # PR-163 (P0 du bug-hunter) : la db dérive en CONTINU (le nightly
+        # et les collecteurs appendent des barres) — ce n'est plus un
+        # critère de refus, seulement une note. Les fenêtres de mesure des
+        # discovery sont HISTORIQUES (train/validation figés) : un append
+        # en queue de db ne les touche pas. Un REMPLACEMENT réel de la db
+        # reste un geste opérateur (--reset).
+        drift = ""
+        if ck.get("db_snapshot") != db_snap:
+            drift = (f" · db dérivée depuis ({ck['db_snapshot']} → "
+                     f"{db_snap}) — append en continu, fenêtres "
+                     "historiques inchangées")
+            ck["db_snapshot"] = db_snap
         return ck, (f"migration ère PR-160 : {carried} item(s) transportés "
-                    f"(moteur prouvé identique à {ck['git_sha']}), ancien "
-                    f"checkpoint archivé → {arch.name}")
-    return {}, (f"checkpoint LEGACY sans identité vérifiable — archivé → "
-                f"{arch.name}, campagne propre")
+                    f"(moteur prouvé identique à {ck['git_sha']}){drift}, "
+                    f"ancien checkpoint archivé → {arch.name}")
+    return {}, ("checkpoint LEGACY sans identité racine (pré-PR-160) — "
+                f"archivé → {arch.name}, campagne propre")
 
 
 def _reconcile_identity(ck: dict, db_snap: str, engine_sha: str,
                         queue_sha: str) -> tuple[dict, list[str]]:
     """La comparaison d'identité schema-2 (PR-161) :
-    - moteur ou db changés → campagne RÉINITIALISÉE (archivée) — les
-      résultats ne mesurent plus ce que le code mesure maintenant
-    - queue seule changée → items CONSERVÉS (le spec_sha par item protège
+    - moteur changé → campagne RÉINITIALISÉE (archivée) — les résultats
+      ne mesurent plus ce que le code mesure maintenant
+    - db dérivée → items CONSERVÉS avec note (PR-163, P0 du bug-hunter :
+      la db est appendée en continu, les fenêtres de mesure sont
+      historiques ; un remplacement réel reste un geste --reset)
+    - queue changée → items CONSERVÉS (le spec_sha par item protège
       le contenu ; l'ensemble de la queue a juste grossi/rétréci)"""
     notes: list[str] = []
     if not ck:
         return ck, notes
-    mismatch = []
     if ck.get("engine_sha") != engine_sha:
-        mismatch.append(f"moteur {ck.get('engine_sha')} → {engine_sha}")
-    if ck.get("db_snapshot") != db_snap:
-        mismatch.append(f"db {ck.get('db_snapshot')} → {db_snap}")
-    if mismatch:
         ARCHIVE.mkdir(parents=True, exist_ok=True)
         tag = ck.get("job_id") or f"reset-{int(time.time())}"
         arch = ARCHIVE / f"grind_checkpoint-{tag}.json"
         _atomic_write_json(arch, ck)
-        notes.append("IDENTITÉ DE CAMPAGNE CHANGÉE ("
-                     + " ; ".join(mismatch) + ") — réinitialisée, "
-                     f"ancien checkpoint archivé → {arch.name}")
+        notes.append("IDENTITÉ DE CAMPAGNE CHANGÉE (moteur "
+                     f"{ck.get('engine_sha')} → {engine_sha}) — "
+                     "réinitialisée, ancien checkpoint archivé → "
+                     f"{arch.name}")
         return {}, notes
+    if ck.get("db_snapshot") != db_snap:
+        notes.append(f"db a dérivé ({ck.get('db_snapshot')} → {db_snap}) "
+                     "— items conservés (append en continu, fenêtres de "
+                     "mesure historiques inchangées)")
+        ck["db_snapshot"] = db_snap
     if ck.get("queue_sha") != queue_sha:
         notes.append(f"queue changée ({ck.get('queue_sha')} → {queue_sha}) "
                      "— items conservés (le spec_sha par item protège "
@@ -310,21 +310,41 @@ def _load_specs(queue_dir: Path) -> list[tuple[Path, str, str]]:
     return out
 
 
-def _status_counts(items: dict, queue_total: int) -> dict:
-    """Les métriques DÉRIVÉES de items uniquement (PR-161) — l'ancien
-    status() lisait processed/failed qui ne sont plus écrits."""
-    done = permanent = retryable = 0
-    for v in items.values():
-        st = v.get("state")
-        if st == "DONE":
-            done += 1
-        elif st == "FAILED_PERMANENT":
-            permanent += 1
-        elif st == "FAILED_RETRYABLE":
-            retryable += 1
+def _status_counts(items: dict, manifest: list | None = None,
+                   queue_total: int = 0) -> dict:
+    """Les métriques DÉRIVÉES de items (PR-161) — PR-163 : quand le
+    manifeste scellé existe, done/remaining ne comptent que les specs qui
+    y sont ENCORE (une spec supprimée de la queue ne masque plus une
+    remaining, un item DONE orphelin ne masque plus une spec restante) ;
+    le spec_sha du manifeste doit aussi correspondre (spec modifiée =
+    à re-mesurer)."""
+    terminal = ("DONE", "FAILED_PERMANENT")
+
+    if manifest:
+        ids = [m.get("id") for m in manifest]
+        shas = {m.get("id"): m.get("sha") for m in manifest}
+
+        def _terminal_ok(iid: str) -> bool:
+            it = items.get(iid) or {}
+            return (it.get("state") in terminal
+                    and it.get("spec_sha") == shas.get(iid))
+
+        done = sum(1 for i in ids if (items.get(i) or {}).get("state")
+                   == "DONE" and items[i].get("spec_sha") == shas.get(i))
+        permanent = sum(1 for i in ids
+                        if (items.get(i) or {}).get("state")
+                        == "FAILED_PERMANENT"
+                        and items[i].get("spec_sha") == shas.get(i))
+        remaining = sum(1 for i in ids if not _terminal_ok(i))
+    else:
+        done = sum(1 for v in items.values() if v.get("state") == "DONE")
+        permanent = sum(1 for v in items.values()
+                        if v.get("state") == "FAILED_PERMANENT")
+        remaining = max(0, queue_total - done - permanent)
+    retryable = sum(1 for v in items.values()
+                    if v.get("state") == "FAILED_RETRYABLE")
     return {"done": done, "failed_permanent": permanent,
-            "failed_retryable": retryable,
-            "remaining": max(0, queue_total - done - permanent)}
+            "failed_retryable": retryable, "remaining": remaining}
 
 
 def _is_permanent_error(exc: Exception) -> bool:
@@ -349,6 +369,26 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     except BlockingIOError:
         print("[worker] un autre worker est ACTIF — refus", flush=True)
         return EXIT_FAILED
+    # PR-163 : worker.lock est gitigné — s'il a été recréé entre notre
+    # open() et notre flock() (git clean, ménage), un 2e worker peut avoir
+    # acquis le NOUVEL inode pendant que nous tenons l'ancien. On refuse
+    # plutôt que de coexister (preuve bug-hunter : inodes 1125200 ≠ 1125201).
+    try:
+        if os.fstat(lock_fh.fileno()).st_ino != os.stat(LOCK).st_ino:
+            print("[worker] REFUS : worker.lock a été recréé (inode "
+                  "différent) — possible 2e worker", flush=True)
+            lock_fh.close()
+            return EXIT_FAILED
+    except OSError:
+        pass
+    # PR-163 : le lease existe DÈS le flock — snapshot_id (hash de Go),
+    # migration et _load_specs tournent AVANT la première heartbeat du
+    # thread (+30 s) : sans ceci le watchdog pouvait couper bonsai dans
+    # la fenêtre de démarrage
+    try:
+        _lease_heartbeat()
+    except OSError:
+        pass
 
     def _make_shutdown_handler(state: dict) -> callable:
         def handler(signum, frame):
@@ -428,8 +468,20 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         while not hb_stop.wait(HEARTBEAT_INTERVAL):
             try:
                 _lease_heartbeat()
-            except OSError:
-                pass
+            except Exception as exc:
+                # PR-163 (P1 du bug-hunter) : une mort SILENCIEUSE du
+                # heartbeat = lease stale = le watchdog arrête bonsai en
+                # pleine discovery sans aucun signal. On marque la mort
+                # DANS le lease (status HB_DEAD + erreur) et on sort.
+                try:
+                    _atomic_write_json(LEASE, {
+                        "pid": os.getpid(),
+                        "heartbeat_at": _now_iso(),
+                        "status": "HB_DEAD",
+                        "hb_error": f"{type(exc).__name__}: {exc}"})
+                except OSError:
+                    pass
+                return
 
     hb_thread = threading.Thread(target=_hb_loop, daemon=True,
                                  name="lease-heartbeat")
@@ -587,7 +639,11 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
 
 
 def _is_lease_stale() -> bool:
-    lease = _load_json(LEASE)
+    # PR-163 : un lease corrompu = aucun heartbeat prouvable = stale
+    try:
+        lease = _load_json(LEASE)
+    except RuntimeError:
+        return True
     hb = lease.get("heartbeat_at")
     if not hb:
         return True
@@ -601,28 +657,38 @@ def _is_lease_stale() -> bool:
 
 def status() -> int:
     ck = _load_json(CHECKPOINT)
-    lease = _load_json(LEASE)
+    # PR-163 : un lease corrompu ne doit pas tuer --status (traceback)
+    try:
+        lease = _load_json(LEASE)
+    except RuntimeError:
+        lease = {}
     if not ck:
         print(json.dumps({"status": "NEVER_RUN"}))
         return 0
     pid = lease.get("pid")
     alive = False
     if pid:
+        # PR-163 : comme le watchdog — le PID doit être VIVANT ET porter
+        # research_worker.py comme BASENAME d'un argument (un PID recyclé
+        # ne ment plus ; une sous-chaîne confondrait test_research_worker.py)
         try:
-            os.kill(pid, 0)
-            alive = True
-        except (OSError, ProcessLookupError):
-            pass
+            with open(f"/proc/{pid}/cmdline", "rb") as fh:
+                argv = fh.read().split(b"\0")
+            alive = any(a.rsplit(b"/", 1)[-1] == b"research_worker.py"
+                        for a in argv)
+        except OSError:
+            alive = False
     stale = _is_lease_stale()
-    counts = _status_counts(ck.get("items", {}),
-                            ck.get("queue_total",
-                                   len(ck.get("items", {}))))
+    counts = _status_counts(
+        ck.get("items", {}), ck.get("manifest"),
+        ck.get("queue_total", len(ck.get("items", {}))))
     print(json.dumps({
         "job_id": ck.get("job_id"), "git_sha": ck.get("git_sha"),
         "engine_sha": ck.get("engine_sha"),
         "schema_version": ck.get("schema_version"),
         "status": ck.get("status"), "worker_pid": pid,
         "worker_alive": alive, "lease_stale": stale,
+        "hb_dead": lease.get("status") == "HB_DEAD",
         **counts,
         "candidates": ck.get("candidates", []),
         "heartbeat": lease.get("heartbeat_at", ck.get("heartbeat_at")),
