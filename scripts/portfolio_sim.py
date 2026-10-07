@@ -70,7 +70,7 @@ LIQ_MOVE_PCT = 100 / LEV - MAINT_PCT   # repli seulement (cf. liq_move_for)
 _LIQ_PARAMS: dict[str, tuple[float, float]] | None = None
 
 
-def liq_params(symbols=None) -> dict[str, tuple[float, float]]:
+def liq_params() -> dict[str, tuple[float, float]]:
     """(maint_margin_pct, max_leverage) par symbole, lus dans liq_params."""
     global _LIQ_PARAMS
     if _LIQ_PARAMS is None:
