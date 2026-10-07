@@ -504,6 +504,67 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
     return out
 
 
+def _perm_loop(pairs: list[tuple[dict, np.ndarray]], h1: int, side: int,
+               cost: float, mean_obs: float, n_perm: int = 99,
+               seed: int = 0) -> float:
+    """La boucle de permutation (pure, testable) : p one-sided supérieur."""
+    from scripts.label_matrix import event_study
+    if not pairs:
+        return float("nan")
+    n_min = min(len(m) for _, m in pairs)
+    lo_shift = max(1, min(168, n_min // 4))
+    rng = np.random.default_rng(seed)
+    ge = 0
+    for _ in range(n_perm):
+        k = int(rng.integers(lo_shift, max(lo_shift + 1, n_min - lo_shift)))
+        num = den = 0.0
+        for cols, m in pairs:
+            st = event_study(cols, np.roll(m, k), h1, side=side,
+                             cost_pct=cost)
+            if st.get("n", 0):
+                num += st["mean"] * st["n"]
+                den += st["n"]
+        mean_perm = num / den if den else float("nan")
+        if np.isfinite(mean_perm) and mean_perm >= mean_obs:
+            ge += 1
+    return (1 + ge) / (n_perm + 1)
+
+
+def _perm_pvalue(spec, matrix, view, db_path, feats_by_sym, frozen,
+                 min_event_ms: int, mean_obs: float, min_n: int,
+                 kept_syms: list[str], n_perm: int = 99,
+                 seed: int = 0) -> float:
+    """PR-176 (B4 audit Sonnet 5.5) : la p-value par PERMUTATION
+    CIRCULAIRE du masque — le décalage circulaire garde l'autocorrélation
+    et le regroupement de volatilité des labels ET du masque, il ne
+    détruit que leur alignement. Le n nominal ne se croit pas (les events
+    24 h sur lignes horaires se chevauchent). One-sided supérieur (l'edge
+    recherché est ≥ 0 ; le contrôle inverse couvre l'autre côté).
+    Calibration de l'audit : P(p<0,05) = 4,7 % sous H0 (300 marches),
+    puissance 100 % à +0,4 % d'edge (n≈490)."""
+    sig = spec["signal"]
+    side = int(sig.get("side", -1))
+    cost = float(spec.get("cost_pct", 0.28))
+    h1 = int(spec.get("horizons", [24])[0])
+    pairs = []
+    for sym in kept_syms:
+        if sym not in matrix or sym not in feats_by_sym:
+            continue
+        feats = feats_by_sym[sym]
+        fz = frozen.get(sym) if frozen is not None else None
+        if frozen is not None and fz is None:
+            fz = [None] * len(_signal_conditions(sig))
+        mask = event_mask(spec, feats, view, frozen=fz,
+                          min_event_ms=min_event_ms,
+                          thr_key=(*_db_key(db_path), sym))
+        mask_h = apply_universe(spec, sym, mask, feats, h1)
+        m_h = mask_h & (feats["open_time_ns"]
+                        <= (view.end_ms - h1 * 3_600_000) * 10**6)
+        if m_h.any():
+            pairs.append((matrix[sym], m_h))
+    return _perm_loop(pairs, h1, side, cost, mean_obs, n_perm, seed)
+
+
 def _aggregate(per_symbol: dict, min_n: int) -> tuple[int, float]:
     """La moyenne agrégée PONDÉRÉE par n (rapport v6) : une moyenne de
     moyennes non pondérée donnait le même poids à un symbole à 3 events
@@ -573,6 +634,15 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
                                                                  {}).get("min_mean", 0.0))
                                     and advantage_ok)
                else "DISCOVERY_FAIL")
+    # PR-176 (B4 audit Sonnet 5.5) : la p-value par PERMUTATION
+    # CIRCULAIRE — le n nominal ne se croit pas (events 24 h horaires
+    # chevauchants) ; la sélection des candidats applique BH sur ce p
+    kept_syms = sorted({k.split("@")[0] for k, v in per_h1.items()
+                        if v.get("n", 0) >= min_n})
+    p_perm = float("nan")
+    if np.isfinite(mean_all) and kept_syms:
+        p_perm = _perm_pvalue(spec, matrix, view, db_path, feats_by_sym,
+                              frozen, 0, mean_all, min_n, kept_syms)
     # FIX v19 (PR-155 №3) : publier le PIRE mean par symbole — la sélection
     # Pareto en a besoin (l'ancien NaN silencieux cassait la dominance)
     worst_sym = min((s["mean"] for s in per_symbol.values()
@@ -580,6 +650,7 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
                     default=float("nan"))
     return {"verdict": verdict, "n": n_total, "mean": mean_all,
             "inverse_mean": inv_mean, "edge_advantage": advantage,
+            "p_perm": p_perm,
             "worst": worst_sym, "per_symbol": per_symbol,
             "frozen_thresholds": frozen,
             "label_hash": lh, "label_version": LABEL_VERSION,
@@ -1012,7 +1083,8 @@ def cmd_discovery(a) -> int:
     _log_ledger(spec, res["verdict"], Mode.DISCOVERY.value,
                 str(rdir / "report.md"), snapshot=res.get("snapshot"))
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
-          f"{res['mean']:.3f} · inverse {res['inverse_mean']:.3f}")
+          f"{res['mean']:.3f} · inverse {res['inverse_mean']:.3f} · "
+          f"p_perm {res.get('p_perm', float('nan')):.3f}")
     print("DISCOVERY = TRAIN only — jamais promote sans confirmation.")
     return 0
 
@@ -1270,13 +1342,31 @@ def cmd_select(a) -> int:
                      "mean": s.get("mean", float("nan")),
                      "worst": s.get("worst", float("nan")),
                      "cluster": _cluster_key(spec),
-                     "verdict": s.get("verdict")})
+                     "verdict": s.get("verdict"),
+                     "p_perm": s.get("p_perm", float("nan"))})
     # PR-166 (P1 bug-hunter) : seuls les DISCOVERY_PASS à mean fini sont
     # éligibles — un FAIL (mean NaN) n'est jamais dominé (NaN compare
     # toujours False) et sortait SUR la frontière comme CANDIDAT
     rows = [r for r in rows
             if r["verdict"] == "DISCOVERY_PASS"
             and np.isfinite(r["mean"])]
+    # PR-176 (B4 audit Sonnet 5.5) : le CONTRÔLE BH sur le lot — la
+    # découverte reste illimitée, les faux positifs se contrôlent ICI
+    # (q = 0.10 sur la p par permutation circulaire). Les summaries
+    # pré-PR-176 (sans p_perm) ne peuvent pas prouver leur p : hors sélection.
+    ps = sorted((r for r in rows if np.isfinite(r.get("p_perm", float("nan")))),
+                key=lambda r: r["p_perm"])
+    m = len(ps)
+    k_max = 0
+    for i, r in enumerate(ps, 1):
+        if r["p_perm"] <= i * 0.10 / m:
+            k_max = i
+    bh_ok = {r["id"] for r in ps[:k_max]}
+    dropped = len(rows) - len(bh_ok)
+    if rows:
+        print(f"BH (q=0.10, m={m}) : {len(bh_ok)} survivant(s) — "
+              f"{dropped} écarté(s) du lot")
+    rows = [r for r in rows if r["id"] in bh_ok]
     if not rows:
         print("aucune discovery à sélectionner")
         return 0
