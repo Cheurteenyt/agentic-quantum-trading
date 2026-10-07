@@ -147,6 +147,15 @@ def main() -> int:
     if not events:
         print("[machine] cascade majors vide ce soir (aucun event) — rapport abstenu")
         return 0
+    # PR-168 : CALIBRATION CAUSALE — les médianes de sizing et les
+    # quantiles du tilt de corrélation sont EXPANDING (un event ne voit
+    # que son passé). L'ancien atr/median(full-sample) et le tilt vs
+    # quantile(70 premiers %) faisaient dépendre les trades précoces du
+    # FUTUR : le live n'était pas reproductible (loi du registre : un
+    # chiffre non reproductible par le code committé est mort). Le décile
+    # ATR du survivor applique déjà cette doctrine (warmup 50).
+    events.sort(key=lambda e: e["ts_ms"])   # l'expanding exige l'ordre temporel
+
     # PR-167 (P1 couche argent) : le gate AL score est EXPANDING —
     # l'ancien quantile sur les 70 premiers % appliqué à TOUT
     # l'échantillon calibrait le seuil des trades précoces sur leur
@@ -169,13 +178,35 @@ def main() -> int:
     if not gated:
         print("[machine] cascade majors gated vide ce soir — rapport abstenu")
         return 0
-    med_majors = float(np.median([e["atr_pct"] for e in gated]))
+
+    def _stamp_expanding_med(rows: list[dict]) -> None:
+        """La médiane EXPANDING de atr_pct — stampée par event (le 1er
+        event : ratio 1.0, sizing de base)."""
+        hist: list[float] = []
+        for e in rows:
+            a = e.get("atr_pct", float("nan"))
+            e["atr_med"] = float(np.median(hist)) if hist else float(a)
+            if np.isfinite(a):
+                hist.append(a)
+
+    def _stamp_expanding_corr(rows: list[dict], warmup: int = 30) -> None:
+        """Les quantiles EXPANDING du tilt de corrélation (hi=0.66,
+        lo=0.33) — stampés par event, NaN pendant le socle."""
+        hist: list[float] = []
+        for e in rows:
+            c = e.get("corr", float("nan"))
+            if len(hist) >= warmup:
+                e["corr_hi"] = float(np.nanquantile(hist, 0.66))
+                e["corr_lo"] = float(np.nanquantile(hist, 0.33))
+            else:
+                e["corr_hi"] = e["corr_lo"] = float("nan")
+            if np.isfinite(c):
+                hist.append(c)
+
+    _stamp_expanding_med(gated)
     mae_gated = max(e["mae_adverse"] for e in gated)
     lev_safe = 100 / (mae_gated + 0.5)
     write_mae_state(mae_gated, lev_safe)   # l'état du moniteur MAE (T8)
-
-    def size_cascade(e, st=None):
-        return min(max(0.24 * (e["atr_pct"] / med_majors), 0.08), 0.40)
     # FIX lot1 (F5) : la machine appliquait 10x même quand son propre
     # lev_safe < 10 — le rapport affichait « BAISSER LE LEVIER » et
     # poussait quand même. La règle 0-liq plafonne, elle n'affiche pas.
@@ -189,16 +220,13 @@ def main() -> int:
     # pas l'abandon du rapport — les autres flux restent exploitables.
     mae_meme = 0.0
     lev_meme = 1
-    med_meme = float("nan")
     if meme:
+        meme.sort(key=lambda e: e["ts_ms"])
         mae_meme = max(e["mae_adverse"] for e in meme)
         lev_meme = max(1, int(100 / (mae_meme + 0.5)))
-        med_meme = float(np.median([e["atr_pct"] for e in meme]))
+        _stamp_expanding_med(meme)
         for e in meme:
             e["lev"] = lev_meme
-
-    def size_meme(e, st=None):
-        return min(max(0.10 * (e["atr_pct"] / med_meme), 0.02), 0.30)
 
     # ——— flux 3 : survivor long 72h 1x ———
     # + le FILTRE ATR extrême : le décile supérieur (les LAB — les ×520 qui
@@ -227,18 +255,18 @@ def main() -> int:
     # config officielle 3 flux reste bit-reproductible.
     VOL_SPIKE = "--vol-spike" in sys.argv
     spike: list[dict] = []
-    med_spike = float("nan")
     mae_spike = 0.0
     if VOL_SPIKE:
         from scripts.p5_frequency_test import collect_vol_spike  # noqa: E402
         spike = collect_vol_spike(con, hold=6)   # seuils p5 : 4×/2,5 %/gate ATR
+        spike.sort(key=lambda e: e["ts_ms"])
         for e in spike:
             e["strategy"] = "vol_spike_6h"
             e["lev"] = 1
             e["fee_rt_bps"] = TAKER_RT
         if spike:
             mae_spike = max(e["mae_adverse"] for e in spike)
-            med_spike = float(np.median([e["atr_pct"] for e in spike]))
+            _stamp_expanding_med(spike)
 
     # le facteur global K : la calibration du DD sur la cible (25 %)
     _K = MACHINE_K
@@ -316,33 +344,35 @@ def main() -> int:
                         pairs.append(np.mean(sa * sb)
                                      / (np.std(sa) * np.std(sb)))
         e["corr"] = float(np.mean(pairs)) if pairs else np.nan
-    _c_hi = float(np.nanquantile(
-        [e.get("corr", np.nan) for e in gated[:int(len(gated) * 0.7)]], 0.66))
-    _c_lo = float(np.nanquantile(
-        [e.get("corr", np.nan) for e in gated[:int(len(gated) * 0.7)]], 0.33))
+    # PR-168 : les quantiles du tilt sont EXPANDING (stampés) — plus de
+    # fenêtre « 70 premiers % » appliquée à tout l'échantillon
+    _stamp_expanding_corr(gated)
 
     def machine_fn(e, st=None):
         s = e.get("strategy")
         if s == "cascade_10x":
-            s0 = min(max(0.24 * _K * (e["atr_pct"] / med_majors), 0.08 * _K), 0.40 * _K)
+            s0 = min(max(0.24 * _K * (e["atr_pct"] / e["atr_med"]),
+                         0.08 * _K), 0.40 * _K)
             if (np.isfinite(e.get("fund_rank", np.nan))
                     and e["fund_rank"] <= 0.33):
                 return min(s0 * 1.5, 0.50 * _K)
             if CORR_TILT:
                 c = e.get("corr", np.nan)
-                if np.isfinite(c):
-                    if c > _c_hi:
+                hi = e.get("corr_hi", float("nan"))
+                lo = e.get("corr_lo", float("nan"))
+                if np.isfinite(c) and np.isfinite(hi):
+                    if c > hi:
                         s0 = min(s0 * 2.0, 0.50 * _K)
-                    elif c < _c_lo:
+                    elif c < lo:
                         s0 = max(s0 * 0.5, 0.05 * _K)
             return s0
         if s == "cascade_meme":
-            return min(max(0.10 * _K * (e["atr_pct"] / med_meme), 0.02 * _K),
-                       0.30 * _K)
+            return min(max(0.10 * _K * (e["atr_pct"] / e["atr_med"]),
+                           0.02 * _K), 0.30 * _K)
         if s == "vol_spike_6h":
             # même sizing vol-inverse que les flux 1x (base machine 10 %)
-            return min(max(0.10 * _K * (e["atr_pct"] / med_spike), 0.02 * _K),
-                       0.30 * _K)
+            return min(max(0.10 * _K * (e["atr_pct"] / e["atr_med"]),
+                           0.02 * _K), 0.30 * _K)
         return 0.20 * _K                # survivor long (1x = 0 risque de liq, le notional scale librement)
 
     r = run_stack(all_ev, CAPITAL, machine_fn, fh)
