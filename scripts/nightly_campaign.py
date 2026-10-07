@@ -268,22 +268,29 @@ def run_nightly(
             or f"unknown-{s['symbol']}-{s['interval']}"
             for s in stats.get("series", [])
         }
-        series_bars = []
+        # PR-164 : l'ancien précharge tenait TOUTES les séries en RAM
+        # pendant tout le balayage (pic mémoire du nightly → swap →
+        # TimeoutStartSec=3600 soufflé 4 nuits de suite, 04→07/10 —
+        # the_machine et le collector funding n'ont plus tourné). La
+        # liste est désormais un PLAN : les barres sont chargées UNE
+        # série à la fois dans la boucle ; le garde « aucune barre »
+        # devient un pré-contrôle SQL (pas de données chargées).
+        plan = []
         for entry in wanted:
             sym, itv = entry["symbol"], entry["interval"]
-            bars = load_bars(con, sym, itv)
-            if not bars:
+            n = con.execute(
+                "SELECT COUNT(*) FROM klines WHERE symbol = ? AND interval = ?",
+                (sym, itv)).fetchone()[0]
+            if not n:
                 print(f"  ! {sym} {itv} : aucune bougie chargee — skip")
                 continue
-            if len(bars) > MAX_BARS_NIGHTLY:
-                bars = bars[-MAX_BARS_NIGHTLY:]
-            series_bars.append(
-                (sym, itv, bars, snap_by_key.get((sym, itv), f"unknown-{sym}-{itv}"))
-            )
+            plan.append((sym, itv,
+                         snap_by_key.get((sym, itv),
+                                         f"unknown-{sym}-{itv}")))
     finally:
         con.close()
 
-    if not series_bars:
+    if not plan:
         print("=== Campagne refusee : aucune barre chargeable ===")
         return 1
 
@@ -297,11 +304,20 @@ def run_nightly(
         "errored": 0,
         "survivors": [],
     }
-    min_bars = min(len(b) for _, _, b, _ in series_bars)
-
     store = BacktestStore(store_path)
+    con_read = init_db(KLINES_DB)
+    lengths: list[int] = []
     try:
-        for sym, itv, bars, snap in series_bars:
+        for sym, itv, snap in plan:
+            # PR-164 : streaming — les barres d'UNE série vivent le temps
+            # de ses stratégies puis sont rendues au collecteur
+            bars = load_bars(con_read, sym, itv)
+            if not bars:
+                print(f"  ! {sym} {itv} : aucune bougie chargee — skip")
+                continue
+            if len(bars) > MAX_BARS_NIGHTLY:
+                bars = bars[-MAX_BARS_NIGHTLY:]
+            lengths.append(len(bars))
             for strat in list_strategies():
                 evaluate, ps, name = REGISTRY[strat]
                 cfg = CampaignConfig(
@@ -324,7 +340,10 @@ def run_nightly(
                 combined["errored"] += report.errored
                 combined["survivors"].extend(report.survivors)
     finally:
+        con_read.close()
         store.close()
+
+    min_bars = min(lengths) if lengths else 1
 
     audit = audit_from_campaign(combined, n_obs_per_lane=max(1, min_bars // 5))
 
