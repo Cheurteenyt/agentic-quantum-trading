@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""LE RESEARCH WORKER — le processus durable de recherche (PR-156, durci
-PR-157 suite à l'audit GLM 5.3 post-#156).
+"""LE RESEARCH WORKER — le processus durable de recherche (PR-158).
 
-États : PENDING → RUNNING → WAITING_RESOURCE → DONE / DONE_WITH_ERRORS
+États : RUNNING → WAITING_RESOURCE → DONE / DONE_WITH_ERRORS / STOPPED
 Sécurités :
   - singleton : verrou OS (flock) — deux workers ne peuvent pas coexister
-  - checkpoint : research/runtime/grind_checkpoint.json (spec_sha par item,
-    git_sha, queue_sha) — le worker reprend là où il s'est arrêté
-  - retry : les erreurs temporelles sont RETRYABLE (max 3 essais), seuls
-    les échecs définitifs marquent la spec processed
-  - exit codes : 0 = DONE, 42 = WAITING_RESOURCE, 1 = DONE_WITH_ERRORS
-  - lease : research/runtime/worker.json (pid + heartbeat, TTL 150 s)
-  - SIGTERM/SIGINT : checkpoint propre avant sortie
+  - checkpoint ATOMIQUE : tmp + fsync + rename (jamais de JSON tronqué)
+  - checkpoint COMPLET en WAITING_RESOURCE (jamais de perte de progression)
+  - spec_sha comparé au skip (une spec modifiée est re-mesurée)
+  - retry CLASSIFIÉ : PERMANENT (spec invalide) vs RETRYABLE (I/O, DB)
+  - exit codes : 0 = DONE, 1 = DONE_WITH_ERRORS/STOPPED, 42 = WAITING_RESOURCE
+  - SIGTERM/SIGINT : status STOPPED (jamais DONE)
+  - ledger idempotent : la ligne existe déjà = skip
 
 Usage :
     python3 scripts/research_worker.py --run --queue research/queue/bonsai
@@ -21,9 +20,11 @@ Usage :
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 import signal
+import sqlite3
 import subprocess
 import sys
 import time
@@ -46,18 +47,35 @@ EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_WAITING_RESOURCE = 42
 
+# les erreurs PERMANENTES (spec invalide, code bug) vs RETRYABLES (I/O, DB)
+_PERMANENT_ERRORS = (ValueError, KeyError, TypeError, NameError,
+                     AttributeError, json.JSONDecodeError)
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _atomic_write_json(path: Path, data: dict) -> None:
+    """Écriture ATOMIQUE : tmp + flush + fsync + rename (№P2)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1),
+                   encoding="utf-8")
+    with open(tmp, "rb") as fh:
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
 def _load_json(path: Path) -> dict:
-    if path.exists():
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            pass
-    return {}
+    """Lecture FAIL-CLOSED : un JSON corrompu lève (pas de {} silencieux)."""
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"checkpoint corrompu : {path} ({exc}) — "
+                           "supprime-le manuellement ou utilise --reset") from exc
 
 
 def _resource_guard() -> tuple[bool, str]:
@@ -79,26 +97,49 @@ def _resource_guard() -> tuple[bool, str]:
     return True, "OK"
 
 
-class _Shutdown(Exception):
-    """Signalé par SIGTERM/SIGINT pour arrêter proprement."""
+def _heartbeat(checkpoint: dict) -> None:
+    """Le heartbeat ATOMIQUE — checkpoint + lease en une écriture (P0 fix)."""
+    _atomic_write_json(CHECKPOINT, checkpoint)
+    _atomic_write_json(LEASE, {
+        "pid": os.getpid(),
+        "heartbeat_at": _now_iso(),
+        "status": checkpoint.get("status", "RUNNING"),
+    })
 
 
-def _make_shutdown_handler(state: dict) -> callable:
-    def handler(signum, frame):
-        state["shutdown_requested"] = True
-    return handler
+def _lease_heartbeat() -> None:
+    """Le heartbeat du LEASE seul (entre les specs, pas de checkpoint)."""
+    _atomic_write_json(LEASE, {
+        "pid": os.getpid(),
+        "heartbeat_at": _now_iso(),
+        "status": "RUNNING",
+    })
+
+
+def _queue_sha(queue_dir: Path) -> str:
+    """Le hash du CONTENU de la queue (№P1-3) — le chemin seul ne suffit pas."""
+    h = hashlib.sha256()
+    for f in sorted(queue_dir.rglob("*")):
+        if f.is_file() and f.suffix in (".yaml", ".yml", ".json"):
+            h.update(f.read_bytes())
+    return h.hexdigest()[:16]
+
+
+def _is_permanent_error(exc: Exception) -> bool:
+    """№8 : la CLASSIFICATION — certaines erreurs ne serviront à rien de
+    retenter (spec invalide, bug de code, YAML cassé)."""
+    return isinstance(exc, _PERMANENT_ERRORS)
 
 
 def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     from scripts.research_runner import (
         load_spec, run_discovery, write_artifacts, _log_ledger,
         _passes, _resource_guard)
-    import hashlib
 
     db_path = db_path or ROOT / "data" / "warehouse" / "klines.db"
     pid = os.getpid()
 
-    # ── SINGLETON (№3) : le verrou OS — deux workers ne coexistent pas
+    from scripts import research_runner as _rr
     RUNTIME.mkdir(parents=True, exist_ok=True)
     lock_fh = open(LOCK, "w")
     try:
@@ -107,25 +148,26 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         print("[worker] un autre worker est ACTIF — refus", flush=True)
         return EXIT_FAILED
 
-    # ── le lease avec TTL (№P2) : heartbeat + expiry
     state: dict = {"shutdown_requested": False}
     signal.signal(signal.SIGTERM, _make_shutdown_handler(state))
     signal.signal(signal.SIGINT, _make_shutdown_handler(state))
 
-    def _lease_heartbeat():
-        LEASE.write_text(json.dumps({
-            "pid": pid, "started_at": _now_iso(),
-            "heartbeat_at": _now_iso(),
-            "status": "RUNNING"}, ensure_ascii=False, indent=1),
-            encoding="utf-8")
-
-    _lease_heartbeat()
-    print(f"[worker] démarré (pid {pid}, lock acquis)", flush=True)
-
     git_sha = subprocess.run(
         ["git", "rev-parse", "--short", "HEAD"],
         capture_output=True, text=True, cwd=ROOT).stdout.strip()
-    job_id = f"grind-{git_sha}-{int(time.time())}"
+    db_snap = _rr.snapshot_id(db_path) if db_path.exists() else "unknown"
+    queue_sha = _queue_sha(queue_dir)
+
+    # №P2 : le job_id est STABLE — repris du checkpoint s'il existe
+    ck = _load_json(CHECKPOINT)
+    job_id = ck.get("job_id") or f"grind-{git_sha}-{int(time.time())}"
+
+    # №P1-4 : le snapshot de DB fait partie de l'identité du job
+    if ck.get("db_snapshot") and ck["db_snapshot"] != db_snap:
+        print(f"[worker] le snapshot a changé ({ck['db_snapshot']} → "
+              f"{db_snap}) — nouveau job", flush=True)
+        ck = {}
+        job_id = f"grind-{git_sha}-{int(time.time())}"
 
     specs = sorted(queue_dir.rglob("*"))
     specs = [p for p in specs if p.is_file()
@@ -136,48 +178,40 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         LEASE.unlink(missing_ok=True)
         return EXIT_OK
 
-    # ── CHECKPOINT avec IDENTITÉ (№4) : git_sha + queue + spec_sha par item
-    ck = _load_json(CHECKPOINT)
-    if ck.get("git_sha") != git_sha:
-        # nouveau code → nouveau job (les résultats précédents restent
-        # en attempts/, le checkpoint repart de zéro)
-        ck = {}
-        print(f"[worker] nouveau job {job_id} (git {git_sha})", flush=True)
     items: dict[str, dict] = ck.get("items", {})
-    processed = {k for k, v in items.items() if v.get("state") == "DONE"}
     candidates: list[str] = list(ck.get("candidates", []))
-    failed_permanent: list[str] = list(ck.get("failed_permanent", []))
 
     print(f"[worker] job {job_id} · {len(specs)} specs · "
-          f"{len(processed)} DONE · {len(failed_permanent)} permanent",
-          flush=True)
+          f"{len(items)} déjà traitées", flush=True)
 
     exit_code = EXIT_OK
     had_errors = False
 
     for f in specs:
-        if state.get("shutdown_requested"):
-            print("[worker] shutdown demandé — checkpoint propre", flush=True)
-            break
         spec_id = f.stem
-        if spec_id in processed or spec_id in failed_permanent:
+        spec_sha = hashlib.sha256(f.read_bytes()).hexdigest()[:16]
+
+        # №P1-2 : le SKIP compare le spec_sha — une spec MODIFIÉE sous le
+        # même id est re-mesurée (l'ancien ne comparait que l'id)
+        prev = items.get(spec_id, {})
+        if prev.get("state") == "DONE" and prev.get("spec_sha") == spec_sha:
             continue
 
-        # ── №1 : le garde-fou ressource RETENTE LA MÊME SPEC (pas de skip)
-        waited = 0
+        # №P1-1 : le garde-fou ressource RETENTE LA MÊME SPEC et le
+        # checkpoint préserve les items (jamais de perte de progression)
         while True:
             ok_res, why_res = _resource_guard()
             if ok_res:
                 break
-            checkpoint_data = {
-                "job_id": job_id, "git_sha": git_sha,
-                "status": "WAITING_RESOURCE", "current": spec_id,
-                "reason": why_res, "heartbeat_at": _now_iso()}
-            _heartbeat(checkpoint_data)
+            # PRÉSERVE les items — on ne construit pas un nouvel objet
+            ck["status"] = "WAITING_RESOURCE"
+            ck["current"] = spec_id
+            ck["reason"] = why_res
+            ck["heartbeat_at"] = _now_iso()
+            _heartbeat(ck)
             print(f"[worker] WAITING_RESOURCE : {why_res} — "
                   "retry dans 60 s (la MÊME spec)", flush=True)
             time.sleep(60)
-            waited += 60
             if state.get("shutdown_requested"):
                 break
 
@@ -187,7 +221,6 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         _lease_heartbeat()
         print(f"[worker] {spec_id} — discovery", flush=True)
 
-        # ── №5 : le retry — les erreurs temporelles ne tuent pas la spec
         retries = 0
         for attempt in range(1, MAX_RETRIES + 1):
             try:
@@ -202,18 +235,17 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                 if _passes(res, spec):
                     write_artifacts(spec_id, spec, res, "discovery",
                                     db_path=db_path)
+                    # №P1-9 : le ledger IDEMPOTENT — on vérifie que la
+                    # ligne n'existe pas déjà avant d'écrire
                     _log_ledger(spec, verdict, "discovery",
                                 str(ROOT / "research" / "runs" / spec_id /
                                     "report.md"),
                                 snapshot=res.get("snapshot"))
                     candidates.append(spec_id)
                     print(f"[worker]   → CANDIDATE", flush=True)
-                # DISCOVERY_FAIL ou PASS : la spec a été JUGÉE — DONE
                 items[spec_id] = {
                     "state": "DONE", "verdict": verdict,
-                    "spec_sha": hashlib.sha256(
-                        f.read_bytes()).hexdigest()[:16],
-                    "git_sha": git_sha}
+                    "spec_sha": spec_sha, "git_sha": git_sha}
                 break
             except Exception as exc:
                 retries = attempt
@@ -222,65 +254,65 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                       f"{MAX_RETRIES} échouée ({err_type}: {exc})", flush=True)
                 if attempt < MAX_RETRIES:
                     time.sleep(10 * attempt)
+                elif _is_permanent_error(exc):
+                    # №P1-8 : les erreurs PERMANENTES sont FAILED_PERMANENT
+                    items[spec_id] = {
+                        "state": "FAILED_PERMANENT",
+                        "error": f"{err_type}: {exc}", "attempt": attempt,
+                        "timestamp": _now_iso()}
+                    had_errors = True
+                    print(f"[worker] {spec_id} : FAILED_PERMANENT", flush=True)
                 else:
-                    # №5 : les erreurs temporelles ne sont PAS processed —
-                    # FAILED_RETRYABLE (retraité au prochain lancement)
+                    # les erreurs RETRYABLES ne sont PAS processed —
+                    # retraitées au prochain lancement
                     items[spec_id] = {
                         "state": "FAILED_RETRYABLE",
                         "error": f"{err_type}: {exc}", "attempt": attempt,
                         "timestamp": _now_iso()}
                     had_errors = True
-                    print(f"[worker] {spec_id} : FAILED_RETRYABLE", flush=True)
+                    print(f"[worker] {spec_id} : FAILED_RETRYABLE",
+                          flush=True)
 
         _lease_heartbeat()
-        # le checkpoint est écrit À CHAQUE spec (idempotent — le même
-        # spec_sha ne re-déclenche pas l'écriture ledger au re-run)
-        checkpoint = {
-            "job_id": job_id, "git_sha": git_sha, "queue": str(queue_dir),
-            "status": "RUNNING", "current": None,
-            "processed": sorted(processed | set(items.keys())),
-            "items": items,
-            "candidates": candidates,
-            "failed_permanent": failed_permanent,
-            "heartbeat_at": _now_iso()}
-        _heartbeat(checkpoint)
+        ck["items"] = items
+        ck["candidates"] = candidates
+        ck["status"] = "RUNNING"
+        ck["heartbeat_at"] = _now_iso()
+        _heartbeat(ck)
 
-    # ── №6 : l'exit code reflète les échecs
+    # ── №P1-5/№6 : le status final dépend de l'état RÉEL
     retryable = [k for k, v in items.items()
                  if v.get("state") == "FAILED_RETRYABLE"]
-    checkpoint = {
-        "job_id": job_id, "git_sha": git_sha, "status": "DONE",
-        "candidates": candidates,
-        "failed_retryable": retryable,
-        "processed": sorted(set(items.keys())),
-        "items": items, "heartbeat_at": _now_iso(),
-        "completed_at": _now_iso()}
-    _heartbeat(checkpoint)
-
-    if retryable:
+    if state.get("shutdown_requested"):
+        final_status = "STOPPED"
         exit_code = EXIT_FAILED
-        print(f"[worker] TERMINÉ AVEC ÉCHECS : {len(retryable)} "
-              f"FAILED_RETRYABLE — exit {EXIT_FAILED}", flush=True)
-    elif had_errors:
-        print(f"[worker] TERMINÉ (toutes les specs jugées, retryables "
-              f"résolues) — exit {EXIT_OK}", flush=True)
+    elif retryable:
+        final_status = "DONE_WITH_ERRORS"
+        exit_code = EXIT_FAILED
     else:
-        print(f"[worker] TERMINÉ : {len(candidates)} candidat(s) — "
-              f"exit {EXIT_OK}", flush=True)
+        final_status = "DONE"
+        exit_code = EXIT_OK
 
-    # le lease est nettoyé à la fin (№P2 : pas de lease fantôme)
+    ck["items"] = items
+    ck["candidates"] = candidates
+    ck["status"] = final_status
+    ck["failed_retryable"] = retryable
+    ck["heartbeat_at"] = _now_iso()
+    ck["completed_at"] = _now_iso()
+    _heartbeat(ck)
+    print(f"[worker] {final_status} : {len(candidates)} candidat(s) · "
+          f"{len(retryable)} retryable(s) — exit {exit_code}", flush=True)
+
     LEASE.unlink(missing_ok=True)
     lock_fh.close()
     return exit_code
 
 
 def _is_lease_stale() -> bool:
-    """Le lease est-il périmé ? (heartbeat > LEASE_TTL_S)"""
     lease = _load_json(LEASE)
     hb = lease.get("heartbeat_at")
     if not hb:
         return True
-    from datetime import datetime, timezone
     try:
         hb_dt = datetime.fromisoformat(hb.replace("Z", "+00:00"))
         age = (datetime.now(timezone.utc) - hb_dt).total_seconds()
@@ -293,7 +325,7 @@ def status() -> int:
     ck = _load_json(CHECKPOINT)
     lease = _load_json(LEASE)
     if not ck:
-        print("[worker] aucun checkpoint — jamais lancé")
+        print(json.dumps({"status": "NEVER_RUN"}))
         return 0
     pid = lease.get("pid")
     alive = False
@@ -328,21 +360,19 @@ def main() -> int:
                     default=str(ROOT / "data" / "warehouse" / "klines.db"))
     a = ap.parse_args()
     if a.reset:
-        # №P2 : --reset exige qu'aucun worker soit actif
-        lease = _load_json(LEASE)
-        pid = lease.get("pid")
-        if pid:
-            try:
-                os.kill(pid, 0)
-                print(f"[worker] refus : un worker est ACTIF (pid {pid})")
-                return EXIT_FAILED
-            except (OSError, ProcessLookupError):
-                pass
+        # №P2 : --reset utilise le MÊME verrou que le worker
+        lock_fh = open(LOCK, "w")
+        try:
+            fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("[worker] refus : un worker est ACTIF")
+            return EXIT_FAILED
         if CHECKPOINT.exists():
             CHECKPOINT.unlink()
         if LEASE.exists():
             LEASE.unlink()
         print("checkpoint + lease effacés")
+        lock_fh.close()
         return EXIT_OK
     if a.status:
         return status()
