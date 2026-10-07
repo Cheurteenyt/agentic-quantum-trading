@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,6 +34,52 @@ REPORTS = ROOT / "reports"
 
 BPS_PER_8H_TO_ANNUAL_PCT = 3 * 365 / 100  # 3 reglements/jour, 100 bps = 1 %
 SEUIL_EXTREME_ANN = 50.0  # % annualises
+
+# FIX F-041 : la fraîcheur du cache funding est un CONTRAT, pas une
+# information. Le cache est un SNAPSHOT live (F-030) : chaque symbole porte
+# son propre `cached_at`, et 48 des 73 symboles de la prod ont > 25 h
+# (9 > 30 j, max 127 j) alors que le mtime du fichier n'a que 15,5 h.
+# Un funding vieux de 4 mois annualisé à 3×365 donne un chiffre qui a
+# l'air d'un taux et qui n'en est pas un.
+FUNDING_MAX_AGE_S = 25 * 3600
+
+
+def load_fresh_ranked(max_age_s: float = FUNDING_MAX_AGE_S) -> tuple[list[dict], int]:
+    """Les symboles du cache dont le `cached_at` est dans la fenêtre.
+
+    Retourne (rows, n_rejetes). Un symbole sans `cached_at` est REJETÉ :
+    l'absence d'horodatage n'est pas une fraîcheur, c'est une donnée qu'on
+    ne peut pas dater — et le code qui suit annualise ce qu'on lui donne.
+    """
+    try:
+        with CACHE.open(encoding="utf-8") as fh:
+            cache = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return [], 0
+    now = time.time()
+    rows: list[dict] = []
+    rejected = 0
+    for sym, entry in cache.get("symbols", {}).items():
+        data = entry.get("data") or {}
+        latest = _ann_pct(data.get("latest_funding_bps_per_8h"))
+        avg = _ann_pct(data.get("avg_funding_bps_per_8h"))
+        if latest is None or avg is None:
+            continue
+        age = now - float(entry.get("cached_at") or 0)
+        if age > max_age_s:
+            rejected += 1
+            continue
+        rows.append({
+            "symbol": sym,
+            "latest_ann": latest,
+            "avg_ann": avg,
+            "heat": latest - avg,
+            "who_collects": "shorts" if latest > 0 else "longs",
+            "session_note": _session_note(sym),
+        })
+    rows.sort(key=lambda r: abs(r["latest_ann"]), reverse=True)
+    return rows, rejected
+
 
 # Perps d'actions / matieres premieres : horaires New York, erreur
 # -2016 NO_TRADING_WINDOW hors session (working-map Aster legacy).
@@ -57,24 +104,8 @@ def _ann_pct(bps_per_8h: float | None) -> float | None:
 
 
 def load_ranked() -> list[dict]:
-    with CACHE.open(encoding="utf-8") as fh:
-        cache = json.load(fh)
-    rows: list[dict] = []
-    for sym, entry in cache.get("symbols", {}).items():
-        data = entry.get("data") or {}
-        latest = _ann_pct(data.get("latest_funding_bps_per_8h"))
-        avg = _ann_pct(data.get("avg_funding_bps_per_8h"))
-        if latest is None or avg is None:
-            continue
-        rows.append({
-            "symbol": sym,
-            "latest_ann": latest,
-            "avg_ann": avg,
-            "heat": latest - avg,
-            "who_collects": "shorts" if latest > 0 else "longs",
-            "session_note": _session_note(sym),
-        })
-    rows.sort(key=lambda r: abs(r["latest_ann"]), reverse=True)
+    """Compatibilité : délègue à load_fresh_ranked (F-041)."""
+    rows, _ = load_fresh_ranked()
     return rows
 
 
@@ -130,10 +161,13 @@ def write_report(rows: list[dict]) -> Path:
 
 
 def main() -> int:
-    rows = load_ranked()
+    rows, rejected = load_fresh_ranked()
+    if rejected:
+        print(f"[scanner] {rejected} symbole(s) rejete(s) — cached_at > 25 h "
+              f"(funding trop vieux pour etre annualise)", file=sys.stderr)
     if not rows:
-        print("[scanner] cache funding vide — lancer refresh_aster_cache d'abord",
-              file=sys.stderr)
+        print("[scanner] cache funding vide ou tout perime — lancer "
+              "refresh_aster_cache d'abord", file=sys.stderr)
         return 1
     out = write_report(rows)
     print(f"[scanner] {len(rows)} symboles classes — rapport : {out}")
