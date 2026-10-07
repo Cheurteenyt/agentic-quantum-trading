@@ -104,7 +104,7 @@ def collect_funding_strategies(con: sqlite3.Connection
         opens = df["open"].values
         ret24 = close.pct_change(24) * 100
         vwap168 = ((close * volume).rolling(168).sum()
-                   / volume.rolling(168).sum())
+                   / volume.rolling(168).sum().replace(0, float("nan")))
         vwap_dev = (close - vwap168) / vwap168 * 100
         mu = vwap_dev.rolling(720, min_periods=100).mean()
         sd = vwap_dev.rolling(720, min_periods=100).std()
