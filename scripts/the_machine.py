@@ -39,7 +39,33 @@ from scripts.aster_indicators import atr as _true_atr  # noqa: E402
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.full_arsenal_2 import collect as collect_arsenal  # noqa: E402
-from scripts.portfolio_sim import KDB, MAJORS, btc_regime_series, monthly_rows  # noqa: E402
+from scripts.portfolio_sim import (  # noqa: E402
+    KDB, MAJORS, btc_regime_series, lev_capped, liq_params, monthly_rows)
+
+
+def _maint_of(symbol: str, fallback: float) -> float:
+    """Le maintMarginPercent réel du symbole (lu dans liq_params).
+
+    Lu au runtime, pas codé en dur : c'était justement l'erreur de F-038 —
+    une constante qui ne correspondait pas à exchangeInfo. `fallback` sert
+    si le symbole est absent de la table (les Synthetic : SCR, SI…).
+    """
+    return liq_params().get(symbol, (fallback, 0.0))[0]
+
+
+# FIX F-038 : les marges sont LUES, plus codées. Vérifié en base au moment du
+# correctif : les 6 majeures à 2,5 %, le flux memecoin à 16,66 %. Le dur 0,5
+# sous-estimait la ligne de mort de 2 % et de 16,1 % respectivement.
+MAINT_MAJORS = _maint_of("BTCUSDT", 2.5)
+MAINT_MEME = _maint_of("PONSUSDT", 16.66)   # le flux meme n'est pas homogène :
+                              # PONS/PENGU à 16,66 %, un à 25 % — d'où le
+                              # max des deux, lu par symbole dans run_stack
+# Marge de SÉCURITÉ sur le MAE, distincte de la marge de maintenance.
+# Sans elle, 100/(MAE+maint) met le mouvement de mort EXACTEMENT au MAE :
+# la liquidation est atteinte à l'égalité, donc le 0-liq n'est pas garanti.
+# C'est ce que le 0,5 attemptsait de faire, mais il était collé au mauvais
+# terme (maint au lieu de safety).
+SAFE_PCT = 0.5
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, MAKER_RT, TAKER_RT, funding_hourly_all, run_stack)
 
@@ -117,13 +143,27 @@ def collect_meme(con: sqlite3.Connection) -> list[dict]:
     return meme
 
 
-def levier_majors_safe(mae_gated: float, cap: float = 10.0) -> float:
-    """La règle 0-liq plafonnée au cap machine : lev ≤ min(cap, 100/(MAE+0,5)).
+def levier_majors_safe(mae_gated: float, cap: float = 10.0,
+                       maint_pct: float = MAINT_MAJORS,
+                       safety_pct: float = SAFE_PCT) -> float:
+    """La règle 0-liq plafonnée au cap machine.
 
-    Le même calcul que write_mae_state, exposé pur pour le test — le cap
-    ne bind que si le MAE gated dépasse 9,5 % (lev_safe < 10).
+        lev ≤ min(cap, 100 / (MAE + maint + safety))
+
+    FIX F-038 — deux défauts dans la même ligne :
+
+    1. `maint` était 0,5 (une confusion avec une marge de SÉCURITÉ). Le
+       maintMarginPercent réel des majeures est 2,5 %, lu dans liq_params. Le
+       dur sous-estimait la ligne de mort de 2 points : à 10x elle vaut
+       100/10 − 2,5 = 7,5 %, pas 9,5 %, et le MAE observé de 7,84 %
+       DÉPASSait la borne — donc la règle « garantit zéro liquidations par
+       construction » était infirmée par elle-même.
+
+    2. même avec le bon maint, 100/(MAE+maint) tombe pile SUR la frontière
+       (mouvement de mort = MAE au lieu de le dépasser) : il faut une marge
+       de sécurité STRICTE pour que l'invariant tienne. D'où `safety_pct`.
     """
-    return min(cap, 100.0 / (mae_gated + 0.5))
+    return min(cap, 100.0 / (mae_gated + maint_pct + safety_pct))
 
 
 def main() -> int:
@@ -207,14 +247,15 @@ def main() -> int:
 
     _stamp_expanding_med(gated)
     mae_gated = max(e["mae_adverse"] for e in gated)
-    lev_safe = 100 / (mae_gated + 0.5)
+    lev_safe = 100 / (mae_gated + MAINT_MAJORS + SAFE_PCT)   # FIX F-038
     write_mae_state(mae_gated, lev_safe)   # l'état du moniteur MAE (T8)
     # FIX lot1 (F5) : la machine appliquait 10x même quand son propre
     # lev_safe < 10 — le rapport affichait « BAISSER LE LEVIER » et
     # poussait quand même. La règle 0-liq plafonne, elle n'affiche pas.
     lev_majors = levier_majors_safe(mae_gated)
     for e in gated:
-        e["lev"] = lev_majors
+        e["lev"] = lev_capped(e["sym"], lev_majors)   # FIX F-038 : borné par
+                                          # le max_leverage RÉEL du symbole
 
     # ——— flux 2 : cascade memecoins 1x (levier mécanique) ———
     meme = collect_meme(con)
@@ -225,10 +266,10 @@ def main() -> int:
     if meme:
         meme.sort(key=lambda e: e["ts_ms"])
         mae_meme = max(e["mae_adverse"] for e in meme)
-        lev_meme = max(1, int(100 / (mae_meme + 0.5)))
+        lev_meme = max(1, int(100 / (mae_meme + MAINT_MEME + SAFE_PCT)))
         _stamp_expanding_med(meme)
         for e in meme:
-            e["lev"] = lev_meme
+            e["lev"] = lev_capped(e["sym"], lev_meme)
 
     # ——— flux 3 : survivor long 72h 1x ———
     # + le FILTRE ATR extrême : le décile supérieur (les LAB — les ×520 qui
