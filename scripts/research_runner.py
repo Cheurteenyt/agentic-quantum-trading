@@ -936,12 +936,17 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
 
 def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
                 snapshot: str | None = None,
-                fail_closed: bool = False) -> None:
+                fail_closed: bool = True) -> None:
     """FIX v8 (№21) : le snapshot du ledger est CELUI DU RUN — jamais
     recalculé implicitement sur une autre DB.
     FIX v16 (PR-149 Bloc B6) : au CONFIRM, l'écriture au ledger est
     FAIL-CLOSED — un CONFIRMED sans sa ligne de budget est une
-    sous-déclaration de gouvernance (l'ancien check=False laissait passer)."""
+    sous-déclaration de gouvernance (l'ancien check=False laissait passer).
+    PR-163 (P2 bug-hunter) : fail-closed PARTOUT — un PASS discovery
+    sans sa ligne de ledger est une pression de sélection invisible
+    (l'ancien défaut False laissait un ledger en erreur passer
+    silencieusement ; le worker enregistre alors FAILED_RETRYABLE et
+    re-tentera la SPEC au prochain lancement)."""
     if snapshot is None:
         try:
             snapshot = str(snapshot_id())

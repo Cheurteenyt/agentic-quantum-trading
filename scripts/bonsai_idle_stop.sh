@@ -30,8 +30,18 @@ w = json.load(open('$WORKER_LEASE'))
 print(w.get('pid', ''), w.get('heartbeat_at', ''))" 2>/dev/null || echo "")
     WPID=$(echo "$W" | cut -d' ' -f1)
     HB=$(echo "$W" | cut -d' ' -f2)
-    if [ -n "$WPID" ] && [ -n "$HB" ] \
-       && ps -p "$WPID" -o args= 2>/dev/null | grep -q "research_worker.py"; then
+    IS_WORKER=0
+    if [ -n "$WPID" ] && [ -r "/proc/$WPID/cmdline" ]; then
+        # PR-163 : basename EXACT d'un argument (une sous-chaîne confondrait
+        # test_research_worker.py avec le vrai worker)
+        while IFS= read -r -d '' a; do
+            if [ "$(basename "$a")" = "research_worker.py" ]; then
+                IS_WORKER=1
+                break
+            fi
+        done < "/proc/$WPID/cmdline"
+    fi
+    if [ "$IS_WORKER" = 1 ] && [ -n "$HB" ]; then
         AGE=$(python3 -c "
 from datetime import datetime, timezone
 hb = datetime.fromisoformat('$HB'.replace('Z', '+00:00'))

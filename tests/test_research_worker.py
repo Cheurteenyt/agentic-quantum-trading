@@ -10,6 +10,7 @@ et le refus des collisions de spec_id.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -136,13 +137,28 @@ class TestMigration(unittest.TestCase):
         self.assertIsNotNone(rw._engine_sha_at("440648e"))
         self.assertIsNone(rw._engine_sha_at("0000000"))
 
-    def test_db_inconnue_pas_de_transport(self):
+    def test_db_derivee_transporte_quand_meme(self):
+        # PR-163 (P0 du bug-hunter) : la db est appendée en continu —
+        # le drift ne bloque PLUS le transport (moteur prouvé identique)
+        with tempfile.TemporaryDirectory() as td:
+            ck = {"items": {"EXP-1": {"state": "DONE", "spec_sha": "a"}},
+                  "db_snapshot": "ANCIENNE", "git_sha": "440648e",
+                  "queue_sha": "q"}
+            with mock.patch.object(rw, "ARCHIVE", Path(td) / "archive"), \
+                 mock.patch.object(rw, "_engine_sha_at", lambda c: "e1"):
+                ck2, note = rw._migrate_checkpoint(ck, "db1", "e1", "q1")
+            self.assertTrue(ck2["items"]["EXP-1"]["migrated"])
+            self.assertIn("db dérivée", note)
+            self.assertEqual(ck2["db_snapshot"], "db1")
+
+    def test_ere_pr160_sans_git_sha_inverifiable(self):
         with tempfile.TemporaryDirectory() as td:
             ck = {"items": {"EXP-1": {"state": "DONE"}},
                   "db_snapshot": "db-AUTRE"}
             with mock.patch.object(rw, "ARCHIVE", Path(td) / "archive"):
-                ck2, _ = rw._migrate_checkpoint(ck, "db1", "e1", "q1")
+                ck2, note = rw._migrate_checkpoint(ck, "db1", "e1", "q1")
             self.assertEqual(ck2, {})
+            self.assertIn("invérifiable", note)
 
     def test_schema_courant_intact(self):
         ck = {"schema_version": rw.SCHEMA_VERSION, "items": {}}
@@ -163,13 +179,17 @@ class TestIdentite(unittest.TestCase):
             self.assertEqual(ck2, {})
             self.assertTrue(notes and "IDENTITÉ" in notes[0])
 
-    def test_db_change_reinitialise(self):
+    def test_db_derive_conserve(self):
+        # PR-163 : la db dérive en continu (append) — items CONSERVÉS
         with tempfile.TemporaryDirectory() as td:
             ck = {"schema_version": 2, "engine_sha": "e1",
-                  "db_snapshot": "ANCIENNE", "queue_sha": "q1", "items": {}}
+                  "db_snapshot": "ANCIENNE", "queue_sha": "q1",
+                  "items": {"EXP-1": {"state": "DONE"}}}
             with mock.patch.object(rw, "ARCHIVE", Path(td) / "archive"):
-                ck2, _ = rw._reconcile_identity(ck, "db1", "e1", "q1")
-            self.assertEqual(ck2, {})
+                ck2, notes = rw._reconcile_identity(ck, "db1", "e1", "q1")
+            self.assertTrue(ck2["items"])
+            self.assertEqual(ck2["db_snapshot"], "db1")
+            self.assertTrue(notes and "dérivé" in notes[0])
 
     def test_queue_seule_change_conserve(self):
         with tempfile.TemporaryDirectory() as td:
@@ -203,13 +223,161 @@ class TestLoadSpecs(unittest.TestCase):
 
 
 class TestStatusCounts(unittest.TestCase):
-    def test_derive_de_items(self):
+    def test_derive_de_items_fallback(self):
         items = {"a": {"state": "DONE"}, "b": {"state": "DONE"},
                  "c": {"state": "FAILED_PERMANENT"},
                  "d": {"state": "FAILED_RETRYABLE"}}
-        self.assertEqual(rw._status_counts(items, 6),
+        self.assertEqual(rw._status_counts(items, None, 6),
                          {"done": 2, "failed_permanent": 1,
                           "failed_retryable": 1, "remaining": 3})
+
+    def test_derive_du_manifeste(self):
+        # PR-163 : seul le manifeste compte — une spec modifiée (sha ≠)
+        # ou disparue de la queue reste « remaining », un item orphelin
+        # ne masque plus rien
+        manifest = [{"id": "a", "sha": "s1"}, {"id": "b", "sha": "s2"},
+                    {"id": "c", "sha": "s3"}, {"id": "e", "sha": "s5"}]
+        items = {"a": {"state": "DONE", "spec_sha": "s1"},
+                 "b": {"state": "FAILED_PERMANENT", "spec_sha": "s2"},
+                 "c": {"state": "DONE", "spec_sha": "ANCIEN"},
+                 "d": {"state": "DONE", "spec_sha": "orphelin"}}
+        self.assertEqual(rw._status_counts(items, manifest, 4),
+                         {"done": 1, "failed_permanent": 1,
+                          "failed_retryable": 0, "remaining": 2})
+
+
+class TestQueueShaDone(unittest.TestCase):
+    def test_done_exclu_du_sel(self):
+        # PR-163 : le sel queue et le manifeste décrivent le MÊME ensemble
+        with tempfile.TemporaryDirectory() as td:
+            q1 = _mk_queue(Path(td) / "q1", {"EXP-1.json": "x: 1"})
+            q2 = _mk_queue(Path(td) / "q2",
+                           {"EXP-1.json": "x: 1", "done/EXP-0.json": "x: 0"})
+            self.assertEqual(rw._queue_sha(q1), rw._queue_sha(q2))
+
+
+class TestSingleton(unittest.TestCase):
+    def test_flock_refuse_second(self):
+        import fcntl as _fcntl
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            rt = tmp / "rt"
+            rt.mkdir()
+            fh = open(rt / "worker.lock", "w")
+            _fcntl.flock(fh, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+            patches = [
+                mock.patch.object(rw, "RUNTIME", rt),
+                mock.patch.object(rw, "CHECKPOINT",
+                                  rt / "grind_checkpoint.json"),
+                mock.patch.object(rw, "LEASE", rt / "worker.json"),
+                mock.patch.object(rw, "LOCK", rt / "worker.lock"),
+                mock.patch.object(rw, "ARCHIVE", rt / "archive"),
+                mock.patch.object(rw, "_git_engine_dirty", lambda: False),
+            ]
+            for p in patches:
+                p.start()
+            try:
+                rc = rw.run_worker(
+                    _mk_queue(tmp, {"EXP-T1.json": SPEC_BODY}),
+                    db_path=tmp / "nope.db")
+            finally:
+                _fcntl.flock(fh, _fcntl.LOCK_UN)
+                fh.close()
+                for p in patches:
+                    p.stop()
+            self.assertEqual(rc, rw.EXIT_FAILED)
+
+
+class TestStatus(unittest.TestCase):
+    def _run_status(self, ck: dict, lease: dict, rt: Path) -> dict:
+        (rt / "grind_checkpoint.json").write_text(json.dumps(ck))
+        (rt / "worker.json").write_text(json.dumps(lease))
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with mock.patch.object(rw, "CHECKPOINT",
+                               rt / "grind_checkpoint.json"), \
+             mock.patch.object(rw, "LEASE", rt / "worker.json"):
+            with contextlib.redirect_stdout(buf):
+                rw.status()
+        return json.loads(buf.getvalue())
+
+    def test_shape_counts_et_hb_dead(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            rt = tmp / "rt"
+            rt.mkdir()
+            ck = {"job_id": "j1", "git_sha": "g", "engine_sha": "e",
+                  "schema_version": 2, "status": "RUNNING",
+                  "items": {"a": {"state": "DONE", "spec_sha": "s1"}},
+                  "manifest": [{"id": "a", "sha": "s1"},
+                               {"id": "b", "sha": "s2"}],
+                  "candidates": [], "queue_total": 2}
+            # pid vivant (le test lui-même) mais sa cmdline ne porte PAS
+            # research_worker.py en basename → alive False (anti-recyclage)
+            d = self._run_status(
+                ck, {"pid": os.getpid(),
+                     "heartbeat_at": "2026-10-07T05:00:00+00:00"}, rt)
+            self.assertEqual(d["done"], 1)
+            self.assertEqual(d["remaining"], 1)
+            self.assertFalse(d["worker_alive"])
+            self.assertFalse(d["hb_dead"])
+            self.assertIn("lease_stale", d)
+
+    def test_pid_worker_reconnu_par_basename(self):
+        # PR-163 : un process dont un argument porte EXACTEMENT le
+        # basename research_worker.py est reconnu (et test_research_worker.py
+        # ne l'est pas — la sous-chaîne suffisait avant)
+        import time as _time
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            rt = tmp / "rt"
+            rt.mkdir()
+            ck = {"status": "RUNNING", "items": {}, "manifest": [],
+                  "candidates": [], "queue_total": 0}
+            proc = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(5)",
+                 "research_worker.py"])
+            try:
+                for _ in range(60):
+                    try:
+                        with open(f"/proc/{proc.pid}/cmdline", "rb") as fh:
+                            if b"research_worker" in fh.read():
+                                break
+                    except OSError:
+                        pass
+                    _time.sleep(0.05)
+                d = self._run_status(
+                    ck, {"pid": proc.pid,
+                         "heartbeat_at": "2026-10-07T05:00:00+00:00"}, rt)
+                self.assertTrue(d["worker_alive"])
+                # le même pid avec la cmdline du TEST ne l'est pas
+                d2 = self._run_status(
+                    ck, {"pid": os.getpid(),
+                         "heartbeat_at": "2026-10-07T05:00:00+00:00"}, rt)
+                self.assertFalse(d2["worker_alive"])
+            finally:
+                proc.kill()
+                proc.wait()
+
+    def test_lease_corrompu_ne_tue_pas_status(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            rt = tmp / "rt"
+            rt.mkdir()
+            ck = {"status": "RUNNING", "items": {}, "manifest": [],
+                  "candidates": [], "queue_total": 0}
+            (rt / "grind_checkpoint.json").write_text(json.dumps(ck))
+            (rt / "worker.json").write_text("{corrompu")
+            import io
+            import contextlib
+            buf = io.StringIO()
+            with mock.patch.object(rw, "CHECKPOINT",
+                                   rt / "grind_checkpoint.json"), \
+                 mock.patch.object(rw, "LEASE", rt / "worker.json"):
+                with contextlib.redirect_stdout(buf):
+                    rw.status()
+            self.assertIn("status", json.loads(buf.getvalue()))
 
 
 class TestEngineSha(unittest.TestCase):

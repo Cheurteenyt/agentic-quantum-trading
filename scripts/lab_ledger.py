@@ -368,15 +368,30 @@ def cmd_log(a) -> int:
                     _prev.append(json.loads(_l))
                 except json.JSONDecodeError:
                     pass
-    if any(
-            e.get("mode") == a.mode
-            and (e.get("snapshot") or "default") == a.snapshot
-            and e.get("family") == family and e.get("strategy") == strategy
-            and e.get("hypothesis_hash") == entry["hypothesis_hash"]
-            and e.get("parameter_hash") == entry["parameter_hash"]
-            and e.get("verdict") == verdict
-            and e.get("git") == entry["git"]
-            for e in _prev):
+    def _same_measure(e: dict) -> bool:
+        if not (e.get("mode") == a.mode
+                and (e.get("snapshot") or "default") == a.snapshot
+                and e.get("family") == family
+                and e.get("strategy") == strategy
+                and e.get("hypothesis_hash") == entry["hypothesis_hash"]
+                and e.get("parameter_hash") == entry["parameter_hash"]
+                and e.get("verdict") == verdict):
+            return False
+        if e.get("git") == entry["git"]:
+            return True
+        # PR-163 (P2 bug-hunter) : un commit ENTRE le log originel et le
+        # re-log post-crash ne doit pas casser la dédup SI le moteur de
+        # mesure est identique (commit docs-only) — on le PROUVE en
+        # comparant le sha moteur au commit d'origine. Moteur différent
+        # ou invérifiable = re-mesure légitime, la ligne est écrite.
+        try:
+            from scripts.research_worker import _engine_sha, _engine_sha_at
+            old = _engine_sha_at(e.get("git") or "")
+            return old is not None and old == _engine_sha()
+        except Exception:
+            return False
+
+    if any(_same_measure(e) for e in _prev):
         print(f"NO-OP : cette ligne exacte est déjà au registre "
               f"(même git {entry['git']}, même snapshot, même verdict) — "
               "pas de doublon")
