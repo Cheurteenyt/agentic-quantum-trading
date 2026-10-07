@@ -106,12 +106,17 @@ class MaeConsumersCoherenceTest(unittest.TestCase):
     """Les 3 consommateurs alignés (même règle, mêmes bases, flux inchangés)."""
 
     def test_tracker_flows_suivent_le_moniteur(self):
+        from scripts.the_machine import MACHINE_K
         base, lev = qft.FLOWS["machine_cascade_majors"]
-        self.assertEqual(base, 0.24)   # poids/base INCHANGÉS
+        # PR-167 : les bases forward taillées ×MACHINE_K — à l'identique
+        # du backtest machine (l'ancien forward utilisait les bases brutes)
+        self.assertAlmostEqual(base, 0.24 * MACHINE_K)
         self.assertEqual(lev, qft._cascade_majors_lever())
         for f in ("machine_cascade_meme", "machine_survivor_long",
                   "machine_vol_spike_6h"):
-            self.assertEqual(qft.FLOWS[f], (0.10, 1.0))   # flux non majors 1x
+            b, l = qft.FLOWS[f]
+            self.assertAlmostEqual(b, 0.10 * MACHINE_K)   # flux non majors 1x
+            self.assertEqual(l, 1.0)
 
     def test_etat_prod_absent_implique_defaut_sur_4x(self):
         """Tant que la machine n'a pas tiré, mae_state.json peut être absent :

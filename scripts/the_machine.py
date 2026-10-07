@@ -45,6 +45,13 @@ from scripts.stacked_portfolio import (  # noqa: E402
 
 REPORTS = ROOT / "reports"
 
+# PR-167 (P1 couche argent) : le facteur global K de la machine est une
+# constante MODULE — les consommateurs forward (paper_forward.py,
+# qubo_forward_tracker.py) l'importent pour tailler leurs bases à
+# l'IDENTIQUE du backtest (l'ancien forward taillait aux bases brutes :
+# le spread QUBO−MAIN mesurait en partie « survivor ×2 », pas les poids).
+MACHINE_K = 0.89
+
 # ——— T8 (pré-enregistré 01/10/2026, reports/aster_machine_deep_regimes.md) ———
 # L'état du moniteur MAE 6 majors est ÉCRIT pour asservir le levier cascade
 # majors des consommateurs (paper_forward.py, qubo_forward_tracker.py).
@@ -140,12 +147,25 @@ def main() -> int:
     if not events:
         print("[machine] cascade majors vide ce soir (aucun event) — rapport abstenu")
         return 0
-    q66 = float(np.nanquantile(
-        [e.get("al_score", float("nan"))
-         for e in events[:int(len(events) * 0.7)]], 2 / 3))
-    gated = [e for e in events
-             if not (np.isfinite(e.get("al_score", float("nan")))
-                     and e["al_score"] >= q66)]
+    # PR-167 (P1 couche argent) : le gate AL score est EXPANDING —
+    # l'ancien quantile sur les 70 premiers % appliqué à TOUT
+    # l'échantillon calibrait le seuil des trades précoces sur leur
+    # FUTUR (le live, lui, est causal → ROI/DD du backtest non
+    # reproductibles). Le décile ATR du survivor est déjà expanding :
+    # même doctrine. Socle minimal : pas de gate avant 30 scores connus.
+    _MIN_GATE_HIST = 30
+    gated = []
+    _gate_hist: list[float] = []
+    for e in events:
+        _s = e.get("al_score", float("nan"))
+        if len(_gate_hist) >= _MIN_GATE_HIST:
+            _q66 = float(np.nanquantile(_gate_hist, 2 / 3))
+            if np.isfinite(_s) and _s >= _q66:
+                gated.append(e)
+        elif np.isfinite(_s):
+            gated.append(e)
+        if np.isfinite(_s):
+            _gate_hist.append(_s)
     if not gated:
         print("[machine] cascade majors gated vide ce soir — rapport abstenu")
         return 0
@@ -221,7 +241,7 @@ def main() -> int:
             med_spike = float(np.median([e["atr_pct"] for e in spike]))
 
     # le facteur global K : la calibration du DD sur la cible (25 %)
-    _K = 0.89
+    _K = MACHINE_K
     # le tilt corrélation (×2/×0,5) : 0 mois négatif mais +6 pts de DD —
     # la variante agressive ; le défaut = la config spec (DD 24,8 %)
     CORR_TILT = "--corr-tilt" in sys.argv
@@ -260,27 +280,41 @@ def main() -> int:
     # corrélation basse = bruit idiosyncratique = elles rebondissent.
     _majors_dfs = {s: load_df(con, s) for s in MAJORS}
     _rets = {s: d["close"].pct_change().values for s, d in _majors_dfs.items()}
-    _idx = _majors_dfs["BTCUSDT"].index.astype("datetime64[ns]").asi8
+    # PR-167 (P2) : l'index PAR SYMBOLE — l'ancienne fenêtre indexait
+    # chaque major sur la timeline BTC (un trou chez un major corrélait
+    # des heures différentes) ; l'intersection temporelle par PAIRE est
+    # la seule lecture honnête
+    _idx_sym = {s: d.index.astype("datetime64[ns]").asi8
+                for s, d in _majors_dfs.items()}
+    _idx = _idx_sym["BTCUSDT"]
     con.close()
 
     all_ev = sorted(gated + meme + surv + spike, key=lambda e: e["ts_ms"])
 
     _WIN = 168
     for e in gated:
-        bi = int(np.searchsorted(_idx, e["ts_ms"], side="left"))
-        lo = bi - _WIN
-        if lo < 0:
-            e["corr"] = np.nan
-            continue
         pairs = []
         for i in range(len(MAJORS)):
             for j in range(i + 1, len(MAJORS)):
-                a, b = _rets[MAJORS[i]][lo:bi], _rets[MAJORS[j]][lo:bi]
+                si, sj = MAJORS[i], MAJORS[j]
+                bi_i = int(np.searchsorted(_idx_sym[si], e["ts_ms"],
+                                           side="left"))
+                bi_j = int(np.searchsorted(_idx_sym[sj], e["ts_ms"],
+                                           side="left"))
+                a_t = _idx_sym[si][max(0, bi_i - _WIN):bi_i]
+                b_t = _idx_sym[sj][max(0, bi_j - _WIN):bi_j]
+                common, ia, ib = np.intersect1d(a_t, b_t,
+                                                return_indices=True)
+                if len(common) <= 100:
+                    continue
+                a = _rets[si][max(0, bi_i - _WIN):bi_i][ia]
+                b = _rets[sj][max(0, bi_j - _WIN):bi_j][ib]
                 m = np.isfinite(a) & np.isfinite(b)
                 if m.sum() > 100:
                     sa, sb = a[m] - np.mean(a[m]), b[m] - np.mean(b[m])
                     if np.std(sa) * np.std(sb) > 0:
-                        pairs.append(np.mean(sa * sb) / (np.std(sa) * np.std(sb)))
+                        pairs.append(np.mean(sa * sb)
+                                     / (np.std(sa) * np.std(sb)))
         e["corr"] = float(np.mean(pairs)) if pairs else np.nan
     _c_hi = float(np.nanquantile(
         [e.get("corr", np.nan) for e in gated[:int(len(gated) * 0.7)]], 0.66))

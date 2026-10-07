@@ -280,7 +280,12 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
         # 1. le funding s'accrue AUX HEURES EXACTES des prints réels —
         #    AVANT les sorties : le print de l'heure de sortie est dû
         for pos in open_pos.values():
-            while pos["fund_prints"] and pos["fund_prints"][0][0] <= t:
+            # PR-167 (P2) : les prints à HH:00:00.002 (jitter DB) sont
+            # accrûs à LEUR heure — l'ancien <= t sur la grille glissait
+            # chaque print jitteré d'une heure (montants justes, chemin
+            # de DD décalé)
+            while pos["fund_prints"] and (
+                    (pos["fund_prints"][0][0] // H_MS) * H_MS) <= t:
                 amt = pos["fund_prints"].pop(0)[1]
                 cash += amt
                 pos["fund_accrued"] = pos.get("fund_accrued", 0.0) + amt
@@ -292,7 +297,27 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                 n_trades += 1
                 month = datetime.fromtimestamp(
                     t / 1000, tz=timezone.utc).strftime("%Y-%m")
-                if pos.get("liq_pending"):
+                # PR-167 (P1 couche argent) : la liq intrabar de la BOUGIE
+                # DE SORTIE — l'ancien code réalisait le ret (ici, step 2)
+                # AVANT le test de franchissement (step 4) : le hi/lo de
+                # la dernière bougie n'était JAMAIS confronté au seuil
+                # (preuve : short 10x, high +12 % ≥ seuil 9,5 %, close
+                # +1 % → liqs=0 au lieu de 1 ; run_stack comptait la liq
+                # → les deux moteurs divergeaient sur le même event)
+                mk_x = marks.get(sym)
+                crossed = False
+                if mk_x is not None and (liq_mode == "simulated"
+                                         or pos.get("liq_pending")):
+                    i_x = _mark_index(mk_x["t"], t)
+                    if i_x is not None:
+                        worst_x = float(
+                            (mk_x["high"] if pos["side"] == -1
+                             else mk_x["low"])[i_x])
+                        adverse_x = ((worst_x / pos["entry"] - 1.0)
+                                     if pos["side"] == -1
+                                     else (1.0 - worst_x / pos["entry"])) * 100.0
+                        crossed = adverse_x >= liq_thr
+                if pos.get("liq_pending") or crossed:
                     cash += -pos["margin"] + pos["fees"] \
                         - pos.get("fund_accrued", 0.0)
                     liq += 1
@@ -308,15 +333,18 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                 realized = (pos["side"] * pos["ret_pct"] / 100.0
                             * pos["notional"])
                 cash += realized
-                wins += 1 if (realized + pos["fund_total"]
-                              - pos["fees"]) > 0 else 0
-                net = realized + pos["fund_total"] - pos["fees"]
+                # PR-167 (P2) : le funding COMPTABILISÉ est celui réellement
+                # accrû (prints couverts) — l'ancien fund_total théorique
+                # revendiquait un funding que le cash n'a pas reçu
+                _fa = pos.get("fund_accrued", 0.0)
+                wins += 1 if (realized + _fa - pos["fees"]) > 0 else 0
+                net = realized + _fa - pos["fees"]
                 monthly[month] = monthly.get(month, 0.0) + net
                 trade_pnls.append({"sym": pos["sym"],
                                    "t_ms": pos["entry_ms"], "exit_ms": t,
                                    "notional": pos["notional"], "net": net,
                                    "liquidated": False})
-                fund_net += pos["fund_total"]
+                fund_net += _fa
                 del open_pos[sym]
         # 2. les nouvelles entrées
         for e in entries_by_t.get(t, []):
@@ -349,7 +377,10 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                 # funding accru, fund_net ne bouge pas)
                 max_dd_mtm = max(max_dd_mtm, 100.0 * margin / eq_now
                                  if eq_now > 0 else 0.0)
-                max_dd_worst = max_dd_mtm
+                # PR-167 (P2) : le mode stress ne doit PAS écraser le
+                # pire DD déjà mesuré (l'ancien = rétrogradait l'invariant
+                # publié worst ≥ mtm)
+                max_dd_worst = max(max_dd_worst, max_dd_mtm)
             else:
                 fee = notional * e["cost_pct"] / 100.0
                 cash -= fee
