@@ -30,6 +30,7 @@ Stdlib pure.
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,6 +63,53 @@ MIN_BARS = 3000
 599-1 636 barres produisaient des walk-forwards bruités et coûtaient
 ~20 % du temps de campagne ; le ciblage --target-bars 3000 des fetches
 est la même doctrine.)"""
+
+# FIX F-040 : le plafond du PLAN (nombre de séries) et son intervalle par
+# défaut. Le plan est resté SANS BORNE : le passage de l'univers 1h à
+# l'univers 15m l'a fait passer de 65 séries (29 min le 03/10) à 324 —
+# 324 × 6 stratégies = 280 584 lanes/nuit, ~86 min pour 3600 s de
+# TimeoutStartSec. Mesuré dans backtest.db : 56 290 lanes le 01→03/10
+# puis ~211 000 par nuit depuis le 04/10 (les 4 nuits en timeout).
+#
+# DEFAULT_INTERVAL = 1h : c'est l'intervalle que le registre et le
+# paper_forward utilisent partout, et le seul où MIN_BARS=3000 ait un
+# sens en jours (3000 h ≈ 125 j). Sur du 15m, 3000 barres ne font que
+# 31 jours — et 553 des 586 séries 1h sont de toute façon sous le seuil,
+# donc la campagne ne valide plus rien en 1h (constat séparé, non
+# traité ici).
+MAX_SERIES_NIGHTLY = 120
+DEFAULT_INTERVAL = "1h"
+
+_INTERVAL_MS = {"1m": 60_000, "3m": 180_000, "5m": 300_000,
+                "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000,
+                "2h": 7_200_000, "4h": 14_400_000, "6h": 21_600_000,
+                "8h": 28_800_000, "12h": 43_200_000, "1d": 86_400_000}
+
+
+def window_start_ts(con: sqlite3.Connection, sym: str, itv: str) -> int | None:
+    """Le timestamp de DÉBUT de la fenêtre glissante (les
+    MAX_BARS_NIGHTLY dernières barres), ou None si l'intervalle est inconnu.
+
+    None = repli sur le chargement complet : jamais moins correct,
+    seulement plus lent. FIX F-040 : sans ce bornage, load_bars charge
+    2,67 M de barres pour BTCUSDT 1m (1,2 Gio de RSS, 11,8 s mesurés) et
+    le caller en jetait 2 668 181 — 14,7 M de barres lues pour 972 000
+    utiles, × 324 séries dans le plan.
+    """
+    step = _INTERVAL_MS.get(itv)
+    if not step:
+        return None
+    row = con.execute(
+        "SELECT MAX(open_time) FROM klines WHERE symbol = ? AND interval = ?",
+        (sym, itv)).fetchone()
+    last = row[0] if row else None
+    if not last:
+        return None
+    # (N-1) et non (N+1) : avec un pas régulier, `open_time >= last-(N-1)*step`
+    # rend EXACTEMENT N barres. Un décalage de deux здесь est invisible sur
+    # une série profonde mais ferait charger 2 barres de trop.
+    return int(last) - (MAX_BARS_NIGHTLY - 1) * step
+
 
 MAX_BARS_NIGHTLY = 3000
 """La fenêtre glissante du validateur nocturne (30/09, forcée par le
@@ -256,9 +304,26 @@ def run_nightly(
         wanted = [s for s in wanted if s["symbol"].upper() in up]
     if intervals:
         wanted = [s for s in wanted if s["interval"] in intervals]
+    # FIX F-040 : sans intervalle explicite, on ne balaie QUE 1h. Le plan
+    # précédent prenait toutes les séries « usable » du warehouse, toutes
+    # intervalles confondues (cf. le commentaire de MAX_SERIES_NIGHTLY).
+    if not intervals and not symbols:
+        wanted = [s for s in wanted if s["interval"] == DEFAULT_INTERVAL]
     if not wanted:
         print("=== Campagne refusee : aucune serie utilisable dans le scope demande ===")
         return 1
+    # le plafond du plan : trié par volume de barres DESCendant, donc le
+    # truncation retire les séries les moins documentées (et non les
+    # premières par ordre alphabétique, ce qui serait arbitraire).
+    truncated = 0
+    if len(wanted) > MAX_SERIES_NIGHTLY:
+        wanted.sort(key=lambda s: -s["bars"])
+        truncated = len(wanted) - MAX_SERIES_NIGHTLY
+        wanted = wanted[:MAX_SERIES_NIGHTLY]
+        print(f"  ! plan plafonne a {MAX_SERIES_NIGHTLY} series "
+              f"({truncated} ecartees, les moins documentees) — "
+              f"elever --symbols/--interval ou MAX_SERIES_NIGHTLY "
+              f"pour couvrir l'univers complet")
 
     con = init_db(KLINES_DB)
     try:
@@ -311,7 +376,15 @@ def run_nightly(
         for sym, itv, snap in plan:
             # PR-164 : streaming — les barres d'UNE série vivent le temps
             # de ses stratégies puis sont rendues au collecteur
-            bars = load_bars(con_read, sym, itv)
+            # FIX F-040 : on NE CHARGE QUE LA FENÊTRE, pas toute la série
+            # puis on tronque. BTCUSDT 1m = 2,67 M de barres chargées
+            # (1,2 Gio de RSS mesurés) pour en garder 3000 : 11,8 s et
+            # ~1 Go gaspillés PAR SÉRIE, ×324 séries dans le plan.
+            # Le LIMIT porte sur les 3000 barres les PLUS RÉCENTES (les
+            # seules que la fenêtre glissante garde) — même résultat,
+            # ordre conservé.
+            bars = load_bars(con_read, sym, itv,
+                             start_ts=window_start_ts(con_read, sym, itv))
             if not bars:
                 print(f"  ! {sym} {itv} : aucune bougie chargee — skip")
                 continue
@@ -366,6 +439,21 @@ def run_nightly(
 
     path = write_report(sections, run_id, reports_dir)
     print(f"  rapport : {path}")
+
+    # FIX F-040 : le retour ne vaut plus que si la campagne a PRODUIT.
+    # Un exit 0 sur 100 % de lanes en erreur faisait passer le run pour
+    # réussi alors que rien n'avait été calculé — le nightly est un
+    # ExecStart= BLOQUANT, donc les 20 étapes suivantes étaient sautées
+    # sans aucun signal.
+    tested = combined["tested"]
+    errored = combined["errored"]
+    if tested and errored >= tested:
+        print(f"  ! {errored}/{tested} lanes en erreur — campagne SANS "
+              f"resultat, retour non nul")
+        return 1
+    if not tested:
+        print("  ! aucune lane testee — campagne vide, retour non nul")
+        return 1
     return 0
 
 
