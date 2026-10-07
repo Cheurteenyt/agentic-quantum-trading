@@ -44,7 +44,7 @@ from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.funding_series import FundingSeries, funding_series_all  # noqa: E402,F401
 from scripts.portfolio_sim import (  # noqa: E402
-    KDB, MAJORS, btc_regime_series, monthly_rows)
+    KDB, MAJORS, btc_regime_series, lev_capped, liq_move_for, monthly_rows)
 
 REPORTS = ROOT / "reports"
 CAPITAL = 100.0
@@ -114,6 +114,13 @@ def collect_funding_strategies(con: sqlite3.Connection
         for name, sig, lev, hold in (("funding_div", fdiv_sig, 3, 12),
                                      ("confluence", conf_sig, 3, 24)):
             fee_rt = TAKER_RT
+            # FIX F-038 — le levier really exécutable : 75 symboles de
+            # l'univers ont max_leverage < 3 (8 sans valeur), Aster refuse
+            # l'ordre au-delà. On plafonne, on ne rejette pas : le trade reste
+            # dans le portefeuille mais au levier que l'exchange accepte.
+            lev_eff = lev_capped(sym, lev)
+            if lev_eff <= 0:
+                continue
             for t in np.where(sig)[0]:
                 ei = t + 1
                 if ei + hold >= len(idx_ns) or t < 300:
@@ -126,7 +133,7 @@ def collect_funding_strategies(con: sqlite3.Connection
                     continue
                 exit_px = df["close"].values[exit_j]
                 out = {"sym": sym, "ts_ms": int(idx_ns[ei]),
-                       "strategy": name, "lev": lev, "hold_h": hold,
+                       "strategy": name, "lev": lev_eff, "hold_h": hold,
                        "fee_rt_bps": fee_rt,
                        "entry": entry, "exit": exit_px,
                        "price_ret_short": (entry - exit_px) / entry * 100,
@@ -204,7 +211,11 @@ def run_stack(events: list[dict], capital: float, size_fn,
         _drain(e["ts_ms"])                 # sorties et latent dus AVANT cet event
         if busy.get(e["strategy"], 0) > e["ts_ms"]:
             continue                       # la stratégie est déjà en position
-        liq_move = 100.0 / e["lev"] - 0.5
+        # FIX F-038 — maintMarginPercent réel par symbole (le -0.5 dur
+        # repoussait la ligne de mort de 4,5 % au lieu de 2,5 % sur les
+        # majeures, et de 16,16 % au lieu de 16,66 % sur les 365 symboles
+        # à maint 16,66 % : sous-comptage des liquidations partout).
+        liq_move = liq_move_for(e["sym"], e["lev"])
         if oracle and e["mae_adverse"] >= liq_move:
             continue                       # l'oracle ne le prend pas
         # le sizing peut recevoir l'état du wallet (balance, drawdown courant) :

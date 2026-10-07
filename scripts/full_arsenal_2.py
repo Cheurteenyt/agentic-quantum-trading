@@ -29,7 +29,9 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.paper_forward import funding_div_mask  # noqa: E402
-from scripts.portfolio_sim import KDB, MAJORS, btc_regime_series, monthly_rows  # noqa: E402
+from scripts.portfolio_sim import (  # noqa: E402
+    KDB, MAINT_PCT, MAJORS, btc_regime_series, lev_capped, liq_params,
+    monthly_rows)
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, MAKER_RT, TAKER_RT, funding_hourly_all, run_stack)
 
@@ -220,10 +222,16 @@ def main() -> int:
     for name, ev in sorted(streams.items()):
         maes = np.array([e["mae_adverse"] for e in ev])
         mae_max = float(maes.max())
-        lev = max(1, int(100 / (mae_max + 0.5)))
+        # FIX F-038 — la marge de maintenance du SMOYEN de sécurité est le
+        # maintMarginPercent RÉEL du symbole, pas 0,5 %. Sur les majeures
+        # (2,5 %) la règle lev ≤ 100/(MAE+0,5) autorisait 10x alors que la
+        # ligne de mort réelle est plus proche : le MAE observée DÉPASSAIT
+        # la borne. Le levier par stream est plafonné par symbole.
         med = float(np.median([e.get("atr_pct", 2.0) or 2.0 for e in ev]))
         for e in ev:
-            e["lev"] = lev
+            mm = liq_params().get(e["sym"], (MAINT_PCT, 0.0))[0]
+            lev = max(1, int(100 / (mae_max + mm)))
+            e["lev"] = lev_capped(e["sym"], lev)
             e["atr_ref"] = med
         def fn(e, st=None, med=med):
             a = e.get("atr_pct")
@@ -246,7 +254,9 @@ def main() -> int:
     cascade = collect_featured(regime, "majors")
     for e in cascade:
         e["strategy"] = "cascade"
-        e["lev"] = 10
+        e["lev"] = lev_capped(e["sym"], 10)   # FIX F-038 : 10x sur majeures
+                                         # (max_leverage 20) mais la LIGNE DE
+                                         # MORT est à 7,5 %, pas 9,5 %
         e["hold_h"] = 24
         e["fee_rt_bps"] = MAKER_RT
     add_rolling_scores(cascade)
