@@ -266,8 +266,11 @@ def main() -> int:
                 mask = funding_div_mask(df, fh_sym)
                 if name == "funding_div_plus_vwap_short":
                     tp = (df["high"] + df["low"] + df["close"]) / 3
+                    # NaN (pas pd.NA) : le dénominateur nul doit donner un
+                    # dev NaN (comparaison False), pas exploser astype(float)
+                    # — le crash TypeError 'NAType' du nightly du 07/10 03:24
                     vwap = ((tp * df["volume"]).rolling(168).sum()
-                            / df["volume"].rolling(168).sum().replace(0, pd.NA))
+                            / df["volume"].rolling(168).sum().replace(0, float("nan")))
                     dev = ((df["close"] - vwap) / vwap).astype(float)
                     mask = mask & (dev > 3 * dev.rolling(168).std()).fillna(False)
                 ev = df.index[mask]

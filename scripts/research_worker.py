@@ -168,16 +168,38 @@ def _engine_sha() -> str:
     return h.hexdigest()[:16]
 
 
+def _engine_sha_at(commit: str) -> str | None:
+    """Le sha moteur TEL QU'IL ÉTAIT au commit (PR-162) — `git show` des
+    modules de mesure : la migration peut PROUVER (ou réfuter) que le
+    moteur du checkpoint ère PR-160 est celui d'aujourd'hui.
+    None = invérifiable (commit inconnu, fichier absent, git en erreur)."""
+    h = hashlib.sha256()
+    for p in ENGINE_FILES:
+        rel = str(p.relative_to(ROOT))
+        proc = subprocess.run(["git", "show", f"{commit}:{rel}"],
+                              capture_output=True, cwd=ROOT)
+        if proc.returncode != 0:
+            return None
+        h.update(rel.encode())
+        h.update(b"\0")
+        h.update(proc.stdout)
+    return h.hexdigest()[:16]
+
+
 def _git_engine_dirty() -> bool:
     """True si un MODULE DE MESURE tracké est modifié non commité —
     le code exécuté ne serait décrit par aucun sha (fail-closed, même
     doctrine que cmd_confirm). Les docs/ledger/studies ne comptent pas :
-    ils ne changent pas ce qu'une discovery mesure."""
-    out = subprocess.run(
+    ils ne changent pas ce qu'une discovery mesure. PR-162 : une erreur
+    git (repo corrompu, git absent) est aussi un refus — on ne peut pas
+    PROUVER l'arbre propre, donc on ne démarre pas."""
+    proc = subprocess.run(
         ["git", "status", "--porcelain", "--",
          *[str(p.relative_to(ROOT)) for p in ENGINE_FILES]],
-        capture_output=True, text=True, cwd=ROOT).stdout
-    return any(not l.startswith("??") for l in out.splitlines())
+        capture_output=True, text=True, cwd=ROOT)
+    if proc.returncode != 0:
+        return True
+    return any(not l.startswith("??") for l in proc.stdout.splitlines())
 
 
 def _is_terminal(prev: dict, spec_sha: str) -> bool:
@@ -206,14 +228,32 @@ def _migrate_checkpoint(ck: dict, db_snap: str, engine_sha: str,
     arch = ARCHIVE / f"grind_checkpoint-{tag}.json"
     _atomic_write_json(arch, ck)
     if ck.get("db_snapshot") and ck["db_snapshot"] == db_snap:
+        # PR-162 : le transport n'est autorisé que si le moteur du
+        # checkpoint est PROUVÉ identique à celui d'aujourd'hui — le
+        # checkpoint ère PR-160 ne stockait pas d'engine_sha, on le
+        # reconstruit depuis son git_sha. Invérifiable ou différent =
+        # campagne propre (les résultats d'un autre moteur ne méritent
+        # pas de skip).
+        old_engine = (_engine_sha_at(ck["git_sha"])
+                      if ck.get("git_sha") else None)
+        if old_engine is None:
+            return {}, ("checkpoint ère PR-160 : moteur d'origine "
+                        f"invérifiable (git {ck.get('git_sha')}) — "
+                        f"archivé → {arch.name}, campagne propre")
+        if old_engine != engine_sha:
+            return {}, ("checkpoint ère PR-160 mais le MOTEUR a changé "
+                        f"depuis {ck['git_sha']} ({old_engine} → "
+                        f"{engine_sha}) — archivé → {arch.name}, "
+                        "campagne propre")
         carried = len(ck.get("items", {}))
         ck["schema_version"] = SCHEMA_VERSION
         ck["engine_sha"] = engine_sha
         ck["queue_sha"] = queue_sha
         for it in ck.get("items", {}).values():
             it["migrated"] = True
-        return ck, (f"migration ère PR-160 : {carried} item(s) transportés, "
-                    f"ancien checkpoint archivé → {arch.name}")
+        return ck, (f"migration ère PR-160 : {carried} item(s) transportés "
+                    f"(moteur prouvé identique à {ck['git_sha']}), ancien "
+                    f"checkpoint archivé → {arch.name}")
     return {}, (f"checkpoint LEGACY sans identité vérifiable — archivé → "
                 f"{arch.name}, campagne propre")
 
@@ -395,14 +435,14 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                                  name="lease-heartbeat")
     hb_thread.start()
 
-    for f, spec_id, spec_sha in spec_tuples:
+    for f, spec_id, start_sha in spec_tuples:
         # №P1-2 : le SKIP compare le spec_sha — une spec MODIFIÉE sous le
         # même id est re-mesurée (l'ancien ne comparait que l'id)
         prev = items.get(spec_id, {})
         # PR-161 : FAILED_PERMANENT est VRAIMENT terminal — via _is_terminal
         # qui exige le spec_sha (l'item PR-160 ne le portait pas et était
         # donc re-joué à l'infini malgré le commentaire)
-        if _is_terminal(prev, spec_sha):
+        if _is_terminal(prev, start_sha):
             continue
 
         # №P1-1 : le garde-fou ressource RETENTE LA MÊME SPEC et le
@@ -428,14 +468,25 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
 
         print(f"[worker] {spec_id} — discovery", flush=True)
 
-        # PR-161 : les bytes sont lus UNE SEULE FOIS — le spec_sha scellé
-        # et le spec exécuté sont les mêmes (une modification de la spec
-        # pendant la campagne ne peut plus glisser sous le sha)
-        raw = f.read_bytes()
         retries = 0
+        spec_sha = start_sha  # par défaut ; l'essai qui réussit le rescelle
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                spec = load_spec(f, raw=raw)
+                # PR-162 : le sha EXÉCUTÉ fait foi — lecture, parse, puis
+                # relecture de vérification : une spec modifiée pendant la
+                # lecture annule l'essai (RETRYABLE, pas _PERMANENT) et la
+                # prochaine tentative repart de zéro
+                raw = f.read_bytes()
+                spec = load_spec(f)
+                if f.read_bytes() != raw:
+                    raise RuntimeError(
+                        "spec modifiée pendant la lecture — reprise")
+                spec_sha = hashlib.sha256(raw).hexdigest()[:16]
+                if spec_sha != start_sha:
+                    print(f"[worker] {spec_id} : la spec a changé depuis le "
+                          f"démarrage de campagne ({start_sha} → "
+                          f"{spec_sha}) — le sha EXÉCUTÉ est scellé",
+                          flush=True)
                 if spec.get("id") != spec_id:
                     raise ValueError(
                         f"spec.id {spec.get('id')!r} ≠ nom de fichier "
