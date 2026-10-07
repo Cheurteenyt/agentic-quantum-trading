@@ -666,6 +666,17 @@ ENTITY_PROFILE_CATALOG: dict[str, dict[str, Any]] = {
 }
 
 
+def _slugify_text(value: str) -> str:
+    """PR-174 : la fonction était appelée (get_entity_profile), jamais
+    définie — NameError au premier lookup hors catalogue. Sémantique de
+    scrapling_probe._slugify (alnum → bascasse, reste → tiret)."""
+    chars = [ch.lower() if ch.isalnum() else "-" for ch in (value or "").strip()]
+    slug = "".join(chars)
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug.strip("-")
+
+
 def get_entity_profile(slug: str, entity: dict[str, Any] | None = None) -> dict[str, Any]:
     normalized_slug = str(slug or "").strip().lower()
     if normalized_slug in ENTITY_PROFILE_CATALOG:

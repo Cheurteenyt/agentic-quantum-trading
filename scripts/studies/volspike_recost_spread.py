@@ -19,6 +19,10 @@ ROOT = Path(__file__).resolve().parents[2]   # scripts/studies/ → racine (le p
 sys.path.insert(0, str(ROOT))
 
 from scripts.p5_frequency_test import run_flat, stats_block  # noqa: E402
+from scripts.portfolio_sim import monthly_rows  # noqa: E402
+# PR-174 (B1 audit Sonnet) : monthly_rows était appelé ligne ~47, jamais
+# importé — le script à l'origine d'un PASS du ledger ne pouvait PAS
+# s'exécuter depuis git (la mesure n'était pas reproductible)
 from scripts.volspike_meme_test import collect_vol_spike_meme  # noqa: E402
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, TAKER_RT, funding_hourly_all, run_stack)
