@@ -124,8 +124,13 @@ class TestFundingPreFirstPrint(unittest.TestCase):
                                   use_cache=False)
             f = mat["BTCUSDT"]["fund_6"]
             self.assertTrue(np.isnan(f[0]))     # fenêtre 0-6h : aucun print,
-            # AVANT le premier print connu (h20) → INCONNU
-            self.assertFalse(np.isnan(f[18]))   # fenêtre 18-24h : prints dedans
+            # AVANT le premier print connu (h21) → INCONNU
+            # PR-166 : STRICT — la fenêtre qui STRADDLE le 1er print
+            # (18-24h ⊃ h21) est INCONNUE (sa partie pré-print est
+            # incertaine, la somme partielle n'est pas la vérité) ; une
+            # fenêtre ENTIÈREMENT dans l'ère est connue
+            self.assertTrue(np.isnan(f[18]))
+            self.assertFalse(np.isnan(f[21]))   # 21-27h ⊆ ère couverte
 
 
 class TestForwardLastBar(unittest.TestCase):

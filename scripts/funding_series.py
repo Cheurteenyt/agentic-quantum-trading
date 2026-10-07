@@ -42,19 +42,26 @@ class FundingSeries:
 
         interval_h = la médiane des gaps observés (F12 : première classe —
         les intervalles Aster ne sont pas universellement 8h)."""
-        rows = sorted(rows)
         if not rows:
             raise ValueError("FundingSeries vide : aucune observation funding")
+        # PR-166 (P1 bug-hunter, preuve SQL : 33 % des prints à +1..17 ms
+        # après l'heure pile) : le JITTER ms faisait sortir le print de
+        # settlement de la fenêtre (t0, t1] quand t1 tombe à l'heure pile
+        # (searchsorted right) — le funding payé à la sortie était facturé
+        # à la fenêtre SUIVANTE : biais DIRECTIONNEL (longs favorisés,
+        # shorts pénalisés). Tous les prints sont ramenés à l'heure — la
+        # granularité du calendrier funding, aucun print réel n'est perdu.
+        rows = [((int(r[0]) // 3_600_000) * 3_600_000, float(r[1]))
+                for r in rows]
         # FIX v19 (№14) : dédupliquer les timestamps — deux lignes avec le
-        # même funding_time additionnaient le taux DEUX FOIS dans cumsum
-        seen = set()
-        deduped = []
-        for r in rows:
-            if r[0] not in seen:
-                seen.add(r[0])
-                deduped.append(r)
-            # sinon : doublon ignoré (le premier gagne)
-        rows = deduped
+        # même funding_time additionnaient le taux DEUX FOIS dans cumsum.
+        # PR-166 : la dédup garde la PREMIÈRE occurrence dans l'ordre
+        # d'ARRIVÉE (l'ancien tri (t, rate) + premier-gagnant gardait le
+        # rate MIN — arbitraire) ; le tri par timestamp vient en dernier.
+        seen: dict[int, float] = {}
+        for t_ms, rate in rows:
+            seen.setdefault(t_ms, rate)
+        rows = sorted(seen.items())
         t = np.array([float(r[0]) for r in rows], dtype=np.float64)
         v = np.array([float(r[1]) * 100.0 for r in rows], dtype=np.float64)
         gaps_h = np.diff(t)[np.diff(t) > 0] / 3_600_000.0

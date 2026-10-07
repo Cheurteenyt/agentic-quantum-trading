@@ -94,16 +94,22 @@ class TestLabels(unittest.TestCase):
         self.assertFalse(np.isnan(cols["ret_6"][0]))
 
     def test_le_funding_est_la_somme_des_prints_de_la_fenetre(self):
-        # 3 prints de 0,01 % aux heures 1, 2, 3 : un hold de 3h depuis h0
-        # encaisse (short) 0.03 %
+        # 3 prints de 0,01 % aux heures 1, 2, 3 : un hold de 2h depuis h1
+        # encaisse (short) 0.02 % — le print à l'HEURE D'ENTRÉE appartient
+        # au détenteur précédent (exclusion (t0, t1] correcte) et la
+        # fenêtre 1h→3h reste couverte par le dernier print
         self.con.executemany(
             "INSERT INTO funding_history VALUES ('BTCUSDT', ?, 0.0001)",
             [(1 * H_MS,), (2 * H_MS,), (3 * H_MS,)])
         self.con.commit()   # sinon l'autre connexion ne voit pas les prints
         from scripts.label_matrix import build_matrix
-        _, mat = build_matrix(["BTCUSDT"], horizons=(3,), db_path=self.db,
+        _, mat = build_matrix(["BTCUSDT"], horizons=(2,), db_path=self.db,
                               use_cache=False)
-        self.assertAlmostEqual(mat["BTCUSDT"]["fund_3"][0], 0.03, places=9)
+        self.assertAlmostEqual(mat["BTCUSDT"]["fund_2"][1], 0.02, places=9)
+        # PR-166 : STRICT — la fenêtre qui COMMENCE avant le 1er print
+        # (h0 < h1) est INCONNUE même si elle contient des prints (la
+        # somme partielle n'est pas le funding réellement payé)
+        self.assertTrue(np.isnan(mat["BTCUSDT"]["fund_2"][0]))
 
     def test_le_cache_est_stable_et_invalide_par_horizons(self):
         from scripts.label_matrix import build_matrix

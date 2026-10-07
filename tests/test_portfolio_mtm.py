@@ -119,7 +119,11 @@ class TestMtm(unittest.TestCase):
             _, mat = build_matrix(["BTCUSDT"], (6,), db_path=db,
                                   use_cache=False)
             f = mat["BTCUSDT"]["fund_6"]
-            self.assertFalse(np.isnan(f[0]))    # fenêtre 0-6h ⊆ prints ✓
+            # PR-166 : STRICT — la fenêtre 0-6h straddle le 1er print (h1)
+            # → INCONNUE ; la fenêtre 1-7h, entièrement dans l'ère, vaut
+            # la somme de ses prints (2h..7h → 6 × 0,01)
+            self.assertTrue(np.isnan(f[0]))
+            self.assertAlmostEqual(float(f[1]), 0.06, places=9)
             self.assertTrue(np.isnan(f[8]))     # fenêtre 8-14h > dernier print
 
 
