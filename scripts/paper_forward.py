@@ -503,6 +503,12 @@ def main() -> int:
         j = int(df.index.searchsorted(target, side="left")) - 1
         j = max(min(j, len(df.index) - 1), 0)
         exit_price = float(df["close"].iloc[j])
+        # PR-167 (P2) : un symbole en trou/délisté clampe j à sa dernière
+        # bougie — le prix devient STALE alors que exit_ts reste exact
+        # (ret faux en silence) ; on l'annonce
+        if int(df.index[j].value // 10**6) < exit_ts_ms - 3_600_000:
+            print(f"  ! {name}/{sym} : exit STALE (dernière bougie "
+                  f"{df.index[j]} < sortie {exit_ts_ms}) — ret non fiable")
         exit_ts = exit_ts_ms
         hold_h = (exit_ts_ms - entry_ts) / 3600000.0
         fund_col = round(funding_applied_pct(
@@ -534,9 +540,12 @@ def main() -> int:
     # cumul par candidat (closed uniquement)
     lines += ["", "## Cumul forward (closed uniquement)", ""]
     for name, horizon, _d in CANDIDATES:
+        # PR-167 (P2) : le filtre HORIZON — sans lui, les bi-horizons
+        # (24/168, 1440/2160) affichaient des lignes +Xh identiques
         r = con.execute("SELECT COUNT(*), AVG(ret_pct>0), AVG(ret_pct), "
                         "SUM(ret_pct) FROM paper_trades WHERE signal=? "
-                        "AND status='closed'", (name,)).fetchone()
+                        "AND horizon_h=? "
+                        "AND status='closed'", (name, horizon)).fetchone()
         if r[0]:
             lines.append(f"- **{name} +{horizon}h** : {r[0]} trades, "
                          f"WR {r[1]*100:.0f} %, moyen {r[2]:+.2f} %, "
@@ -547,8 +556,15 @@ def main() -> int:
     _lev = {"machine_cascade_majors": _cascade_majors_lever(),
             "machine_cascade_meme": 1, "machine_survivor_long": 1,
             "machine_vol_spike_6h": 1, "machine_deep_fast": 7.5}
-    _base = {"machine_cascade_majors": 0.24, "machine_cascade_meme": 0.10,
-             "machine_survivor_long": 0.10, "machine_vol_spike_6h": 0.10,
+    from scripts.the_machine import MACHINE_K as _machine_k
+    # PR-167 (P1 couche argent) : les bases forward taillées à l'IDENTIQUE
+    # du backtest machine (×K) — l'ancien forward taillait aux bases
+    # brutes : le spread QUBO−MAIN mesurait en partie « survivor ×2 »,
+    # pas les poids. deep_fast n'est pas un flux machine (pas de K).
+    _base = {"machine_cascade_majors": 0.24 * _machine_k,
+             "machine_cascade_meme": 0.10 * _machine_k,
+             "machine_survivor_long": 0.10 * _machine_k,
+             "machine_vol_spike_6h": 0.10 * _machine_k,
              "machine_deep_fast": 0.10}
     _mrows = con.execute(
         "SELECT signal, symbol, direction, entry_ts, exit_ts, exit_price, "

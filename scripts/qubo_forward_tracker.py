@@ -30,12 +30,16 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 KDB = ROOT / "data" / "warehouse" / "klines.db"
+if str(ROOT) not in sys.path:
+    # PR-167 : l'import de MACHINE_K (the_machine) exige ROOT sur le path
+    sys.path.insert(0, str(ROOT))
 
 # ——— LEVIER CASCADE MAJORS ASSERVI AU MAE (T8, pré-enregistré 01/10/2026,
 # reports/aster_machine_deep_regimes.md) — MÊME RÈGLE que paper_forward.py ———
@@ -61,11 +65,14 @@ def _cascade_majors_lever(state_path: Path | None = None) -> float:
 
 # les 4 flux de la machine : (base marge, levier) — paper_forward.py, mais le
 # levier majors est résolu au CHARGEMENT via le moniteur MAE (défaut sûr 4x).
+# PR-167 (P1 couche argent) : bases taillées ×MACHINE_K — à l'IDENTIQUE du
+# backtest machine (l'ancien forward utilisait les bases brutes).
+from scripts.the_machine import MACHINE_K as _MACHINE_K  # noqa: E402
 FLOWS: dict[str, tuple[float, float]] = {
-    "machine_cascade_majors": (0.24, _cascade_majors_lever()),
-    "machine_cascade_meme": (0.10, 1.0),
-    "machine_survivor_long": (0.10, 1.0),
-    "machine_vol_spike_6h": (0.10, 1.0),
+    "machine_cascade_majors": (0.24 * _MACHINE_K, _cascade_majors_lever()),
+    "machine_cascade_meme": (0.10 * _MACHINE_K, 1.0),
+    "machine_survivor_long": (0.10 * _MACHINE_K, 1.0),
+    "machine_vol_spike_6h": (0.10 * _MACHINE_K, 1.0),
 }
 WEIGHTS: dict[str, dict[str, float]] = {
     "MAIN": {f: 1.0 for f in FLOWS},
@@ -162,10 +169,15 @@ def main() -> int:
     per_flow = {f: {"played": 0, "blocked": 0, "open": 0} for f in FLOWS}
     for t in trades:
         if t["flow"] in per_flow:
-            if t["status"] == "open":
-                per_flow[t["flow"]]["open"] += 1
-            elif t["rowid"] in played_ids:
-                per_flow[t["flow"]]["played"] += 1
+            # PR-167 (P2) : le test PLAYED d'abord — un trade avec son
+            # slot est joué (clos) ou open (en cours) ; un open SANS slot
+            # est bloqué (l'ancien ordre open-first ne classait jamais un
+            # open dans blocked, ce qui gonflait « ouverts »)
+            if t["rowid"] in played_ids:
+                if t["status"] == "open":
+                    per_flow[t["flow"]]["open"] += 1
+                else:
+                    per_flow[t["flow"]]["played"] += 1
             else:
                 per_flow[t["flow"]]["blocked"] += 1
     wallets = {n: run_wallet(n, played) for n in WEIGHTS}
@@ -183,8 +195,11 @@ def main() -> int:
     L.append(f"=== QUBO FORWARD TRACKER — {now:%d/%m/%Y %H:%M} UTC ===")
     L.append("Convention : ret_pct = ret PRIX net (coûts+funding déduits, sans "
              "levier) ; PnL frac = ret/100 × base × lev × poids ; base/lev = "
-             f"paper_forward (majors 0.24@{FLOWS['machine_cascade_majors'][1]:.0f}x "
-             "asservi MAE, meme/survivor/vol 0.10@1x) ; "
+             f"paper_forward taillé ×MACHINE_K (majors "
+             f"{FLOWS['machine_cascade_majors'][0]:.3f}"
+             f"@{FLOWS['machine_cascade_majors'][1]:.0f}x "
+             f"asservi MAE, meme/survivor/vol "
+             f"{FLOWS['machine_cascade_meme'][0]:.3f}@1x) ; "
              "créneaux run_stack (1 slot/flux, flux croisés), ordre entry_ts.")
     L.append(f"Ledger : {len(trades)} trades machine_* ({len(trades) - open_n} "
              f"closed, {open_n} open) ; joués aux créneaux : {len(played)}, "
