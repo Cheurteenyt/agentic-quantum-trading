@@ -144,7 +144,9 @@ class LedgerTests(unittest.TestCase):
 
     def test_real_repo_ledger_and_policy_parse(self):
         pol = L.read_policy(ROOT / "agent" / "policy.yaml")
-        self.assertEqual(set(pol["budget"]), {"total_experiments", "per_family", "per_strategy", "max_parameter_variants"})
+        self.assertEqual(set(pol["budget"]), {"total_experiments", "per_family",
+                                              "per_strategy", "max_parameter_variants",
+                                              "prior_trials"})
         self.assertTrue(all(isinstance(v, int) and v > 0 for v in pol["budget"].values()))
         entries = L.load(ROOT / "research" / "ledger" / "trials.jsonl", pol["effective"])
         self.assertGreater(len(entries), 0)

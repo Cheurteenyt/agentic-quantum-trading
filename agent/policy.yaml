@@ -11,6 +11,11 @@ weekly_budget:
   per_strategy: 3
   max_parameter_variants: 12
   on_exhaustion: STOP          # jamais « une petite amélioration supplémentaire »
+  # PR-175 (B3 audit Sonnet 5.5) : les essais ANTÉRIEURS au ledger comptent
+  # dans la multiplicité — ~341 cellules citées dans les commits/messages
+  # avant le 05/10 (264 + 55 + 12 + 10). Sans eux, t* affiché 3,34 au lieu
+  # du vrai ≈ 3,84 : le seuil de preuve était trop doux.
+  prior_trials: 341
 
 agent_limits:
   max_files_modified: 8
