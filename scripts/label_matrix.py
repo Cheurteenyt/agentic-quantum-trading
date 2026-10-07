@@ -149,7 +149,11 @@ def _build_symbol(con: sqlite3.Connection, sym: str,
             # AUX DEUX BOUTS — avant le premier print connu, le funding est
             # INCONNU (l'ancien code donnait 0.0 « connu » aux fenêtres
             # pré-listing-funding : 2025-09 → 2025-10-27 sur univ10)
-            known_start = (ts / 1e6 >= fts_ms[0]) | (k1 > k0)
+            # PR-166 (P2 bug-hunter) : la clause | (k1 > k0) ré-admettait
+            # les fenêtres straddlant le PREMIER print (un partiel présenté
+            # comme complet, ex. pré-listing-funding 2025-10-27) — connu =
+            # commencé après le premier print, point.
+            known_start = ts / 1e6 >= fts_ms[0]
             # FIX v15 (№4) : le TROU INTERNE — une fenêtre de durée ≥
             # l'intervalle du calendrier, sans AUCUN print, est un trou de
             # données (un print aurait dû exister), pas « 0 connu »

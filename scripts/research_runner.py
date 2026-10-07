@@ -227,7 +227,10 @@ def compute_features(con: sqlite3.Connection, sym: str,
             # jamais vu, pour toutes les barres)
             k = np.searchsorted(fser.times_ms, ts / 1e6, side="right") - 1
             fund_last = np.where(k >= 0, fser.rates_pct[np.maximum(k, 0)], np.nan)
-    except Exception:
+    except ValueError:
+        # PR-166 (P2 bug-hunter) : seul l'ABSENCE de funding est tolérée —
+        # l'ancien except Exception avalait une vraie erreur (DB lock,
+        # corruption) et rendait fund_last tout-NaN en silence
         pass
     return {"open_time_ns": ts,
             "range_pct": (h - l) / c * 100.0,
@@ -354,10 +357,18 @@ def event_mask(spec: dict, feats: dict, view, frozen=None,
                                 op=sig.get("op", ">="),
                                 thr=np.full(len(fvals), float(ft)), view=wide)
         else:
-            q = float(sig.get("quantile", 0.95))
-            thr = expanding_cached(fvals, q,
-                                   (*thr_key, sig["feature"], q)
-                                   if thr_key else None)
+            if "threshold" in sig:
+                # PR-166 (P1 bug-hunter) : un threshold DÉCLARÉ doit être
+                # honoré — l'ancienne branche ne lisait que quantile
+                # (défaut 0.95) alors que le gel repart du threshold
+                # déclaré : la confirmation aurait jugé un AUTRE signal
+                # que la discovery qui a produit le candidat
+                thr = np.full(len(fvals), float(sig["threshold"]))
+            else:
+                q = float(sig.get("quantile", 0.95))
+                thr = expanding_cached(fvals, q,
+                                       (*thr_key, sig["feature"], q)
+                                       if thr_key else None)
             raw = _mask_for(cols=feats, fvals=fvals, op=sig.get("op", ">="),
                             thr=thr, view=wide)
     # LE DÉCALAGE : l'entrée est la bougie SUIVANTE (le signal de i entre
@@ -375,10 +386,15 @@ def event_mask(spec: dict, feats: dict, view, frozen=None,
 
 
 def apply_universe(spec: dict, sym: str, mask: np.ndarray,
-                   feats: dict, horizon_h: int) -> np.ndarray:
+                   feats: dict, horizon_h: int,
+                   manifest: dict | None = None) -> np.ndarray:
     """LA primitive anti-survivorship (PR-147, durcie PR-148) : entry et
     sortie (entry + horizon) dans le span tradable du manifest. Une SEULE
     interprétation de l'univers pour discovery/confirmation/wallet/forward.
+
+    PR-166 : `manifest` permet au forward d'injecter une copie CLAMPÉE
+    (borne finie étendue à maintenant pour les vivants) — le backtest,
+    lui, passe toujours par le manifest gelé.
 
     FAIL-CLOSED (audit GLM 5.3 post-#147 №2) : un univers DÉCLARÉ mais non
     résoluble (manifest absent, symbole absent, bornes invalides) lève
@@ -389,7 +405,9 @@ def apply_universe(spec: dict, sym: str, mask: np.ndarray,
     from scripts.research_os import UniverseViolation
     from scripts.universe import load as _uload, tradable_window_ms
     try:
-        tw = tradable_window_ms(_uload(str(spec["universe"])), sym)
+        man = (manifest if manifest is not None
+               else _uload(str(spec["universe"])))
+        tw = tradable_window_ms(man, sym)
     except FileNotFoundError as exc:
         raise UniverseViolation(
             f"univers {spec['universe']!r} introuvable — fail-closed") from exc
@@ -522,7 +540,14 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
     except ScopeViolation as exc:
         return {"verdict": "SCOPE_VIOLATION", "reason": str(exc)}
     min_n = int(spec.get("criteria", {}).get("min_n", 30))
-    n_total, mean_all = _aggregate(per_symbol, min_n)
+    # PR-166 (P1 bug-hunter) : n et mean publiés = HORIZON 1 SEUL —
+    # l'agrégat tous horizons comptait chaque trigger ×H (preuve : n
+    # publié ×7,3) et le contrôle inverse (h1 seul) comparait deux
+    # populations différentes. Miroir exact de la confirmation (h1 seul).
+    h1 = spec.get("horizons", [24])[0]
+    per_h1 = {k: v for k, v in per_symbol.items()
+              if k.endswith(f"@{h1}h")}
+    n_total, mean_all = _aggregate(per_h1, min_n)
     # le contrôle inverse : le côté inversé doit être pire sur l'horizon 1
     inv = _study(spec, matrix, view, -1.0, db_path,
                  feats_by_sym=feats_by_sym)
@@ -830,10 +855,17 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
                                and stress_mean > 0.0
                                and fund_cov >= min_fund_cov
                                and not dd_breach
-                               and (not np.isfinite(deg) or deg <= deg_max))
+                               # PR-166 (P2 bug-hunter) : FAIL-CLOSED —
+                               # un dégagement incalculable (tr_mean ≤ 0,
+                               # NaN) est un REJET, pas un passage
+                               and (np.isfinite(deg) and deg <= deg_max))
                else "REJECTED")
     return {"verdict": verdict, "n": n_total, "mean": val_mean,
             "train_mean": tr_mean, "degradation_pct": deg,
+            # PR-166 (P2 bug-hunter) : l'horloge de maturation est STAMPÉE
+            # ICI — le manifest peut être réécrit par une re-discovery
+            # (preuve réelle : EXP-bonsai-h-18), jamais ce champ
+            "confirmed_at": datetime.now(timezone.utc).isoformat(),
             "stress_mean": stress_mean, "stress_multiplier": stress_mult,
             "fund_coverage": fund_cov,
             "dd_breach_windows": dd_breach,
@@ -869,7 +901,12 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
         except json.JSONDecodeError:
             old_m = {}
         prov_now = _provenance()
+        # PR-166 (P2 bug-hunter) : le `kind` fait partie de l'identité —
+        # une réécriture discovery↔confirmation à provenance égale
+        # écrasait report.md sans archivage (le ref du ledger discovery
+        # pointait alors vers le rapport de l'AUTRE phase)
         same = (old_m.get("spec_sha") == sha
+                and old_m.get("kind") == kind
                 and old_m.get("snapshot") == result.get("snapshot")
                 and old_m.get("git_sha") == prov_now.get("git_sha")
                 and old_m.get("diff_sha") == prov_now.get("diff_sha"))
@@ -1050,7 +1087,11 @@ def _confirm_locked(spec: dict, a) -> int:
     # est un état terminal impossible à moitié écrit
     _log_ledger(spec, "FAIL" if res["verdict"] == "REJECTED" else "PASS",
                 Mode.CONFIRMATION.value,
-                str(rr.RUNS / spec["id"] / "report.md"),
+                # PR-166 (P0 bug-hunter) : `rr` n'existe PAS dans ce module
+                # (résidu PR-150) — TOUTE confirmation CLI crashait en
+                # NameError APRÈS le calcul : verdict jeté, ledger jamais
+                # écrit, budget jamais décompté
+                str(RUNS / spec["id"] / "report.md"),
                 snapshot=res.get("snapshot"), fail_closed=True)
     pw = res.get("windows_pass")
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
@@ -1228,7 +1269,14 @@ def cmd_select(a) -> int:
         rows.append({"id": s.get("run_id"), "n": s.get("n", 0),
                      "mean": s.get("mean", float("nan")),
                      "worst": s.get("worst", float("nan")),
-                     "cluster": _cluster_key(spec)})
+                     "cluster": _cluster_key(spec),
+                     "verdict": s.get("verdict")})
+    # PR-166 (P1 bug-hunter) : seuls les DISCOVERY_PASS à mean fini sont
+    # éligibles — un FAIL (mean NaN) n'est jamais dominé (NaN compare
+    # toujours False) et sortait SUR la frontière comme CANDIDAT
+    rows = [r for r in rows
+            if r["verdict"] == "DISCOVERY_PASS"
+            and np.isfinite(r["mean"])]
     if not rows:
         print("aucune discovery à sélectionner")
         return 0

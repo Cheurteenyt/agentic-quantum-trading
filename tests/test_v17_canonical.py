@@ -170,8 +170,11 @@ class TestTrouPartiel(unittest.TestCase):
             # fenêtre 20→26h : le segment [9h, 25h) de 16h (> 1,5×8h)
             # intersecte la fenêtre → un print attendu manque → INCONNUE
             self.assertTrue(np.isnan(f[20]))
-            # fenêtre 0→6h : print à 1h, segments sains (8h ≤ 1,5×8h) → connu
-            self.assertFalse(np.isnan(f[0]))
+            # PR-166 : STRICT — la fenêtre 0-6h straddle le 1er print (h1)
+            # → INCONNUE ; la fenêtre 1-7h (entièrement dans l'ère, aucun
+            # print attendu) est connue
+            self.assertTrue(np.isnan(f[0]))
+            self.assertFalse(np.isnan(f[1]))
 
 
 class TestDiscoveryPinning(unittest.TestCase):

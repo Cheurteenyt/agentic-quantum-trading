@@ -85,10 +85,22 @@ def _load_run(run_id: str, runs_dir: Path = RUNS) -> tuple[dict, dict | None, st
         if s.get("frozen_thresholds"):
             frozen, src = s["frozen_thresholds"], "discovery_artifact"
     confirmed_at = ""
-    mfile = rdir / "manifest.json"
-    if mfile.exists():
-        m = json.loads(mfile.read_text(encoding="utf-8"))
-        confirmed_at = str(m.get("timestamp", ""))
+    # PR-166 (P2 bug-hunter) : l'horloge de maturation = la CONFIRMATION
+    # (champ confirmed_at du summary, stampé par run_confirmation) — le
+    # manifest est réécrit à chaque re-discovery et repartait les 30 jours
+    # à zéro. Le manifest ne reste que le repli (runs confirmés d'avant).
+    scfile = rdir / "summary_confirmation.json"
+    if scfile.exists():
+        try:
+            sc = json.loads(scfile.read_text(encoding="utf-8"))
+            confirmed_at = str(sc.get("confirmed_at", ""))
+        except json.JSONDecodeError:
+            confirmed_at = ""
+    if not confirmed_at:
+        mfile = rdir / "manifest.json"
+        if mfile.exists():
+            m = json.loads(mfile.read_text(encoding="utf-8"))
+            confirmed_at = str(m.get("timestamp", ""))
     return spec, frozen, confirmed_at
 
 
@@ -150,6 +162,24 @@ def collect(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
         # la barre last_closed soit DANS le masque, la fin de vue est son
         # open + 1h (l'intervalle [open, open+1h) de la barre fermée)
         view = DataView(snap, Mode.PAPER.value, val_end + 1, last_closed + H_MS)
+        # PR-166 (P1 bug-hunter) : le manifest est un INSTANTANÉ backtest —
+        # sa last_bar (univ10 : 05/10 14:00) tronquait SILENCIEUSEMENT la
+        # collecte forward (36 h+ d'events perdus sur 7 confirmés en
+        # maturation). Au forward SEUL : les vivants (sans delist) voient
+        # leur borne finie étendue à maintenant — le backtest reste gelé.
+        fwd_manifest = None
+        if spec.get("universe"):
+            import copy as _copy
+            from scripts.universe import load as _uload
+            try:
+                base = _uload(str(spec["universe"]))
+            except FileNotFoundError:
+                base = None
+            if base is not None:
+                fwd_manifest = _copy.deepcopy(base)
+                for e in fwd_manifest.get("symbols", {}).values():
+                    if not e.get("delisted_at") and e.get("last_bar_ms"):
+                        e["last_bar_ms"] = max(int(e["last_bar_ms"]), now)
         new_events = []
         for sym in d["symbols"]:
             feats = feats_by_sym.get(sym)
@@ -161,8 +191,11 @@ def collect(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
             mask = rr.event_mask(spec, feats, view, frozen=fz,
                                  thr_key=(*rr._db_key(db_path), sym))
             # FIX v15 (№4) + PR-149 : le masque anti-survivorship au
-            # forward — la même primitive que le backtest
-            mask = rr.apply_universe(spec, sym, mask, feats, h1)
+            # forward — la même primitive que le backtest ; PR-166 : avec
+            # le manifest clampé aux vivants (le gel backtest tronquait
+            # la collecte au dernier bar du manifest)
+            mask = rr.apply_universe(spec, sym, mask, feats, h1,
+                                     manifest=fwd_manifest)
             idx = [i for i in range(len(mask)) if mask[i]
                    and (sym, int(feats["open_time_ns"][i] // 10**6)) not in seen]
             for i in idx:
@@ -316,7 +349,10 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
         mk0 = _fetch_marks(db_path, syms0,
                            min(t["t_ms"] for t in trades),
                            max(t["exit_ms"] for t in trades))
-        mk_available = bool(mk0)
+        # PR-166 (P2 bug-hunter) : TOUS les symboles requis — l'ancien
+        # bool(mk0) passait le gate si UN SEUL symbole avait des marks,
+        # les autres tombant en MTM-sur-entry sans contrôle
+        mk_available = bool(mk0) and all(s in mk0 for s in syms0)
     stats = {"n": len(trades), "mean": None, "wr": None, "sharpe": None,
              "fund_known_pct": None}
     if trades:
@@ -330,7 +366,11 @@ def status(run_id: str, db_path: Path = KDB, now_ms: int | None = None,
                 for t in trades]
         stats["mean"] = sum(rets) / len(rets)
         stats["wr"] = sum(1 for r in rets if r > 0) / len(rets) * 100.0
-        stats["sharpe"] = _sharpe_trades(rets, now, trades[0]["t_ms"])
+        # PR-166 (P2 bug-hunter) : le SPAN part du MIN des timestamps —
+        # trades[0] suit l'ordre du journal (par symbole) et faussait
+        # l'annualisation √(per_year)
+        stats["sharpe"] = _sharpe_trades(rets, now,
+                                         min(t["t_ms"] for t in trades))
         # FIX v15 (№7) : le moteur CANONIQUE (MTM horaire, le même que la
         # confirmation) — l'ancien wallet close-only pouvait dire « excellent
         # en confirmation, différent en maturation »

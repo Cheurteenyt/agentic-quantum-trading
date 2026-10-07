@@ -163,7 +163,11 @@ class TestFundingHole(unittest.TestCase):
             _, mat = build_matrix(["BTCUSDT"], (6,), db_path=db,
                                   use_cache=False)
             f = mat["BTCUSDT"]["fund_6"]
-            self.assertFalse(np.isnan(f[0]))    # fenêtre 0-6h ⊆ ère, print
+            # PR-166 : STRICT — la fenêtre 0-6h straddle le 1er print (h1)
+            # → INCONNUE ; la fenêtre 1-7h, entièrement dans l'ère, est
+            # connue (aucun print attendu sur (1h, 7h])
+            self.assertTrue(np.isnan(f[0]))
+            self.assertFalse(np.isnan(f[1]))
             self.assertTrue(np.isnan(f[20]))    # 20-26h : dans le trou 1-25h
             self.assertTrue(np.isnan(f[40]))    # 40-46h : trou aussi
 

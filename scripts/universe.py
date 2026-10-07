@@ -77,14 +77,23 @@ def generate(name: str, symbols: list[str], db_path: Path = KDB) -> Path:
                 "WHERE symbol=?", (sym,)).fetchone()
             fstart, fprints = (int(frows[0]) if frows and frows[0] else None), \
                 int(frows[1]) if frows else 0
-            f_cov = (fprints / span_hours * 100.0) if span_hours else 0.0
+            # PR-166 (P2 bug-hunter) : la couverture funding se lit en
+            # prints ATTENDUS (span / intervalle 8h du calendrier), pas
+            # par heure — une série parfaite affichait 12,5 %.
+            f_cov = (fprints / max(1.0, span_hours / 8.0)
+                     * 100.0) if span_hours else 0.0
+            # PR-166 (P1 bug-hunter, 271/589 symboles) : le funding prouve
+            # une existence ANTÉRIEURE à la première kline (backfill de
+            # klines tardif) — la borne tradeable est le MIN des deux,
+            # sinon apply_universe jetait les premiers mois tradeables.
+            first_bar = min(start, fstart) if fstart else start
             entries[sym] = {
                 "observed_start": _ms_iso(start),
                 "observed_end": _ms_iso(end),
                 # FIX v15 (№8) : la précision HORAIRE — les dates ISO sont
                 # de la présentation, les ms sont la vérité (l'arrondi au
                 # jour rendait la dernière journée non tradable)
-                "first_bar_ms": start,
+                "first_bar_ms": first_bar,
                 "last_bar_ms": end,
                 "bars": int(len(ts)),
                 "gaps": gaps,
@@ -166,6 +175,14 @@ def main() -> int:
     a = ap.parse_args()
     symbols = [s.strip().upper() for s in a.symbols.split(",") if s.strip()]
     if a.generate:
+        if not symbols:
+            # PR-166 : FAIL-CLOSED — l'ancien comportement écrivait un
+            # manifest VIDE en silence (boucle sur rien) : tout
+            # apply_universe suivant échouait en UniverseViolation sans
+            # que la cause soit évidente
+            print("REFUS : --generate exige --symbols (liste CSV) — "
+                  "un manifest vide ne sera pas écrit")
+            return 2
         out = generate(a.name, symbols, Path(a.db))
         m = load(a.name)
         print(f"manifest écrit : {out}")
