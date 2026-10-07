@@ -81,8 +81,12 @@ def apply_op(values, op: str, thr):
 
 
 # ------------------------------------------------------------------ spec
-def load_spec(path: Path) -> dict:
-    spec = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+def load_spec(path: Path, raw: bytes | None = None) -> dict:
+    # PR-161 : raw permet au worker de parser EXACTEMENT les bytes qu'il a
+    # hashés — une spec modifiée entre le sha et l'exécution est une course
+    # fermée (le fichier n'est plus jamais relu)
+    spec = yaml.safe_load(
+        raw if raw is not None else Path(path).read_text(encoding="utf-8"))
     for k in ("id", "hypothesis", "data", "signal", "horizons"):
         if k not in spec:
             raise ValueError(f"spec incomplète : champ requis manquant '{k}'")

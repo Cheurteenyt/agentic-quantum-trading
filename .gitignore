@@ -145,3 +145,9 @@ scripts/studies/x501_openmarket/results/
 # le coffre Obsidian généré par Ariad (dérivé, jamais source)
 .codebase-memory-vault/
 research/ledger/confirm.lock
+
+# PR-161 : l'état runtime du worker n'est PAS du code — un clone récupérait
+# des status/pid/heartbeat historiques (grind_checkpoint, worker.json, lock)
+research/runtime/*.json
+research/runtime/*.lock
+research/runtime/archive/

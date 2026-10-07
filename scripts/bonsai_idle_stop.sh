@@ -18,19 +18,26 @@ if echo "$HEALTH" | grep -q '"is_processing": *true'; then
 fi
 
 # un worker de recherche actif ? (PR-157 — le lease du research_worker)
-WORKER_LEASE="/run/media/cheurteen/Jeux SSD/trading-agent/research/runtime/worker.json"
+# PR-161 : chemin déduit du repo (le script survit à un déplacement) et le
+# PID du lease est VALIDÉ (vivant + cmdline = research_worker.py) — un PID
+# recyclé d'un autre processus ne protège plus à tort
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORKER_LEASE="$ROOT/research/runtime/worker.json"
 if [ -f "$WORKER_LEASE" ]; then
-    HB=$(python3 -c "
+    W=$(python3 -c "
 import json
 w = json.load(open('$WORKER_LEASE'))
-print(w.get('heartbeat_at', ''))" 2>/dev/null || echo "")
-    if [ -n "$HB" ]; then
+print(w.get('pid', ''), w.get('heartbeat_at', ''))" 2>/dev/null || echo "")
+    WPID=$(echo "$W" | cut -d' ' -f1)
+    HB=$(echo "$W" | cut -d' ' -f2)
+    if [ -n "$WPID" ] && [ -n "$HB" ] \
+       && ps -p "$WPID" -o args= 2>/dev/null | grep -q "research_worker.py"; then
         AGE=$(python3 -c "
 from datetime import datetime, timezone
 hb = datetime.fromisoformat('$HB'.replace('Z', '+00:00'))
 print(int((datetime.now(timezone.utc) - hb).total_seconds()))" 2>/dev/null || echo 9999)
         if [ "$AGE" -lt 150 ]; then
-            echo "$(date -Is) worker de recherche actif (heartbeat ${AGE}s) — stop différé"
+            echo "$(date -Is) worker de recherche actif (pid $WPID, heartbeat ${AGE}s) — stop différé"
             exit 0
         fi
     fi

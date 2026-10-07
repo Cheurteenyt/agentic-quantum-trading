@@ -353,6 +353,34 @@ def cmd_log(a) -> int:
     if is_reverify:
         entry["reverify"] = True
     entry = {k: v for k, v in entry.items() if v is not None}
+    # PR-161 : l'IDEMPOTENCE RÉELLE — la MÊME mesure (même code git, mêmes
+    # données snapshot, même hypothèse/params, même verdict) déjà au
+    # registre = NO-OP. Le crash du worker entre l'écriture du ledger et
+    # son checkpoint ne duplique plus la gouvernance (l'ancien append
+    # réécrivait la ligne ; budget, multiplicité et re-vérifications
+    # lisaient alors un double événement). Scan brut du fichier (sans le
+    # filtre d'effective de load()) : la dédup porte sur TOUT l'historique.
+    _prev: list[dict] = []
+    if Path(a.ledger).exists():
+        for _l in Path(a.ledger).read_text(encoding="utf-8").splitlines():
+            if _l.strip():
+                try:
+                    _prev.append(json.loads(_l))
+                except json.JSONDecodeError:
+                    pass
+    if any(
+            e.get("mode") == a.mode
+            and (e.get("snapshot") or "default") == a.snapshot
+            and e.get("family") == family and e.get("strategy") == strategy
+            and e.get("hypothesis_hash") == entry["hypothesis_hash"]
+            and e.get("parameter_hash") == entry["parameter_hash"]
+            and e.get("verdict") == verdict
+            and e.get("git") == entry["git"]
+            for e in _prev):
+        print(f"NO-OP : cette ligne exacte est déjà au registre "
+              f"(même git {entry['git']}, même snapshot, même verdict) — "
+              "pas de doublon")
+        return EXIT_OK
     p = Path(a.ledger)
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8") as f:  # append atomique : jamais de réécriture du fichier
