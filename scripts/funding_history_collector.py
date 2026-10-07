@@ -61,7 +61,11 @@ def collect_symbol(con: sqlite3.Connection, symbol: str,
         (symbol,)).fetchone()
     last = row[0] if row and row[0] else None
     if backfill:
-        start = 0
+        # PR-177 (B5) : startTime=0 = PAS DE FILTRE côté API (elle renvoie
+        # la QUEUE — les 1000 points les plus récents, déjà en base :
+        # le backfill « 2021→ » ne ramenait RIEN). startTime=1 = depuis
+        # le listing réel (BTC : 2021-08-27, vérifié à la source)
+        start = 1
     elif last:
         start = int(last) + 1
     else:
