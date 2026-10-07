@@ -13,6 +13,7 @@ import asyncio
 import json
 import os
 import re
+import time   # PR-174 : utilisé aux lignes 623/690+, jamais importé
 from pathlib import Path
 
 import aiohttp
@@ -629,7 +630,10 @@ async def vision_agent(req: AgentInstruction):
 
         else:
             # Click, Move, Type, Shortcut, App, Scroll, etc.
-            step_entry["result"] = "exécuté"
+            # PR-174 : result n'était JAMAIS assigné (NameError à chaque
+            # tool générique) — l'exécution passe par l'appel générique
+            result = await asyncio.to_thread(_mcp_call_sync, client,
+                                             tool_name, params)
             if result.get("success") or result.get("error") is None:
                 step_entry["result"] = "exécuté"
             else:

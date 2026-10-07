@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re   # PR-174 : utilisé ligne ~1211, jamais importé
 import time
 import urllib.parse
 import urllib.request

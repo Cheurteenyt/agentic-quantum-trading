@@ -14,6 +14,16 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install --no-deps -r requirements.lock --quiet
+      - name: Oracle pyflakes (noms indéfinis — BLOQUANT, B7 audit Sonnet 5.5)
+        run: |
+          pip install pyflakes --quiet
+          # un seul nom indéfini doit faire échouer la CI (C3/C4 ont survécu
+          # à 7 et 2 PR sans cet oracle) ; les warnings "import *" ne
+          # comptent pas (pas de grep sur 'unable to detect')
+          if python -m pyflakes scripts backend discord_bot agent tests | grep "undefined name '"; then
+            echo "::error::undefined name détecté — corrige ou importe"
+            exit 1
+          fi
       - name: Run tests
         run: python scripts/run_tests.py --fast
       - name: Research integrity (invariants I001-I008)

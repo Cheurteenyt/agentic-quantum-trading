@@ -703,7 +703,10 @@ async def search_entities(q: str, limit: int = 10):
 @app.get("/api/market/signals", tags=["smart"])
 async def get_smart_signals(strength: str = None):
     """Signaux detectes par le Smart Engine."""
-    return {"signals": smart_engine.get_signals(strength=strength)}
+    # PR-174 : le lazy import existe (_get_smart_engine) — l'ancienne
+    # route référençait le nom module-level direct (jamais importé) :
+    # 500 à chaque appel
+    return {"signals": _get_smart_engine().get_signals(strength=strength)}
 
 @app.get("/api/market/smart-stats/{coin}", tags=["smart"])
 async def get_smart_stats(coin: str):

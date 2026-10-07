@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.fomo_harvest import _connect_cdp  # noqa: E402
 
 DB = ROOT / "data" / "fomo" / "fomo.db"
+BASE = "https://fomo.family"   # PR-174 : la constante existait au fallback reload, jamais définie
 
 # l'ANTI-DOUBLE-INSTANCE : un verrou exclusif dès l'import — si un
 # processus vit déjà, celui-ci sort (les orphelins tiennent la DB et

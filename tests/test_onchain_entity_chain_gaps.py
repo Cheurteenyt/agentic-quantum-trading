@@ -9,6 +9,7 @@ import json
 import time
 import hashlib
 from pathlib import Path
+from typing import Any   # PR-174 : utilisé ligne ~13400, jamais importé
 from unittest.mock import patch
 
 

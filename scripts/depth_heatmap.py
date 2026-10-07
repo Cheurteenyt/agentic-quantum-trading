@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
+import sys   # PR-174 : utilisé dans la branche « pas assez de données », jamais importé
 from datetime import datetime, timezone
 from pathlib import Path
 

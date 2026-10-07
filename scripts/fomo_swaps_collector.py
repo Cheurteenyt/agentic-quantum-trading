@@ -55,6 +55,7 @@ with sync_playwright() as p:
     # page DÉDIÉE — l'ancienne règle « réutiliser une page existante » volait
     # l'onglet du user et le naviguait vers l'accueil (le bug du 29/09)
     page = b.contexts[0].new_page()
+    created = True   # PR-174 : le drapeau était lu en fin de cycle, jamais défini
     page.goto("https://fomo.family/", wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(3000)
 
