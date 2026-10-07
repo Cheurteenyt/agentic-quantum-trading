@@ -16,8 +16,6 @@ ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" script
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/deep_fast_signals.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/qubo_forward_tracker.py --report
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/edge_regime_monitor.py
-ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --run
-ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --review
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/reevaluate_oos.py
 # P4 30/09/2026 : retiré — doublon OI. aster_oi_history.py ré-collecte l'univers complet dans
 # oi_history (klines.db), déjà couvert par oi-collector.timer (*:0/15, univers = klines 1h).
@@ -48,5 +46,25 @@ ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" script
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/the_machine.py
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/confluence_exact.py
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/full_arsenal_2.py
-TimeoutStartSec=3600
+# FIX F-040 : la campagne passe EN DERNIER et devient TOLÉRANTE (-).
+# C'est de loin l'étape la plus lourde : 29 min le 03/10 (65 séries), ~86 min
+# depuis que l'univers 15m a été ajouté au plan sans plafond (324 séries).
+# En 9e position, son dépassement de TimeoutStartSec interrompait le service
+# EN PLEIN et sailait 20 ExecStart= BLOQUANTS derrière : the_machine,
+# full_arsenal_2, aster_absorption, basis_guard, flow_snapshot,
+# depth_heatmap, housekeeping, memecoin_pulse, listing_watcher,
+# funding_history_collector… n'ont pas tourné du 04 au 07/10, et le journal
+# ne disait que « result=timeout ». Tolérante ET dernière, elle ne peut plus
+# tuer les étapes de la collecte. Son propre exit ≠ 0 (campagne vide ou
+# 100 % d'erreurs, cf. F-040) est journalisé sans avaler le reste.
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --run
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/nightly_campaign.py --review
+# FIX F-040 : 3600 s suffisaient le 03/10 (29 min de campagne). On les porte
+# à 7200 pour absorber un run long SANS jamais tuer les étapes bloquantes
+# de la collecte — la campagne est désormais bornée (MAX_SERIES_NIGHTLY) et
+# sa fenêtre est chargée en SQL borné, donc elle ne devrait pas dépasser
+# ~30 min. Le budget double est une marge, pas une autorisation de
+# dérive : le plafond du plan est le vrai garde-fou, ici on ne fait que
+# ne pas tuer le pipeline si l'univers grossit.
+TimeoutStartSec=7200
 
