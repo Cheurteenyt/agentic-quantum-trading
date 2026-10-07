@@ -133,7 +133,14 @@ class TestMigration(unittest.TestCase):
             self.assertIn("MOTEUR a changé", note)
 
     def test_engine_sha_at_commit_reel(self):
-        # intégration : le moteur à 440648e est calculable depuis git
+        # intégration : le moteur à 440648e est calculable depuis git —
+        # PR-179 : un clone SHALLOW (l'ancien défaut CI) n'a pas les
+        # ancêtres → skip propre au lieu d'un faux échec
+        shallow = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            capture_output=True, text=True, cwd=ROOT).stdout.strip()
+        if shallow == "true":
+            self.skipTest("clone shallow : l'ancêtre 440648e est absent")
         self.assertIsNotNone(rw._engine_sha_at("440648e"))
         self.assertIsNone(rw._engine_sha_at("0000000"))
 
