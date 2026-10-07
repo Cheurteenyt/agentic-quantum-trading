@@ -269,7 +269,7 @@
       }
     },
     "BTCUSDT": {
-      "cached_at": 1791334981.6164923,
+      "cached_at": 1791345328.5132015,
       "data": {
         "avg_funding_bps_per_8h": 0.45880800000000005,
         "avg_funding_rate": 4.58808e-05,
@@ -471,7 +471,7 @@
       }
     },
     "ETHUSDT": {
-      "cached_at": 1791334982.0810995,
+      "cached_at": 1791345328.9701023,
       "data": {
         "avg_funding_bps_per_8h": 0.620178,
         "avg_funding_rate": 6.20178e-05,
@@ -1316,5 +1316,5 @@
       }
     }
   },
-  "updated_at": 1791334992.7621715
+  "updated_at": 1791345328.9701111
 }
