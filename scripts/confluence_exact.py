@@ -54,8 +54,17 @@ def collect_conf_exact(con: sqlite3.Connection,
             continue
         mask = funding_div_mask(df, fh_sym)
         tp = (df["high"] + df["low"] + df["close"]) / 3
+        # FIX F-039 : un sentinelle pd.NA sur un dénominateur nul fait
+        # basculer la série en dtype OBJECT dès qu'une fenêtre roulante est
+        # entièrement nulle (le cas réel : 8 symboles de l'univers ont une
+        # fenêtre 168 sans volume), et l'astype(float) qui suit lève alors
+        # TypeError: float() argument must be ... not 'NAType'.
+        # float("nan") garde le dtype float64 : le dénominateur nul donne un
+        # dev NaN (comparaison False) au lieu d'exploser.
+        # paper_forward.py avait déjà été corrigé ainsi (PR-162) — le
+        # correctif n'avait pas été propagé aux 2 autres occurrences.
         vwap = ((tp * df["volume"]).rolling(168).sum()
-                / df["volume"].rolling(168).sum().replace(0, pd.NA))
+                / df["volume"].rolling(168).sum().replace(0, float("nan")))
         dev = ((df["close"] - vwap) / vwap).astype(float)
         # la confluence vedette v5 = ACCEL funding + ÉTIREMENT vwap only
         # (le -3%/24h appartient à funding_prix_divergence seule)

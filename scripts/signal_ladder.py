@@ -54,8 +54,13 @@ def enrich(con: sqlite3.Connection, events: list[dict]) -> list[dict]:
         if df is None:
             continue
         tp = (df["high"] + df["low"] + df["close"]) / 3
+        # FIX F-039 : pd.NA fait basculer la série en object sur une fenêtre
+        # roulante entièrement nulle (8 symboles le font réellement) et
+        # l'astype(float) qui suit lève TypeError ... not 'NAType'.
+        # float("nan") conserve float64. Même correctif que paper_forward
+        # (PR-162) et confluence_exact, propagé ici.
         vwap = ((tp * df["volume"]).rolling(168).sum()
-                / df["volume"].rolling(168).sum().replace(0, pd.NA))
+                / df["volume"].rolling(168).sum().replace(0, float("nan")))
         dev = ((df["close"] - vwap) / vwap).astype(float)
         dev_sd = dev.rolling(168).std()
         z = (dev / dev_sd).values

@@ -19,22 +19,47 @@ sys.path.insert(0, str(ROOT))
 from agent.client import GLMClient  # noqa: E402
 from agent.state_manager import StateManager  # noqa: E402
 from scripts.stacked_portfolio import run_stack  # noqa: E402
-from scripts.the_machine import levier_majors_safe  # noqa: E402
+from scripts.the_machine import MAINT_MAJORS, levier_majors_safe  # noqa: E402
 
 
 class TestLevierMajorsSafe(unittest.TestCase):
-    """F5 : the_machine forçait e["lev"] = 10 même quand lev_safe < 10."""
+    """F5 : the_machine forçait e["lev"] = 10 même quand lev_safe < 10.
+
+    RÉÉCRIT par F-038 : le dénominateur est le maintMarginPercent réel des
+    majeures (2,5 %), plus 0,5. L'ancien test encodait l'ère codifiée — il
+    affirmait 10x à MAE 7,84 % alors que la ligne de mort réelle à 10x est
+    7,5 %, donc le MAE observée DÉPASSait la borne et la règle 0-liq du
+    README était infirmée par elle-même. Le test encodait le bug.
+    """
 
     def test_le_cap_ne_bine_pas_sur_un_mae_sain(self):
-        self.assertEqual(levier_majors_safe(7.84), 10.0)   # l'ère codifiée
-        self.assertEqual(levier_majors_safe(9.5), 10.0)    # frontière exacte
+        # MAE 1 % → lev_safe très au-dessus du cap de 10 → le cap bind
+        self.assertEqual(levier_majors_safe(1.0), 10.0)
+        # l'ère observée (7,84 %) donne 9,23x : SOUS le cap, la règle bite
+        self.assertAlmostEqual(levier_majors_safe(7.84), 100 / (7.84 + 3.0))
+        self.assertLess(levier_majors_safe(7.84), 10.0)
 
     def test_le_cap_plafonne_sur_un_mae_chaud(self):
-        self.assertAlmostEqual(levier_majors_safe(15.0), 100 / 15.5)
-        self.assertAlmostEqual(levier_majors_safe(25.0), 100 / 25.5)
+        # dénominateur = MAE + maint (2,5) + sécurité (0,5)
+        self.assertAlmostEqual(levier_majors_safe(15.0), 100 / 18.0)
+        self.assertAlmostEqual(levier_majors_safe(25.0), 100 / 28.0)
 
     def test_le_cap_est_surchargeable(self):
         self.assertEqual(levier_majors_safe(1.0, cap=4.0), 4.0)
+
+    def test_la_regle_0_liq_tient_pour_le_mae_observe(self):
+        """L'invariant que le README AFFIRMAIT et que le dur 0,5 violait.
+
+        Pour tout MAE, le levier rendu doit donner un mouvement de mort
+        STRICTEMENT supérieur au MAE : sinon le trade se fait tuer.
+        """
+        for mae in (1.0, 3.5, 7.84, 9.5, 15.0, 25.0, 60.0):
+            lev = levier_majors_safe(mae)
+            mort = 100.0 / lev - MAINT_MAJORS
+            self.assertGreater(
+                mort, mae,
+                f"MAE {mae} % liquidé à {mort:.2f} % : la règle 0-liq est "
+                f"violée (lev {lev:.2f}x)")
 
 
 class _BoomSession:
