@@ -151,3 +151,6 @@ research/ledger/confirm.lock
 research/runtime/*.json
 research/runtime/*.lock
 research/runtime/archive/
+
+# les évidences de recherche (re-preuves) entrent dans git
+!reports/al-gradient-reproof-*.md
