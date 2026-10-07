@@ -195,6 +195,8 @@ class TestRetourNonNulSiAucunResultat(unittest.TestCase):
 
 class TestUniteSystemdValide(unittest.TestCase):
     def test_systemd_analyze_avec_verify(self):
+        if not Path("/usr/bin/systemd-analyze").exists():
+            self.skipTest("systemd-analyze absent (CI GitHub Actions)")
         unit = ROOT / "configs/systemd-user/trading-agent-nightly.service"
         with tempfile.NamedTemporaryFile("w", suffix=".service",
                                          delete=False) as f:
