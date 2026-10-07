@@ -244,7 +244,8 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
 
     cash = float(capital)
     open_pos: dict[str, dict] = {}
-    busy: dict[str, int] = {}
+    open_flux: set[str] = set()   # PR-169 : les slots FLUX ouverts
+    busy: dict[str, int] = {}     # PR-169 : désormais LU (fin réelle par slot)
     entries_by_t: dict[int, list[dict]] = {}
     for e in evs:
         entries_by_t.setdefault(e["t_ms"], []).append(e)
@@ -328,6 +329,10 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                                        "net": -pos["margin"],
                                        "liquidated": True})
                     fund_net += pos.get("fund_accrued", 0.0)
+                    # PR-169 : le slot se libère à la FIN RÉELLE (l'heure
+                    # de mort) — même sémantique que run_stack
+                    open_flux.discard(pos.get("flux", sym))
+                    busy[pos.get("flux", sym)] = t
                     del open_pos[sym]
                     continue
                 realized = (pos["side"] * pos["ret_pct"] / 100.0
@@ -345,10 +350,21 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                                    "notional": pos["notional"], "net": net,
                                    "liquidated": False})
                 fund_net += _fa
+                # PR-169 : fin réelle = l'heure de sortie ; slot libéré
+                open_flux.discard(pos.get("flux", sym))
+                busy[pos.get("flux", sym)] = t
                 del open_pos[sym]
         # 2. les nouvelles entrées
         for e in entries_by_t.get(t, []):
-            if e["sym"] in open_pos:
+            # PR-169 (P1 composition) : le slot est LU (l'ancien busy était
+            # écrit, jamais consulté — re-entrée 1 h après une liq) et la
+            # CLÉ est le FLUX (doctrine run_stack « 1 slot par flux ») —
+            # l'ancienne clé symbole laissait un même flux tenir N
+            # positions simultanées en forward contre 1 dans la
+            # composition mesurée. Frontière inclusive : entrée à
+            # exactement la fin réelle = autorisée.
+            _key = e.get("strategy") or e["sym"]
+            if _key in open_flux or t < busy.get(_key, 0):
                 skipped += 1
                 continue
             eq_now = cash + sum(_unrealized(p, last_close)
@@ -400,12 +416,15 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                     "exit_ms": e["exit_ms"],
                     "fees": fee, "fund_total": fund_signed * notional / 100.0,
                     "fund_prints": prints,
+                    # PR-169 : la clé de slot FLUX portée par la position
+                    "flux": e.get("strategy") or e["sym"],
                     # FIX v18 (PR-150 №5) : le mode SIMULÉ ne regarde
                     # JAMAIS le MAE futur — la liquidation est décidée
                     # uniquement par les marks observés heure par heure ;
                     # le mode stress garde la borne ex ante (liq_pending)
                     "liq_pending": (e["mae_pct"] >= liq_thr
                                     and liq_mode == "stress")}
+                open_flux.add(e.get("strategy") or e["sym"])
 
         # 4. les marks de l'heure : le DERNIER prix clôturé connu (pas de
         #    look-ahead) ; worst = high intrabar (short) / low (long)
@@ -457,7 +476,11 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                                        "liquidated": True})
                     fund_net += pos.get("fund_accrued", 0.0)
                     del open_pos[sym]
-                    busy[sym] = pos["exit_ms"]
+                    # PR-169 : fin réelle = l'heure de mort (l'ancien
+                    # exit_ms prévu bloquait le slot au-delà de la mort) ;
+                    # busy est désormais consulté à l'entrée
+                    busy[pos.get("flux", sym)] = t
+                    open_flux.discard(pos.get("flux", sym))
         # 5. l'équité MTM de l'heure + les métriques de concurrence (№29)
         eq_mtm = cash + sum(_unrealized(p, last_close)
                             for p in open_pos.values())
