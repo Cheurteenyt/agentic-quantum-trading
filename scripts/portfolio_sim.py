@@ -49,10 +49,61 @@ LEV = 20
 FEE_BPS = 4        # taker par side
 SLIP_BPS = 10      # slippage par side
 MAKER_BPS = 2      # maker par side (GTX), slippage ~0
-MAINT_PCT = 0.5    # marge de maintenance approx (liq_params par symbole = affiné)
+# Repli si le symbole est absent de liq_params (8 symboles sur 586, surtout
+# des Synthetic : SCRUSDT, SIUSDT). On prend le maintMarginPercent le plus BAS
+# observé (2,5 %) — un repli trop bas surestimerait la ligne de mort, donc
+# sous-estimerait la liquidation, c'est-à-dire nous rendre optimistes.
+MAINT_PCT = 2.5
 HOLD_H = 24        # la détention en heures
 MAJORS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
-LIQ_MOVE_PCT = 100 / LEV - MAINT_PCT   # le mouvement adverse qui liquide
+LIQ_MOVE_PCT = 100 / LEV - MAINT_PCT   # repli seulement (cf. liq_move_for)
+
+# FIX F-038 — la marge de maintenance N'EST PAS 0,5 % : c'est le
+# maintMarginPercent RÉEL par symbole, lu dans liq_params (extraite
+# d'exchangeInfo). Le durcâ était 5x trop petit sur les majeures (2,5 %),
+# donc la ligne de mort était repoussée : à 20x 4,5 % au lieu de 2,5 %, et à
+# 10x 9,5 % au lieu de 7,5 % — sous-comptage des liquidations d'un facteur
+# ~2,2 à 20x. Le commentaire « approx » masquait une erreur d'un facteur 5.
+# La table existe, est peuplée et liq_price.py la lisait déjà correctement :
+# le dur ne venait pas d'une absence d'information mais d'une constante
+# copiée. Cette fonction est la source UNIQUE (stacked_portfolio l'importe).
+_LIQ_PARAMS: dict[str, tuple[float, float]] | None = None
+
+
+def liq_params(symbols=None) -> dict[str, tuple[float, float]]:
+    """(maint_margin_pct, max_leverage) par symbole, lus dans liq_params."""
+    global _LIQ_PARAMS
+    if _LIQ_PARAMS is None:
+        _LIQ_PARAMS = {}
+        try:
+            con = sqlite3.connect(KDB, timeout=60)
+            for sym, mm, mx in con.execute(
+                    "SELECT symbol, maint_margin_pct, max_leverage FROM liq_params"):
+                if mm is not None:
+                    _LIQ_PARAMS[sym] = (float(mm), float(mx) if mx is not None else 0.0)
+            con.close()
+        except sqlite3.Error:
+            pass          # repli MAINT_PCT : une base absente ne doit pas tuer le run
+    return _LIQ_PARAMS
+
+
+def liq_move_for(symbol: str, lev: float) -> float:
+    """Le mouvement adverse qui liquide CE symbole (100/L - maintMarginPercent).
+
+    Fallback sur MAINT_PCT seulement si le symbole est absent de liq_params.
+    """
+    mm = liq_params().get(symbol, (MAINT_PCT, 0.0))[0]
+    return 100.0 / lev - mm
+
+
+def lev_capped(symbol: str, lev: float) -> float:
+    """Le levier really exécutable : jamais au-dessus du max_leverage du symbole.
+
+    75 symboles de l'univers ont max_leverage < 3 : à 3x ou 10x fixe l'ordre
+    est refusé par Aster, et le trade était pourtant compté comme exécuté.
+    """
+    mx = liq_params().get(symbol, (MAINT_PCT, 0.0))[1]
+    return min(lev, mx) if mx > 0 else lev
 
 
 def btc_regime_series() -> pd.Series:
@@ -110,7 +161,7 @@ def run_sim(events: list[dict], capital: float, size: float,
             funding = notional * fser / 100.0 * HOLD_H
         pnl = e["price_ret_short"] / 100 * notional + funding - fees
 
-        liq = e["mae_adverse"] >= LIQ_MOVE_PCT or pnl <= -margin_alloc
+        liq = e["mae_adverse"] >= liq_move_for(e["sym"], LEV) or pnl <= -margin_alloc
         if liq and oracle:
             pnl = 0.0            # l'oracle n'a pas pris le trade
             liq = False
@@ -307,7 +358,8 @@ def main() -> int:
         "", "Paramètres : levier 20x, "
         f"frais {(fee_bps+slip_bps)*2} bps RT sur notionnel "
         f"(= {(fee_bps+slip_bps)*2*LEV/100:.1f} % de marge), "
-        f"liquidation en chemin à {LIQ_MOVE_PCT:.1f} % adverse, hold {HOLD_H}h.",
+        f"liquidation en chemin à {liq_move_for('BTCUSDT', LEV):.1f} % adverse "
+        f"(maintMarginPercent réel des majeures, liq_params), hold {HOLD_H}h.",
         "L'oracle anti-liquidation = un plafond, PAS une stratégie : personne",
         "ne sait ex ante quel trade sera liquidé. L'écart réel ↔ oracle = le",
         "coût exact des liquidations.",

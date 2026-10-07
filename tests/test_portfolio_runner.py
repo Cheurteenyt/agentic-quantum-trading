@@ -5,6 +5,10 @@ symbole, cap de marge, liquidation ex ante (MAE ≥ 100/lev − 0,5), funding
 signé, bookage au mois de sortie, DD max — et la baseline long-and-hold
 sur une fixture DB.
 
+F-038 : le seuil de liquidation est le maintMarginPercent RÉEL par symbole
+(lu dans liq_params), plus la constante 0,5 qui repoussait la ligne de mort
+de 2 points sur les majeures et de 16 points sur les memecoins.
+
     python tests/test_portfolio_runner.py
 """
 from __future__ import annotations
@@ -20,6 +24,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.portfolio_runner import (  # noqa: E402
     baseline_hold, collect_events, run_wallet)
+from scripts.portfolio_sim import liq_move_for, liq_params  # noqa: E402
 from scripts import research_runner as rr  # noqa: E402
 
 H_MS = 3_600_000
@@ -61,17 +66,41 @@ class TestWallet(unittest.TestCase):
         self.assertEqual(w["skipped_overlap"], 1)
 
     def test_liquidation_ex_ante_coute_la_marge(self):
-        """MAE ≥ 100/lev − 0,5 → liquidation, perte = la marge engagée.
-        À 10x : seuil 9,5 % ; un MAE 9,6 % tue, un MAE 9,4 % survit — et le
-        ret de la bougie de mort est IGNORÉ (la mort, pas le mark)."""
-        dead = _ev(ret=-20.0, mae=9.6)
-        alive = _ev(ret=-20.0, mae=9.4)      # short gagnant qui survit
+        """MAE ≥ 100/lev − maintMarginPercent réel → liquidation.
+
+        RÉÉCRIT par F-038 : le seuil est lu dans liq_params par symbole, plus
+        le dur 0,5. Sur BTCUSDT (maint 2,5) à 10x la ligne de mort est 7,5 %,
+        pas 9,5 % : un MAE de 7,6 % tuerait un trade que l'ancien test
+        déclarait survivant. Le test encodait le bug, il l'affirmait même en
+        commentaire (« seuil 9,5 % »). Le ret de la bougie de mort reste
+        IGNORÉ (la mort, pas le mark).
+        """
+        mort = liq_move_for("BTCUSDT", 10.0)      # 7,5 %
+        dead = _ev(sym="BTCUSDT", ret=-20.0, mae=mort + 0.1)
+        alive = _ev(sym="BTCUSDT", ret=-20.0, mae=mort - 0.1)
         w = run_wallet([dead], capital=100.0, cap_pct=1.0, lev=10.0)
         self.assertEqual(w["liqs"], 1)
         self.assertAlmostEqual(w["solde"], 99.0, places=9)
         w2 = run_wallet([alive], capital=100.0, cap_pct=1.0, lev=10.0)
         self.assertEqual(w2["liqs"], 0)
         self.assertGreater(w2["solde"], 100.0)
+
+    def test_le_seuil_de_liq_varie_avec_le_symbole(self):
+        """F-038 : deux symboles, deux marges → deux lignes de mort.
+
+        Un seuil unique (le dur 0,5) donnait le même résultat à PONSUSDT
+        (maint 16,66 %) et à BTCUSDT (maint 2,5 %). L'écart est de 14,16
+        points de mouvement, pas un arrondi.
+        """
+        if "PONSUSDT" not in liq_params():
+            self.skipTest("PONSUSDT absent de liq_params")
+        thr_btc = liq_move_for("BTCUSDT", 3.0)
+        thr_pons = liq_move_for("PONSUSDT", 3.0)
+        self.assertGreater(thr_btc - thr_pons, 10.0)
+        # un MAE que le dur aurait tué sur PONSUSDT laisse passer le vrai
+        dead_for_old = _ev(sym="PONSUSDT", ret=-5.0, mae=25.0)
+        w = run_wallet([dead_for_old], capital=100.0, cap_pct=1.0, lev=3.0)
+        self.assertEqual(w["liqs"], 1)
 
     def test_cap_de_marge_sur_equite_courante(self):
         """La marge suit l'équité COURANTE : après une perte, le notional

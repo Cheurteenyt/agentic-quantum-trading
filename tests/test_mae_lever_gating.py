@@ -27,7 +27,7 @@ from scripts import the_machine as tm  # noqa: E402
 
 def _state(tmp: str, lev_safe: float, age_days: float = 0.0) -> Path:
     """Un mae_state.json synthétique au format exact de write_mae_state."""
-    st = {"mae_gated": round(100 / lev_safe - 0.5, 4) if lev_safe else 0.0,
+    st = {"mae_gated": round(100 / lev_safe - 2.5, 4) if lev_safe else 0.0,
           "lev_safe": lev_safe,
           "updated_at": (datetime.now(timezone.utc)
                          - timedelta(days=age_days)).isoformat()}
