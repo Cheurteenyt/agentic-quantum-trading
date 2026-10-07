@@ -194,13 +194,29 @@ class TestRetourNonNulSiAucunResultat(unittest.TestCase):
 
 
 class TestUniteSystemdValide(unittest.TestCase):
+    VENV = '"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python"'
+
     def test_systemd_analyze_avec_verify(self):
         if not Path("/usr/bin/systemd-analyze").exists():
             self.skipTest("systemd-analyze absent (CI GitHub Actions)")
         unit = ROOT / "configs/systemd-user/trading-agent-nightly.service"
+        # FIX CI : le binaire ExecStart vit sur la machine dev (chemin avec
+        # espace, .venv locale) et n'existe pas sur un runner. L'ancien
+        # garde (skip si systemd-analyze absent) ne déclenchait jamais :
+        # systemd-analyze EXISTE sur ubuntu-latest, l'échec venait du
+        # chemin ExecStart (« is not executable: No such file or
+        # directory » ×14). verify vérifie la SYNTAXE de l'unité, pas
+        # l'existence du venv : on réécrit le binaire vers /usr/bin/python3
+        # et le WorkingDirectory vers /tmp dans la copie temporaire.
+        txt = unit.read_text(encoding="utf-8")
+        self.assertIn(self.VENV, txt, "le chemin venv attendu a changé")
+        txt = txt.replace(self.VENV, "/usr/bin/python3")
+        txt = txt.replace(
+            "WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent",
+            "WorkingDirectory=/tmp")
         with tempfile.NamedTemporaryFile("w", suffix=".service",
                                          delete=False) as f:
-            f.write(unit.read_text(encoding="utf-8"))
+            f.write(txt)
             tmp = f.name
         r = subprocess.run(["systemd-analyze", "verify", tmp],
                            capture_output=True, text=True)
