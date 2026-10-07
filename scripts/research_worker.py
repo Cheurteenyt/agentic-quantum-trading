@@ -148,6 +148,11 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         print("[worker] un autre worker est ACTIF — refus", flush=True)
         return EXIT_FAILED
 
+    def _make_shutdown_handler(state: dict) -> callable:
+        def handler(signum, frame):
+            state["shutdown_requested"] = True
+        return handler
+
     state: dict = {"shutdown_requested": False}
     signal.signal(signal.SIGTERM, _make_shutdown_handler(state))
     signal.signal(signal.SIGINT, _make_shutdown_handler(state))
