@@ -58,7 +58,8 @@ VERDICTS = CONSUMING | {"PREREG", "DISCOVERY_PASS", "DISCOVERY_FAIL"}
 # v3 : les verdicts DISCOVERY_* sont loggés en mode discovery (hors budget
 # scientifique, jamais promote) — ils TRACENT la pression de sélection
 # (N_discovery, brief V3 §75) sans toucher le budget de confirmation.
-DEFAULT_BUDGET = {"total_experiments": 20, "per_family": 5, "per_strategy": 3, "max_parameter_variants": 12}
+DEFAULT_BUDGET = {"total_experiments": 20, "per_family": 5, "per_strategy": 3, "max_parameter_variants": 12,
+                  "prior_trials": 0}   # PR-175 (B3) : les essais ANTÉRIEURS au ledger (policy.yaml)
 EXIT_OK, EXIT_ERR, EXIT_DUP, EXIT_STOP = 0, 2, 3, 4
 BEGIN, END = "<!-- LEDGER:BEGIN (généré par lab_ledger.py sync-state — ne pas éditer à la main) -->", "<!-- LEDGER:END -->"
 
@@ -267,9 +268,14 @@ def assess(entries, budget, now, family, strategy, hypothesis, params,
     n_conf = confirmation_multiplicity(entries)
     n_disc = sum(1 for e in entries
                  if e.get("_mode", "confirmation") == "discovery")
-    msgs.append(f"Multiplicité : N_confirmation {n_conf} cumulées (backfill inclus, "
-                f"jamais remis à zéro) + {n_disc} discoveries → seuil indicatif du prochain |t| ≥ "
-                f"{tstar(n_conf + 1):.2f} (Bonferroni 5 % bilatéral, N={n_conf + 1}).")
+    # PR-175 (B3 audit Sonnet 5.5) : la multiplicité inclut les essais
+    # ANTÉRIEURS au ledger (budget.prior_trials) — sinon t* est trop doux
+    prior = int(budget.get("prior_trials", 0))
+    n_eff = prior + n_conf + 1
+    msgs.append(f"Multiplicité : {prior} essais pré-ledger + {n_conf} confirmations "
+                f"cumulées (backfill inclus, jamais remis à zéro) + {n_disc} discoveries "
+                f"→ seuil indicatif du prochain |t| ≥ "
+                f"{tstar(n_eff):.2f} (Bonferroni 5 % bilatéral, N={n_eff}).")
     return {"status": status, "code": code, "msgs": msgs}
 
 
@@ -296,7 +302,10 @@ def status_md(entries, budget, now, effective) -> str:
              f"**{total}/{budget['total_experiments']}** consommés (hors re-vérifications exemptées), reste {max(0, budget['total_experiments'] - total)}",
              f"- Familles bloquantes hors reverify : {', '.join(cap) if cap else 'aucune'}",
              f"- Familles raw historiques (re-verifies incluses) : {', '.join(raw_cap) if raw_cap else 'aucune'}",
-             f"- Seuil de preuve du prochain essai : |t| ≥ {tstar(n_all + 1):.2f} (Bonferroni, N={n_all + 1})",
+             f"- Seuil de preuve du prochain essai : |t| ≥ "
+             f"{tstar(int(budget.get('prior_trials', 0)) + n_all + 1):.2f} "
+             f"(Bonferroni, N={int(budget.get('prior_trials', 0)) + n_all + 1} "
+             f"dont {int(budget.get('prior_trials', 0))} pré-ledger)",
              END]
     return "\n".join(lines)
 
@@ -430,7 +439,11 @@ def cmd_status(a) -> int:
     for s, c in sorted(by_str.items()):
         print(f"  stratégie {s:<30s} {c}/{b['per_strategy']}")
     n_all = confirmation_multiplicity(entries)   # le MÊME N que le checker
-    print(f"Cumul : {n_all} essais · t*(N={n_all}) = {tstar(n_all):.2f} (Bonferroni 5 % bilatéral)")
+    # PR-175 (B3) : le N EFFECTIF inclut les essais pré-ledger
+    prior = int(pol["budget"].get("prior_trials", 0))
+    print(f"Cumul : {n_all} essais (+ {prior} pré-ledger) · "
+          f"t*(N={prior + n_all}) = {tstar(prior + n_all):.2f} "
+          f"(Bonferroni 5 % bilatéral)")
     return EXIT_OK
 
 
