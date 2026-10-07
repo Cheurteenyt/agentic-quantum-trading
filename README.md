@@ -58,9 +58,11 @@ provenance seals) is the asset — the search restarts from honest grounds.
 Every indicator, verdict and date lives in `docs/20-registre-indicateurs.md`
 — the living registry.
 
-**Research pivot (2026-09-30):** Aster/FOMO *research* is frozen in favor of
-the **OpenMarket x501** program (`docs/25`–`docs/33`). Collectors keep
-running; no new research effort on those axes.
+**Research state (2026-10-07):** the Research OS is LIVE on Aster
+(discovery grind, protocol-gated confirmation, forward maturation,
+nightly campaign) — every claim carries its evidence id
+(`research/evidence/facts.jsonl`). The **OpenMarket x501** program
+(`docs/25`–`docs/33`) runs in parallel on its own data domain.
 
 ## Discipline (the part that matters)
 
