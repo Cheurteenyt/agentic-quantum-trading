@@ -73,10 +73,18 @@ def collect_symbol(con: sqlite3.Connection, symbol: str,
         if not rows:
             break
         payload = []
+        # PR-170 (P1) : newest est calculé DANS le try par-ligne —
+        # l'ancien max() hors try faisait sauter TOUT le symbole sur une
+        # seule ligne malformée, et le commit (plus bas) n'était jamais
+        # atteint : rollback des lignes valides DÉJÀ comptées (+N
+        # mensonger)
+        newest = None
         for r in rows:
             try:
-                payload.append((symbol, int(r["fundingTime"]),
+                ft = int(r["fundingTime"])
+                payload.append((symbol, ft,
                                 float(r["fundingRate"]), time.time()))
+                newest = ft if newest is None else max(newest, ft)
             except (TypeError, ValueError, KeyError):
                 continue
         if payload:
@@ -85,8 +93,8 @@ def collect_symbol(con: sqlite3.Connection, symbol: str,
                 "INSERT OR IGNORE INTO funding_history VALUES (?,?,?,?)",
                 payload)
             added += con.total_changes - before
-        newest = max(int(r["fundingTime"]) for r in rows)
-        if newest + 1 <= start or newest >= now_ms - 3600 * 1000:
+        if newest is None or newest + 1 <= start \
+                or newest >= now_ms - 3600 * 1000:
             break                      # page suivante vide ou déjà au présent
         start = newest + 1
         time.sleep(SLEEP_S)
@@ -119,6 +127,7 @@ def main() -> int:
         symbols = sorted(known | have_klines)
 
     total = 0
+    failed = 0
     t0 = time.time()
     for sym in symbols:
         try:
@@ -127,12 +136,23 @@ def main() -> int:
             if n:
                 print(f"[funding-collector] {sym}: +{n} records")
         except Exception as e:
+            # PR-170 (P1) : rollback des lignes valides du symbole (le
+            # commit manqué les aurait fait disparaître au close) + le
+            # mode dégradé devient VISIBLE (exit 1 — l'ancien exit 0
+            # rendait « 2/2 en 429 » indiscernable d'un succès)
+            try:
+                con.rollback()
+            except sqlite3.Error:
+                pass
+            failed += 1
             print(f"[funding-collector] {sym}: ERREUR {e}")
         time.sleep(SLEEP_S)
+    con.commit()
     con.close()
     print(f"[funding-collector] {len(symbols)} symboles, +{total} records "
-          f"en {time.time()-t0:.0f}s")
-    return 0
+          f"en {time.time()-t0:.0f}s"
+          + (f" — {failed} SYMBOLE(S) EN ÉCHEC" if failed else ""))
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

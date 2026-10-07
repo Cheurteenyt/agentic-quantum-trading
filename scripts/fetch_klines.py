@@ -467,6 +467,13 @@ def store_klines(
 
     parsed = [parse_kline_row(row, i) for i, row in enumerate(raw)]
     parsed.sort(key=lambda r: r[0])
+    # PR-170 (P0 collecteurs, preuve prod : 1839 barres figées partielles
+    # sur 933/964 séries — HUSDT close −6 %, volume ÷50) : la dernière
+    # bougie renvoyée par l'API est EN COURS — l'écrire la fige PARTIELLE
+    # pour toujours (INSERT OR IGNORE refuse le re-fetch correctif). On
+    # n'écrit qu'une bougie DÉJÀ CLOSE (close_time <= maintenant).
+    parsed = [r for r in parsed
+              if r[6] is None or r[6] <= time.time() * 1000]
 
     snap = snapshot_id or snapshot_id_for_rows(sym, interval, parsed)
     now = time.time()
@@ -649,6 +656,14 @@ def fetch_and_store(
             )
             res = store_klines(con, sym, interval, raw)
         except (AsterFetchError, KlineParseError, ValueError, sqlite3.Error) as exc:
+            # PR-170 (P1) : ROLLBACK — l'ancien continue laissait les
+            # INSERT partiels du symbole en transaction OUVERTE pendant
+            # sleep+HTTP des symboles suivants (8 scripts écrivent cette
+            # DB : locks mutuels possibles la nuit)
+            try:
+                con.rollback()
+            except sqlite3.Error:
+                pass
             results["failed"].append(sym)
             results["details"][sym] = {"error": str(exc)}
             print(f"  ! {sym} : {exc}")
