@@ -244,16 +244,26 @@ def run_stack(events: list[dict], capital: float, size_fn,
         n += 1
         n_wins += pnl > 0
         exit_ns = e["ts_ms"] + e["hold_h"] * 3600 * 10**9  # ts_ms = NS
-        busy[e["strategy"]] = exit_ns
         liq_ts_dt = None
         if liq and e.get("liq_ts_ms"):
             liq_ts_dt = datetime.fromtimestamp(e["liq_ts_ms"] / 10**9,
                                                tz=timezone.utc)
+        # PR-169 (P1 composition) : le créneau se libère à la FIN RÉELLE
+        # de la position — une liq morte à h5 libère le flux à h5, pas à
+        # la sortie prévue h24 (135/901 créneaux fdiv bloqués à tort dans
+        # le rapport du 03/10). Même sémantique que run_wallet_mtm
+        # (liq_ts_ms porte des NS malgré son nom — /10**9 ci-dessus).
+        busy[e["strategy"]] = (e["liq_ts_ms"]
+                               if liq and e.get("liq_ts_ms") else exit_ns)
         tr = {"sym": e["sym"], "strategy": e["strategy"],
               "entry_ts": datetime.fromtimestamp(
                   e["ts_ms"] / 10**9, tz=timezone.utc),
-              "exit_ts": datetime.fromtimestamp(exit_ns / 10**9,
-                                                tz=timezone.utc),
+              # PR-169 (P2) : le bucketing mensuel utilise la fin RÉELLE —
+              # l'ancien exit_ts prévu plaçait la perte de liq au mois de
+              # sortie prévue (mtm la place au mois de mort réel)
+              "exit_ts": (liq_ts_dt if liq and liq_ts_dt else
+                          datetime.fromtimestamp(exit_ns / 10**9,
+                                                 tz=timezone.utc)),
               "pnl": pnl, "balance": balance, "liq": liq,
               "entry": e.get("entry"), "margin": margin,
               "liq_price": e.get("liq_price") if liq else None,
@@ -381,15 +391,15 @@ def main() -> int:
                 # fallback : prix de mort théorique depuis le levier
                 lp = t["entry"] * (1 + (100 / 3 - 0.5) / 100)
             lt = t.get("liq_ts")
+            # PR-169 (P2) : le ternaire coupait la ligne markdown AVANT les
+            # colonnes Perte/Balance dès que liq_ts existait (4 colonnes
+            # sur 7, pas de pipe final)
+            row_liq = (f"| {lt:%d/%m %H:%M} " if lt else "| — ")
             lines.append(
                 f"| {t['strategy']} | {t['sym']} "
                 f"| {t['entry_ts']:%d/%m %H:%M} "
                 f"| ${t['entry']:,.4g} → ${lp:,.4g} "
-                f"| {lt:%d/%m %H:%M} " if lt else
-                f"| {t['strategy']} | {t['sym']} "
-                f"| {t['entry_ts']:%d/%m %H:%M} "
-                f"| ${t['entry']:,.4g} → ${lp:,.4g} "
-                f"| — "
+                f"{row_liq}"
                 f"| **-${t['margin']:,.2f}** | ${t['balance']:,.2f} |")
         by_strat: dict[str, list] = {}
         for t in liqs:
