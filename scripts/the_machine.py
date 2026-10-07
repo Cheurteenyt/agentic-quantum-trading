@@ -165,10 +165,12 @@ def main() -> int:
     _MIN_GATE_HIST = 30
     gated = []
     _gate_hist: list[float] = []
+    last_q66 = float("nan")   # PR-171 : la valeur de gate COURANTE pour le rapport
     for e in events:
         _s = e.get("al_score", float("nan"))
         if len(_gate_hist) >= _MIN_GATE_HIST:
             _q66 = float(np.nanquantile(_gate_hist, 2 / 3))
+            last_q66 = _q66
             if np.isfinite(_s) and _s >= _q66:
                 gated.append(e)
         elif np.isfinite(_s):
@@ -397,7 +399,7 @@ def main() -> int:
     lines = [
         "# LA MACHINE — le portefeuille officiel",
         f"{datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC — "
-        f"cascade 10x (gate AL p66={q66:.2f}, vol-inverse base 24 %, "
+        f"cascade 10x (gate AL p66={last_q66:.2f}, vol-inverse base 24 %, "
         f"MAE gated {mae_gated:.2f} % → levier sûr {lev_safe:.1f}x) + "
         f"cascade memecoins {lev_meme}x + survivor 1x{_flux4}.", "",
         "## BLOC STATS OFFICIEL", "",

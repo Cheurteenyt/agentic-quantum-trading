@@ -75,7 +75,14 @@ def collect(con: sqlite3.Connection, fh: pd.DataFrame) -> dict[str, list[dict]]:
             "sym": sym, "ts_ms": int(idx_ns[ei]), "strategy": name,
             "lev": 1, "hold_h": hold, "fee_rt_bps": MAKER_RT if maker else TAKER_RT,
             "entry": entry, "exit": float(x), "price_ret_short": ret_field,
-            "fund_sign": -1 if direction > 0 else 1, "mae_adverse": abs(mae),
+            "fund_sign": -1 if direction > 0 else 1,
+            # PR-171 (P1 chasse sources) : max(mae, 0) — l'ancien abs()
+            # transformait une excursion FAVORABLE (le low ne descend
+            # jamais sous l'entrée pour un long) en MAE adverse : un
+            # trade GAGNANT pouvait être liquidé par run_stack (latent
+            # aujourd'hui, s'activera sur les meilleurs trades). Même
+            # pattern que p5_frequency_test.py:196
+            "mae_adverse": max(mae, 0.0),
             "atr_pct": float(atr_pct),
         })
 
@@ -168,6 +175,10 @@ def collect(con: sqlite3.Connection, fh: pd.DataFrame) -> dict[str, list[dict]]:
         opens = df["open"].values
         highs = df["high"].values
         closes = df["close"].values
+        # PR-171 (P2) : lows DANS CETTE portée — l'ancien push lisait le
+        # lows de la boucle précédente (NameError si aucun symbole ne
+        # passait le filtre, lectures croisées sinon)
+        lows = df["low"].values
         ts_ms = fh_sym["funding_time"].astype(float).values
         keep = (rate > p90).fillna(False).values
         taken = 0

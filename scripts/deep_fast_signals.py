@@ -77,7 +77,11 @@ def collect_deep_fast(con: sqlite3.Connection, fresh_h: int = FRESH_H,
                 continue                          # hors fenêtre 48 h
             if ts_ms < fresh_min_ts:
                 continue                          # pas frais (< 6 h clôture)
-            if (sym, ts_ms) in emitted:
+            if (sym, ts_ms + 3_600_000) in emitted:
+                # PR-171 (P2) : paper_forward stocke signal_ts = CLOSE(t)
+                # (open + 1h) — l'ancien comparait l'open : l'idempotence
+                # ne matchait JAMAIS (écart exact 3 600 000 ms) et la
+                # non-ré-émission ne tenait qu'à l'accident du check 24 h
                 last_emit = max(last_emit, ts_ms)
                 continue                          # déjà émis : jamais ré-émis
             if ts_ms - last_emit < overlap_ms:
