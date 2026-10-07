@@ -100,13 +100,41 @@ class TestMigration(unittest.TestCase):
             ck = {"items": {"EXP-1": {"state": "DONE", "spec_sha": "a"}},
                   "db_snapshot": "db1", "queue_sha": "ancien-algo",
                   "git_sha": "440648e"}
-            with mock.patch.object(rw, "ARCHIVE", td / "archive"):
+            with mock.patch.object(rw, "ARCHIVE", td / "archive"), \
+                 mock.patch.object(rw, "_engine_sha_at", lambda c: "e1"):
                 ck2, note = rw._migrate_checkpoint(ck, "db1", "e1", "q1")
             self.assertTrue(ck2["items"]["EXP-1"]["migrated"])
             self.assertEqual(ck2["schema_version"], rw.SCHEMA_VERSION)
             self.assertEqual(ck2["engine_sha"], "e1")
             self.assertIn("transportés", note)
+            self.assertIn("prouvé", note)
             self.assertTrue(any((td / "archive").iterdir()))
+
+    def test_ere_pr160_moteur_inverifiable_pas_de_transport(self):
+        with tempfile.TemporaryDirectory() as td:
+            ck = {"items": {"EXP-1": {"state": "DONE"}},
+                  "db_snapshot": "db1", "git_sha": "deadbeef00",
+                  "queue_sha": "q"}
+            with mock.patch.object(rw, "ARCHIVE", Path(td) / "archive"):
+                ck2, note = rw._migrate_checkpoint(ck, "db1", "e1", "q1")
+            self.assertEqual(ck2, {})
+            self.assertIn("invérifiable", note)
+
+    def test_ere_pr160_moteur_change_pas_de_transport(self):
+        with tempfile.TemporaryDirectory() as td:
+            ck = {"items": {"EXP-1": {"state": "DONE"}},
+                  "db_snapshot": "db1", "git_sha": "440648e",
+                  "queue_sha": "q"}
+            with mock.patch.object(rw, "ARCHIVE", Path(td) / "archive"), \
+                 mock.patch.object(rw, "_engine_sha_at", lambda c: "ANCIEN"):
+                ck2, note = rw._migrate_checkpoint(ck, "db1", "e1", "q1")
+            self.assertEqual(ck2, {})
+            self.assertIn("MOTEUR a changé", note)
+
+    def test_engine_sha_at_commit_reel(self):
+        # intégration : le moteur à 440648e est calculable depuis git
+        self.assertIsNotNone(rw._engine_sha_at("440648e"))
+        self.assertIsNone(rw._engine_sha_at("0000000"))
 
     def test_db_inconnue_pas_de_transport(self):
         with tempfile.TemporaryDirectory() as td:
@@ -197,6 +225,14 @@ class TestEngineSha(unittest.TestCase):
                 a = rw._engine_sha()
                 f2.write_text("y = 3")
                 self.assertNotEqual(rw._engine_sha(), a)
+
+    def test_git_en_erreur_est_sale(self):
+        # PR-162 : git indisponible = on ne peut pas PROUVER l'arbre propre
+        from types import SimpleNamespace
+        with mock.patch.object(
+                rw.subprocess, "run",
+                return_value=SimpleNamespace(returncode=128, stdout="")):
+            self.assertTrue(rw._git_engine_dirty())
 
 
 class TestRunWorker(unittest.TestCase):
