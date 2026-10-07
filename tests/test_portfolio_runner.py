@@ -153,7 +153,11 @@ class TestCollectEvents(unittest.TestCase):
                 "signal": {"feature": "ret_1h", "op": "<=",
                            "threshold": 1000.0, "side": -1},
                 "horizons": [6], "cost_pct": 0.28}
-        feats = rr.compute_features(sqlite3.connect(db), "BTCUSDT")
+        # PR-180 : la provenance funding = la MÊME DB que les prix
+        # (le contrat compute_features) — l'ancien appel sans db_path
+        # lisait le warehouse GLOBAL (dépendance cachée à data/)
+        feats = rr.compute_features(sqlite3.connect(db), "BTCUSDT",
+                                    db_path=db)
         n = 120
         ret = np.full(n, 1.0)
         hi = np.full(n, 0.01)          # fractions du kernel

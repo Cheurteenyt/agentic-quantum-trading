@@ -94,13 +94,23 @@ class FundingSeries:
 
 
 def funding_series_for(symbol: str, db_path: Path | None = None) -> FundingSeries:
-    """La série d'UN symbole — le loader ciblé pour la comptabilité par trade."""
+    """La série d'UN symbole — le loader ciblé pour la comptabilité par trade.
+    PR-180 : une DB ABSANTE ou SANS table funding_history = « funding
+    inconnu » (ValueError → compute_features rend fund_last NaN) —
+    l'ancien OperationalError plantait les env sans warehouse (la CI) ;
+    les vraies erreurs (lock, corruption) restent fail-closed."""
     path = Path(db_path) if db_path else KDB
+    if not path.exists():
+        raise ValueError(f"pas de base funding : {path}")
     con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
-        rows = con.execute(
-            "SELECT funding_time, rate FROM funding_history "
-            "WHERE symbol=? ORDER BY funding_time", (symbol,)).fetchall()
+        try:
+            rows = con.execute(
+                "SELECT funding_time, rate FROM funding_history "
+                "WHERE symbol=? ORDER BY funding_time", (symbol,)).fetchall()
+        except sqlite3.OperationalError as exc:
+            raise ValueError(
+                f"pas de table funding_history dans {path}") from exc
     finally:
         con.close()
     if not rows:
