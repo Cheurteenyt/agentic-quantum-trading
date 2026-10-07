@@ -77,10 +77,32 @@ def depth_gaps_24h() -> int:
 
 
 def funding_cache_age() -> float:
+    """L'âge du cache funding — le MIN des `cached_at` par symbole.
+
+    FIX F-041 : l'ancienne sonde lisait le `mtime` du FICHIER (15,5 h en
+    prod) alors que 48 des 73 symboles ont un `cached_at` > 25 h, dont
+    9 > 30 j et un à 127 j. Le mtime ne bouge que quand le fichier est
+    réécrit — un symbole non rafraîchi garde sa vieille valeur ET le
+    fichier est touché par les autres symboles. La sonde était donc
+    structurellement incapable de voir la péremption.
+
+    Le MAX des `cached_at` est la seule lecture honnête : c'est l'âge du
+    symbole le PLUS FRAIS. Si même lui est vieux, tout le cache l'est.
+    """
     try:
-        return round(time.time() - os.path.getmtime(CACHE), 1)
+        with CACHE.open(encoding="utf-8") as fh:
+            blob = json.load(fh)
     except Exception:
         return None
+    stamps: list[float] = []
+    for entry in (blob.get("symbols") or {}).values():
+        if isinstance(entry, dict):
+            val = entry.get("cached_at")
+            if isinstance(val, (int, float)) and val > 0:
+                stamps.append(float(val))
+    if not stamps:
+        return None
+    return round(time.time() - max(stamps), 1)
 
 
 def traders_registry_fresh() -> bool:

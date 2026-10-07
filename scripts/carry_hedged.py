@@ -36,6 +36,42 @@ CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / \
     "aster_public_funding_history_cache.json"
 REPORTS = ROOT / "reports"
 
+# FIX F-041 : même contrat que funding_scanner — la fraîcheur est un filtre,
+# pas une information. 48/73 symboles de la prod ont un cached_at > 25 h.
+FUNDING_MAX_AGE_S = 25 * 3600
+
+
+def load_fresh_sides(max_age_s: float = FUNDING_MAX_AGE_S) -> tuple[list[dict], list[dict], int]:
+    """Les jambes du cache dont le `cached_at` est dans la fenêtre.
+
+    Retourne (shorts, longs, n_rejetes). Un symbole sans `cached_at` est
+    rejete : on ne peut pas dater une donnée qu'on annualise ensuite.
+    """
+    import time
+    try:
+        with CACHE.open(encoding="utf-8") as fh:
+            cache = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return [], [], 0
+    now = time.time()
+    shorts: list[dict] = []
+    longs: list[dict] = []
+    rejected = 0
+    for sym, entry in cache.get("symbols", {}).items():
+        data = entry.get("data") or {}
+        ann = _ann_pct(data.get("latest_funding_bps_per_8h"))
+        if ann is None:
+            continue
+        age = now - float(entry.get("cached_at") or 0)
+        if age > max_age_s:
+            rejected += 1
+            continue
+        row = {"symbol": sym, "ann": ann}
+        (shorts if ann > 0 else longs).append(row)
+    shorts.sort(key=lambda r: r["ann"], reverse=True)
+    longs.sort(key=lambda r: r["ann"])
+    return shorts[:N_SHORTS], longs[:N_LONGS], rejected
+
 BASE_URL = "https://fapi.asterdex.com"
 USER_AGENT = "trading-agent-carry/1.0 (stdlib urllib)"
 BPS_PER_8H_TO_ANNUAL_PCT = 3 * 365 / 100
@@ -77,22 +113,9 @@ def _ann_pct(bps_per_8h: float | None) -> float | None:
 
 
 def funding_sides() -> tuple[list[dict], list[dict]]:
-    """Jambes courtes (funding positif, shorts encaissent) et longues
-    (funding negatif, longs encaissent), triees par annualise."""
-    with CACHE.open(encoding="utf-8") as fh:
-        cache = json.load(fh)
-    shorts: list[dict] = []
-    longs: list[dict] = []
-    for sym, entry in cache.get("symbols", {}).items():
-        data = entry.get("data") or {}
-        ann = _ann_pct(data.get("latest_funding_bps_per_8h"))
-        if ann is None:
-            continue
-        row = {"symbol": sym, "ann": ann}
-        (shorts if ann > 0 else longs).append(row)
-    shorts.sort(key=lambda r: r["ann"], reverse=True)
-    longs.sort(key=lambda r: r["ann"])  # le plus negatif d'abord
-    return shorts[:N_SHORTS], longs[:N_LONGS]
+    """Compatibilité : délègue à load_fresh_sides (F-041)."""
+    shorts, longs, _ = load_fresh_sides()
+    return shorts, longs
 
 
 def hourly_returns(symbol: str) -> list[float] | None:
@@ -219,7 +242,10 @@ def write_report(pairs: list[dict], n_shorts: int, n_longs: int) -> Path:
 
 
 def main() -> int:
-    shorts, longs = funding_sides()
+    shorts, longs, rejected = load_fresh_sides()
+    if rejected:
+        print(f"[carry] {rejected} symbole(s) rejete(s) — cached_at > 25 h "
+              f"(funding trop vieux pour etre annualise)", file=sys.stderr)
     if not shorts or not longs:
         print("[carry] pas de paire possible ce soir "
               f"({len(shorts)} shorts / {len(longs)} longs collecteurs)",
