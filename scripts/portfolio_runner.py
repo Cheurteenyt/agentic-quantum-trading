@@ -50,6 +50,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.label_matrix import build_matrix, snapshot_id  # noqa: E402
+from scripts.portfolio_sim import liq_move_for  # noqa: E402
 from scripts.research_os import (  # noqa: E402
     DataScope, load_confirmation_protocol)
 from scripts import research_runner as rr  # noqa: E402
@@ -239,7 +240,13 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
     if not events:
         return run_wallet([], capital=capital, cap_pct=cap_pct, lev=lev)
     evs = sorted(events, key=lambda e: e["t_ms"])
-    liq_thr = 100.0 / lev - 0.5
+    # FIX F-038 — la borne est par SYMBOLE (maintMarginPercent réel), plus
+    # un seul seuil wallet. Les 6 majeures sont à 2,5 %, pas 0,5 % : le
+    # seuil dur repoussait la ligne de mort de 2 points (à 20x) et
+    # sous-comptait les liquidations.
+    def _thr(sym: str) -> float:
+        return liq_move_for(sym, lev)
+
     h1 = (evs[0]["exit_ms"] - evs[0]["t_ms"]) // 3_600_000
 
     cash = float(capital)
@@ -317,7 +324,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                         adverse_x = ((worst_x / pos["entry"] - 1.0)
                                      if pos["side"] == -1
                                      else (1.0 - worst_x / pos["entry"])) * 100.0
-                        crossed = adverse_x >= liq_thr
+                        crossed = adverse_x >= _thr(sym)
                 if pos.get("liq_pending") or crossed:
                     cash += -pos["margin"] + pos["fees"] \
                         - pos.get("fund_accrued", 0.0)
@@ -375,7 +382,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
             notional = margin * lev
             month = datetime.fromtimestamp(
                 t / 1000, tz=timezone.utc).strftime("%Y-%m")
-            if e["mae_pct"] >= liq_thr and liq_mode == "stress":
+            if e["mae_pct"] >= _thr(e["sym"]) and liq_mode == "stress":
                 # option A, borne conservatrice : la mort absorbée dès
                 # l'entrée (le moteur sait ex ante que le trade mourra)
                 cash -= margin
@@ -422,7 +429,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                     # JAMAIS le MAE futur — la liquidation est décidée
                     # uniquement par les marks observés heure par heure ;
                     # le mode stress garde la borne ex ante (liq_pending)
-                    "liq_pending": (e["mae_pct"] >= liq_thr
+                    "liq_pending": (e["mae_pct"] >= _thr(e["sym"])
                                     and liq_mode == "stress")}
                 open_flux.add(e.get("strategy") or e["sym"])
 
@@ -457,7 +464,7 @@ def run_wallet_mtm(events: list[dict], marks: dict[str, dict],
                 adverse = ((worst_px / pos["entry"] - 1.0)
                            if pos["side"] == -1
                            else (1.0 - worst_px / pos["entry"])) * 100.0
-                if adverse >= liq_thr:
+                if adverse >= _thr(pos["sym"]):
                     # total de la position = −marge (option A) : le cash a
                     # déjà payé les frais (−fee à l'entrée) et reçu le
                     # funding (+Σ) → la clôture ramène le cumul exactement
@@ -700,7 +707,6 @@ def run_wallet(events: list[dict], capital: float = 100.0,
     monthly: dict[str, float] = {}
     curve: list[tuple[int, float]] = []
     skipped = 0
-    liq_thr = 100.0 / lev - 0.5
     # FIX v8 (rapport GLM 5.3 №29) : la concurrence du portefeuille est
     # MESURÉE — le cap 1 %/trade n'empêche pas 10 positions simultanées
     open_exits: list[int] = []
@@ -717,7 +723,7 @@ def run_wallet(events: list[dict], capital: float = 100.0,
             break
         notional = margin * lev
         fund_signed = ev["fund_pct"] * (1.0 if ev["side"] == -1 else -1.0)
-        if ev["mae_pct"] >= liq_thr:
+        if ev["mae_pct"] >= liq_move_for(ev["sym"], lev):
             # FIX v8 (rapport GLM 5.3 №28, option A) : la liquidation est une
             # perte TOUT COMPRIS (marge absorbée = prix de liq + frais +
             # funding) — les frais/funding ne sont PAS comptés à côté, la
