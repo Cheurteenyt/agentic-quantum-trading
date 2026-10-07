@@ -169,6 +169,9 @@ def build_universe() -> dict:
     rets = {s: d["close"].pct_change().values for s, d in majors_dfs.items()}
     idx_ns = majors_dfs["BTCUSDT"].index.astype("datetime64[ns]").asi8
     # vol7 — ATR % 24 h des majeures, moyenne sur les 168 h avant le signal
+    # PR-172 (P2) : NOTA — ceci est mean|Δclose|/close, PAS le True ATR
+    # (C8) ; ne pas « upgrader » vers _true_atr sans re-preuve (les
+    # évidences vol7 du registre sont mesurées sous CETTE formule)
     atrs = {s: (d["close"].diff().abs().rolling(24).mean() / d["close"] * 100
                 ).values for s, d in majors_dfs.items()}
     con.close()
@@ -259,7 +262,9 @@ def rolling_ranks(events: list[dict], feats: list[str],
     (anti_liq.add_rolling_scores) : fenêtre = events STRICTEMENT
     antérieurs sur win_days ; < min_window → NaN ; par feature :
       - f        = mean(vals_window <= v)        (rang brut, direction-libre)
-      - f/__neg  = mean(vals_window <= -v)       (l'orientation DOWN exacte v1)
+      - f/__neg  = mean(vals_window >= v)       (l'orientation DOWN —
+        PR-172 : le rang DOWN est la fraction de la fenêtre AUSSI risquée
+        que le courant ; l'ancien <= -v ne niait que la valeur courante)
     Feature non finie → 0.5 au score (convention v1)."""
     win_ns = win_days * 86400 * 10**9
     n = len(events)
@@ -280,8 +285,10 @@ def rolling_ranks(events: list[dict], feats: list[str],
                 out[f][i] = 0.5
                 out[f + "/__neg"][i] = 0.5
             else:
-                out[f][i] = float(np.mean(wv <= v))
-                out[f + "/__neg"][i] = float(np.mean(wv <= -v))
+                # PR-172 : les NaN de la fenêtre hors du rang
+                wv_f = wv[np.isfinite(wv)]
+                out[f][i] = float(np.mean(wv_f <= v))
+                out[f + "/__neg"][i] = float(np.mean(wv_f >= v))
     return out
 
 
@@ -290,7 +297,7 @@ def oriented_score(events: list[dict], ranks: dict[str, np.ndarray],
                    binary: set[str] = frozenset()) -> np.ndarray:
     """Score composite = moyenne des rangs ORIENTÉS.
     UP continu        → mean(vals <= v)            (formule exacte v1)
-    DOWN continu      → mean(vals <= -v)           (formule exacte v1)
+    DOWN continu      → mean(vals >= v)            (PR-172, aligné sur v1 corrigé)
     DOWN binaire      → 1 - rang brut              (monotone dans la valeur ;
     la négation v1 n'est définie que pour du continu)
     Feature non finie → 0.5 neutre INCLUS dans la moyenne. Fenêtre trop
@@ -396,7 +403,15 @@ def main() -> int:
 
     # r_not : rendement brut du signal (% du NOTIONAL, indépendant du sizing)
     for e in events:
-        fund_pct = uni["fh"].get(e["sym"], 0.0) * e.get("hold_h", 24)
+        # PR-172 (P1 chasse AL) : funding_hourly_all retourne des
+        # FundingSeries depuis le refactor — l'ancien *hold crashait en
+        # TypeError (la confirmation pré-enregistrée d'octobre était
+        # BLOQUÉE). Le funding RÉEL de la fenêtre (convention F3, comme
+        # le backfill du ledger machine)
+        _fs = uni["fh"].get(e["sym"])
+        _t1_ms = (e["ts_ms"] + e.get("hold_h", 24) * 3600 * 10**9) / 1e6
+        fund_pct = (_fs.sum_pct_between(e["ts_ms"] / 1e6, _t1_ms)
+                    if _fs is not None else 0.0)
         e["r_not"] = (e["price_ret_short"] + e.get("fund_sign", 1) * fund_pct
                       - e["fee_rt_bps"] / 100.0)
 

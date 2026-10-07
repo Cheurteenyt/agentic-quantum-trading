@@ -200,7 +200,9 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
 
 def tercile_lift(vals: np.ndarray, liq: np.ndarray) -> list[tuple[str, int, int, float]]:
     """Le taux de liq par tercile (TRAIN) pour une feature numérique."""
-    q1, q2 = np.quantile(vals, [1 / 3, 2 / 3])
+    # PR-172 : nanquantile — un NaN fabriquait des seuils NaN → masques
+    # tous vides → ligne « 0.0 % » sans avertissement
+    q1, q2 = np.nanquantile(vals, [1 / 3, 2 / 3])
     out = []
     for label, mask in (("T1 (bas)", vals <= q1),
                         ("T2", (vals > q1) & (vals <= q2)),
@@ -239,14 +241,25 @@ def add_rolling_scores(events: list[dict], win_days: int = 90,
             if not np.isfinite(v):
                 ranks.append(0.5)
                 continue
+            # PR-172 : les NaN/inf de la fenêtre hors du rang (l'ancien
+            # comparaison <= les comptait « moins risqués » en silence)
+            vals = vals[np.isfinite(vals)]
             ranks.append(float(np.mean(vals <= v)))
         for f in RISK_DOWN:
             vals = np.array([p[f] for p in window])
-            v = -e[f]
+            v = e[f]
             if not np.isfinite(v):
                 ranks.append(0.5)
                 continue
-            ranks.append(float(np.mean(vals <= v)))
+            # PR-172 (P0 chasse AL) : la DIRECTION — le rang DOWN est la
+            # fraction de la fenêtre AUSSI risquée que le courant (bas =
+            # risqué) : l'ancien mean(vals <= -v) ne niait que la valeur
+            # COURANTE, pas la fenêtre — cascade_depth (< 0 par
+            # construction) saturait à 1.0 sur 100 % des events (feature
+            # MORTE : le gate tournait sur ~4 features effectives, pas
+            # les 6 documentées). La re-preuve du gradient est exigée.
+            vals = vals[np.isfinite(vals)]
+            ranks.append(float(np.mean(vals >= v)))
         e["al_score"] = float(np.mean(ranks))
 
 
@@ -297,7 +310,8 @@ def main() -> int:
     def best_filter(feat_vals, liq_mask):
         """Le seuil qui attrape le plus de liqs pour ≤ 15 % de gagnants perdus."""
         best = None
-        qs = np.quantile(feat_vals, np.linspace(0.05, 0.95, 19))
+        # PR-172 : nanquantile (un NaN vidait les seuils en silence)
+        qs = np.nanquantile(feat_vals, np.linspace(0.05, 0.95, 19))
         for side in ("haut", "bas"):
             for q in qs:
                 mask = (feat_vals >= q) if side == "haut" else (feat_vals <= q)
