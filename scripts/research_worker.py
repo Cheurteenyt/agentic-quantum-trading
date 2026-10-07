@@ -167,12 +167,30 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     ck = _load_json(CHECKPOINT)
     job_id = ck.get("job_id") or f"grind-{git_sha}-{int(time.time())}"
 
-    # №P1-4 : le snapshot de DB fait partie de l'identité du job
+    # FIX v20 (PR-160 №1-№3) : les TROIS identifiants de campagne sont
+    # PERSISTÉS au checkpoint et COMPARÉS à la reprise — tout changement
+    # (git, DB, queue) = nouveau job (les anciens DONE restent en attempts/)
+    cur_queue_sha = _queue_sha(queue_dir)
+    identity_mismatch = []
+    if ck.get("git_sha") and ck["git_sha"] != git_sha:
+        identity_mismatch.append(f"git {ck['git_sha']} → {git_sha}")
     if ck.get("db_snapshot") and ck["db_snapshot"] != db_snap:
-        print(f"[worker] le snapshot a changé ({ck['db_snapshot']} → "
-              f"{db_snap}) — nouveau job", flush=True)
+        identity_mismatch.append(f"db {ck['db_snapshot']} → {db_snap}")
+    if ck.get("queue_sha") and ck["queue_sha"] != cur_queue_sha:
+        identity_mismatch.append(f"queue {ck['queue_sha']} → {cur_queue_sha}")
+    if identity_mismatch:
+        print(f"[worker] IDENTITÉ DE CAMPAGNE CHANGÉE : "
+              f"{' ; '.join(identity_mismatch)} — nouveau job", flush=True)
         ck = {}
         job_id = f"grind-{git_sha}-{int(time.time())}"
+
+    # les 3 identifiants sont SCELLÉS au checkpoint (№1/№2 : l'ancien code
+    # les calculait mais ne les persistait jamais)
+    ck["job_id"] = job_id
+    ck["git_sha"] = git_sha
+    ck["db_snapshot"] = db_snap
+    ck["queue_sha"] = cur_queue_sha
+    job_id = ck["job_id"]
 
     specs = sorted(queue_dir.rglob("*"))
     specs = [p for p in specs if p.is_file()
@@ -192,6 +210,17 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     exit_code = EXIT_OK
     had_errors = False
 
+    last_hb = time.monotonic()
+
+    def _heartbeat_if_due():
+        """Le heartbeat est émis si HEARTBEAT_INTERVAL s'est écoulé —
+        une discovery longue ne laisse plus le lease devenir stale."""
+        nonlocal last_hb
+        now_mono = time.monotonic()
+        if now_mono - last_hb >= HEARTBEAT_INTERVAL:
+            _lease_heartbeat()
+            last_hb = now_mono
+
     for f in specs:
         spec_id = f.stem
         spec_sha = hashlib.sha256(f.read_bytes()).hexdigest()[:16]
@@ -199,7 +228,11 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         # №P1-2 : le SKIP compare le spec_sha — une spec MODIFIÉE sous le
         # même id est re-mesurée (l'ancien ne comparait que l'id)
         prev = items.get(spec_id, {})
-        if prev.get("state") == "DONE" and prev.get("spec_sha") == spec_sha:
+        # FIX v21 (PR-160 №4) : FAILED_PERMANENT est TERMINAL — la spec
+        # ne sera pas re-jouée à l'infini (l'ancien code ne skipait que
+        # les DONE : un FAILED_PERMANENT était re-tenté chaque nuit)
+        if (prev.get("state") in ("DONE", "FAILED_PERMANENT")
+                and prev.get("spec_sha") == spec_sha):
             continue
 
         # №P1-1 : le garde-fou ressource RETENTE LA MÊME SPEC et le
@@ -216,6 +249,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
             _heartbeat(ck)
             print(f"[worker] WAITING_RESOURCE : {why_res} — "
                   "retry dans 60 s (la MÊME spec)", flush=True)
+            _heartbeat_if_due()
             time.sleep(60)
             if state.get("shutdown_requested"):
                 break
@@ -223,7 +257,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         if state.get("shutdown_requested"):
             break
 
-        _lease_heartbeat()
+        _heartbeat_if_due()
         print(f"[worker] {spec_id} — discovery", flush=True)
 
         retries = 0
@@ -285,13 +319,16 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         ck["heartbeat_at"] = _now_iso()
         _heartbeat(ck)
 
-    # ── №P1-5/№6 : le status final dépend de l'état RÉEL
+    # ── №P1-5/№6 + FIX v21 (PR-160 №5) : le status final dépend de TOUTES
+    # les erreurs — FAILED_PERMANENT produit aussi DONE_WITH_ERRORS
     retryable = [k for k, v in items.items()
                  if v.get("state") == "FAILED_RETRYABLE"]
+    permanent = [k for k, v in items.items()
+                 if v.get("state") == "FAILED_PERMANENT"]
     if state.get("shutdown_requested"):
         final_status = "STOPPED"
         exit_code = EXIT_FAILED
-    elif retryable:
+    elif retryable or permanent:
         final_status = "DONE_WITH_ERRORS"
         exit_code = EXIT_FAILED
     else:

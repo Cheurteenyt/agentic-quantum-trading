@@ -1,5 +1,5 @@
 {
- "status": "DONE",
+ "status": "RUNNING",
  "pid": 2353205,
  "started_at": "2026-10-06T16:25:02.535987+00:00",
  "queue": "research/queue/bonsai",
@@ -83,7 +83,21 @@
   "EXP-bonsai-h-59"
  ],
  "remaining": [],
- "heartbeat_at": "2026-10-06T19:55:35.560586+00:00",
+ "heartbeat_at": "2026-10-07T01:55:06.702827+00:00",
  "current": null,
- "completed_at": "2026-10-06T19:55:47.381694+00:00"
+ "completed_at": "2026-10-06T19:55:47.381694+00:00",
+ "items": {
+  "EXP-bonsai-h-21": {
+   "state": "DONE",
+   "verdict": "DISCOVERY_FAIL",
+   "spec_sha": "d97cee8a630479a7",
+   "git_sha": "98d9bb7"
+  },
+  "EXP-bonsai-h-22": {
+   "state": "DONE",
+   "verdict": "DISCOVERY_FAIL",
+   "spec_sha": "e0354d20ca4573c7",
+   "git_sha": "98d9bb7"
+  }
+ }
 }
