@@ -1042,6 +1042,54 @@ def write_artifacts(run_id: str, spec: dict, result: dict, kind: str,
     return rdir
 
 
+def _ledger_params(spec: dict) -> list[str]:
+    """F-045 — les PARAMÈTRES du spec, au format `k=v` de lab_ledger.
+
+    Le garde anti grid-sweep de la gouvernance est
+    `max_parameter_variants` (policy.yaml), application dans
+    `lab_ledger.assess` :
+
+        same_h = [e for e in entries if e["_hh"] == hh]
+        variants = len({e["_ph"] for e in same_h})
+        if variants + 1 > budget["max_parameter_variants"]: STOP
+
+    où `ph = sha(json.dumps(params))`. Or les deux appels subprocess
+    (ici et dans `_budget_precheck`) ne passaient PAS `--params` :
+    `params` valait toujours `{}`, donc `ph` une constante et le compteur
+    `variants` ne comptait que le nombre d'ENTRÉES, jamais des variantes
+    RÉELLES. Concrètement : re-tester la même hypothèse avec
+    `threshold` 1.5 puis 1.6 puis 1.7 ne déclenchait pas le plafond, et le
+    `parameter_hash` du dedup (`dedup_hashes` de policy.yaml) ne
+    discriminait rien. Le garde existait, il était inerte.
+
+    On dérive `params` de ce qui fait DEUX ÉTUDES DIFFÉRENTES la même
+    hypothèse : la définition du signal, les horizons, les critères de
+    passage, le coût et l'univers. On EXCLUT délibérément `id`,
+    `hypothesis` (déjà le `hypothesis_hash`), `family`/`strategy`
+    (déjà des colonnes du ledger), les fenêtres temporelles (elles
+    avancent avec le snapshot : c'est une réplication, pas une variante)
+    et `compute` (l'infrastructure n'est pas une variable d'expérience).
+    """
+    def _flat(v):
+        return json.dumps(v, sort_keys=True, separators=(",", ":"))
+
+    p: dict[str, str] = {}
+    if spec.get("signal") is not None:
+        p["signal"] = _flat(spec["signal"])
+    if spec.get("horizons") is not None:
+        p["horizons"] = _flat(spec["horizons"])
+    if spec.get("criteria") is not None:
+        p["criteria"] = _flat(spec["criteria"])
+    if spec.get("cost_pct") is not None:
+        p["cost_pct"] = str(spec["cost_pct"])
+    data = spec.get("data") or {}
+    if data.get("symbols") is not None:
+        p["symbols"] = ",".join(sorted(str(s) for s in data["symbols"]))
+    if data.get("timeframe") is not None:
+        p["timeframe"] = str(data["timeframe"])
+    return [f"{k}={v}" for k, v in sorted(p.items())]
+
+
 def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
                 snapshot: str | None = None,
                 fail_closed: bool = True) -> None:
@@ -1066,7 +1114,8 @@ def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
         "--strategy", str(spec.get("strategy", "runner")),
         "--hypothesis", str(spec.get("hypothesis", ""))[:300],
         "--verdict", verdict, "--mode", mode,
-        "--snapshot", snapshot, "--ref", ref],
+        "--snapshot", snapshot, "--ref", ref,
+        "--params", *_ledger_params(spec)],   # F-045
         capture_output=fail_closed, text=fail_closed, cwd=ROOT)
     if fail_closed and result.returncode != 0:
         raise RuntimeError(
@@ -1127,7 +1176,8 @@ def _budget_precheck(spec: dict, db_path: Path) -> tuple[bool, str]:
          "--strategy", str(spec.get("strategy", "runner")),
          "--hypothesis", str(spec.get("hypothesis", ""))[:300],
          "--mode", "confirmation",
-         "--snapshot", str(snapshot_id(db_path))],
+         "--snapshot", str(snapshot_id(db_path)),
+         "--params", *_ledger_params(spec)],   # F-045
         capture_output=True, text=True, cwd=ROOT)
     ok = out.returncode == 0
     return ok, (out.stdout + out.stderr).strip()
