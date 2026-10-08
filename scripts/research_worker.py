@@ -28,6 +28,7 @@ Usage :
 """
 from __future__ import annotations
 
+import ast
 import fcntl
 import hashlib
 import json
@@ -58,12 +59,113 @@ SCHEMA_VERSION = 2
 # PR-161 : l'identité de campagne est le MOTEUR DE MESURE, pas git entier.
 # Ces fichiers définissent ce qu'une discovery MESURE — leur changement
 # invalide les résultats (leçon v14) ; un commit docs/worker non.
-ENGINE_FILES = (
-    ROOT / "scripts" / "research_runner.py",
-    ROOT / "scripts" / "label_matrix.py",
-    ROOT / "scripts" / "universe.py",
-    ROOT / "scripts" / "funding_series.py",
+#
+# P1 (audit 2026-10-08) : la liste était ÉCRITE À LA MAIN et elle était
+# INCOMPLÈTE. `ENGINE_FILES` couvrait 4 fichiers alors que la clôture
+# transitive réelle en compte 18. Deux modules du cœur scientifique étaient
+# ABSENTS : `aster_indicators.py` (importé au niveau module par
+# research_runner:56, il fournit `volume_z` — une des features) et
+# `research_os.py` (importé au niveau module :91). Conséquence directe :
+#
+#     aster_indicators.py modifié   →   mesure différente
+#                                   →   engine_sha IDENTIQUE
+#                                   →   la spec DONE n'est PAS rejouée
+#
+# C'est précisément ce que l'identité de campagne doit empêcher.
+#
+# On ne corrige pas en ajoutant 2 lignes à la main : la main ne couvre
+# pas, elle sous-estime par construction (le prochain import ajouté
+# silencieusement n'entre pas dans la liste). `measurement_files()` calcule
+# la CLÔTURE TRANSITIVE des imports, et les tests exigent que tout module
+# atteignable soit soit haché, soit explicitement exclu.
+MEASUREMENT_ROOTS = (
+    "research_runner.py",   # l'orchestrateur : découverte + confirmation
+    "label_matrix.py",      # event_study : la mesure
+    "universe.py",          # fenêtre tradable (lazy import, cycle évité)
+    "funding_series.py",    # funding as-of (lazy import)
+    "aster_indicators.py",  # volume_z : une des features
+    "research_os.py",       # contrat d'univers, DataScope
 )
+
+# Sorties de la clôture, et POURQUOI. Toute exclusion doit se défendre :
+# l'exclusion d'un module de mesure est un trou silencieux.
+NOT_MEASUREMENT = {
+    # CLI de confirmation, importé tardivement par research_runner pour
+    # éviter un cycle. Il ne change pas ce qu'une DISCOVERY mesure — mais
+    # le dire « ne change pas ce qu'une discovery mesure » serait faux
+    # pour la confirmation : `portfolio_sim` (dans la clôture) calcule
+    # lui aussi, donc la confirmation reste couverte.
+    "scripts/portfolio_runner.py",
+    # le worker lui-même
+    "scripts/research_worker.py",
+}
+
+
+def _imports_de(path: Path) -> set[str]:
+    """Modules importés par `path`, au niveau module ET en local.
+
+    Les imports locaux (dans une fonction) comptent : `research_runner`
+    importe `universe` et `funding_series` ainsi, pour casser un cycle.
+    Ne les ignorer laisserait exactement le trou qu'on veut fermer.
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError):
+        return set()
+    out: set[str] = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            out.update(a.name for a in n.names)
+        elif isinstance(n, ast.ImportFrom):
+            # les imports relatifs ne sont pas résolvables sans le module
+            if n.level == 0 and n.module:
+                out.add(n.module)
+    return out
+
+
+def _resoudre(mod: str) -> Path | None:
+    """`scripts.<a>.<b>` ou `<a>.<b>` -> fichier sous scripts/."""
+    parts = mod.split(".")
+    for prefix in (("scripts",), ()):
+        cand = ROOT.joinpath(*prefix, *parts).with_suffix(".py")
+        if cand.exists():
+            return cand
+        pkg = ROOT.joinpath(*prefix, *parts) / "__init__.py"
+        if pkg.exists():
+            return pkg
+    return None
+
+
+def measurement_files() -> tuple[Path, ...]:
+    """Clôture transitive des modules de mesure, DÉTERMINISTE.
+
+    Triée par chemin pour que le sha ne dépende pas de l'ordre de
+    découverte (donc du système de fichiers) : deux exécutions sur le même
+    contenu donnent le même sha, sur n'importe quelle machine.
+    """
+    vus: set[Path] = set()
+
+    def promener(p: Path) -> None:
+        if p in vus:
+            return
+        vus.add(p)
+        for mod in sorted(_imports_de(p)):
+            cible = _resoudre(mod)
+            if cible is None:
+                continue
+            rel = str(cible.relative_to(ROOT))
+            if rel in NOT_MEASUREMENT:
+                continue
+            promener(cible)
+
+    for nom in MEASUREMENT_ROOTS:
+        racine = ROOT / "scripts" / nom
+        if racine.exists():
+            promener(racine)
+    return tuple(sorted(vus, key=lambda p: str(p.relative_to(ROOT))))
+
+
+ENGINE_FILES = measurement_files()
 
 EXIT_OK = 0
 EXIT_FAILED = 1
