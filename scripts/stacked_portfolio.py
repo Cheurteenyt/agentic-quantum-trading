@@ -16,7 +16,9 @@ Règles du wallet :
     même stratégie en même temps) ; les stratégies DIFFÉRENTES peuvent
     coexister — c'est le but
   - marge = % de la balance courante (compounding), par stratégie
-  - liquidation en chemin : MAE ≥ 100/lev − 0,5 %
+  - liquidation en chemin : MAE ≥ 100/lev − maintMarginPercent du symbole
+    (liq_move_for ; le « − 0,5 % » hérité du pré-F-038 ne valait que pour
+    les majeures à maint 0,5 % — obsolète depuis F-038, corrigé R3/B-B)
   - funding réel pendant détention (le short reçoit le taux positif)
 
 Comparaisons : chaque stratégie SEULE (exposition moyenne 5 %) vs

@@ -6,9 +6,23 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
-ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/refresh_aster_cache.py --refresh-funding --symbols BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,LTCUSDT,ASTERUSDT,MEMEUSDT,BOMEUSDT,WIFUSDT,PNUTUSDT,MOODENGUSDT,NEIROUSDT,TURBOUSDT,PENGUUSDT,NOTUSDT,DOGSUSDT,TRUMPUSDT,FARTCOINUSDT,CATEUSDT,1000PEPEUSDT,1000BONKUSDT,1000FLOKIUSDT,DRAMUSDT,PIEVERSEUSDT
-ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/funding_scanner.py
-ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/carry_hedged.py
+# FIX R3 (C-C3) : cette étape passe en tolérante (-). Elle était BLOQUANTE et
+# exit 1 dès qu'UN des symboles demandés échoue (refresh_aster_cache.py:551-553
+# : rc=1 si res["failed"]) — un hic réseau sur un symbole avortait alors les
+# 38 ExecStart suivants (systemd oneshot séquentiel), exactement le pattern
+# que F-040 a corrigé pour la campagne. Depuis F-041, les consommateurs
+# (funding_scanner, carry_hedged) rangent sur les symboles frais et rejettent
+# les périmés : un refresh PARTIEL est un état tolérable, journalisé ici.
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/refresh_aster_cache.py --refresh-funding --symbols BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,LTCUSDT,ASTERUSDT,MEMEUSDT,BOMEUSDT,WIFUSDT,PNUTUSDT,MOODENGUSDT,NEIROUSDT,TURBOUSDT,PENGUUSDT,NOTUSDT,DOGSUSDT,TRUMPUSDT,FARTCOINUSDT,CATEUSDT,1000PEPEUSDT,1000BONKUSDT,1000FLOKIUSDT,DRAMUSDT,PIEVERSEUSDT
+# FIX R3 (B-A, ronde 2) : funding_scanner/carry_hedged exit 1 si le cache
+# funding est vide ou 100 % périmé (funding_scanner.py:170-173, carry_hedged.py:253)
+# — c'est un SIGNAL d'alerte voulu par F-041 (les tests verrouillent ce
+# comportement), pas une raison de couper le nocturne : un exit != 0 ici
+# sautait ~18 étapes de collecte jusqu'à la fin de la chaîne. Tolérantes :
+# l'échec reste journalisé par systemd, la sonde funding_cache_coverage
+# (aster_health, même PR) alerte en parallèle.
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/funding_scanner.py
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/carry_hedged.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_klines.py --fetch --symbols "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT,DOGEUSDT,ADAUSDT,ARBUSDT,ASTERUSDT,AVAXUSDT,BOMEUSDT,CATEUSDT,DOGSUSDT,FARTCOINUSDT,GOOGLUSDT,HUSDT,HYPEUSDT,LABUSDT,LINKUSDT,LTCUSDT,MEMEUSDT,MOODENGUSDT,NEIROUSDT,NOTUSDT,NVDAUSDT,PENGUUSDT,PNUTUSDT,PONSUSDT,PORTALUSDT,TRUMPUSDT,TURBOUSDT,WIFUSDT" --target-bars 3000
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_klines.py --fetch --symbols "DRAMUSDT,PIEVERSEUSDT,VIRTUALUSDT,MELANIAUSDT" --target-bars 3000
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_klines.py --fetch --symbols "BTCUSDT,ETHUSDT,SOLUSDT,ASTERUSDT,XRPUSDT,DRAMUSDT,PIEVERSEUSDT,VIRTUALUSDT,MELANIAUSDT,BNBUSDT,DOGEUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,LTCUSDT" --interval 15m --target-bars 3000

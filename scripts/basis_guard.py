@@ -105,7 +105,13 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"[WARN] Binance {sym}: {exc} (Binance indisponible, basis non mesurable)", file=sys.stderr)
             continue
-        b = basis_pct(aster, binance)
+        # FIX R3 (C-D3b) : basis_pct lève ValueError("prix Binance nul") —
+        # hors try, un prix dégénéré était un crash → exit 1 bloquant (l.30).
+        try:
+            b = basis_pct(aster, binance)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[WARN] {sym}: basis incalculable : {exc}", file=sys.stderr)
+            continue
         rows.append({
             "symbol": sym,
             "aster_price": aster,
@@ -130,8 +136,13 @@ def main() -> int:
             print(f"{r['symbol']:<12} {r['aster_price']:>12.4f} {r['binance_price']:>12.4f} "
                   f"{r['basis_pct']:>9.4f}{alert}")
     else:
-        print("Aucune mesure (réseaux indisponibles ?).", file=sys.stderr)
-        return 1
+        # FIX R3 (C-D3) : cette étape est ExecStart= BLOQUANTE (l.30 du
+        # nocturne). Une panne Aster+Binance totale (les 4 symboles en
+        # échec sur les 2 feeds) renvoyait 1 → housekeeping, memecoin_pulse,
+        # listing_watcher, anti_liq, portfolio_sim, stacked, the_machine,
+        # campagne… sautés. Une nuit sans basis n'est pas une nuit coupée.
+        print("Aucune mesure (réseaux indisponibles ?) — toléré, le nocturne continue.", file=sys.stderr)
+        return 0
 
     if flags:
         print(f"\n! Divergence >= {args.threshold}%% sur : {', '.join(flags)}"

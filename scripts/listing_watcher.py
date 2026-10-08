@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -42,21 +43,50 @@ def live_universe() -> dict[str, dict]:
     }
 
 
+def _write_atomic(path: Path, text: str) -> None:
+    """FIX R3 (C-D2) : écriture atomique tmp + os.replace. Le write_text
+    direct laissait un JSON TRONQUÉ si le processus mourait pendant l'écriture
+    (TimeoutStartSec, OOM, mount externe) — et le watcher se re-snapshottait
+    impossible : JSONDecodeError au tir suivant, toutes les nuits jusqu'à
+    intervention manuelle (empoisonnement auto-entretenu du nocturne).
+    Même patron que refresh_aster_cache.write_cache_atomic."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="Détecteur de nouveaux listings Aster")
     p.add_argument("--init", action="store_true", help="enregistrer l'univers actuel comme référence")
     args = p.parse_args()
 
-    current = live_universe()
+    # FIX R3 (C-D1) : cette étape est ExecStart= BLOQUANTE (l.35 du nocturne) :
+    # un hic réseau sur exchangeInfo (URLError, timeout, 5xx, 429) levait un
+    # traceback non attrapé → exit 1 → les 26 étapes suivantes (lcs, regime,
+    # anti_liq, portfolio_sim, stacked, the_machine, campagne…) sautées.
+    # Un watcher de listings n'a pas vocation à couper le pipeline.
+    try:
+        current = live_universe()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[watcher] exchangeInfo indisponible, nuit dégradée : {exc}",
+              file=sys.stderr)
+        return 0
     now = time.time()
 
     if args.init or not SNAPSHOT.exists():
         SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
-        SNAPSHOT.write_text(json.dumps({"captured_at": now, "symbols": current}, indent=1))
+        _write_atomic(SNAPSHOT, json.dumps({"captured_at": now, "symbols": current}, indent=1))
         print(f"[watcher] snapshot initial : {len(current)} perps USDT TRADING")
         return 0
 
-    known = json.loads(SNAPSHOT.read_text()).get("symbols", {})
+    # FIX R3 (C-D2) : un snapshot tronqué (kill pendant écriture) levait
+    # JSONDecodeError → exit 1 chaque nuit suivante. Re-snapshot et on continue.
+    try:
+        known = json.loads(SNAPSHOT.read_text()).get("symbols", {})
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        print("[watcher] snapshot corrompu — re-snapshot complet", file=sys.stderr)
+        _write_atomic(SNAPSHOT, json.dumps({"captured_at": now, "symbols": current}, indent=1))
+        return 0
     added = sorted(set(current) - set(known))
     removed = sorted(set(known) - set(current))
 
@@ -88,7 +118,7 @@ def main() -> int:
 
     out = ROOT / "reports" / "listings-watch.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    SNAPSHOT.write_text(json.dumps({"captured_at": now, "symbols": current}, indent=1))
+    _write_atomic(SNAPSHOT, json.dumps({"captured_at": now, "symbols": current}, indent=1))
     print(f"[watcher] +{len(added)} -{len(removed)} -> {out}")
     for sym in added:
         print(f"  NOUVEAU: {sym}")

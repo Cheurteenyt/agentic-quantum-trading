@@ -47,7 +47,6 @@ from backend.services.backtest_v2.reporting import (  # noqa: E402
     build_report,
     health_flags,
     render_console,
-    render_discord,
     render_markdown,
 )
 from scripts.fetch_klines import detect_gaps, init_db, load_bars, warehouse_stats  # noqa: E402
@@ -465,11 +464,11 @@ def main() -> int:
     p.add_argument("--symbols", default=None,
                    help="liste sep. par virgules (defaut : toutes les paires)")
     p.add_argument("--interval", default=None,
-                   help="liste sep. par virgules (defaut : tous les intervalles)")
+                   help="liste sep. par virgules (defaut : 1h SEUL — FIX F-040, "
+                        "plan plafonne ; passer --interval explicite pour elargir)")
     p.add_argument("--store", default=str(STORE_DB))
     p.add_argument("--review", action="store_true", help="candidats mûrs a reevaluer")
     p.add_argument("--maturity-days", type=float, default=MATURITY_DAYS)
-    p.add_argument("--discord", action="store_true", help="sortie decoupee Discord")
     args = p.parse_args()
 
     if args.run:
