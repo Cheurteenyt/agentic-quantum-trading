@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT / "scripts"))   # refresh_aster_cache importe aster_
 from backend.services.backtest_v2.costs import (  # noqa: E402
     FundingRate, funding_cost_usd, load_funding_rate)
 from scripts.funding_series import FundingSeries, funding_series_all  # noqa: E402
+from scripts import portfolio_sim as ps  # noqa: E402
 from scripts.portfolio_sim import run_sim  # noqa: E402
 from scripts.refresh_aster_cache import parse_funding_rows  # noqa: E402
 from scripts.stacked_portfolio import run_stack  # noqa: E402
@@ -97,6 +98,25 @@ class TestRunStackAsOf(unittest.TestCase):
 
 
 class TestRunSimAsOf(unittest.TestCase):
+    """Ces tests vérifient l'ARITHMÉTIQUE DU FUNDING as-of, pas le modèle
+    de liquidation. Or `XUSDT` est un symbole synthétique ABSENT de
+    `liq_params` : depuis F-047, un symbole inconnu hérite de la marge de
+    maintenance la plus haute de la table et du max_leverage le plus bas.
+    À LEV(20) ce symbole est donc liquidé à l'entrée, et le solde tombe à
+    90 — le test échouait en mesurant plus du tout le funding.
+
+    On donne donc à XUSDT une marge CONNUE et viable, pour que le test
+    porte sur ce qu'il prétend tester.
+    """
+
+    def setUp(self):
+        self._memo = ps._LIQ_PARAMS
+        ps._LIQ_PARAMS = dict(self._memo or {})
+        ps._LIQ_PARAMS["XUSDT"] = (2.5, 20.0)   # majeure : marge 2,5 %, max 20x
+
+    def tearDown(self):
+        ps._LIQ_PARAMS = self._memo
+
     def test_le_funding_reel_de_la_fenetre_est_applique(self):
         ev = _event(5 * H_MS)
         r = run_sim([ev], 100.0, 0.1, {"XUSDT": _series()}, 0, 0)

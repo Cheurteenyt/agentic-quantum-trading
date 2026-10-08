@@ -69,6 +69,42 @@ LIQ_MOVE_PCT = 100 / LEV - MAINT_PCT   # repli seulement (cf. liq_move_for)
 # copiée. Cette fonction est la source UNIQUE (stacked_portfolio l'importe).
 _LIQ_PARAMS: dict[str, tuple[float, float]] | None = None
 
+# P1 (audit 2026-10-08 §27) : le repli de marge de maintenance était
+# OPTIMISTE.
+#
+# `liq_move_for` retombait sur MAINT_PCT = 2,5 % pour tout symbole absent
+# de `liq_params`. C'est la valeur RÉELLE de BTC/ETH/BNB, et elle est
+# fausse pour presque tout le reste de l'univers :
+#
+#     ASTERUSDT  12,5 %   → repli 2,5 % : 10 points trop optimiste
+#     memecoins   16,66 %  → repli 2,5 % : 14 points trop optimiste
+#     pire       25,0 %   → repli 2,5 % : 22,5 points trop optimiste
+#
+# `distance = 100/L − mm` : une marge sous-estimée donne une distance de
+# mort SURESTIMÉE, donc des trades qui « survivent » dans le backtest et
+# qui se seraient liquidés. Le biais est systematically flatteur — c'est
+# la pire direction possible pour un modèle de risque.
+#
+# Le repli devient donc PRUDENT : la plus haute marge observée dans la
+# table (la plus conservatrice), jamais une constante plate. Et il est
+# COMPTÉ, pour qu'un rapport puisse dire combien de trades reposaient sur
+# une marge substituée.
+LIQ_FALLBACK_COUNT = 0
+
+# Positions dont le levier est non VIABLE à la marge du symbole
+# (100/L ≤ maint) : liquidées à l'entrée. Cf. issue #202 (C-B4).
+LIQ_NON_VIABLE = 0
+
+
+def _maint_prudent() -> float:
+    """La marge de maintenance la plus haute observée — le repli prudent.
+
+    Si la table est VIDE (base absente), on rend `MAINT_PCT` et on le dit :
+    au moins on ne prétend pas avoir une lecture de l'univers.
+    """
+    valeurs = [mm for mm, _ in liq_params().values() if mm is not None]
+    return max(valeurs) if valeurs else MAINT_PCT
+
 
 def liq_params() -> dict[str, tuple[float, float]]:
     """(maint_margin_pct, max_leverage) par symbole, lus dans liq_params."""
@@ -83,26 +119,82 @@ def liq_params() -> dict[str, tuple[float, float]]:
                     _LIQ_PARAMS[sym] = (float(mm), float(mx) if mx is not None else 0.0)
             con.close()
         except sqlite3.Error:
-            pass          # repli MAINT_PCT : une base absente ne doit pas tuer le run
+            # une base absente ne doit pas tuer le run — mais le repli
+            # PRUDENT s'appliquera à TOUS les symboles (cf. _maint_prudent),
+            # et `liq_params()` étant vide, chaque trade sera compté dans
+            # LIQ_FALLBACK_COUNT. Un run sur une base absente se VOIT donc.
+            _LIQ_PARAMS = {}
     return _LIQ_PARAMS
 
 
 def liq_move_for(symbol: str, lev: float) -> float:
-    """Le mouvement adverse qui liquide CE symbole (100/L - maintMarginPercent).
+    """Le mouvement adverse qui liquide CE symbole (100/L − maintMarginPercent).
 
-    Fallback sur MAINT_PCT seulement si le symbole est absent de liq_params.
+    Symbole présent dans `liq_params` : la valeur réelle.
+    Symbole ABSENT : repli PRUDENT (la plus haute marge observée), et
+    `LIQ_FALLBACK_COUNT` est incrémenté. Un repli optimiste rendrait le
+    modèle flatteur ; cf. le commentaire de `LIQ_FALLBACK_COUNT`.
     """
-    mm = liq_params().get(symbol, (MAINT_PCT, 0.0))[0]
-    return 100.0 / lev - mm
+    global LIQ_FALLBACK_COUNT, LIQ_NON_VIABLE
+    entree = liq_params().get(symbol)
+    if entree is None:
+        LIQ_FALLBACK_COUNT += 1
+        mm = _maint_prudent()
+    else:
+        mm = entree[0]
+    distance = 100.0 / lev - mm
+    if distance <= 0.0:
+        # Levier non VIABLE à cette marge : 100/L ≤ mm signifie que la
+        # marge de maintenance exige à elle seule plus que le notionnel
+        # entier du levier, donc la position est liquidée à l'ENTRÉE.
+        #
+        # C'est l'issue #202 (C-B4), restée LATENTE jusqu'ici parce que le
+        # repli plat 2,5 % rendait le cas presque inatteignable. Le repli
+        # PRUDENT le rend réel : un symbole à 25 % de marge de maintenance
+        # est liquidé dès l'entrée à 10x, et le repli l'expose.
+        #
+        # Retourner une distance NÉGATIVE n'aurait aucun sens physique —
+        # « liquidé il y a −15 % » n'est pas une mesure. On borne à 0,
+        # ce qui signifie exactement « liquidé à l'entrée », et on compte.
+        LIQ_NON_VIABLE += 1
+        return 0.0
+    return distance
+
+
+def _lev_prudent() -> float:
+    """Le plus BAS max_leverage observé — le repli prudent pour un symbole
+    dont on ignore la contrainte. Un symbole inconnu est plafonné AU PIRE
+    plutôt qu'au mieux : sous-compter des trades est réparable, simuler un
+    ordre que l'échange refuse ne l'est pas."""
+    valeurs = [mx for _, mx in liq_params().values() if mx and mx > 0]
+    return min(valeurs) if valeurs else 1.0
 
 
 def lev_capped(symbol: str, lev: float) -> float:
-    """Le levier really exécutable : jamais au-dessus du max_leverage du symbole.
+    """Le levier réellement exécutable : jamais au-dessus du max_leverage.
 
     75 symboles de l'univers ont max_leverage < 3 : à 3x ou 10x fixe l'ordre
     est refusé par Aster, et le trade était pourtant compté comme exécuté.
+
+    Symbole ABSENT de `liq_params` : le plafond était **ignoré** — le
+    `.get(symbol, (MAINT_PCT, 0.0))[1]` rendait 0, et `if mx > 0 else lev`
+    renvoyait `lev` inchangé. C'est le défaut miroir de `liq_move_for` :
+    là on surestimait la distance de mort, ici on surestimait le levier
+    autorisé. Les deux font apparaître un trade exécutable qui ne l'est pas.
+
+    Mesuré : **8 symboles de l'univers 1h** (586) n'ont aucune ligne dans
+    `liq_params` — ACNUSD1, CTUSDT, METAUSD1, PAIDUSDT, QNTUSDT, SCRUSDT,
+    SIUSDT, XDPUSDT. Ce n'est pas théorique.
+
+    Repli : le plus BAS max_leverage observé, et `LIQ_FALLBACK_COUNT`
+    incrémenté.
     """
-    mx = liq_params().get(symbol, (MAINT_PCT, 0.0))[1]
+    global LIQ_FALLBACK_COUNT
+    entree = liq_params().get(symbol)
+    if entree is None:
+        LIQ_FALLBACK_COUNT += 1
+        return min(lev, _lev_prudent())
+    mx = entree[1]
     return min(lev, mx) if mx > 0 else lev
 
 

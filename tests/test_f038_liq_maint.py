@@ -21,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from scripts import portfolio_sim as ps  # noqa: E402
 from scripts.portfolio_sim import (  # noqa: E402
     MAINT_PCT, lev_capped, liq_move_for, liq_params)
 
@@ -64,9 +65,32 @@ class TestLiqParamsSource(unittest.TestCase):
 
 class TestLiqMove(unittest.TestCase):
     def test_la_formule(self):
-        for lev in (3, 5, 10, 20):
-            for sym, (mm, _mx) in liq_params().items():
-                self.assertAlmostEqual(liq_move_for(sym, lev), 100.0 / lev - mm)
+        """La formule reste exacte — pour les symboles VIABLES.
+
+        F-047 borne les distances négatives à 0 (« liquidé à l'entrée ») :
+        un symbole dont la marge exige à elle seule plus que le notionnel
+        n'a pas de distance de mort, il meurt au démarrage. Le bornage a
+        son propre test (tests/test_p1_liq_fallback.py).
+
+        HERMÉTIQUE — la table est injectée. La version précédente lisait
+        `liq_params()` du warehouse, absent en CI (`data/` est git-ignoré) :
+        la boucle ne tournait pas, et mon garde `trouve > 0` a fait
+        échouer la CI en « aucun couple viable ». Un test qui ne mesure
+        rien parce qu'il n'a pas de données doit le dire, pas passer.
+        """
+        marge = ps._LIQ_PARAMS
+        ps._LIQ_PARAMS = {"BTCUSDT": (2.5, 20.0), "ASTERUSDT": (12.5, 4.0),
+                          "MEMEUSDT": (16.66, 5.0), "PIREUSDT": (25.0, 2.0)}
+        try:
+            for lev in (3, 5, 10, 20):
+                for sym, (mm, _mx) in ps._LIQ_PARAMS.items():
+                    attendu = 100.0 / lev - mm
+                    if attendu <= 0:
+                        continue
+                    self.assertAlmostEqual(liq_move_for(sym, lev), attendu,
+                                           msg=f"{sym} a {lev}x")
+        finally:
+            ps._LIQ_PARAMS = marge
 
     def test_lev_10x_sur_majeures_7_5_pas_9_5(self):
         for sym in MAJORS:
@@ -74,22 +98,55 @@ class TestLiqMove(unittest.TestCase):
                 self.skipTest(f"{sym} absent")
             self.assertAlmostEqual(liq_move_for(sym, 10), 7.5, msg=sym)
 
-    def test_un_symbole_inconnu_replie_sans_echouer(self):
-        self.assertAlmostEqual(
-            liq_move_for("ZZZ_NOT_A_SYMBOL", 10), 100.0 / 10 - MAINT_PCT)
+    def test_un_symbole_inconnu_replie_sur_le_maint_le_plus_haut(self):
+        """F-047 — le repli est PRUDENT, dans le sens qui ne flatte pas.
 
-    def test_le_repli_est_le_plus_bas_maint_connu(self):
-        """Le repli doit être CONSERVATEUR, pas seulement défini.
+        `distance = 100/L − mm` : un `mm` PLUS ÉLEVÉ donne une distance de
+        mort PLUS COURTE, donc liquident plus tôt. Le repli doit donc
+        prendre la marge la plus haute de la table, jamais la plus basse.
 
-        Si le symbole est absent de liq_params, un repli trop-bas
-        surestimerait la ligne de mort (100/L − mm) et donc
-        sous-estimerait la liquidation : c'est la seule erreur qui rend le
-        moteur optimiste. On prend donc le maint le plus bas de la table.
+        Le test d'origine affirmait le repli plat sur `MAINT_PCT` (2,5 %) —
+        la valeur des majeures, fausse pour ASTER (12,5 %), les memecoins
+        (16,66 %) et le pire symbole (25 %). Sur ces trois cas, 2,5 % donne
+        une distance de mort SURESTIMÉE : le backtest faisait survivre des
+        trades qui auraient été liquidés.
+
+        Noter l'incohérence du commentaire d'origine, qui disait « un
+        repli trop-bas rend le moteur optimiste » puis prenait le maint le
+        plus bas. Le raisonnement était juste, la conclusion inversée.
         """
         table = liq_params()
         if not table:
             self.skipTest("liq_params vide")
-        self.assertAlmostEqual(MAINT_PCT, min(mm for mm, _ in table.values()))
+        attendu = max(mm for mm, _ in table.values())
+        # borné à 0 : si la marge prudente dépasse 100/L, le symbole est
+        # liquidé à l'entrée (cf. issue #202 et test_p1_liq_fallback.py)
+        self.assertAlmostEqual(
+            liq_move_for("ZZZ_NOT_A_SYMBOL", 10),
+            max(0.0, 100.0 / 10 - attendu))
+
+    def test_le_repli_est_le_plus_haut_maint_connu(self):
+        """Le repli doit être CONSERVATEUR — et « conservateur » veut dire
+        « marge la plus HAUTE », pas la plus basse.
+
+        `distance = 100/L − mm` : plus `mm` est grand, plus la mort est
+        proche. Le symbole le plus risqué de la table définit donc le
+        repli. Prendre le plus BAS `mm` donnerait à un symbole inconnu la
+        meilleure protection de l'univers — l'inverse de prudent.
+
+        Ce test échouait avant F-047 avec un commentaire qui concluait
+        l'inverse de son propre raisonnement.
+        """
+        table = liq_params()
+        if not table:
+            self.skipTest("liq_params vide")
+        symbole_inconnu = "ZZZ_NOT_A_SYMBOL"
+        for sym, (mm, _mx) in table.items():
+            with self.subTest(symbole=sym):
+                self.assertLessEqual(
+                    liq_move_for(symbole_inconnu, 10), liq_move_for(sym, 10) + 1e-9,
+                    f"le repli est plus large que le risque de {sym} "
+                    f"(maint {mm} %) : il est optimiste")
 
 
 class TestLevCapped(unittest.TestCase):
@@ -106,8 +163,23 @@ class TestLevCapped(unittest.TestCase):
         for sym, (_mm, mx) in liq_params().items():
             self.assertGreaterEqual(lev_capped(sym, 1), 1.0, sym)
 
-    def test_un_symbole_sans_max_leverage_laisse_passer(self):
-        self.assertAlmostEqual(lev_capped("ZZZ_NOT_A_SYMBOL", 3), 3.0)
+    def test_un_symbole_sans_max_leverage_est_plafonne(self):
+        """F-047 — un symbole INCONNU n'était pas plafonné du tout.
+
+        `.get(symbol, (MAINT_PCT, 0.0))[1]` rendait 0, et `if mx > 0
+        else lev` renvoyait le levier demandé inchangé : on simulait un
+        ordre que l'échange refuse peut-être. Le plafond prudent est le
+        plus BAS max_leverage de la table.
+
+        Mesuré : 8 symboles de l'univers 1h (586) n'ont aucune ligne dans
+        `liq_params`.
+        """
+        table = liq_params()
+        if not table:
+            self.skipTest("liq_params vide")
+        prudent = min(mx for _, mx in table.values() if mx and mx > 0)
+        self.assertAlmostEqual(lev_capped("ZZZ_NOT_A_SYMBOL", 3),
+                               min(3.0, prudent))
 
 
 class TestNoLiquidationsByConstruction(unittest.TestCase):
