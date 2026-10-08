@@ -540,18 +540,67 @@ def bh_reachable(p_min: float, m: int, q: float = BH_Q) -> bool:
     return bool(m) and p_min <= q / m
 
 
+def sequential_perm_pvalue(exceed, n_max: int,
+                           h_stop: int = 10) -> tuple[float, int]:
+    """p-value par permutation SÉQUENTIELLE (Besag–Clifford, forme).
+
+    `exceed()` renvoie le booléen « ce tirage dépasse l'observé » — la
+    comparaison est DANS le callback, donc l'observé n'est pas passé ici :
+    un paramètre mort ferait croire qu'il sert à quelque chose.
+    On tire, on compte les dépassements, et on S'ARRÊTE dès `h_stop`
+    dépassements : au-delà, aucune suite de tirages ne peut plus rendre la
+    p-value petite, donc le coût supplémentaire est du temps perdu.
+
+    Returns `(p, n_tirages_effectues)`.
+
+    ## Pourquoi (N1b, audit 2026-10-08)
+
+    PR #198 a rendu le BH franchissable en dimensionnant la résolution :
+    `n_perm = bh_min_perms(m) = max(99, m/q − 1)`. C'était juste, mais
+    appliqué à CHAQUE spec du lot, ça donne **m × (m/q − 1) permutations** :
+    le coût croît en m². Sur un lot de 43, ≈ 18 000 appels à
+    `event_study` ; sur un lot de 500, ≈ 2,5 M — plusieurs heures, et
+    le moteur avorte en `WAITING_RESOURCE`.
+
+    Sous H0, les dépassements suivent une binomiale — s'arrêter au
+    `h_stop`-ième ne biaise donc pas la p-value : c'est la forme
+    séquentielle classique, et `test_p0_perm_calibration.py` la MESURE
+    (FPR ≤ 8 % sous H0, puissance ≥ 90 % à +0,4 %).
+
+    Les vraies p-valeurs petites demandent les tirages complets ; les
+    candidates qui ne le sont pas s'arrêtent en quelques dizaines. C'est
+    le compromis correct : on paie le prix seulement quand le prix compte.
+    """
+    exc = 0
+    for i in range(1, int(n_max) + 1):
+        exc += 1 if exceed(i) else 0
+        if exc >= h_stop:
+            return (exc + 1) / (i + 1), i
+    return (exc + 1) / (int(n_max) + 1), int(n_max)
+
+
 def _perm_loop(pairs: list[tuple[dict, np.ndarray]], h1: int, side: int,
                cost: float, mean_obs: float, n_perm: int = 99,
-               seed: int = 0) -> float:
-    """La boucle de permutation (pure, testable) : p one-sided supérieur."""
+               seed: int = 0, h_stop: int = 10) -> float:
+    """La boucle de permutation (pure, testable) : p one-sided supérieur.
+
+    SÉQUENTIELLE depuis N1b : on arrête dès `h_stop` dépassements. Sous H0
+    un tirage dépasse l'observé une fois sur deux, donc `h_stop = 10`
+    arrête en ~20 tirages au lieu de `n_perm` (43 pour un lot de 43, ×9
+    moins). Un edge réel ne dépasse pas, il part une fois sur vingt : il
+    va jusqu'à `n_perm` et atteint le plancher dont le BH a besoin.
+
+    `h_stop=0` désactive l'arrêt précoce (l'ancien comportement fixe),
+    pour les tests qui veulent mesurer le nombre de tirages.
+    """
     from scripts.label_matrix import event_study
     if not pairs:
         return float("nan")
     n_min = min(len(m) for _, m in pairs)
     lo_shift = max(1, min(168, n_min // 4))
     rng = np.random.default_rng(seed)
-    ge = 0
-    for _ in range(n_perm):
+
+    def exceed(_i: int) -> bool:
         k = int(rng.integers(lo_shift, max(lo_shift + 1, n_min - lo_shift)))
         num = den = 0.0
         for cols, m in pairs:
@@ -561,9 +610,14 @@ def _perm_loop(pairs: list[tuple[dict, np.ndarray]], h1: int, side: int,
                 num += st["mean"] * st["n"]
                 den += st["n"]
         mean_perm = num / den if den else float("nan")
-        if np.isfinite(mean_perm) and mean_perm >= mean_obs:
-            ge += 1
-    return (1 + ge) / (n_perm + 1)
+        return bool(np.isfinite(mean_perm) and mean_perm >= mean_obs)
+
+    if not h_stop:
+        ge = sum(1 for _ in range(int(n_perm)) if exceed(0))
+        return (1 + ge) / (int(n_perm) + 1)
+
+    p, _n = sequential_perm_pvalue(exceed, n_perm, h_stop=h_stop)
+    return p
 
 
 def _perm_pvalue(spec, matrix, view, db_path, feats_by_sym, frozen,
