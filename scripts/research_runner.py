@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import shutil
 import sqlite3
 import subprocess
@@ -504,6 +505,41 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
     return out
 
 
+BH_Q = 0.10
+
+
+def bh_min_perms(m: int, q: float = BH_Q) -> int:
+    """N1 — combien de permutations pour que le BH soit ATTEIGNABLE.
+
+    Le plancher d'une p-value par permutation est `1 / (n_perm + 1)`. Pour
+    que le MEILLEUR candidat d'un lot de `m` specs puisse franchir le BH au
+    rang 1, il faut `p <= q / m`. Donc :
+
+        1 / (n_perm + 1) <= q / m   ⇔   n_perm >= m / q - 1
+
+    Avec le défaut historique `n_perm = 99`, le plancher est 0,01. Le BH
+    n'est donc franchissable que si `0,01 <= 0,10 / m`, soit **m ≤ 10**.
+    Sur un lot de 43 specs, AUCUN candidat ne peut jamais passer le BH,
+    quel que soit son edge : le contrôle n'était pas un filtre, c'était un
+    refus automatique. Un vrai edge de +0,4 % était écarté au même titre
+    qu'un bruit.
+
+    | lot m | n_perm requis (≥ m/q − 1) |
+    |---|---|
+    | 10  | 99   |
+    | 43  | 429  |
+    | 100 | 999  |
+
+    Le plancher de 99 est conservé pour ne pas dégrader les petits lots.
+    """
+    return max(99, int(math.ceil(m / q)) - 1)
+
+
+def bh_reachable(p_min: float, m: int, q: float = BH_Q) -> bool:
+    """Le seuil BH du rang 1 est-il atteignable avec cette résolution ?"""
+    return bool(m) and p_min <= q / m
+
+
 def _perm_loop(pairs: list[tuple[dict, np.ndarray]], h1: int, side: int,
                cost: float, mean_obs: float, n_perm: int = 99,
                seed: int = 0) -> float:
@@ -580,7 +616,8 @@ def _aggregate(per_symbol: dict, min_n: int) -> tuple[int, float]:
 
 
 # ------------------------------------------------------------------ runs
-def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
+def run_discovery(spec: dict, db_path: Path = KDB,
+                   n_perm: int = 99) -> dict:
     """L'expérience DISCOVERY : vue TRAIN du DataScope uniquement, et
     production des seuils GELÉS que la confirmation réutilisera tels quels."""
     d = spec["data"]
@@ -642,7 +679,8 @@ def run_discovery(spec: dict, db_path: Path = KDB) -> dict:
     p_perm = float("nan")
     if np.isfinite(mean_all) and kept_syms:
         p_perm = _perm_pvalue(spec, matrix, view, db_path, feats_by_sym,
-                              frozen, 0, mean_all, min_n, kept_syms)
+                              frozen, 0, mean_all, min_n, kept_syms,
+                              n_perm=n_perm)
     # FIX v19 (PR-155 №3) : publier le PIRE mean par symbole — la sélection
     # Pareto en a besoin (l'ancien NaN silencieux cassait la dominance)
     worst_sym = min((s["mean"] for s in per_symbol.values()
@@ -1326,6 +1364,23 @@ def cmd_grind(a) -> int:
     if not ok_guard:
         print(f"grind : WAITING_RESOURCE — {why} (exit 42, pas un succès)")
         return 42
+    # N1 — dimensionner la permutation selon la taille du LOT, connue
+    # avant le moindre run. À n_perm=99 le plancher de p est 0,01, et le
+    # BH au rang 1 exige p <= q/m : sur un lot > 10 specs, aucun candidat
+    # ne pouvait JAMAIS passer, même avec un edge réel. Le contrôle
+    # multiplicatif était donc un refus automatique déguisé en filtre.
+    n_perm = bh_min_perms(len(specs))
+    p_min = 1.0 / (n_perm + 1)
+    print(f"[grind] lot de {len(specs)} spec(s) — {n_perm} permutations/spec "
+          f"(plancher de p = {p_min:.4f}, seuil BH rang 1 = "
+          f"{BH_Q / max(1, len(specs)):.4f})")
+    if not bh_reachable(p_min, len(specs)):
+        print("[grind] ATTENTION : le seuil BH reste hors de portée — "
+              "réduire la taille du lot ou augmenter n_perm")
+    if n_perm > 99:
+        print(f"[grind]   coût de la permutation multiplié par "
+              f"{n_perm / 99:.1f} vs le défaut (99) : c'est le prix d'un "
+              f"BH qui filtre vraiment")
     survivors = []
     for f in specs:
         spec = load_spec(f)
@@ -1337,7 +1392,7 @@ def cmd_grind(a) -> int:
                   f"mean {r1.get('mean', float('nan')):.3f})")
             continue
         print(f"[grind] stage 2 : {spec['id']} — tous les horizons + inverse")
-        r2 = run_discovery(spec, db_path=Path(a.db))
+        r2 = run_discovery(spec, db_path=Path(a.db), n_perm=n_perm)
         if _passes(r2, spec):
             write_artifacts(spec["id"], spec, r2, "discovery")
             _log_ledger(spec, r2["verdict"], Mode.DISCOVERY.value,
@@ -1414,8 +1469,16 @@ def cmd_select(a) -> int:
     bh_ok = {r["id"] for r in ps[:k_max]}
     dropped = len(rows) - len(bh_ok)
     if rows:
-        print(f"BH (q=0.10, m={m}) : {len(bh_ok)} survivant(s) — "
+        print(f"BH (q={BH_Q:.2f}, m={m}) : {len(bh_ok)} survivant(s) — "
               f"{dropped} écarté(s) du lot")
+        # N1 : si le seuil du rang 1 est hors de portée de la résolution
+        # disponible, le BH ne filtre rien : il écarte tout. Le dire.
+        if ps and not bh_reachable(ps[0]["p_perm"], m):
+            print(f"  ATTENTION BH : le meilleur p du lot est "
+                  f"{ps[0]['p_perm']:.4f}, le seuil du rang 1 est "
+                  f"{BH_Q / m:.4f} — sur les {m} specs sélectionnées, "
+                  f"ce lot ne peut produire aucun survivant. "
+                  f"Il faut n_perm >= {bh_min_perms(m)}.")
     rows = [r for r in rows if r["id"] in bh_ok]
     if not rows:
         print("aucune discovery à sélectionner")
