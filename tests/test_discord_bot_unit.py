@@ -14,6 +14,144 @@ import unittest
 from pathlib import Path
 
 
+class TestDashboardXSS(unittest.TestCase):
+    """F-048 — aucune donnée non fiable ne doit atteindre le HTML brut.
+
+    Deux entrées distinctes, toutes deux réelles :
+
+      RÉFLÉCHI  `GET /oauth2/callback?error=<script>…` — piloté par l'URL,
+                donc par le lien de la victime. Exécuté dans le navigateur
+                de celle qui clique sur le lien (login CSRF + vol de
+                cookie de session).
+
+      STOCKÉ    `global_name`, les noms de rôle, `author_name`,
+                `channel_name`, `user_name`, le symbole et le verdict des
+                calls : ils viennent de la base (remplie par le bot et
+                Discord). Une seule ligne:name suffice à empoisonner le
+                classement pour tous les membres-connectés.
+
+    Discord interdit `<` et `>` dans les noms d'utilisateur, ce qui rend le
+    cas stocké peu probable en pratique — mais « improbable » n'est pas une
+    garantie, et la base est aussi alimentée par le bot et par des
+    collecteurs. L'échappement se fait au point de sortie, systématiquement.
+    """
+
+    PAYLOADS = [
+        "<script>alert(1)</script>",
+        "<img src=x onerror=alert(1)>",
+        '"><script>alert(1)</script>',
+        "'><svg/onload=alert(1)>",
+        "<iframe srcdoc='<script>alert(1)</script>'></iframe>",
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        from discord_bot import dashboard as d
+        cls.d = d
+
+    def test_esc_ne_laisse_passer_aucun_balise(self):
+        for payload in self.PAYLOADS:
+            with self.subTest(payload=payload):
+                out = self.d._esc(payload)
+                self.assertNotIn("<", out, f"< non échappé : {out}")
+                self.assertNotIn(">", out, f"> non échappé : {out}")
+
+    def test_le_titre_de_page_est_echappe(self):
+        for payload in self.PAYLOADS:
+            with self.subTest(payload=payload):
+                html = self.d._page(payload, "<p>ok</p>").body.decode()
+                self.assertNotIn(payload, html)
+                self.assertIn(self.d._esc(payload), html)
+
+    def test_esc_echappe_les_guillemets_pour_les_attributs(self):
+        """Sans ça, `<img src=x onerror=...>` passe par un attribut."""
+        self.assertNotIn('"', self.d._esc('a" onerror="alert(1)'))
+        self.assertNotIn("'", self.d._esc("a' onerror='alert(1)"))
+
+    def test_esc_sur_none_et_non_str(self):
+        self.assertEqual(self.d._esc(None), "")
+        self.assertEqual(self.d._esc(42), "42")
+
+    def test_la_page_de_login_echappe_le_message(self):
+        """`/oauth2/callback?error=` — le sink réfléchi.
+
+        L'échappement est dans `_login_page` (le sink), pas au site
+        d'appel : `oauth_callback` passe `p.get('error')` BRUT. On vérifie
+        donc le rendu, pas l'appel.
+        """
+        for payload in self.PAYLOADS:
+            with self.subTest(payload=payload):
+                html = self.d._login_page(
+                    f"Connexion refusée ({payload}) — tu peux réessayer."
+                ).body.decode()
+                self.assertNotIn(payload, html,
+                                 "le payload d'error est rendu BRUT dans le HTML")
+                self.assertIn(self.d._esc(payload), html,
+                              "le payload devrait apparaître sous forme échappée")
+
+    def test_les_champs_stockes_sont_echappes_dans_le_classement(self):
+        """On rejoue la construction de ligne du /classement."""
+        payload = "<script>alert('xss')</script>"
+        rows = [{"author_name": payload, "n": 5, "wr": 0.5, "tot": 1.0}]
+        lignes = "".join(
+            f"<tr><td>{i}</td><td><b>{self.d._esc(r['author_name'])}</b></td>"
+            f"<td>{r['n']}</td></tr>"
+            for i, r in enumerate(rows, 1)
+        )
+        self.assertNotIn(payload, lignes)
+        self.assertIn("&lt;script&gt;", lignes)
+
+    def test_aucune_interpolation_brute_restante(self):
+        """Verrou par AST : tout champ non fiable utilisé dans une
+        f-string destinée au HTML doit passer par `_esc(...)`.
+
+        Une recherche de chaîne ne suffit pas — elle matche à la fois
+        `user.get("global_name")` (lecture, inoffensive) et une
+        interpolation réellement brute. On regarde donc les
+        `FormattedValue` de l'AST, et pour chacun on exige qu'il
+        contienne un appel `_esc`.
+        """
+        import ast
+        import inspect
+        import textwrap
+
+        champs = {"author_name", "channel_name", "user_name",
+                  "global_name", "verdict", "entry", "symbol", "title"}
+
+        def _noms(node):
+            out = set()
+            for n in ast.walk(node):
+                if isinstance(n, ast.Subscript) and isinstance(n.slice, ast.Constant):
+                    if isinstance(n.slice.value, str):
+                        out.add(n.slice.value)
+                if isinstance(n, ast.Constant) and isinstance(n.value, str):
+                    out.add(n.value)
+            return out
+
+        tree = ast.parse(textwrap.dedent(inspect.getsource(self.d)))
+        coupables = []
+        for n in ast.walk(tree):
+            if not isinstance(n, ast.JoinedStr):
+                continue
+            for frag in n.values:
+                if not isinstance(frag, ast.FormattedValue):
+                    continue
+                lus = _noms(frag.value) & champs
+                if not lus:
+                    continue
+                echappe = any(
+                    isinstance(c, ast.Call)
+                    and isinstance(c.func, ast.Name)
+                    and c.func.id == "_esc"
+                    for c in ast.walk(frag.value))
+                if not echappe:
+                    coupables.append(
+                        f"L{n.lineno}: {{{ast.unparse(frag.value)}}}")
+
+        self.assertEqual(coupables, [],
+                         f"interpolation non échappée d'un champ non fiable : {coupables}")
+
+
 class TestDashboardCookies(unittest.TestCase):
     """Le cookie de session du dashboard : signé HMAC, expirable, infalsifiable."""
 
