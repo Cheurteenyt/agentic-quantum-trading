@@ -42,6 +42,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import yaml
+
+from scripts.label_matrix import dataset_window_sha  # noqa: E402 (P0-③)
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -396,12 +400,47 @@ def _git_engine_dirty() -> bool:
     return any(not l.startswith("??") for l in proc.stdout.splitlines())
 
 
-def _is_terminal(prev: dict, spec_sha: str) -> bool:
-    """LA définition unique de « terminal » (PR-161) : l'item porte le
-    même spec_sha ET est DONE ou FAILED_PERMANENT. Un FAILED_PERMANENT
-    sans spec_sha (item legacy) n'est PAS terminal — il est re-mesuré."""
+def _is_terminal(prev: dict, spec_sha: str, dws: str | None) -> bool:
+    """LA définition unique de « terminal » (PR-161, P0-③ audit 2026-10-08) :
+    l'item porte le même spec_sha, le MÊME état des données sous sa
+    fenêtre scientifique (dataset_window_sha) ET est DONE ou
+    FAILED_PERMANENT.
+    - item sans dataset_window_sha (ère pré-P0-③) : PAS terminal — il est
+      re-mesuré une fois puis scellé (fail-closed, comme l'item PR-160
+      sans spec_sha) ;
+    - dws incalculable (None) : PAS terminal — on ne peut pas prouver que
+      la mesure DONE décrit les données d'aujourd'hui.
+    Un FAILED_PERMANENT sans spec_sha (item legacy) n'est PAS terminal."""
     return (prev.get("spec_sha") == spec_sha
+            and dws is not None
+            and prev.get("dataset_window_sha") == dws
             and prev.get("state") in ("DONE", "FAILED_PERMANENT"))
+
+
+def _spec_validation_end(path: Path) -> int | None:
+    """P0-③ : validation_end de la spec (int ms epoch) — parse TOLÉRANT.
+    Au SKIP la spec n'est pas encore passée par load_spec (elle n'est lue
+    qu'après le garde ressource) et un fichier illisible ne doit pas
+    casser la boucle : None = dws incalculable = pas de skip (fail-closed,
+    le run normal classera la spec)."""
+    try:
+        spec = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+        v = (spec.get("data") or {}).get("validation_end")
+        return int(v) if v is not None else None
+    except Exception:
+        return None
+
+
+def _dws_now(db_path: Path, v_end: int | None) -> str | None:
+    """Le dataset_window_sha COURANT pour une fenêtre — None (non
+    terminal, pas de skip) si la fenêtre est inconnue ou si la db est
+    présente mais illisible (fail-closed)."""
+    if v_end is None:
+        return None
+    try:
+        return dataset_window_sha(db_path, v_end)
+    except sqlite3.Error:
+        return None
 
 
 def _migrate_checkpoint(ck: dict, db_snap: str, engine_sha: str,
@@ -533,18 +572,29 @@ def _status_counts(items: dict, manifest: list | None = None,
     if manifest:
         ids = [m.get("id") for m in manifest]
         shas = {m.get("id"): m.get("sha") for m in manifest}
+        # P0-③ : le dws attendu par le manifeste — un item DONE dont la
+        # fenêtre de données a changé depuis sa mesure n'est plus done
+        # (dws=None au manifeste = incalculable, aucune exigence ajoutée)
+        dwss = {m.get("id"): m.get("dws") for m in manifest}
 
         def _terminal_ok(iid: str) -> bool:
             it = items.get(iid) or {}
             return (it.get("state") in terminal
-                    and it.get("spec_sha") == shas.get(iid))
+                    and it.get("spec_sha") == shas.get(iid)
+                    and (dwss.get(iid) is None
+                         or it.get("dataset_window_sha") == dwss.get(iid)))
 
         done = sum(1 for i in ids if (items.get(i) or {}).get("state")
-                   == "DONE" and items[i].get("spec_sha") == shas.get(i))
+                   == "DONE" and items[i].get("spec_sha") == shas.get(i)
+                   and (dwss.get(i) is None
+                        or items[i].get("dataset_window_sha") == dwss.get(i)))
         permanent = sum(1 for i in ids
                         if (items.get(i) or {}).get("state")
                         == "FAILED_PERMANENT"
-                        and items[i].get("spec_sha") == shas.get(i))
+                        and items[i].get("spec_sha") == shas.get(i)
+                        and (dwss.get(i) is None
+                             or items[i].get("dataset_window_sha")
+                             == dwss.get(i)))
         remaining = sum(1 for i in ids if not _terminal_ok(i))
     else:
         done = sum(1 for v in items.values() if v.get("state") == "DONE")
@@ -668,9 +718,25 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     candidates: list[str] = list(ck.get("candidates", []))
 
     # le MANIFEST de la campagne est scellé au checkpoint (auditable) —
-    # la campagne exécute exactement cette liste matérialisée au démarrage
+    # la campagne exécute exactement cette liste matérialisée au démarrage.
+    # P0-③ : le manifeste scelle AUSSI l'état des données sous la fenêtre
+    # scientifique de chaque spec (dws), FIGÉ AU DÉMARRAGE — sémantique
+    # « la campagne exécute exactement ce manifest ». Les specs qui
+    # partagent la même validation_end partagent UN SEUL calcul (le hash
+    # complet d'une fenêtre est coûteux : déduplication côté appelant,
+    # dataset_window_sha est volontairement pure et sans cache). Une
+    # correction qui arrive PENDANT la campagne sera détectée au prochain
+    # démarrage (le manifeste est alors recalculé sur le nouvel état).
+    dws_by_spec: dict[str, str | None] = {}
+    dws_by_end: dict[int | None, str | None] = {}
+    for mf, msid, msha in spec_tuples:
+        v_end = _spec_validation_end(mf)
+        if v_end not in dws_by_end:
+            dws_by_end[v_end] = _dws_now(db_path, v_end)
+        dws_by_spec[msid] = dws_by_end[v_end]
     ck["queue_total"] = len(spec_tuples)
-    ck["manifest"] = [{"id": sid, "sha": sha} for _, sid, sha in spec_tuples]
+    ck["manifest"] = [{"id": msid, "sha": msha, "dws": dws_by_spec[msid]}
+                      for _, msid, msha in spec_tuples]
 
     print(f"[worker] job {job_id} · {len(spec_tuples)} specs · "
           f"{len(items)} déjà traitées · moteur {engine}", flush=True)
@@ -709,10 +775,17 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         # №P1-2 : le SKIP compare le spec_sha — une spec MODIFIÉE sous le
         # même id est re-mesurée (l'ancien ne comparait que l'id)
         prev = items.get(spec_id, {})
+        # P0-③ (audit 2026-10-08) : le spec_sha ne voit pas les DONNÉES —
+        # une correction historique DANS la fenêtre scientifique d'une
+        # spec DONE exige une re-mesure ; un append AU-DELÀ de
+        # validation_end (l'actif continue d'exister) ne doit pas la
+        # provoquer. Le dws est celui du manifeste (figé au démarrage de
+        # campagne) ; None = incalculable = pas de skip (fail-closed).
+        dws_now = dws_by_spec.get(spec_id)
         # PR-161 : FAILED_PERMANENT est VRAIMENT terminal — via _is_terminal
         # qui exige le spec_sha (l'item PR-160 ne le portait pas et était
         # donc re-joué à l'infini malgré le commentaire)
-        if _is_terminal(prev, start_sha):
+        if _is_terminal(prev, start_sha, dws_now):
             continue
 
         # №P1-1 : le garde-fou ressource RETENTE LA MÊME SPEC et le
@@ -740,6 +813,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
 
         retries = 0
         spec_sha = start_sha  # par défaut ; l'essai qui réussit le rescelle
+        dws_exec = None  # P0-③ : le dws d'EXÉCUTION (scellé sur la spec exécutée)
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 # PR-162 : le sha EXÉCUTÉ fait foi — lecture, parse, puis
@@ -761,6 +835,14 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     raise ValueError(
                         f"spec.id {spec.get('id')!r} ≠ nom de fichier "
                         f"{spec_id!r} — renommage ou collision")
+                # P0-③ : le dws d'EXÉCUTION — scellé sur la spec exécutée
+                # (miroir du « sha EXÉCUTÉ fait foi »), calculé PRÉ-mesure :
+                # si une correction historique arrive PENDANT la mesure, le
+                # dws scellé (pré) ≠ dws courant (post) → re-mesure
+                # (fail-closed). None (spec mal typée / db illisible) =
+                # item JAMAIS terminal.
+                dws_exec = _dws_now(
+                    db_path, int(spec["data"]["validation_end"]))
                 res = run_discovery(spec, db_path=db_path)
                 verdict = res.get("verdict", "?")
                 n = res.get("n", 0)
@@ -781,7 +863,8 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     print(f"[worker]   → CANDIDATE", flush=True)
                 items[spec_id] = {
                     "state": "DONE", "verdict": verdict,
-                    "spec_sha": spec_sha, "git_sha": git_sha}
+                    "spec_sha": spec_sha, "git_sha": git_sha,
+                    "dataset_window_sha": dws_exec}
                 break
             except Exception as exc:
                 retries = attempt
@@ -792,10 +875,11 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     time.sleep(10 * attempt)
                 elif _is_permanent_error(exc):
                     # №P1-8 : les erreurs PERMANENTES sont FAILED_PERMANENT —
-                    # le spec_sha+git_sha rendent la terminalité RÉELLE
+                    # le spec_sha+git_sha+dataset_window_sha rendent la
+                    # terminalité RÉELLE
                     items[spec_id] = {
                         "state": "FAILED_PERMANENT", "spec_sha": spec_sha,
-                        "git_sha": git_sha,
+                        "git_sha": git_sha, "dataset_window_sha": dws_exec,
                         "error": f"{err_type}: {exc}", "attempt": attempt,
                         "timestamp": _now_iso()}
                     had_errors = True
@@ -805,7 +889,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     # retraitées au prochain lancement
                     items[spec_id] = {
                         "state": "FAILED_RETRYABLE", "spec_sha": spec_sha,
-                        "git_sha": git_sha,
+                        "git_sha": git_sha, "dataset_window_sha": dws_exec,
                         "error": f"{err_type}: {exc}", "attempt": attempt,
                         "timestamp": _now_iso()}
                     had_errors = True

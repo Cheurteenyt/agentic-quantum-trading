@@ -28,10 +28,13 @@ id: EXP-T1
 hypothesis: test de collision/migration
 data:
   symbols: [BTCUSDT]
-  train_start: "2025-01-01"
-  train_end: "2025-02-01"
-  validation_start: "2025-02-01"
-  validation_end: "2025-03-01"
+  # P0-③ : les fenêtres sont des int ms epoch (format réel des specs de
+  # prod — l'ancienne fixture en dates ISO ne survivait qu'au mock de
+  # run_discovery : int("2025-01-01") est un FAILED_PERMANENT en vrai run)
+  train_start: 1735689600000
+  train_end: 1738368000000
+  validation_start: 1738368000000
+  validation_end: 1740787200000
 signal:
   feature: funding_rate
   op: ">="
@@ -67,20 +70,25 @@ class TestQueueSha(unittest.TestCase):
 
 class TestTerminal(unittest.TestCase):
     def test_done_terminal(self):
-        self.assertTrue(
-            rw._is_terminal({"state": "DONE", "spec_sha": "abc"}, "abc"))
+        self.assertTrue(rw._is_terminal(
+            {"state": "DONE", "spec_sha": "abc",
+             "dataset_window_sha": "d1"}, "abc", "d1"))
 
     def test_permanent_terminal(self):
         self.assertTrue(rw._is_terminal(
-            {"state": "FAILED_PERMANENT", "spec_sha": "abc"}, "abc"))
+            {"state": "FAILED_PERMANENT", "spec_sha": "abc",
+             "dataset_window_sha": "d1"}, "abc", "d1"))
 
     def test_permanent_sans_sha_rejoue(self):
         # l'item PR-160 (sans spec_sha) n'était PAS terminal — le bug audit
-        self.assertFalse(rw._is_terminal({"state": "FAILED_PERMANENT"}, "abc"))
+        self.assertFalse(rw._is_terminal(
+            {"state": "FAILED_PERMANENT", "dataset_window_sha": "d1"},
+            "abc", "d1"))
 
     def test_spec_modifie_remesure(self):
         self.assertFalse(rw._is_terminal(
-            {"state": "DONE", "spec_sha": "abc"}, "zzz"))
+            {"state": "DONE", "spec_sha": "abc",
+             "dataset_window_sha": "d1"}, "zzz", "d1"))
 
 
 class TestMigration(unittest.TestCase):
@@ -456,10 +464,16 @@ class TestRunWorker(unittest.TestCase):
             self.assertEqual(ck["schema_version"], rw.SCHEMA_VERSION)
             self.assertEqual(ck["items"]["EXP-T1"]["state"], "DONE")
             self.assertEqual(len(ck["items"]["EXP-T1"]["spec_sha"]), 16)
+            # P0-③ : l'item DONE porte le dws d'exécution, le manifeste
+            # scelle le dws attendu — les deux coïncident sur db absente
+            dws_it = ck["items"]["EXP-T1"]["dataset_window_sha"]
+            self.assertTrue(dws_it.startswith("dws-"))
+            self.assertEqual(len(dws_it), 20)
             self.assertEqual(
                 ck["manifest"],
                 [{"id": "EXP-T1",
-                  "sha": ck["items"]["EXP-T1"]["spec_sha"]}])
+                  "sha": ck["items"]["EXP-T1"]["spec_sha"],
+                  "dws": dws_it}])
             # 2e lancement : la spec est SKIPPÉE (pas de re-mesure)
             self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
             self.assertEqual(calls, ["EXP-T1"])
