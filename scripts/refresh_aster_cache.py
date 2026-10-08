@@ -530,9 +530,15 @@ def main(argv: list[str] | None = None) -> int:
     if do_funding:
         print("=== Rafraichissement funding ===")
         if args.symbols.strip():
+            # FIX R3 (C-C2) : une liste --symbols explicite est un CONTRAT de
+            # l'opérateur — ne jamais la tronquer. L'ancienne troncature à
+            # --limit (25) laissait les 4 derniers symboles de la ligne 9 du
+            # nocturne (1000BONKUSDT, 1000FLOKIUSDT, DRAMUSDT, PIEVERSEUSDT,
+            # ajoutés le 22/09/2026) hors de toute vague de refresh : absents
+            # ou figés dans le cache, mesuré 25/73 symboles frais < 25 h =
+            # exactement le plafond. Le --limit ne concerne que
+            # default_symbols (l'échantillon « prix cassé »).
             syms = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-            if args.limit:
-                syms = syms[: args.limit]
         else:
             syms = default_symbols(limit=args.limit)
         print(f"  {len(syms)} symbole(s), pause {max(MIN_SLEEP_S, args.sleep)}s entre appels")

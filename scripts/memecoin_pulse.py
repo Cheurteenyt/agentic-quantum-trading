@@ -55,10 +55,24 @@ FUNDING_CACHE = ROOT / "backend" / "services" / "onchain" / "aster" / "aster_pub
 
 
 def funding_row(symbol: str) -> tuple[float | None, float | None]:
-    """(dernier taux %, annualisé %) — source : cache funding Aster (nuit)."""
+    """(dernier taux %, annualisé %) — source : cache funding Aster (nuit).
+
+    FIX R3 (C-C1) : F-041 a imposé le contrat de fraîcheur aux consommateurs
+    de rang (funding_scanner, carry_hedged) mais CE lecteur datait
+    silencieusement ses publications : DRAMUSDT/PIEVERSEUSDT (jamais
+    rafraîchis depuis leur ajout — cf. C-C2) ont publié le « dernier
+    règlement » du 22/09/2026 pendant 15 nuits, ≈ +34,6 %/an figé.
+    Même contrat que F-041 : sans cached_at, ou > 25 h → (None, None),
+    affiché « — » dans le rapport.
+    """
     try:
         cache = json.loads(FUNDING_CACHE.read_text())
         entry = cache.get("symbols", {}).get(symbol) or {}
+        cached_at = entry.get("cached_at")
+        if not isinstance(cached_at, (int, float)) \
+                or float(cached_at) <= 0 \
+                or time.time() - float(cached_at) > 25 * 3600:
+            return None, None
         rate = entry.get("data", {}).get("latest_funding_rate")
         if rate is None:
             return None, None
