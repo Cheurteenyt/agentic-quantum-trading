@@ -93,6 +93,15 @@ jobs:
           pip install pip-audit --quiet
           python -m pip_audit --no-deps --disable-pip -r requirements.lock
 
+      # `except: pass` est le bug prioritaire n°1 d'AGENTS.md : un
+      # excepteur qui n'avale rien cache une panne derrière un résultat vide
+      # — un collecteur qui échoue « prouve » alors une absence de signal
+      # inexistante. Stock mesuré : 207 sur 84 fichiers. Réduire 207 d'un
+      # coup n'est pas réaliste ; ce qu'il faut, c'est que la dette cesse de
+      # croître et reste visible. ROCHET, comme bandit.
+      - name: "Ratchet except-pass (BLOQUANT, 207 mesurés)"
+        run: python scripts/audit_except_pass.py --check
+
       # Le scan bandit COMPLET trouve 500+ avis (373 B608 sur du SQL
       # formaté, 118 B310, 12 B301, 8 B324, 8 B108). Les rendre bloquants
       # ferait échouer la CI immédiatement et l'oracle serait ignoré. On
