@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { apiUrl } from "../services/api"
 
 type InvestigationStatus = "pending" | "running" | "completed" | "failed" | "timeout"
 
@@ -37,7 +38,7 @@ interface UseIntelFeedOptions {
   refreshInterval?: number
 }
 
-const API = `http://${window.location.hostname}:8000/api/intel`
+const API = apiUrl("/intel")
 
 function normalizeStatus(status?: string): InvestigationStatus {
   switch (status) {

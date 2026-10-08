@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
+import { WS_ROOT, apiUrl } from "../services/api"
 
 export interface TerminalLine {
   id: string
@@ -37,7 +38,7 @@ export function useTerminal({ maxLines = 500, autoScroll = true }: UseTerminalOp
     let ws: WebSocket | null = null
     
     try {
-      ws = new WebSocket(`ws://${window.location.hostname}:8000/ws/logs`)
+      ws = new WebSocket(`${WS_ROOT}/ws/logs`)
       
       ws.onopen = () => {
         setConnected(true)
@@ -86,7 +87,7 @@ export function useTerminal({ maxLines = 500, autoScroll = true }: UseTerminalOp
     addLog("command", `$ ${command}`)
 
     try {
-      const res = await fetch(`http://${window.location.hostname}:8000/api/terminal/execute`, {
+      const res = await fetch(apiUrl("/terminal/execute"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command }),

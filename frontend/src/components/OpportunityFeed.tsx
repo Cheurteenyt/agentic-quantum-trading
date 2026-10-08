@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { useMarket } from "../contexts/WSContext"
+import { apiUrl } from "../services/api"
 
 interface Opportunity {
   type: string
@@ -99,7 +100,7 @@ export function OpportunityFeed() {
     const fetchOpps = async () => {
       try {
         const host = window.location.hostname
-        const response = await fetch(`http://${host}:8000/api/market/opportunities?limit=10`)
+        const response = await fetch(apiUrl("/market/opportunities?limit=10"))
         if (!response.ok) return
         const payload = await response.json()
         if (!payload.opportunities?.length) return

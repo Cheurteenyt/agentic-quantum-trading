@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react"
+import { apiUrl } from "../services/api"
 
-const API_HOST = window.location.port === "5173" ? `${window.location.hostname}:8000` : window.location.host
-const API = `${window.location.protocol}//${API_HOST}/api/chat`
+// Issue #208 : le port 5173 signifiait « le backend est ailleurs ».
+// C’est désormais `resolveBaseUrl()` qui tranche (runtime → env →
+// hostname), donc plus aucune logique de port dispersée dans l’UI.
+const API = apiUrl("/chat")
 
 interface Message {
   id: number

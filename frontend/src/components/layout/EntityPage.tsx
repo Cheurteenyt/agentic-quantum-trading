@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react"
 import { useMarket } from "../../contexts/WSContext"
+import { apiUrl } from "../../services/api"
 
 // =========================================================
 // ENTITY PAGE — Arkham Intelligence-style full-page view
 // Accessible only from TopBar search results
 // =========================================================
 
-const API = `http://${window.location.hostname}:8000/api`
+const API = apiUrl("")
 
 const TYPE_COLORS: Record<string, string> = {
   token: "var(--blue-bright)",

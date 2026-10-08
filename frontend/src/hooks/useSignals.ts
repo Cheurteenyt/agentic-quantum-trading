@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import type { SignalType, SignalPriority } from "../components/SignalCard"
+import { apiUrl } from "../services/api"
 
 export interface Signal {
   id: string
@@ -36,7 +37,7 @@ export function useSignals({ autoRefresh = true, refreshInterval = 30000 }: UseS
   const fetchSignals = async () => {
     try {
       setLoading(true)
-      const res = await fetch(`http://${window.location.hostname}:8000/api/market/signals`)
+      const res = await fetch(apiUrl("/market/signals"))
       
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       
@@ -65,7 +66,7 @@ export function useSignals({ autoRefresh = true, refreshInterval = 30000 }: UseS
     setSignals(prev => prev.filter(s => s.id !== id))
     
     try {
-      await fetch(`http://${window.location.hostname}:8000/api/market/signals/${id}`, {
+      await fetch(apiUrl(`/market/signals/${id}`), {
         method: "DELETE",
       })
     } catch (err) {
@@ -80,7 +81,7 @@ export function useSignals({ autoRefresh = true, refreshInterval = 30000 }: UseS
     ))
 
     try {
-      await fetch(`http://${window.location.hostname}:8000/api/market/signals/${id}/ack`, {
+      await fetch(apiUrl(`/market/signals/${id}/ack`), {
         method: "POST",
       })
     } catch (err) {

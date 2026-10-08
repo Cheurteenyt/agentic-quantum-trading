@@ -16,6 +16,7 @@
  * chaque cas passe par `vi.resetModules()` + import dynamique.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
+import { API_ROOT, WS_ROOT, apiUrl } from "../services/api"
 
 function stubWindow(hostname: string, runtime?: string) {
   vi.stubGlobal("window", {
@@ -176,5 +177,87 @@ describe("useMarketData — sortie d'état loading", () => {
       await new Promise((r) => setTimeout(r, 0))
     })
     expect(result.current.loading).toBe(false)
+  })
+})
+
+/**
+ * Ratchet de #208 — le garde-fou contre le retour du dur.
+ *
+ * 17 fichiers construisaient `http://${window.location.hostname}:8000`
+ * en contournant `resolveBaseUrl()`. Corriger le résolveur n'aurait rien
+ * changé pour eux : c'est le motif « l'invariant existe et n'est pas
+ * appliqué », déjà vu sur `engine_sha` (PR #211) et le repli de marge
+ * (PR #213). Un ratchet le rend impossible.
+ *
+ * Comme le ratchet bandit côté Python : on gèle un compte de référence et
+ * la CI échoue s'il AUGMENTE. Ici la référence est zéro, donc c'est un
+ * simple « aucune occurrence en dehors de `api.ts` ».
+ */
+import { readdirSync, readFileSync, statSync } from "node:fs"
+import { join } from "node:path"
+
+function fichiersSrc(dossier: string): string[] {
+  const out: string[] = []
+  for (const nom of readdirSync(dossier)) {
+    const chemin = join(dossier, nom)
+    if (statSync(chemin).isDirectory()) {
+      out.push(...fichiersSrc(chemin))
+    } else if (/\.tsx?$/.test(nom) && !/\.test\.tsx?$/.test(nom)) {
+      out.push(chemin)
+    }
+  }
+  return out
+}
+
+describe("ratchet #208 — aucune URL d'API en dur hors api.ts", () => {
+  it("api.ts est le SEUL lieu où le port backend apparaît", () => {
+    const coupables: string[] = []
+    for (const f of fichiersSrc("src")) {
+      if (f.replace(/\\/g, "/").endsWith("services/api.ts")) continue
+      const src = readFileSync(f, "utf8")
+      // `:8000` n'est une URL que s'il suit un `http`/`ws` — ailleurs
+      // c'est un timeout (`8000` ms) et ce n'est pas la même chose.
+      if (/(?:https?|wss?):\/\/[^`'"\s]*:8000/.test(src)) {
+        coupables.push(f)
+      }
+    }
+    expect(
+      coupables,
+      `URL d'API en dur dans ${coupables.length} fichier(s) :\n  ` +
+        `${coupables.join("\n  ")}\n` +
+        "Utilise apiUrl() / WS_ROOT de src/services/api.ts — sans quoi le\n" +
+        "cookie core_access n'est pas envoyé (credentials: include), le\n" +
+        "site casse en HTTPS (mixed content) et la CSP refuse l'origine.",
+    ).toEqual([])
+  })
+
+  it("le comptage ne confond pas un port et un timeout", () => {
+    // `8000` utilisé comme délai en ms doit rester autorisé : c'est le
+    // cas de Dashboard.tsx et ArkhamEntityPage.tsx.
+    for (const f of fichiersSrc("src")) {
+      if (f.replace(/\\/g, "/").endsWith("services/api.ts")) continue
+      const src = readFileSync(f, "utf8")
+      const ports = (src.match(/8000/g) || []).length
+      const urls = (src.match(/(?:https?|wss?):\/\/[^`'"\s]*:8000/g) || []).length
+      expect(urls, `${f} : ${urls} URL(s) en dur`).toBe(0)
+      expect(ports).toBeGreaterThanOrEqual(urls)
+    }
+  })
+
+  it("WS_ROOT déduit le protocole de la page", () => {
+    // https: -> wss:, http: -> ws:. Un `ws://` en dur casserait en HTTPS.
+    //
+    // On ne vérifie PAS l'absence de `:8000` dans la valeur résolue : en
+    // configuration de dev, le repli EST bien localhost:8000. Ce qui doit
+    // être absent, c'est le `:8000` ÉCRIT DANS LE SOURCE — c'est
+    // exactement ce que vérifie le ratchet ci-dessus.
+    expect(WS_ROOT).toMatch(/^wss?:\/\//)
+  })
+
+  it("API_ROOT est la base sans /api, apiUrl y ajoute le préfixe", () => {
+    expect(API_ROOT).not.toMatch(/\/api$/)
+    expect(apiUrl("")).toBe(`${API_ROOT}/api`)
+    expect(apiUrl("/health")).toBe(`${API_ROOT}/api/health`)
+    expect(apiUrl("health")).toBe(`${API_ROOT}/api/health`)
   })
 })

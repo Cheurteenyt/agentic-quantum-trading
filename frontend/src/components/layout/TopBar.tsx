@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { useMarket } from "../../contexts/WSContext"
 import LogoAvatar from "../LogoAvatar"
 import { useLanguage } from "../../i18n"
+import { apiUrl } from "../../services/api"
 
 // =========================================================
 // TOPBAR — with Live Search (ARK Intelligence Style)
@@ -151,8 +152,8 @@ export default function TopBar({ page, onEntitySelect, onArkhamPageOpen }: TopBa
 
       const host = window.location.hostname
       const [localRes, arkhamRes] = await Promise.allSettled([
-        fetch(`http://${host}:8000/api/search?q=${encodeURIComponent(q)}&limit=8`),
-        fetch(`http://${host}:8000/api/arkham/search?q=${encodeURIComponent(q)}&limit=8`),
+        fetch(apiUrl(`/search?q=${encodeURIComponent(q)}&limit=8`)),
+        fetch(apiUrl(`/arkham/search?q=${encodeURIComponent(q)}&limit=8`)),
       ])
       const merged: SearchResult[] = []
 

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react"
+import { WS_ROOT } from "../services/api"
 
 // =========================================================
 // WEBSOCKET CONTEXT — shared across all pages & components
@@ -35,9 +36,7 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     function connect() {
-      const protocol = window.location.protocol === "https:" ? "wss" : "ws"
-      const host = window.location.port === "5173" ? `${window.location.hostname}:8000` : window.location.host
-      const ws = new WebSocket(`${protocol}://${host}/ws`)
+      const ws = new WebSocket(`${WS_ROOT}/ws`)
       wsRef.current = ws
       ws.onopen = () => setConnected(true)
       ws.onclose = () => {

@@ -1,6 +1,7 @@
 import { useMarket } from "../../contexts/WSContext"
 import { useState, useEffect } from "react"
 import LogoAvatar from "../LogoAvatar"
+import { apiUrl } from "../../services/api"
 
 // =========================================================
 // TICKER STRIP — Scrolling Entity Cards (ARK-style)
@@ -56,7 +57,7 @@ export default function TickerStrip({ onEntitySelect }: TickerStripProps) {
   // ── Fetch Arkham top entities once ──
   useEffect(() => {
     const host = window.location.hostname
-    fetch(`http://${host}:8000/api/arkham/top-entities?limit=8`)
+    fetch(apiUrl("/arkham/top-entities?limit=8"))
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.entities) {

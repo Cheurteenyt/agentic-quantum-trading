@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { apiUrl } from "../services/api"
 
 export interface MarketSymbol {
   symbol: string
@@ -27,7 +28,7 @@ export function useMarketData(symbol?: string) {
     // Polling fallback si WebSocket déconnecté
     const fetchLatest = async () => {
       try {
-        const res = await fetch(`http://${window.location.hostname}:8000/api/market/snapshot`)
+        const res = await fetch(apiUrl("/market/snapshot"))
         if (res.ok) {
           const snapshot = await res.json()
           setData(snapshot)
