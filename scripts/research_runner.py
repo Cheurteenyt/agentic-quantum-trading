@@ -1465,9 +1465,23 @@ def cmd_grind(a) -> int:
         print(f"queue vide : {q}")
         return 0
     order = {"tiny": 0, "small": 1, "medium": 2, "large": 3}
-    specs.sort(key=lambda f: order.get(
-        (json.loads(f.read_text(encoding="utf-8")).get("compute", {})
-         .get("class", "small")), 1))
+
+    def _compute_class(f: Path) -> str:
+        # C3 (bug-hunter ronde 4) : la queue admet .yaml/.yml/.json — le
+        # tri parsait tout en JSON et crashait (json.JSONDecodeError) sur
+        # une spec YAML VALIDE avant la moindre mesure. yaml.safe_load
+        # couvre les deux formats (YAML ⊇ JSON) ; un fichier illisible au
+        # tri est classé par défaut — la mesure (load_spec) le jugera.
+        try:
+            doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            print(f"[grind] {f.name} : YAML illisible au tri "
+                  f"({type(exc).__name__}) — classe par défaut, la mesure "
+                  f"jugera", flush=True)
+            return "small"
+        return (doc or {}).get("compute", {}).get("class", "small")
+
+    specs.sort(key=lambda f: order.get(_compute_class(f), 1))
     ok_guard, why = _resource_guard()
     if not ok_guard:
         print(f"grind : WAITING_RESOURCE — {why} (exit 42, pas un succès)")
