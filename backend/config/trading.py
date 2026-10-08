@@ -53,17 +53,12 @@ class TradingConfig(BaseSettings):
         description="List of configured exchanges",
     )
 
-    # Database
-    database_url: str = Field(
-        "postgresql://user:password@localhost:5432/trading_db",
-        description="Database connection string",
-    )
-
-    # Redis
-    redis_url: str = Field(
-        "redis://localhost:6379",
-        description="Redis connection string",
-    )
+    # Stockage : SQLite, un FICHIER. Aucun serveur de base dans ce projet
+    # (3.3) — `database_url` et `redis_url` ont été retirés : ils
+    # déclaraient une architecture jamais utilisée (0 `psycopg2`,
+    # 0 `import redis`, 419 `sqlite3.connect`) et aucun code ne les lisait.
+    # `model_config` porte `extra = "ignore"` : un .env qui les contient
+    # encore ne casse pas, la clé est simplement ignorée.
 
     # Model provider
     model_provider: str = Field(
