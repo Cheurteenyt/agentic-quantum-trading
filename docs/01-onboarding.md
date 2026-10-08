@@ -9,6 +9,21 @@ updated: 2026-08-09
 
 Bienvenue. Lis cette page en entier avant de toucher au code. 10 minutes.
 
+## 0. Prérequis — Python 3.13 EXACTEMENT
+
+Le `requirements.lock` contient `audioop-lts==0.2.2`, dont le marqueur est
+`Requires-Python: >=3.13`. Sur une version antérieure, l'installation échoue
+ou, pire, `pip install --no-deps` laisse un module manquant qui ne se révèle
+qu'à l'exécution.
+
+```bash
+python3 --version        # doit afficher 3.13.x
+uv venv --python 3.13    # ou : python3.13 -m venv .venv
+uv pip install --python .venv/bin/python --no-deps -r requirements.lock
+```
+
+C'est aussi ce que fait la CI (`.github/workflows/ci.yml`, `python-version: "3.13"`).
+
 ## 1. Le contexte, sans enrobage
 
 Ce projet a **coûté plus de 4000 $ en pertes réelles**. La cause n'est pas un
