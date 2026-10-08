@@ -79,6 +79,73 @@ class TestCacheAge(unittest.TestCase):
         rac.write_cache_atomic(p, {"symbols": {"BTCUSDT": {"cached_at": old}}})
         self.assertGreater(rac.cache_age_days(p), 80)
 
+    def test_un_symbole_perime_ne_peut_pas_etre_masque_par_la_racine(self):
+        """F-046 — LE TEST DU BUG.
+
+        Le refresh réécrit `updated_at = time.time()` à la RACINE du
+        fichier à chaque passe. Tant que `cache_age_days` prenait
+        l'horodatage le plus récent, UN SEUL symbole rafraîchi suffisait à
+        rendre tout le cache « frais ».
+
+        Constat sur le fichier de production : `--check` annonçait 0,96 j
+        « OK » alors que 71 des 73 symboles dataient de plus de 25 h
+        (le plus ancien de 127,7 j). Le watchdog était structurellement
+        incapable de voir la péremption qu'il prétend surveiller.
+
+        On doit donc lire l'âge du symbole le PLUS ANCIEN.
+        """
+        now = time.time()
+        p = self.dir / "c.json"
+        rac.write_cache_atomic(p, {
+            "updated_at": now,                       # le refresh vient de passer
+            "symbols": {
+                "FRAISUSDT": {"cached_at": now},
+                "VIEUXUSDT": {"cached_at": now - 90 * 86400},
+            },
+        })
+        age = rac.cache_age_days(p)
+        self.assertGreater(
+            age, 80,
+            f"un symbole de 90 j est masqué par `updated_at` racine : "
+            f"cache_age_days={age} — le garde F-041/F-046 est redevenu inerte")
+
+    def test_symbol_ages_days_exclut_la_racine(self):
+        """`updated_at` racine = horodatage du FICHIER, pas de la donnée."""
+        now = time.time()
+        p = self.dir / "c.json"
+        rac.write_cache_atomic(p, {
+            "updated_at": now,
+            "symbols": {"AUSDT": {"cached_at": now - 2 * 86400}},
+        })
+        ages = rac.symbol_ages_days(p)
+        self.assertEqual(set(ages), {"AUSDT"})
+        self.assertAlmostEqual(ages["AUSDT"], 2.0, delta=0.01)
+
+    def test_stale_symbols_nomme_les_symboles(self):
+        now = time.time()
+        p = self.dir / "c.json"
+        rac.write_cache_atomic(p, {"updated_at": now, "symbols": {
+            "OK1USDT": {"cached_at": now},
+            "VIEUX1USDT": {"cached_at": now - 10 * 86400},
+            "VIEUX2USDT": {"cached_at": now - 40 * 86400},
+        }})
+        perimes = rac.stale_symbols(p, 1.0)
+        self.assertEqual([s for s, _ in perimes], ["VIEUX2USDT", "VIEUX1USDT"],
+                         "triés du plus ancien au plus récent")
+        self.assertAlmostEqual(dict(perimes)["VIEUX2USDT"], 40.0, delta=0.01)
+
+    def test_cache_sans_symbole_horodate_retombe_sur_la_racine(self):
+        p = self.dir / "c.json"
+        rac.write_cache_atomic(p, {"cached_at": time.time(), "status": "ok"})
+        self.assertLess(rac.cache_age_days(p), 0.01)
+        self.assertEqual(rac.symbol_ages_days(p), {})
+
+    def test_fichier_illisible_ne_leve_pas(self):
+        p = self.dir / "c.json"
+        p.write_text("{ pas du json", encoding="utf-8")
+        self.assertIsNone(rac.cache_age_days(p))
+        self.assertEqual(rac.symbol_ages_days(p), {})
+
 
 class TestAtomicWrite(unittest.TestCase):
     def setUp(self):
