@@ -516,6 +516,92 @@ class CliTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             fk.interval_ms("nope")
 
+class TestTargetBarsHonoreParFetch(unittest.TestCase):
+    """F-049 — `--target-bars` était un NO-OP SILENCIEUX en mode `--fetch`.
+
+    `args.target_bars` n'était lu que dans la branche `--fetch-range`.
+    La branche `--fetch` appelait `fetch_and_store(limit=args.limit)` :
+    UNE page de MAX_LIMIT=1500 bougies, sans pagination.
+
+    Or les trois ExecStart= de trading-agent-nightly.service passent
+    `--fetch ... --target-bars 3000`. argparse acceptait le flag, personne
+    ne le lisait : la campagne ne pouvait structurellement JAMAIS atteindre
+    `nightly_campaign.MIN_BARS = 3000` depuis ces jobs.
+
+    Ces tests n'utilisent AUCUN réseau : les deux fonctions de fetch sont
+    remplacées par des enregistreurs d'appels.
+    """
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = str(Path(self.tmp.name) / "k.db")
+        self.calls = []
+        self._orig_page = fk.fetch_klines
+        self._orig_pag = fk.fetch_klines_paginated
+        fk.fetch_klines = self._page
+        fk.fetch_klines_paginated = self._pag
+
+    def tearDown(self):
+        fk.fetch_klines = self._orig_page
+        fk.fetch_klines_paginated = self._orig_pag
+        self.tmp.cleanup()
+
+    def _page(self, sym, *, interval, limit, base_url, timeout, **kw):
+        self.calls.append(("page", sym, limit))
+        return make_rows(limit)
+
+    def _pag(self, sym, *, interval, target_bars, base_url, timeout, **kw):
+        self.calls.append(("paginated", sym, target_bars))
+        n = min(target_bars, 3000)
+        return make_rows(n), {"requests": 3, "fetched": n, "reached_target": True,
+                              "reason": "cible atteinte", "first_ts": T0,
+                              "last_ts": T0 + (n - 1) * HOUR}
+
+    def _run(self, *extra):
+        return fk.main(["--fetch", "--db", self.db, "--symbols", "BTCUSDT",
+                        "--interval", "1h", "--sleep", "0", *extra])
+
+    def test_une_page_suffisante_passe_la_cible_a_la_page_unique(self):
+        """--target-bars <= MAX_LIMIT : une requête, et la cible est respectée."""
+        self.assertEqual(self._run("--target-bars", "400"), 0)
+        self.assertEqual([c[:2] for c in self.calls], [("page", "BTCUSDT")])
+        self.assertEqual(self.calls[0][2], 400,
+                         "la cible n'est pas passée à la requête unique")
+
+    def test_au_dela_de_max_limit_la_pagination_est_declenchee(self):
+        """--target-bars > MAX_LIMIT : on délègue au paginateur."""
+        self.assertEqual(self._run("--target-bars", "3000"), 0)
+        self.assertEqual([c[:2] for c in self.calls], [("paginated", "BTCUSDT")])
+        self.assertEqual(self.calls[0][2], 3000)
+
+    def test_les_bougies_attendues_sont_bien_ecrites_en_base(self):
+        """Le but du flag : ce sont les LIGNES qui doivent changer."""
+        self.assertEqual(self._run("--target-bars", "3000"), 0)
+        import sqlite3
+        con = sqlite3.connect(self.db)
+        try:
+            n = con.execute(
+                "SELECT COUNT(*) FROM klines WHERE symbol='BTCUSDT' "
+                "AND interval='1h'").fetchone()[0]
+        finally:
+            con.close()
+        self.assertEqual(n, 3000,
+                         f"{n} bougies en base au lieu de 3000 : "
+                         f"--target-bars reste sans effet")
+
+    def test_la_defaut_de_3000_bougies_est_bien_respecte(self):
+        """Le nocturne ne passe pas --target-bars sur certaines lignes :
+        le défaut doit faire la meme chose."""
+        self.assertEqual(self._run(), 0)
+        self.assertEqual(self.calls[0][:2], ("paginated", "BTCUSDT"))
+        self.assertEqual(self.calls[0][2], 3000)
+
+    def test_une_cible_aberrante_ne_declenche_pas_la_pagination(self):
+        """--target-bars minuscule : une page, pas de pagination inutile."""
+        self.assertEqual(self._run("--target-bars", "10"), 0)
+        self.assertEqual([c[:2] for c in self.calls], [("page", "BTCUSDT")])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

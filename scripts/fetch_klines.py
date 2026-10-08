@@ -807,7 +807,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--fetch-range", default="", metavar="SYMBOL",
                    help="Telecharge en PAGINANT jusqu'a --target-bars bougies.")
     p.add_argument("--target-bars", type=int, default=3000,
-                   help="Nombre de bougies visees par --fetch-range (defaut 3000).")
+                   help="Bougies visees par symbole, en --fetch ET en "
+                        "--fetch-range (defaut 3000). Au-dela de "
+                        "MAX_LIMIT, --fetch pagine automatiquement.")
     p.add_argument("--export", default="", metavar="SYMBOL",
                    help="Affiche les statistiques d'une serie (pas de dump).")
     p.add_argument("--symbols", default="BTCUSDT",
@@ -858,15 +860,60 @@ def main(argv: list[str] | None = None) -> int:
     print(f"=== Telechargement klines {args.interval} — {len(syms)} symbole(s) ===")
     print(f"  base : {args.db}  |  pause {max(MIN_SLEEP_S, args.sleep)}s entre appels")
     con = init_db(args.db)
+
+    # F-049 — `--target-bars` était un NO-OP SILENCIEUX en mode `--fetch`.
+    #
+    # `args.target_bars` n'était lu que dans la branche `--fetch-range`
+    # (main() plus haut). La branche `--fetch` appelait
+    # `fetch_and_store(limit=args.limit)` : UNE page de MAX_LIMIT=1500
+    # bougies par symbole, sans pagination.
+    #
+    # Or les trois ExecStart= de trading-agent-nightly.service passent
+    # `--fetch ... --target-bars 3000`. argparse acceptait le flag,
+    # personne ne le lisait : la campagne ne pouvait donc JAMAIS atteindre
+    # `nightly_campaign.MIN_BARS = 3000` depuis ces jobs — d'où la note
+    # « 553 des 586 séries 1h sont sous le seuil », une conséquence
+    #structurelle, pas un simple retard de backfill.
+    #
+    # `--target-bars` devient la cible du `--fetch`. Quand elle dépasse
+    # une page, on délègue au paginateur existant `fetch_klines_paginated`
+    # (déjà testé, décale `start_time`, s'arrête en fin d'historique) via
+    # le paramètre `fetcher` que `fetch_and_store` accepte déjà — aucune
+    # modification de la boucle de fetch.
+    target = max(1, int(args.target_bars))
+    pagine = target > MAX_LIMIT
+
+    def _fetch(sym, *, interval, limit, base_url, timeout):
+        if not pagine:
+            return fetch_klines(sym, interval=interval, limit=min(limit, target),
+                                base_url=base_url, timeout=timeout)
+        rows, meta = fetch_klines_paginated(
+            sym, interval=interval, target_bars=target,
+            base_url=base_url, timeout=timeout)
+        if meta.get("requests", 0) > 1:
+            # tracer la pagination évite qu'on la croie inactive
+            print(f"    {sym} : {meta['fetched']} bougies en "
+                  f"{meta['requests']} requetes (cible {target}, "
+                  f"{'cible atteinte' if meta.get('reached_target') else meta.get('reason')})")
+        return rows
+
+    if pagine:
+        print(f"  pagination : cible {target} bougies/symbole "
+              f"(MAX_LIMIT={MAX_LIMIT} par page)")
+    elif args.limit != target:
+        print(f"  cible : {target} bougies/symbole (une page suffit, "
+              f"MAX_LIMIT={MAX_LIMIT})")
+
     try:
         res = fetch_and_store(
             con,
             syms,
             interval=args.interval,
-            limit=args.limit,
+            limit=target,
             base_url=args.base_url,
             timeout=args.timeout,
             sleep_s=args.sleep,
+            fetcher=_fetch,
         )
     finally:
         con.close()
