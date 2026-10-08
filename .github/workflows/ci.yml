@@ -35,3 +35,79 @@ jobs:
         run: python scripts/research_integrity.py
       - name: Audit check (bloquant sur --fail-on)
         run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
+
+  # ─── S3 : oracles de sécurité ───
+  # F-047 (routes admin ouvertes) et F-048 (XSS) n'ont été trouvés que par
+  # audit LLM : les oracles existants attrapent les NameError, la causalité
+  # et la régression de tests, pas les failles. Ces trois étapes ferment ce
+  # trou. Les seuils sont mesurés, pas devinés.
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Dépendances
+        run: pip install --no-deps -r requirements.lock --quiet
+
+      # BLOQUANT. Les URL des appels sont des constantes https (Yahoo,
+      # Binance, Aster) : B310 n'a rien à voir avec une injection ici.
+      - name: Bandit — bind large, shell, eval (BLOQUANT, 0 attendu)
+        run: |
+          pip install bandit --quiet
+          # Motifs dont le compte mesuré est 0 : on peut les rendre
+          # bloquants sans casser la CI, et ils couvrent exactement ce
+          # qui a produit F-047 et S2.
+          #   B104 bind sur toutes les interfaces
+          #   B602/B603 subprocess shell / sans liste d'arguments
+          #   B605/B607 start avec shell / avec un chemin
+          for t in B104 B602 B603 B605 B607; do
+            if python -m bandit -q -ll -r backend discord_bot scripts -t "$t" \
+               | grep -q "^>> Issue:"; then
+              echo "::error::bandit $t détecté (bind large / shell / eval)"
+              python -m bandit -ll -r backend discord_bot scripts -t "$t" || true
+              exit 1
+            fi
+          done
+          echo "bandit ciblé : 0 finding"
+
+      # Secrets dans l'historique COMPLET (fetch-depth: 0) — c'est le
+      # `.env` versionné qu'un scan superficiel ne voit pas.
+      - name: Gitleaks — secrets dans le dépôt ET l'historique (BLOQUANT)
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz \
+            | tar xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner \
+            --config .gitleaks.toml --exit-code 1
+
+      # BLOQUANT après le bump de multidict (CVE-2026-104874). `--no-deps`
+      # est nécessaire : la résolution complète du lock échoue sur
+      # coincurve (metadata-generation-failed), et la CI installe justement
+      # avec --no-deps.
+      - name: Pip-audit — CVE des dépendances épinglées (BLOQUANT)
+        run: |
+          pip install pip-audit --quiet
+          python -m pip_audit --no-deps --disable-pip -r requirements.lock
+
+      # Le scan bandit COMPLET trouve 500+ avis (373 B608 sur du SQL
+      # formaté, 118 B310, 12 B301, 8 B324, 8 B108). Les rendre bloquants
+      # ferait échouer la CI immédiatement et l'oracle serait ignoré. On
+      # garde donc un COMPTE DE RÉFÉRENCE : la CI échoue si le nombre
+      # AUGMENTE. C'est un rochet — on ne peut pas réintroduire un
+      # problème sans le voir, et le stock peut être réduit PR par PR.
+      - name: Bandit complet — ratchet (non bloquant tant que le stock ne monte pas)
+        run: |
+          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null \
+                  | grep -c "^>> Issue:" || true)
+          ref=$(cat .github/bandit-baseline.txt)
+          echo "bandit complet : $total (référence $ref)"
+          if [ "$total" -gt "$ref" ]; then
+            echo "::error::le stock d'avis bandit a AUGMENTÉ ($total > $ref) — "
+            echo "::error::corrige, ou n'augmente pas la référence"
+            exit 1
+          fi
+          echo "::notice::stock bandit ${total}/${ref} — à réduire progressivement"
