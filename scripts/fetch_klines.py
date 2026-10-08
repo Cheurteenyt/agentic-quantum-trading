@@ -919,9 +919,28 @@ def main(argv: list[str] | None = None) -> int:
         con.close()
 
     print(f"  succes : {res['ok']} / {len(syms)}")
+
+    # R3 C-D5 (#215) : le code de sortie distingue l'échec TOTAL de
+    # l'échec PARTIEL. L'ancien `if res["failed"]: return 1` sortait 1
+    # dès qu'UN symbole manquait, et cette ligne de l'unité est un
+    # `ExecStart=` SANS le préfixe `-` : systemd avortait alors les 12
+    # étapes suivantes, dont paper_forward, reevaluate_oos et
+    # housekeeping --apply, alors que 11 séries sur 12 étaient
+    # correctement écrites.
+    #
+    # Même décision que le PR #189 pour `refresh_aster_cache` : le
+    # refresh partiel est un état TOLÉRABLE, journalisé par systemd.
+    # L'échec total reste un échec — c'est lui qu'il faut voir.
+    #
+    # La dégradation n'est PAS silencieuse : le compte et la liste des
+    # symboles en échec restent affichés ci-dessus.
     if res["failed"]:
         print(f"  en echec : {', '.join(res['failed'])}")
-        return 1
+        if res["ok"] == 0:
+            print("  ECHEC TOTAL — aucune serie n'a ete recuperee")
+            return 1
+        print(f"  echec PARTIEL ({len(res['failed'])}/{len(syms)}) tolere : "
+              f"les etapes suivantes de l'unite s'executent")
     return 0
 
 
