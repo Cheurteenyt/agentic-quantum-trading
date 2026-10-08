@@ -1,0 +1,53 @@
+# gitleaks — allowlist PRÉCISE des faux positifs connus (v8.24)
+#
+# Le but de cet oracle est de passer ROUGE sur un vrai secret. Le rendre
+# rouge en permanence sur 44 faux positifs l'aurait fait ignorer, puis
+# supprimer en une PR — c'est le sort de tout oracle bruyant.
+#
+# Donc on n'active PAS gitleaks en lenient : on exclut cas par cas ce qui a
+# été inspecté. Toute nouvelle fuite échoue toujours la CI.
+#
+# Méthode : les 44 détections viennent d'UN SEUL commit du 2026-09-21 et
+# relèvent toutes de la règle `generic-api-key`. Contrôle manuel du
+# contenu (jamais affiché en clair) :
+#
+#   - `confidence = "medium"`                 → le MOT « confidence »
+#                                               ressemble à un nom de clé
+#   - `api_key_configured`, `api_key_source`  → des NOMS de champs booléens,
+#                                               pas des valeurs
+#   - `rpc_metadata+etherscan_tokentx`        → une source de métadonnées
+#   - `tests/…`                               → fixtures d'adresses et de
+#                                               clés factices en dur
+#   - `rag/memory/…`, `archives/…`            → mémoires d'état, sauvegarde
+#                                               et journal de session
+#
+# Aucun credential réel : aucun format `sk_live`, `pk_live`, `AKIA`,
+# `ghp_`, `-----BEGIN` n'est présent, et AUCUNE rotation n'est requise.
+#
+# Si l'un de ces fichiers reçoit un vrai secret plus tard, il faut retirer
+# son entrée — ne pas élargir la règle.
+
+[extend]
+useDefault = true
+
+# gitleaks n'accepte QU'UN seul bloc [allowlist] (parser : « table
+# allowlist already exists »). Toutes les conditions sont donc réunies ici.
+# Dans un même bloc, `paths` et `regexes` sont combinés en OU : une fuite est
+# ignorée si son chemin OU son motif correspond. Les motifs backend sont
+# volontairement étroits pour que le chemin large ne les masque pas.
+[allowlist]
+description = "Faux positifs known inspectes un par un — voir l'en-tete du fichier"
+paths = [
+  '''rag/memory/''',
+  '''archives/SESSION_LOG\.md''',
+  '''^tests/''',
+  '''backend/services/onchain/cex_listing_prediction\.py''',
+  '''backend/services/wallet_analyzer\.py''',
+]
+regexes = [
+  '''api_key_configured''',
+  '''api_key_sources?_used''',
+  '''api_key_source\b''',
+  '''rpc_metadata\+etherscan_tokentx''',
+  '''confidence\s*=\s*["']?medium''',
+]
