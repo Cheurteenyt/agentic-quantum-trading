@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -71,11 +72,32 @@ def execution_fee_bps(symbol: str | None, execution_model: str | None = None) ->
     return taker_fee_bps_for_symbol(symbol)
 
 
+class FundingCacheCorruptError(RuntimeError):
+    """Issue #203 (mode catastrophe) : le fichier cache EXISTE mais est
+    illisible (JSON tronqué, crash disque). L'ancien code retournait
+    {"symbols": {}} en silence — la write-back suivante réécrivait un
+    cache à N symboles et EFFAÇAIT les 73 autres. Désormais : exception
+    dédiée, le snapshot tourne en mode dégradé SANS jamais écrire."""
+
+
 def _read_funding_cache() -> dict[str, Any]:
+    """Lecture du cache — FileNotFoundError (absent, état normal) → vide.
+    Un fichier PRÉSENT mais illisible LÈVE (fail-closed) : on ne fabrique
+    jamais un « cache vide » qui servira d'effaceur."""
     try:
         return json.loads(FUNDING_CACHE_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, TypeError):
+    except FileNotFoundError:
         return {"symbols": {}}
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise FundingCacheCorruptError(
+            f"{FUNDING_CACHE_FILE.name} illisible ({exc}) — écriture "
+            "interdite pour ne pas effacer le cache (issue #203)") from exc
+    except OSError as exc:
+        # PermissionError & co : présent mais illisible — même fail-closed
+        # (on ne doit pas écrire un cache qu'on ne peut pas lire)
+        raise FundingCacheCorruptError(
+            f"{FUNDING_CACHE_FILE.name} inaccessible ({exc}) — écriture "
+            "interdite (issue #203)") from exc
 
 
 def _write_funding_cache(payload: dict[str, Any]) -> None:
@@ -83,7 +105,10 @@ def _write_funding_cache(payload: dict[str, Any]) -> None:
         temp_path = FUNDING_CACHE_FILE.with_name(f"{FUNDING_CACHE_FILE.name}.{os.getpid()}.tmp")
         temp_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
         temp_path.replace(FUNDING_CACHE_FILE)
-    except OSError:
+    except OSError as exc:
+        # Issue #203 : un échec d'écriture n'est plus indiscernable d'un
+        # succès — l'appelant diagnostique au moins quelque chose.
+        print(f"[funding_cache] écriture impossible: {exc}", file=sys.stderr)
         return
 
 
@@ -296,12 +321,16 @@ def get_public_funding_history_snapshot(
     """Return one public funding snapshot per symbol, using a short local cache."""
     now = time.time()
     safe_symbols = list(dict.fromkeys(str(symbol or "").strip().upper() for symbol in symbols if str(symbol or "").strip()))
-    cache = _read_funding_cache()
-    cache_symbols = cache.setdefault("symbols", {})
+    try:
+        cache = _read_funding_cache()
+    except FundingCacheCorruptError as exc:
+        print(f"[funding_cache] {exc}", file=sys.stderr)
+        cache = None
+    cache_symbols = cache.setdefault("symbols", {}) if isinstance(cache, dict) else {}
     results: dict[str, dict[str, Any]] = {}
     changed = False
     for symbol in safe_symbols:
-        cached = cache_symbols.get(symbol)
+        cached = cache_symbols.get(symbol) if cache_symbols else None
         if isinstance(cached, dict) and now - float(cached.get("cached_at") or 0) <= max(0, int(cache_ttl_seconds or 0)):
             row = dict(cached.get("data") or {})
             row["cache_status"] = "hit"
@@ -310,9 +339,27 @@ def get_public_funding_history_snapshot(
         row = _fetch_funding_history(symbol, limit=limit, timeout_seconds=timeout_seconds)
         row["cache_status"] = "miss"
         results[symbol] = row
-        cache_symbols[symbol] = {"cached_at": now, "data": row}
+        if cache_symbols is None:
+            # cache corrompu : on répond au consommateur mais on n'ÉCRIT JAMAIS
+            continue
+        previous = cached if isinstance(cached, dict) else None
+        previous_data = previous.get("data") if isinstance(previous, dict) else None
+        if row.get("status") != "ok" and isinstance(previous_data, dict) and previous_data.get("status") == "ok":
+            # keep-old-on-error : l'erreur transitoire ne remplace pas une
+            # bonne entrée — le cache conserve la dernière mesure saine.
+            continue
+        entry = {k: v for k, v in row.items() if k != "cache_status"}
+        # HÉRITAGE (le cœur de #203) : funding_interval_hours est MESURÉ
+        # par l'écrivain propriétaire (médiane des gaps) ; ce module ne le
+        # produit pas — une row qui l'ignore hérite de la mesure existante
+        # au lieu de la détruire.
+        if ("funding_interval_hours" not in entry
+                and isinstance(previous_data, dict)
+                and previous_data.get("funding_interval_hours") is not None):
+            entry["funding_interval_hours"] = previous_data["funding_interval_hours"]
+        cache_symbols[symbol] = {"cached_at": now, "data": entry}
         changed = True
-    if changed:
+    if changed and isinstance(cache, dict):
         cache["updated_at"] = now
         _write_funding_cache(cache)
     return results
