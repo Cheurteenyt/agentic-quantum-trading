@@ -331,34 +331,109 @@ class AdminGateWithoutAccessTokenTests(unittest.TestCase):
                             path="/api/desktop/launch/app", method="POST")
         self.assertEqual(_gate(req), 403)
 
-    def test_admin_route_autorisee_depuis_la_boucle_locale(self) -> None:
-        """Le dev local doit continuer de fonctionner sans token."""
+    def test_admin_route_autorisee_avec_admin_token_meme_depuis_le_distant(self) -> None:
+        """S1 — le token admin ouvre, y compris derrière un proxy.
+
+        C'est le SEUL moyen d'ouvrir une route d'exécution : ni le pair de
+        socket, ni la boucle locale, ni l'absence de token d'accès ne
+        suffisent.
+        """
+        main._ADMIN_TOKEN = "admin-secret"
         req = _peer_request("127.0.0.1", b"127.0.0.1:8000",
                             path="/api/desktop/launch/app", method="POST")
-        self.assertEqual(_gate(req), 200)
-
-    def test_admin_route_autorisee_avec_admin_token_meme_depuis_le_distant(self) -> None:
-        main._ADMIN_TOKEN = "admin-secret"
-        req = _peer_request("203.0.113.9", b"example:8000",
-                            path="/api/desktop/launch/app", method="POST")
         req.scope["headers"] = [
-            (b"host", b"example:8000"),
+            (b"host", b"127.0.0.1:8000"),
             (b"x-core-admin-token", b"admin-secret"),
         ]
         self.assertEqual(_gate(req), 200)
 
-    def test_le_reste_de_api_reste_ouvert_en_local_open(self) -> None:
-        """Le confort de dev est PRÉSERVÉ : rien d'autre n'est durci."""
-        for path in ("/api/market/prices", "/api/news/gold/latest", "/api/arkham/top-entities"):
+    def test_les_routes_admin_non_execution_restent_ouvertes_en_local(self) -> None:
+        """Le confort de dev n'est retiré QUE de la classe exécution.
+
+        `/api/arkham/db` et `/api/news/gold` lisent des données ; ils
+        gardent la porte loopback ouverte en local-open.
+        """
+        for path in ("/api/arkham/db/stats", "/api/news/gold"):
             with self.subTest(path=path):
-                self.assertEqual(_gate(_peer_request("172.18.216.1", b"127.0.0.1:8000", path=path)), 200)
+                self.assertEqual(
+                    _gate(_peer_request("127.0.0.1", b"127.0.0.1:8000", path=path)), 200)
 
-    def test_health_reste_public(self) -> None:
-        self.assertEqual(_gate(_peer_request("203.0.113.9", b"x:8000", path="/health")), 200)
+    # ——— S1 : F-047 était contournable derrière un proxy local ———
 
-    def test_la_shell_react_reste_atteignable(self) -> None:
-        """Le shell doit rester atteignable pour afficher l'écran de login."""
-        self.assertEqual(_gate(_peer_request("203.0.113.9", b"x:8000", path="/")), 200)
+    EXECUTION_ROUTES = [
+        ("POST", "/api/desktop/launch/app"),
+        ("POST", "/api/desktop/mouse/click"),
+        ("POST", "/api/chat"),
+        ("POST", "/api/agents/run"),
+        ("POST", "/api/vision/analyze"),
+        ("POST", "/api/intel/investigate"),
+        ("GET", "/api/market/mt5/account"),
+    ]
+
+    def test_route_d_execution_refusee_meme_en_boucle_locale(self) -> None:
+        """S1 — le test d'acceptation de l'audit.
+
+        F-047 ouvrait les routes d'exécution à quiconque avait
+        `client.host == 127.0.0.1`. Or le déploiement prévu du projet est
+        un tunnel (`configs/cloudflare-tunnel.example.yml` :
+        `service: http://127.0.0.1:8000`) : derrière cloudflared, TOUTE
+        requête distante arrive depuis la boucle locale.
+
+        Concrètement : sans token, `/api/desktop/launch/app` exécutait un
+        process pour n'importe qui sur Internet. Il doit maintenant être
+        refusé même depuis 127.0.0.1.
+        """
+        for method, path in self.EXECUTION_ROUTES:
+            with self.subTest(route=f"{method} {path}"):
+                self.assertEqual(
+                    _gate(_peer_request("127.0.0.1", b"127.0.0.1:8000",
+                                        path=path, method=method)),
+                    403,
+                    f"{method} {path} s'ouvre en boucle locale sans token : "
+                    f"le tunnel rend le pair de socket inexploitable")
+
+    def test_entete_de_proxy_invalide_la_qualite_de_locale(self) -> None:
+        """`127.0.0.1` + `X-Forwarded-For` = un relais, pas un client local."""
+        for header in (b"x-forwarded-for", b"cf-connecting-ip", b"x-real-ip",
+                       b"forwarded", b"true-client-ip", b"x-original-forwarded-for"):
+            with self.subTest(header=header):
+                req = Request({
+                    "type": "http", "method": "GET", "path": "/api/test",
+                    "query_string": b"", "client": ("127.0.0.1", 4242),
+                    "server": ("127.0.0.1", 8000), "scheme": "http",
+                    "headers": [(b"host", b"127.0.0.1:8000"),
+                                (header, b"203.0.113.9")],
+                })
+                self.assertFalse(main._is_strictly_local_peer(req),
+                                 f"{header!r} est ignoré")
+
+    def test_route_non_execution_refusee_si_proxy_derriere(self) -> None:
+        """Le refus « local-only » tient aussi quand un proxy est présent."""
+        req = Request({
+            "type": "http", "method": "GET", "path": "/api/arkham/db/stats",
+            "query_string": b"", "client": ("127.0.0.1", 4242),
+            "server": ("127.0.0.1", 8000), "scheme": "http",
+            "headers": [(b"host", b"127.0.0.1:8000"),
+                        (b"x-forwarded-for", b"203.0.113.9")],
+        })
+        self.assertEqual(_gate(req), 403)
+
+    def test_sans_proxy_la_boucle_locale_reste_locale(self) -> None:
+        """Contrôle négatif : le refus ne doit pas tout casser."""
+        self.assertTrue(main._is_strictly_local_peer(
+            _peer_request("127.0.0.1", b"127.0.0.1:8000")))
+        self.assertTrue(main._is_strictly_local_peer(
+            _peer_request("::1", b"[::1]:8000")))
+
+    def test_les_prefixes_d_execution_sont_bien_couverts(self) -> None:
+        """Un oubli dans la liste rendrait une route d'exécution publique."""
+        for method, path in self.EXECUTION_ROUTES:
+            self.assertTrue(main._requires_execution_token(method, path), path)
+        for path in ("/api/arkham/db/stats", "/api/news/gold",
+                     "/api/market/prices", "/api/agents-list"):
+            self.assertFalse(main._requires_execution_token("GET", path), path)
+
+
 
     def test_avec_access_token_le_comportement_admin_est_inchange(self) -> None:
         """Régression : avec token, la branche admin d'origine doit tenir."""
@@ -386,3 +461,89 @@ class AdminGateWithoutAccessTokenTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BindSafetyTests(unittest.TestCase):
+    """S2 — refuser de démarrer sur une interface large sans token.
+
+    Le mode « local-open » se définit par l'absence de `CORE_ACCESS_TOKEN`.
+    Tant que le serveur n'écoute que sur la boucle locale, cette
+    configuration veut dire ce qu'elle dit. Dès qu'il écoute sur 0.0.0.0,
+    elle expose toutes les routes `/api/*` au réseau — et c'était l'état
+    par défaut (`--host 0.0.0.0 --reload` dans start_all.sh et dans le
+    `__main__` de main.py).
+    """
+
+    MATRICE = [
+        # (host, token configuré, doit démarrer ?)
+        ("127.0.0.1", False, True),
+        ("localhost", False, True),
+        ("::1", False, True),
+        ("0.0.0.0", False, False),
+        ("0.0.0.0", True, True),
+        ("192.168.1.5", False, False),
+    ]
+
+    def setUp(self) -> None:
+        self._token = main._ACCESS_TOKEN
+
+    def tearDown(self) -> None:
+        main._ACCESS_TOKEN = self._token
+
+    def test_matrice_bind_vers_token(self) -> None:
+        for host, has_token, must_start in self.MATRICE:
+            with self.subTest(host=host, token=has_token):
+                main._ACCESS_TOKEN = "secret" if has_token else ""
+                if must_start:
+                    main._assert_safe_bind(host, False)
+                else:
+                    with self.assertRaises(SystemExit):
+                        main._assert_safe_bind(host, False)
+
+    def test_le_refus_explique_les_deux_options(self) -> None:
+        main._ACCESS_TOKEN = ""
+        with self.assertRaises(SystemExit) as ctx:
+            main._assert_safe_bind("0.0.0.0", False)
+        msg = str(ctx.exception)
+        self.assertIn("CORE_ACCESS_TOKEN", msg)
+        self.assertIn("CORE_HOST", msg, "le message doit dire comment sortir de là")
+
+    def test_loopback_bind_reconnait_les_boucles(self) -> None:
+        for host in ("127.0.0.1", "127.0.0.5", "::1", "localhost"):
+            self.assertTrue(main._loopback_bind(host), host)
+        for host in ("0.0.0.0", "192.168.1.5", "::", ""):
+            self.assertFalse(main._loopback_bind(host), host)
+
+    def test_le_controle_de_boucle_est_unique(self) -> None:
+        """Verrou d'anti-régression : une seule implémentation.
+
+        `addr in _LOOPBACK_NETWORKS` sur un tuple teste l'ÉGALITÉ, pas
+        l'appartenance. L'erreur a été commise deux fois (F-047, puis S2)
+        — la seconde fois juste sous le commentaire d'avertissement.
+        Elle doit maintenant n'exister qu'à un seul endroit.
+        """
+        import ast
+        import inspect
+        import textwrap
+        tree = ast.parse(textwrap.dedent(inspect.getsource(main)))
+        # On compte les LECTURES de la constante (contexte Load), pas sa
+        # définition : une affectation la crée, chaque usage la consomme.
+        sites = [(n.lineno, n.id) for n in ast.walk(tree)
+                 if isinstance(n, ast.Name) and n.id == "_LOOPBACK_NETWORKS"
+                 and isinstance(n.ctx, ast.Load)]
+        self.assertEqual(len(sites), 1,
+                         f"l'appartenance à la boucle doit être testée en UN "
+                         f"seul endroit : {sites}")
+
+    def test_le_reste_de_api_reste_ouvert_en_local_open(self) -> None:
+        """Le confort de dev est PRÉSERVÉ : rien d'autre n'est durci."""
+        for path in ("/api/market/prices", "/api/news/gold/latest", "/api/arkham/top-entities"):
+            with self.subTest(path=path):
+                self.assertEqual(_gate(_peer_request("172.18.216.1", b"127.0.0.1:8000", path=path)), 200)
+
+    def test_health_reste_public(self) -> None:
+        self.assertEqual(_gate(_peer_request("203.0.113.9", b"x:8000", path="/health")), 200)
+
+    def test_la_shell_react_reste_atteignable(self) -> None:
+        """Le shell doit rester atteignable pour afficher l'écran de login."""
+        self.assertEqual(_gate(_peer_request("203.0.113.9", b"x:8000", path="/")), 200)

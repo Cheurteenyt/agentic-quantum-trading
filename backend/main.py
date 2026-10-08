@@ -245,6 +245,41 @@ _FORWARDED_CLIENT_HEADERS = (
     "x-forwarded-proto",
     "x-real-ip",
     "cf-connecting-ip",
+    "cf-ipcountry",
+    "cf-ray",
+    "cf-visitor",
+    "true-client-ip",
+    "x-client-ip",
+    "x-original-forwarded-for",
+    "x-cluster-client-ip",
+)
+
+# S1 — de la classe EXÉCUTION : ces routes lancent un process, pilotent la
+# souris, ou donnent un terminal à un LLM. Elles exigent `CORE_ADMIN_TOKEN`
+# SANS exception — pas de « local-open », pas de dérogation loopback.
+#
+# F-047 avait laissé un mode local-open sur ces routes, en se fiant au pair
+# de socket. Or le déploiement prévu du projet est un TUNNEL :
+#
+#     configs/cloudflare-tunnel.example.yml
+#         ingress: service: http://127.0.0.1:8000
+#
+# Cloudflared se connecte en boucle locale, donc TOUTE requête distante
+# arrive avec `client.host == "127.0.0.1"`. Le pair de socket ne prouve
+# alors plus du tout que le client est local — il prouve seulement qu'il y
+# a un proxy sur la machine. F-047 était neutralisé exactement dans le
+# déploiement pour lequel il était écrit.
+#
+# La machette la plus simple est de ne pas essayer de deviner derrière un
+# proxy : ces routes ne s'ouvrent pas sans token, point.
+_EXECUTION_ONLY_PREFIXES = (
+    "/api/desktop",
+    "/api/chat",
+    "/api/agents",
+    "/api/vision",
+    "/api/intel",
+    "/api/market/mt5",
+    "/api/market/ninjatrader",
 )
 
 
@@ -399,6 +434,24 @@ async def private_access_gate(request: Request, call_next):
     # exactement comme quand `CORE_ACCESS_TOKEN` est défini.
     needs_admin = _requires_admin_access(request.method, path)
     if not _ACCESS_TOKEN:
+        # S1 — les routes de classe EXÉCUTION ne s'ouvrent JAMAIS en
+        # local-open, même en boucle locale. F-047 les ouvrait quand le
+        # pair de socket était 127.0.0.1, ce qui est précisément le cas
+        # derrière le tunnel Cloudflare du projet (ingress vers
+        # http://127.0.0.1:8000) : l'exécution de process à distance était
+        # possible SANS aucun token configuré.
+        if _requires_execution_token(request.method, path):
+            # Fail-closed : sans `CORE_ADMIN_TOKEN` configuré, aucune
+            # dérogation. Avec, il faut le présenter. Ni le pair de
+            # socket, ni la boucle locale, ni l'absence de token d'accès
+            # n'entrent en ligne de compte.
+            if not _is_admin_request(request):
+                detail = ("CORE_ADMIN_TOKEN is not configured"
+                          if not _ADMIN_TOKEN
+                          else "Core Equity admin token required")
+                return _with_security_headers(JSONResponse({"detail": detail},
+                                                             status_code=403))
+            return await pass_through()
         if needs_admin and not (
             _is_strictly_local_peer(request) or _is_admin_request(request)
         ):
@@ -423,32 +476,56 @@ async def private_access_gate(request: Request, call_next):
 
     return _with_security_headers(JSONResponse({"detail": "Core Equity access token required"}, status_code=401))
 
-def _is_strictly_local_peer(request: Request) -> bool:
-    """F-047 — le PAIR DE SOCKET est-il vraiment en boucle locale ?
+def _requires_execution_token(method: str, path: str) -> bool:
+    """S1 — cette route exige-t-elle `CORE_ADMIN_TOKEN` sans exception ?"""
+    return any(path == p or path.startswith(p + "/")
+               for p in _EXECUTION_ONLY_PREFIXES)
 
-    NON falsifiable : on ne lit que `request.client.host`, que le client ne
-    peut pas choisir (il vient de l'accept() du serveur).
 
-    C'est la différence avec `_is_local_client`, qui autorise aussi :
-      - l'en-tête `Host` — choisi librement par le client
-        (`curl -H "Host: localhost:8000"`) ;
-      - la plage `172.16.0.0/12` — la NAT Windows et une bonne partie des
-        réseaux de conteneurs, pas « la machine du propriétaire ».
+def _is_loopback_addr(addr: object) -> bool:
+    """L'adresse est-elle dans la boucle locale ?
 
-    Ces deux signaux restent valables pour decideR qu'un token n'est pas
-    demandé (confort de dev local). Ils ne doivent JAMAIS ouvrir une route
-    admin : `/api/desktop/launch/app` exécute un process, `/api/desktop/
-    mouse/click` pilote la souris, `/api/chat` donne le terminal à un LLM.
+    SOURCE UNIQUE de cette décision (S2) : `_is_strictly_local_peer` et
+    `_loopback_bind` l'utilisent tous les deux.
+
+    F-047 l'a écrit en ligne dans chaque fonction, et l'erreur
+    `addr in _LOOPBACK_NETWORKS` sur un TUPLE (égalité, pas appartenance)
+    a été commise deux fois — la seconde fois après un commentaire
+    d'avertissement posé à côté. Un seul endroit, un seul piège.
     """
-    host = request.client.host if request.client else ""
     try:
-        addr = ip_address(host)
+        ip = ip_address(addr)
     except ValueError:
         return False
-    # ATTENTION : `addr in _LOOPBACK_NETWORKS` sur un TUPLE teste
-    # l'ÉGALITÉ (une adresse IP n'est jamais égale à un réseau), pas
-    # l'appartenance. Il faut itérer explicitement.
-    return any(addr in net for net in _LOOPBACK_NETWORKS)
+    return any(ip in net for net in _LOOPBACK_NETWORKS)
+
+
+def _is_strictly_local_peer(request: Request) -> bool:
+    """S1/F-047 — le PAIR DE SOCKET est-il vraiment en boucle locale,
+    et sans proxy devant ?
+
+    Deux conditions, cumulatives :
+
+    1. aucun en-tête de proxy dans la requête. C'est ce que F-047
+       oubliait. `configs/cloudflare-tunnel.example.yml` route le tunnel
+       vers `http://127.0.0.1:8000` : derrière cloudflared, Tailscale
+       serve, nginx ou ngrok, le pair de socket est `127.0.0.1` pour
+       TOUT le monde, distant compris. Lire `request.client.host` ne
+       prouve donc pas que le client est local — ça prouve qu'il y a un
+       relais sur la machine. Cloudflare ajoute `CF-Connecting-IP`,
+       `CF-Ray`, `CF-Visitor` ; un nginx ajoute `X-Real-IP`. On les
+       refuse tous.
+
+    2. le pair est dans la boucle locale, ce qui n'est pas falsifiable
+       (il vient de l'accept() du serveur).
+
+    On se garde cependant le droit de se tromper du côté STRICT : une
+    requête refusée à tort est un désagrément ; une requête acceptée à
+    tort est une exécution de process distante.
+    """
+    if _has_forwarded_client_headers(request.headers):
+        return False
+    return _is_loopback_addr(request.client.host if request.client else "")
 
 
 # Start background collector on startup
@@ -1074,6 +1151,50 @@ if STATIC_DIR.exists():
         raise HTTPException(status_code=404, detail="Frontend build not found")
 
 
+def _loopback_bind(host: str) -> bool:
+    """S2 — ce bind n'ouvre que la boucle locale ?"""
+    if host == "localhost":
+        return True
+    return _is_loopback_addr(host)
+
+
+def _assert_safe_bind(host: str, reload: bool) -> None:
+    """S2 — refuse de démarrer sur une interface large sans token.
+
+    Le mode « local-open » de F-047/S1 se définit par l'ABSENCE de
+    `CORE_ACCESS_TOKEN`. Tant que le serveur n'écoute que sur la boucle
+    locale, « local-open » veut dire ce qu'il dit. Dès qu'il écoute sur
+    0.0.0.0, la même configuration expose toutes les routes `/api/*` au
+    réseau — c'était l'état par défaut (`--host 0.0.0.0` dans
+    start_all.sh:18 et ci-dessous), donc l'état par défaut de la machine.
+
+    On refuse de démarrer plutôt que d'avertir : une erreur de config
+    silencieuse est exactement ce qu'un mode ouvert ne doit pas tolérer.
+    Exposer volontairement reste possible — il suffit de configurer le
+    token, c'est le contrat.
+    """
+    if _loopback_bind(host) or _ACCESS_TOKEN:
+        return
+    raise SystemExit(
+        f"REFUS de démarrer sur {host} : CORE_ACCESS_TOKEN est vide.\n"
+        f"  Le mode local-open n'a de sens que sur la boucle locale.\n"
+        f"  Deux options :\n"
+        f"    - écouter en boucle locale :  CORE_HOST=127.0.0.1 "
+        f"(defaut, recommandé)\n"
+        f"    - exposer volontairement :   définir CORE_ACCESS_TOKEN "
+        f"dans backend/.env")
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # S2 : la boucle locale par défaut. Auparavant c'était 0.0.0.0, ce
+    # qui exposait `/api/*` en local-open sans aucun token configuré.
+    _host = os.getenv("CORE_HOST", "127.0.0.1")
+    _port = int(os.getenv("CORE_PORT", "8000"))
+    # `--reload` recharge le module au changement de fichier : en
+    # production c'est un superviseur qui est inutilement dans la
+    # boucle (et un reload qui rate une exception fait tomber le
+    # worker). Réservé au dev explicite.
+    _reload = os.getenv("CORE_RELOAD", "0").lower() in {"1", "true", "yes"}
+    _assert_safe_bind(_host, _reload)
+    uvicorn.run("main:app", host=_host, port=_port, reload=_reload)
