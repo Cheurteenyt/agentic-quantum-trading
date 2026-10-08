@@ -166,6 +166,44 @@ def levier_majors_safe(mae_gated: float, cap: float = 10.0,
     return min(cap, 100.0 / (mae_gated + maint_pct + safety_pct))
 
 
+def gate_expanding(events: list[dict], min_hist: int = 30) -> tuple[list[dict], float]:
+    """Le gate AL score EXPANDING (PR-167), SENS PRÉ-167 RESTAURÉ (FIX R3 C-B1).
+
+    al_score HAUT = PLUS risqué : le rang RISK_UP est mean(vals <= v) et le
+    rang RISK_DOWN est mean(vals >= v) (anti_liq.collect_featured, PR-172).
+    La sémantique pré-167 (6760a16~1, l.147-148) tradait le tiers BAS :
+
+        gated = [e for e in events if not (isfinite(s) and s >= q66)]
+
+    La réécriture expanding de PR-167 a gardé le socle (30 scores connus)
+    et le quantile roulant mais RENVERSÉ le sens (`if s >= q66: append`) :
+    la machine officielle tradait exactement le tiers le plus risqué —
+    celui que size_by_policy (stacked_portfolio), portfolio_sim (l.254-256)
+    et full_arsenal_2 (l.265-267) écartent tous — et le moniteur MAE
+    (levier_majors_safe) se calait sur cette mauvaise population.
+
+    Un score NaN est tradé (pas de signal ≠ signal de risque), comme avant.
+    Renvoie (gated, last_q66) : le quantile COURANT pour le rapport (PR-171).
+    """
+    gated: list[dict] = []
+    hist: list[float] = []
+    last_q66 = float("nan")
+    # l'expanding exige l'ordre temporel (re-sort stable : sans effet si
+    # l'appelant a déjà trié, contracte l'ordre sinon)
+    for e in sorted(events, key=lambda x: x["ts_ms"]):
+        s = e.get("al_score", float("nan"))
+        if len(hist) >= min_hist:
+            q66 = float(np.nanquantile(hist, 2 / 3))
+            last_q66 = q66
+            if not (np.isfinite(s) and s >= q66):
+                gated.append(e)
+        elif np.isfinite(s):
+            gated.append(e)
+        if np.isfinite(s):
+            hist.append(s)
+    return gated, last_q66
+
+
 def main() -> int:
     con = sqlite3.connect(KDB, timeout=60)
     fh = funding_hourly_all()
@@ -202,21 +240,11 @@ def main() -> int:
     # FUTUR (le live, lui, est causal → ROI/DD du backtest non
     # reproductibles). Le décile ATR du survivor est déjà expanding :
     # même doctrine. Socle minimal : pas de gate avant 30 scores connus.
-    _MIN_GATE_HIST = 30
-    gated = []
-    _gate_hist: list[float] = []
-    last_q66 = float("nan")   # PR-171 : la valeur de gate COURANTE pour le rapport
-    for e in events:
-        _s = e.get("al_score", float("nan"))
-        if len(_gate_hist) >= _MIN_GATE_HIST:
-            _q66 = float(np.nanquantile(_gate_hist, 2 / 3))
-            last_q66 = _q66
-            if np.isfinite(_s) and _s >= _q66:
-                gated.append(e)
-        elif np.isfinite(_s):
-            gated.append(e)
-        if np.isfinite(_s):
-            _gate_hist.append(_s)
+    # FIX R3 (C-B1) : le SENS du gate est restauré à la sémantique pré-167
+    # (fonction gate_expanding, testée par test_r3_machine_gate.py) —
+    # l'inversion héritée de la réécriture PR-167 faisait trader le tiers
+    # al_score le PLUS risqué et jeter le tiers sûr.
+    gated, last_q66 = gate_expanding(events)
     if not gated:
         print("[machine] cascade majors gated vide ce soir — rapport abstenu")
         return 0
