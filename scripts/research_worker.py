@@ -167,6 +167,114 @@ def measurement_files() -> tuple[Path, ...]:
 
 ENGINE_FILES = measurement_files()
 
+
+# ─── L'IDENTITÉ D'EXÉCUTION ────────────────────────────────────────────────
+# L'audit du 2026-10-08 (action 5) : `engine_sha` seul ne suffit pas à dire
+# « ce résultat est le même ». Le hash du moteur couvre les modules de
+# mesure, mais deux autres choses peuvent changer la MESURE sans le
+# changer :
+#
+#   - les SEUILS du protocole (`active.yaml` peut changer un seuil sous le
+#     même `protocol_id` — d'où `protocol_sha`, PR-150) ;
+#   - l'UNIVERS (`univ10.yaml` modifié garde son nom — d'où `universe_sha`) ;
+#   - les VERSIONS des bibliothèques qui font les calculs (un patch numpy
+#     change un quantile au 16ᵉ chiffre, donc un t au 3ᵉ) ;
+#   - la SPEC elle-même.
+#
+# `execution_identity()` les compose en UN sha. C'est cet identifiant, et
+# non `engine_sha`, qui doit autoriser un `skip`.
+#
+# Ce qui n'entre PAS, et doit donc pouvoir changer sans invalider :
+#   - la documentation ;
+#   - ce fichier (le worker) ;
+#   - la configuration de CI.
+#
+# Une règle qui n'est pas testée n'est pas une règle : `TestMatriceDIdentite`
+# modifie chaque entrée, une par une, et exige que l'identité change — et
+# exige l'inverse pour les trois éléments hors périmètre. C'est ce seul
+# test qui vaut plus que des dizaines de tests unitaires isolés.
+EXECUTION_IDENTITY_PARTS = (
+    "engine", "spec", "universe", "protocol", "db_snapshot",
+    "deps", "git",
+)
+
+
+def execution_identity(engine_sha: str, *, spec_sha: str = "",
+                       universe_sha: str = "", protocol_sha: str = "",
+                       db_snapshot: str = "", deps_sha: str = "",
+                       git_sha: str = "") -> str:
+    """SHA256 du CANONICAL JSON des composantes d'exécution.
+
+    Volontairement une fonction PURE et testable : l'oracle de matrice
+    l'appelle directement avec des valeurs connues, sans base, sans git,
+    sans réseau. C'est ce qui permet d'affirmer que chaque composante
+    compte au lieu de le supposer.
+
+    `engine_sha` seul (le cas d'avant ce PR) est conservé comme
+    composante ET comme sous-clé : un run ancien reste comparable.
+    """
+    canonique = json.dumps(
+        {
+            "engine": engine_sha,
+            "spec": spec_sha,
+            "universe": universe_sha,
+            "protocol": protocol_sha,
+            "db_snapshot": db_snapshot,
+            "deps": deps_sha,
+            "git": git_sha,
+        },
+        sort_keys=True,          # l'ordre des clés ne doit pas compter
+        separators=(",", ":"),   # pas d'espace : le canonique est stable
+    )
+    return hashlib.sha256(canonique.encode("utf-8")).hexdigest()[:16]
+
+
+def deps_sha() -> str:
+    """Le sha des VERSIONS des bibliothèques qui font les calculs.
+
+    Un patch de numpy/pandas change un quantile au 16ᵉ chiffre, donc un
+    t-statistique au 3ᵉ, donc un verdict. Deux runs « identiques » sur
+    deux patchs de numpy ne sont pas le même résultat.
+
+    Stdlib seule : `importlib.metadata.version` lit la distribution
+    INSTALLÉE. Une version absente contribute une chaîne vide, pas une
+    exception — l'absence de numpy serait un autre problème, signalé
+    ailleurs, et ne doit pas faire tomber l'identité.
+    """
+    from importlib.metadata import PackageNotFoundError, version
+    parts = []
+    for dist in ("numpy", "pandas", "scipy", "pyarrow"):
+        try:
+            parts.append(f"{dist}={version(dist)}")
+        except PackageNotFoundError:
+            parts.append(f"{dist}=absent")
+    return "|".join(parts)
+
+
+def _execution_identity_for(engine_sha: str, spec_sha: str = "",
+                            db_snapshot: str = "", git_sha: str = "") -> str:
+    """L'identité d'exécution complète, lue sur disque.
+
+    `protocol_sha` est lu ici (et non passé) parce qu'il décrit un fichier
+    du dépôt, pas un paramètre du run : l'oublier serait exactement le trou
+    que l'oracle de matrice ferme — un seuil de protocole peut changer sous
+    le même `protocol_id`.
+
+    `universe_sha` est laissé vide ici : il dépend de l'univers de la spec,
+    donc c'est à l'appelant de le passer (il a la spec en main). Le canal
+    reste ouvert et l'oracle le vérifie.
+    """
+    proto = ""
+    try:
+        from scripts.research_runner import protocol_sha as _proto
+        proto = _proto()
+    except (OSError, ImportError, ValueError):
+        proto = ""
+    return execution_identity(
+        engine_sha, spec_sha=spec_sha, db_snapshot=db_snapshot,
+        protocol_sha=proto, deps_sha=deps_sha(), git_sha=git_sha or "",
+    )
+
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_WAITING_RESOURCE = 42
@@ -532,6 +640,14 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     ck["job_id"] = job_id
     ck["git_sha"] = git_sha
     ck["engine_sha"] = engine
+    # L'identité d'EXÉCUTION (audit 2026-10-08, action 5) : engine_sha seul
+    # ne suffit pas à dire « ce résultat est le même ». Un seuil de
+    # protocole peut changer sous le même protocol_id, un univers peut
+    # changer sous le même nom, et un patch numpy décale un t-statistique.
+    # Ces trois choses-là ne touchent aucun module de mesure — donc
+    # engine_sha reste identique — alors que le résultat, si.
+    ck["execution_identity"] = _execution_identity_for(
+        engine, spec_sha="", db_snapshot=db_snap, git_sha=git_sha)
     ck["db_snapshot"] = db_snap
     ck["queue_sha"] = queue_sha
     ck["schema_version"] = SCHEMA_VERSION
