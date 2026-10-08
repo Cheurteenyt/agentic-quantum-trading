@@ -37,7 +37,25 @@ ASTER_DIR = ROOT / "backend" / "services" / "onchain" / "aster"
 EXCHANGE_INFO_CACHE = ASTER_DIR / "aster_public_exchange_info_cache.json"
 FUNDING_CACHE = ASTER_DIR / "aster_public_funding_history_cache.json"
 
+# F-046 — les deux paliers de fraîcheur du funding, et pourquoi ils coexistent.
+# Ils ne se contredisent PAS : ce sont deux seuils de RIGUEUR croissante, sur
+# deux usages distincts.
+#
+#   25 h  funding_scanner.FUNDING_MAX_AGE_S / aster_health (5 min)
+#         → fraîcheur OPÉRATIONNELLE. Un funding vieux de 4 mois annualisé
+#           à 3×365 donne un chiffre qui a l'air d'un taux et qui n'en est
+#           pas un : le classement de funding refuse de le classer.
+#   30 j  cette constante (et le coût de backtest)
+#         → péremption STRUCTURELLE. Au-delà, le snapshot n'est plus
+#           exploitable comme historique de funding, même pour un coût.
+#
+# Le garde de cette constante ne portait sur AUCUN des deux avant F-046 :
+# `cache_age_days` prenait l'horodatage le PLUS RÉCENT du fichier (dont le
+# `updated_at` racine réécrit à chaque refresh), donc n'attrapait rien.
 MAX_FUNDING_AGE_DAYS = 30.0
+# Seuil d'alerte (non bloquant) : au-delà, le symbole est refusé par
+# funding_scanner. Affiché pour que l'opérateur voie le palier bas.
+FUNDING_OPERATIONAL_MAX_AGE_H = 25.0
 MIN_SLEEP_S = 0.2
 DEFAULT_TIMEOUT = 10.0
 USER_AGENT = "trading-agent-refresh-aster-cache/1.0 (stdlib urllib)"
@@ -84,11 +102,69 @@ def http_get_json(
 # ------------------------------------------------------------------ cache utils
 
 
-def cache_age_days(path: Path) -> float | None:
-    """Age du cache en jours, None si le fichier est absent ou illisible.
+def _stamps(blob: object) -> dict[str, float]:
+    """Horodatages de fraîcheur : {symbole ou '<racine>' -> epoch}."""
+    out: dict[str, float] = {}
+    if not isinstance(blob, dict):
+        return out
+    for key in ("cached_at", "updated_at"):
+        val = blob.get(key)
+        if isinstance(val, (int, float)) and val > 0:
+            out.setdefault("<racine>", float(val))
+            break
+    symbols = blob.get("symbols")
+    if isinstance(symbols, dict):
+        for sym, entry in symbols.items():
+            if isinstance(entry, dict):
+                val = entry.get("cached_at")
+                if isinstance(val, (int, float)) and val > 0:
+                    out[str(sym)] = float(val)
+    return out
 
-    Utilise `cached_at` / `updated_at` du contenu quand disponible (c'est ce que
-    lit costs.py) ; retombe sur le mtime du fichier sinon.
+
+def symbol_ages_days(path: Path) -> dict[str, float]:
+    """F-046 — âge en jours PAR symbole. {} si le fichier est illisible.
+
+    `updated_at` racine (écrit à chaque refresh) n'est PAS retenu comme
+    freshness d'un symbole : c'est l'horodatage du FICHIER, pas de la
+    donnée. Il sert de repli quand aucun symbole n'est horodaté.
+    """
+    path = Path(path)
+    if not path.exists():
+        return {}
+    try:
+        blob = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    now = time.time()
+    st = _stamps(blob)
+    per_sym = {k: (now - v) / 86400.0 for k, v in st.items() if k != "<racine>"}
+    return per_sym
+
+
+def stale_symbols(path: Path, max_age_days: float) -> list[tuple[str, float]]:
+    """(symbole, âge en jours) des symboles au-delà de `max_age_days`,
+    du plus ancien au plus récent."""
+    ag = symbol_ages_days(path)
+    return sorted(((s, a) for s, a in ag.items() if a > max_age_days),
+                  key=lambda kv: -kv[1])
+
+
+def cache_age_days(path: Path) -> float | None:
+    """F-046 — âge du cache en jours, None si absent ou illisible.
+
+    L'âge est celui du SYMBOLE LE PLUS ANCIEN, pas celui du plus récent.
+
+    AVANT le fix : `newest = max(stamps)`. Comme le refresh réécrit
+    `updated_at = time.time()` à la racine à CHAQUE passe, un seul symbole
+    rafraîchi suffisait à rendre tout le cache « frais » — et le
+    watchdog `--check` annonçait « caches a jour » pendant que 71 des 73
+    symboles du fichier de prod dataient de plus de 25 h (médiane 385 h,
+    max 3 064 h). Le garde était structurellement incapable de voir la
+    péremption qu'il prétend surveiller.
+
+    Un cache n'est frais que si TOUT ce qu'il contient l'est : c'est le
+    symbole le plus ancien qui borne la décision (fail-closed).
     """
     path = Path(path)
     if not path.exists():
@@ -98,28 +174,18 @@ def cache_age_days(path: Path) -> float | None:
     except (OSError, json.JSONDecodeError):
         return None
 
-    stamps: list[float] = []
-    if isinstance(blob, dict):
-        for key in ("cached_at", "updated_at"):
-            val = blob.get(key)
-            if isinstance(val, (int, float)) and val > 0:
-                stamps.append(float(val))
-        symbols = blob.get("symbols")
-        if isinstance(symbols, dict):
-            for entry in symbols.values():
-                if isinstance(entry, dict):
-                    val = entry.get("cached_at")
-                    if isinstance(val, (int, float)) and val > 0:
-                        stamps.append(float(val))
+    per_sym = symbol_ages_days(path)
+    if per_sym:
+        return max(0.0, max(per_sym.values()))
 
-    if stamps:
-        newest = max(stamps)
-    else:
-        try:
-            newest = path.stat().st_mtime
-        except OSError:
-            return None
-    return max(0.0, (time.time() - newest) / 86400.0)
+    # repli : aucun symbole horodaté -> l'horodatage racine, puis le mtime
+    st = _stamps(blob)
+    if st:
+        return max(0.0, (time.time() - min(st.values())) / 86400.0)
+    try:
+        return max(0.0, (time.time() - path.stat().st_mtime) / 86400.0)
+    except OSError:
+        return None
 
 
 def backup_existing(path: Path) -> Path | None:
@@ -463,8 +529,29 @@ def run_check(base_url: str = ASTER_BASE, timeout: float = DEFAULT_TIMEOUT) -> i
         elif age > MAX_FUNDING_AGE_DAYS:
             verdict = f"PERIME (> {MAX_FUNDING_AGE_DAYS:.0f} j)"
             stale = True
+        elif age > FUNDING_OPERATIONAL_MAX_AGE_H / 24.0:
+            verdict = (f"DEGRADE (> {FUNDING_OPERATIONAL_MAX_AGE_H:.0f} h, "
+                       f"refuse par funding_scanner)")
         print(f"  {label} : age = {_fmt_age(age):>12}   -> {verdict}")
         print(f"      {path}")
+
+        # F-046 : le verdict porte sur le symbole le plus ancien, donc on
+        # nomme LESQUELS sont périmés — sinon l'opérateur voit « PERIME »
+        # sans savoir s'il manque 1 symbole ou les 73.
+        perimes = stale_symbols(path, MAX_FUNDING_AGE_DAYS)
+        if perimes:
+            print(f"      {len(perimes)} symbole(s) au-delà de "
+                  f"{MAX_FUNDING_AGE_DAYS:.0f} j (age = le plus ancien) :")
+            for sym, a in perimes[:5]:
+                print(f"        - {sym:<16} {_fmt_age(a):>12}")
+            if len(perimes) > 5:
+                print(f"        ... et {len(perimes) - 5} autre(s)")
+        elif age is not None:
+            ages = symbol_ages_days(path)
+            if ages:
+                frais = sum(1 for a in ages.values() if a <= MAX_FUNDING_AGE_DAYS)
+                print(f"      {frais}/{len(ages)} symboles frais "
+                      f"(age median {_fmt_age(sorted(ages.values())[len(ages) // 2])})")
 
     print("\n--- Sante de l'API publique Aster ---")
     probe = probe_api(base_url=base_url, timeout=timeout)
