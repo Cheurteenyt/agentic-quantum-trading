@@ -2,8 +2,9 @@ import { useEffect, useState } from "react"
 
 import { Card } from "../components/Card"
 import { useIntelFeed } from "../hooks"
+import { apiUrl } from "../services/api"
 
-const API = `http://${window.location.hostname}:8000/api/agents`
+const API = apiUrl("/agents")
 
 const fieldStyle = {
   width: "100%",

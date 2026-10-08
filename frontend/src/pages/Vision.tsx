@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, Btn, LiveStatus } from "../components"
+import { apiUrl } from "../services/api"
 
-const API_V = `http://${window.location.hostname}:8000/api/vision`
-const API_D = `http://${window.location.hostname}:8000/api/desktop`
-const API_M = `http://${window.location.hostname}:8000/api/market`
+const API_V = apiUrl("/vision")
+const API_D = apiUrl("/desktop")
+const API_M = apiUrl("/market")
 
 function LogLine({ msg, ts, type = "info" }: { msg: string; ts: string; type?: "info" | "success" | "error" }) {
   return (

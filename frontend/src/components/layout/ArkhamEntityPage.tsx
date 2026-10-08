@@ -2,6 +2,7 @@
 import EntityExplorerSection from "./EntityExplorerSection"
 import LogoAvatar from "../LogoAvatar"
 import { getExplorerAddressUrl, getExplorerTokenUrl, getExplorerTxUrl, normalizeExplorerChain } from "../../services/explorerLinks"
+import { apiUrl } from "../../services/api"
 
 // =========================================================
 // ARKHAM ENTITY PAGE — Full overlay inspired by arkham.com
@@ -9,7 +10,7 @@ import { getExplorerAddressUrl, getExplorerTokenUrl, getExplorerTxUrl, normalize
 // NEW: perp data, entity flows, multi-chain holders/transfers
 // =========================================================
 
-const API = `http://${window.location.hostname}:8000/api`
+const API = apiUrl("")
 
 /* ── Types ── */
 

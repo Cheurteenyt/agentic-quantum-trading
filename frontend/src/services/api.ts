@@ -19,6 +19,45 @@ function resolveBaseUrl(): string {
 
 const BASE_URL = resolveBaseUrl()
 
+/**
+ * Racine de l'API SANS le `/api` — pour construire des URLs qui ne
+ * passent pas par `request()` (WebSocket, chemins non-`/api`).
+ *
+ * Issue #208 : 17 fichiers construisaient eux-mêmes
+ * `http://${window.location.hostname}:8000/...`, en contournant
+ * `resolveBaseUrl()`. Trois conséquences, toutes silencieuses :
+ *
+ *   1. `credentials: "include"` absent → le cookie `core_access`
+ *      (HttpOnly) n'est pas envoyé en cross-origin (5173 → 8000) →
+ *      401 sur `/api/search`, `/api/market/opportunities`…
+ *   2. `http:` en dur → mixed content dès que le site est en HTTPS.
+ *   3. la CSP `connect-src 'self' http://127.0.0.1:* http://localhost:*`
+ *      refuse toute autre origine.
+ *
+ * Corriger le résolveur ne changeait RIEN pour ces 17 fichiers : c'est
+ * l'invariant « calculé mais pas appliqué », déjà vu ailleurs.
+ */
+export const API_ROOT = BASE_URL.replace(/\/api$/, "")
+
+/** Racine du WebSocket, protocole déduit de celui de la page. */
+export const WS_ROOT = (() => {
+  const u = new URL(API_ROOT)
+  u.protocol = u.protocol === "https:" ? "wss:" : "ws:"
+  return u.toString().replace(/\/+$/, "")
+})()
+
+/** `GET`/`POST`/… avec les credentials par défaut — pour l'UI. */
+export function apiUrl(path: string): string {
+  if (!path) return BASE_URL
+  return `${BASE_URL}${path.startsWith("/") ? path : `/${path}`}`
+}
+
+/** URL absolue d'un chemin qui n'est PAS sous `/api` (santé, WS, …). */
+export function rootUrl(path: string): string {
+  if (!path) return API_ROOT
+  return `${API_ROOT}${path.startsWith("/") ? path : `/${path}`}`
+}
+
 interface RequestConfig extends RequestInit {
   requiresAuth?: boolean
 }

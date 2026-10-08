@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { apiUrl } from "../../services/api"
 
 // =========================================================
 // ENTITY DETAIL — Slide-in panel (ARK-style)
@@ -29,7 +30,7 @@ export default function EntityDetail({ entityId, onClose }: EntityDetailProps) {
     if (!entityId) { setEntity(null); return }
     setLoading(true)
     const host = window.location.hostname
-    fetch(`http://${host}:8000/api/entity/${encodeURIComponent(entityId)}`)
+    fetch(apiUrl(`/entity/${encodeURIComponent(entityId)}`))
       .then(r => r.ok ? r.json() : null)
       .then(data => { setEntity(data && !data.error ? data : null) })
       .catch(() => setEntity(null))
