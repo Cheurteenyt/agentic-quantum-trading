@@ -22,6 +22,7 @@ import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
+from html import escape as _html_escape
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -247,24 +248,53 @@ nav .brand{color:#5865f2;font-weight:700}
 """
 
 
+def _esc(value: object) -> str:
+    """F-048 — échappe une valeur pour un contexte HTML.
+
+    À appliquer SYSTÉMATIQUEMENT à tout ce qui entre dans une f-string
+    destinée à du HTML. On échappe au point de SORTIE, jamais « quand on
+    a le temps » : c'est la seule façon de ne pas oublier la prochaine
+    interpolation.
+
+    Fermeture du tag comprise : `quote=True` (le défaut) traite `"` et
+    `'`, ce qui couvre les attributs — sans quoi `<img src=x onerror=...>`
+    passe parce que la valeur est dans un attribut et pas dans le texte.
+
+    Les deux autres points d'entrée non échappés étaient :
+      - `?error=` dans /oauth2/callback (RÉFLÉCHI, piloté par l'URL) ;
+      - `global_name`, les noms de rôle, `author_name`, `channel_name`,
+        `user_name`, le symbole et le verdict des calls (STOCKÉS en base).
+    """
+    return _html_escape("" if value is None else str(value), quote=True)
+
+
 def _page(title: str, body: str) -> HTMLResponse:
     nav = (f'<nav><span class="brand">Core Equity</span> — <a href="/moi">Moi</a>'
            f'<a href="/classement">Classement</a><a href="/serveur">Serveur</a>'
            f'<a href="/logout" style="float:right">Déconnexion</a></nav>')
     return HTMLResponse(f"<!doctype html><html lang=fr><head><meta charset=utf-8>"
                         f"<meta name=viewport content='width=device-width,initial-scale=1'>"
-                        f"<title>{title} — Core Equity</title><style>{_CSS}</style></head>"
+                        f"<title>{_esc(title)} — Core Equity</title><style>{_CSS}</style></head>"
                         f"<body>{nav}<div class=wrap>{body}</div></body></html>")
 
 
 def _avatar(uid: str, av: str | None, size: int = 72) -> str:
+    # F-048 : `av` part de l'API Discord et finit dans un attribut src.
+    # Les hash Discord sont alphanumériques, mais la valeur est échappée
+    # quand même : une URL d'attribut qui casse le contexte ne doit
+    # pas devenir une injection.
     if av:
-        return f"{CDN}/avatars/{uid}/{av}.png?size={size}"
+        return f"{CDN}/avatars/{_esc(uid)}/{_esc(av)}.png?size={size}"
     return f"{CDN}/embed/avatars/{(int(uid) >> 22) % 6}.png"
 
 
 def _login_page(msg: str = "") -> HTMLResponse:
-    err = f"<div class=card style='border-left:3px solid #f23f43'>{msg}</div>" if msg else ""
+    # F-048 : l'échappement se fait ICI, dans le sink, et pas au site
+    # d'appel. Placé au site d'appel, le prochain appelant oubliera —
+    # c'est exactement le piège que l'audit avait laissé passer. `_page`
+    # fait de même pour `title`.
+    err = (f"<div class=card style='border-left:3px solid #f23f43'>{_esc(msg)}</div>"
+           if msg else "")
     return _page("Connexion", f"""
         <h1>Core Equity</h1>
         <p class=muted>Le tableau de bord du serveur — tes calls, ton rang, le serveur en direct.</p>
@@ -298,6 +328,7 @@ def oauth_login():
 async def oauth_callback(request: Request):
     p = request.query_params
     if p.get("error"):
+        # brut ici : `_login_page` est le sink et échappe (F-048)
         return _login_page(f"Connexion refusée ({p.get('error')}) — tu peux réessayer.")
     if not p.get("code") or not _state_take(p.get("state", "")):
         return _login_page("Session de connexion expirée — réessaie, ça arrive.")
@@ -345,7 +376,7 @@ def moi(request: Request):
         resp.delete_cookie(COOKIE, path="/")
         return resp
     user, member = prof["user"], prof["member"]
-    name = user.get("global_name") or user.get("username", "?")
+    name = _esc(user.get("global_name") or user.get("username", "?"))
     roles = []
     rmap = _role_map()
     for rid in member.get("roles", []):
@@ -354,7 +385,7 @@ def moi(request: Request):
         if color.isdigit():
             color = f"{int(color):06x}"
         roles.append(f'<span class=chip style="background:#{color}">'
-                     f'{r["name"] if r else rid[:8]}</span>')
+                     f'{_esc(r["name"]) if r else _esc(rid[:8])}</span>')
     con = _ddb()
     try:
         n_msg = con.execute("SELECT COUNT(*) FROM d_messages WHERE author_id=?",
@@ -368,17 +399,17 @@ def moi(request: Request):
     wr = f"{agg['wr'] * 100:.0f} %" if agg["n"] else "—"
     tot = f"{agg['tot']:+.1f} %" if agg["tot"] is not None else "—"
     lignes = "".join(
-        f"<tr><td><b>{c['symbol']}</b></td>"
-        f"<td class={'up' if c['direction'] == 'long' else 'down'}>{c['direction']}</td>"
-        f"<td>{c['entry'] if c['entry'] else '—'}</td>"
-        f"<td class=muted>{(c['posted_at'] or '?')[:16].replace('T', ' ')}</td>"
+        f"<tr><td><b>{_esc(c['symbol'])}</b></td>"
+        f"<td class={'up' if c['direction'] == 'long' else 'down'}>{_esc(c['direction'])}</td>"
+        f"<td>{_esc(c['entry']) if c['entry'] else '—'}</td>"
+        f"<td class=muted>{_esc((c['posted_at'] or '?')[:16].replace('T', ' '))}</td>"
         f"<td>{c['ret_pct'] if c['scored'] else '<span class=muted>en cours</span>'}"
-        f"{' %' if c['scored'] else ''} {'· ' + c['verdict'] if c['verdict'] else ''}</td></tr>"
+        f"{' %' if c['scored'] else ''} {'· ' + _esc(c['verdict']) if c['verdict'] else ''}</td></tr>"
         for c in calls) or "<tr><td colspan=5 class=muted>Aucun call — poste-le dans les salons de trading.</td></tr>"
     return _page("Moi", f"""
         <div class=card><img class=avatar src="{_avatar(uid, user.get('avatar'))}">
             <h1 style=display:inline>{name}</h1>
-            <p class=muted>Membre depuis le {joined} · {n_msg} message(s) capturé(s)</p>
+            <p class=muted>Membre depuis le {_esc(joined)} · {n_msg} message(s) capturé(s)</p>
             <div>{''.join(roles) or '<span class=muted>aucun rôle</span>'}</div></div>
         <h2>Tes calls scorés</h2>
         <div class=card>{agg['n'] or 0} call(s) scoré(s) · WR {wr} · Σ ret {tot}</div>
@@ -391,7 +422,7 @@ def classement():
     lignes = ""
     for i, r in enumerate(rows, 1):
         med = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"{i}")
-        lignes += (f"<tr><td>{med}</td><td><b>{r['author_name']}</b></td>"
+        lignes += (f"<tr><td>{med}</td><td><b>{_esc(r['author_name'])}</b></td>"
                    f"<td>{r['n']}</td><td class=up>{r['wr'] * 100:.0f} %</td>"
                    f"<td class={'up' if (r['tot'] or 0) > 0 else 'down'}>{r['tot']:+.1f} %</td></tr>")
     if not lignes:
@@ -409,11 +440,8 @@ def serveur():
     m24, m7 = s["m24"], s["m7"]
     top = s["top_channels"]
     frais = s["newcomers"]
-    topl = "".join(f"<tr><td>#{r['channel_name']}</td><td>{r['n']}</td></tr>" for r in top)
-    fraisl = "".join(f"<tr><td>{r['user_name']}</td><td class=muted>{(r['joined_at'] or '?')[:10]}</td></tr>"
-                     for r in frais)
-    topl = "".join(f"<tr><td>#{r['channel_name']}</td><td>{r['n']}</td></tr>" for r in top)
-    fraisl = "".join(f"<tr><td>{r['user_name']}</td><td class=muted>{(r['joined_at'] or '?')[:10]}</td></tr>"
+    topl = "".join(f"<tr><td>#{_esc(r['channel_name'])}</td><td>{r['n']}</td></tr>" for r in top)
+    fraisl = "".join(f"<tr><td>{_esc(r['user_name'])}</td><td class=muted>{_esc((r['joined_at'] or '?')[:10])}</td></tr>"
                      for r in frais)
     return _page("Serveur", f"""
         <h1>Le serveur en direct</h1>
