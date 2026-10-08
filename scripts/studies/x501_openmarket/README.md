@@ -79,7 +79,7 @@ commiter). Aucune dépendance externe : stdlib pure (numpy requis pour les
 ## Statut (02/10/2026)
 
 - **v31 — le harnais v8 officiel est porté sur la base deep « depuis le début de l'actif »**
-  (`docs/38-openmarket-harnais-deep-40sym.md`) : base étendue 9 → **40 symboles** via Binance Vision
+  (`docs/40-openmarket-harnais-deep-40sym.md`) : base étendue 9 → **40 symboles** via Binance Vision
   (2,34 M barres au total, QA 15 contrôles PASS, trou ICP réel documenté) ; portage par transformation
   contrôlée (moteur/règles bit à bit) ; **L1 gate ATR REJETÉ 4/4, L2 → V3 retenu** ; pool 868 trades
   E[R] +0,093 (contraction ÷1,9 vs fenêtre 34 mois — 2,4× plus douce que le moteur 8 sym) ;

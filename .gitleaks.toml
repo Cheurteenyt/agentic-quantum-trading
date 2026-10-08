@@ -27,6 +27,34 @@
 # Si l'un de ces fichiers reçoit un vrai secret plus tard, il faut retirer
 # son entrée — ne pas élargir la règle.
 
+# ── B301 (pickle), 12 occurrences — assumées ──────────────────────────────
+# `bandit -t B301` trouve 12 `pickle.load` :
+#
+#     3  scripts/studies/x501_openmarket/x501_v8_scale_deep_v31.py
+#     2  scripts/studies/x501_openmarket/x501_mc_v30.py
+#     2  scripts/studies/x501_openmarket/x501_mc_v31.py
+#     1  scripts/corpus_cache.py
+#     1  scripts/studies/x501_openmarket/qa_deep40_v31.py
+#     1  scripts/studies/x501_openmarket/qa_engine_deep_v30.py
+#     1  scripts/studies/x501_openmarket/x501_fill_maker_surface.py
+#     1  scripts/x501_signaux_om_v29.py
+#
+# Ce sont des CACHES AUTO-PRODUITS par ces mêmes scripts : le fichier est
+# écrit puis relu par le même code, sur la même machine, à partir de
+# données déjà dans le warehouse. Le risque réel n'est pas l'injection —
+# c'est qu'un tiers écrive le cache.
+#
+# Le registre bandit (.github/bandit-baseline.txt) couvre déjà B301 : le
+# stock ne peut pas augmenter. Ce fichier documente POURQUOI les 12
+# existants restent.
+#
+# Migration envisagée si un jour un cache devient partageable ou
+# transportable : `np.save` / parquet (format non exécutable), ou un
+# hmac-sha256 du contenu dans un en-tête. PAS fait ici : cela casserait la
+# compatibilité des caches déjà sur disque, et le rapport en dépend.
+#
+# Voir l'issue #209.
+
 [extend]
 useDefault = true
 

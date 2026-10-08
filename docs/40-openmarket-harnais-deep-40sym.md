@@ -1,7 +1,7 @@
-# 38 — OpenMarket : le harnais v8 porté sur la base deep (40 symboles, v31)
+# 40 — OpenMarket : le harnais v8 porté sur la base deep (40 symboles, v31)
 
 **Date : 02/10/2026.** Application directe de la politique docs/37
-(« tout backtest part du début de l'actif ») au harnais OFFICIEL v8 :
+(« tout backtest part du début de l'actif », docs/37) au harnais OFFICIEL v8 :
 40 perps Binance USDT-M, gates IS/OOS, gate volatilité BTC D1 (L1),
 échelle de sortie (L2). Ce chantier complète le re-chiffrement v30
 (moteur 8 symboles) par le pool que la trajectoire officielle utilise
