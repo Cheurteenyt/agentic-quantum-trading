@@ -31,10 +31,19 @@ export function useMarketData(symbol?: string) {
         if (res.ok) {
           const snapshot = await res.json()
           setData(snapshot)
-          setLoading(false)
+        } else {
+          // Le `setLoading(false)` était DANS le `if (res.ok)` : sur un 401
+          // (cookie de session absent) ou un 500, `loading` restait vrai
+          // POUR TOUJOURS et l'interface tournait indéfiniment, sans
+          // message. `loading` décrit « une requête est en cours », pas
+          // « les données sont arrivées » : il doit retomber quoi qu'il
+          // arrive.
+          console.error(`Snapshot marché : HTTP ${res.status}`)
         }
       } catch (err) {
         console.error("Failed to fetch market snapshot:", err)
+      } finally {
+        setLoading(false)
       }
     }
 

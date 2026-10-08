@@ -7,7 +7,14 @@ function resolveBaseUrl(): string {
     typeof window !== "undefined" ? String((window as any).__HERMES_API_BASE__ || "").trim() : ""
   const envBase = String(import.meta.env.VITE_API_BASE_URL || "").trim()
   const rawBase = runtimeBase || envBase || `http://${window.location.hostname}:8000`
-  return `${rawBase.replace(/\/+$/, "")}/api`
+  // Le test `n'accole jamais /api deux fois` a trouvé le défaut : on
+  // normalisait les slashs FINALS mais pas un `/api` final. Une base
+  // configurée à `https://core.example/api` (ce qu'on écrit spontanément,
+  // l'API étant déjà dans le nom) produisait `…/api/api/health` — un 404
+  // silencieux sur TOUTES les requêtes, sans erreur visible.
+  const sansSlash = rawBase.replace(/\/+$/, "")
+  const dejaAvecApi = /\/api$/i.test(sansSlash)
+  return dejaAvecApi ? sansSlash : `${sansSlash}/api`
 }
 
 const BASE_URL = resolveBaseUrl()

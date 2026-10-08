@@ -36,6 +36,29 @@ jobs:
       - name: Audit check (bloquant sur --fail-on)
         run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
 
+  # ─── 3.7 : le frontend était le seul pan sans oracle ───
+  # 42 fichiers TS/TSX, 0 test, aucun typecheck en CI. `tsc --noEmit`
+  # est l'équivalent exact du gate pyflakes côté Python : il attrape les
+  # symboles non définis, que rien ne vérifiait.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Dépendances
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck (tsc --noEmit) — BLOQUANT
+        run: npm run typecheck
+      - name: Tests (vitest)
+        run: npm test
+
   # ─── S3 : oracles de sécurité ───
   # F-047 (routes admin ouvertes) et F-048 (XSS) n'ont été trouvés que par
   # audit LLM : les oracles existants attrapent les NameError, la causalité
