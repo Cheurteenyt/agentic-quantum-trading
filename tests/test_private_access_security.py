@@ -253,5 +253,136 @@ class PrivateAccessSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 413)
 
 
+def _gate(request: Request) -> int:
+    """Passe la requête dans le middleware et rend le code HTTP."""
+
+    async def call_next(_: Request) -> Response:
+        return Response("passe", status_code=200)
+
+    return asyncio.run(main.private_access_gate(request, call_next)).status_code
+
+
+def _peer_request(client: str, host: bytes, path: str = "/api/test", method: str = "GET") -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": method,
+            "path": path,
+            "query_string": b"",
+            "headers": [(b"host", host)],
+            "client": (client, 4242),
+            "server": (client, 8000),
+            "scheme": "http",
+        }
+    )
+
+
+class AdminGateWithoutAccessTokenTests(unittest.TestCase):
+    """F-047 — l'absence de `CORE_ACCESS_TOKEN` ne doit PAS ouvrir les
+    routes admin à un pair distant.
+
+    Le mode « local-open » (pas de token d'accès) reste le défaut pour
+    `/api/*` : c'est le confort de dev local. Mais le middleware
+    court-circuait AVANT d'appeler `_requires_admin_access`, donc sans
+    token les préfixes admin devenaient publics — `/api/desktop/launch/app`
+    (exécute un process), `/api/desktop/mouse/click` (pilote la souris),
+    `/api/chat` (donne le terminal à un LLM) — sur un serveur qui écoute
+    sur 0.0.0.0:8000.
+    """
+
+    ADMIN_ROUTES = [
+        ("POST", "/api/desktop/launch/app"),
+        ("POST", "/api/desktop/mouse/click"),
+        ("POST", "/api/chat"),
+        ("POST", "/api/agents/run"),
+        ("POST", "/api/vision/analyze"),
+        ("POST", "/api/intel/investigate"),
+        ("GET", "/api/market/mt5/account"),
+    ]
+
+    def setUp(self) -> None:
+        self._token = main._ACCESS_TOKEN
+        self._admin = main._ADMIN_TOKEN
+        main._ACCESS_TOKEN = ""      # mode local-open
+        main._ADMIN_TOKEN = ""
+
+    def tearDown(self) -> None:
+        main._ACCESS_TOKEN = self._token
+        main._ADMIN_TOKEN = self._admin
+
+    def test_admin_route_refusee_sans_token_depuis_un_pair_distant(self) -> None:
+        for method, path in self.ADMIN_ROUTES:
+            with self.subTest(route=f"{method} {path}"):
+                req = _peer_request("172.18.216.1", b"localhost:8000",
+                                    path=path, method=method)
+                self.assertEqual(
+                    _gate(req), 403,
+                    f"{method} {path} passe en mode local-open depuis "
+                    f"172.18.216.1 : le gate admin est court-circuité")
+
+    def test_admin_route_refusee_meme_avec_un_entete_host_local(self) -> None:
+        """L'en-tête Host est choisi par le client : il ne prouve rien."""
+        req = _peer_request("172.18.216.1", b"127.0.0.1:8000",
+                            path="/api/desktop/launch/app", method="POST")
+        self.assertEqual(_gate(req), 403)
+
+    def test_admin_route_refusee_depuis_une_ip_publique(self) -> None:
+        req = _peer_request("203.0.113.9", b"127.0.0.1:8000",
+                            path="/api/desktop/launch/app", method="POST")
+        self.assertEqual(_gate(req), 403)
+
+    def test_admin_route_autorisee_depuis_la_boucle_locale(self) -> None:
+        """Le dev local doit continuer de fonctionner sans token."""
+        req = _peer_request("127.0.0.1", b"127.0.0.1:8000",
+                            path="/api/desktop/launch/app", method="POST")
+        self.assertEqual(_gate(req), 200)
+
+    def test_admin_route_autorisee_avec_admin_token_meme_depuis_le_distant(self) -> None:
+        main._ADMIN_TOKEN = "admin-secret"
+        req = _peer_request("203.0.113.9", b"example:8000",
+                            path="/api/desktop/launch/app", method="POST")
+        req.scope["headers"] = [
+            (b"host", b"example:8000"),
+            (b"x-core-admin-token", b"admin-secret"),
+        ]
+        self.assertEqual(_gate(req), 200)
+
+    def test_le_reste_de_api_reste_ouvert_en_local_open(self) -> None:
+        """Le confort de dev est PRÉSERVÉ : rien d'autre n'est durci."""
+        for path in ("/api/market/prices", "/api/news/gold/latest", "/api/arkham/top-entities"):
+            with self.subTest(path=path):
+                self.assertEqual(_gate(_peer_request("172.18.216.1", b"127.0.0.1:8000", path=path)), 200)
+
+    def test_health_reste_public(self) -> None:
+        self.assertEqual(_gate(_peer_request("203.0.113.9", b"x:8000", path="/health")), 200)
+
+    def test_la_shell_react_reste_atteignable(self) -> None:
+        """Le shell doit rester atteignable pour afficher l'écran de login."""
+        self.assertEqual(_gate(_peer_request("203.0.113.9", b"x:8000", path="/")), 200)
+
+    def test_avec_access_token_le_comportement_admin_est_inchange(self) -> None:
+        """Régression : avec token, la branche admin d'origine doit tenir."""
+        main._ACCESS_TOKEN = "client-secret"
+        for method, path in self.ADMIN_ROUTES:
+            with self.subTest(route=f"{method} {path}"):
+                req = _peer_request("203.0.113.9", b"example:8000",
+                                    path=path, method=method)
+                req.scope["headers"] = [
+                    (b"host", b"example:8000"),
+                    (b"x-core-token", b"client-secret"),
+                ]
+                self.assertEqual(_gate(req), 403, "admin sans token admin")
+
+    def test_is_strictly_local_peer_ignore_l_entete_host(self) -> None:
+        self.assertTrue(main._is_strictly_local_peer(
+            _peer_request("127.0.0.1", b"nimporte-quoi:8000")))
+        self.assertTrue(main._is_strictly_local_peer(
+            _peer_request("127.0.0.5", b"nimporte-quoi:8000")))
+        self.assertFalse(main._is_strictly_local_peer(
+            _peer_request("172.18.216.1", b"127.0.0.1:8000")))
+        self.assertFalse(main._is_strictly_local_peer(
+            _peer_request("203.0.113.9", b"127.0.0.1:8000")))
+
+
 if __name__ == "__main__":
     unittest.main()

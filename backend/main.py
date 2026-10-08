@@ -233,6 +233,10 @@ app.add_middleware(
 
 
 _LOCAL_CLIENT_HOSTS = {"127.0.0.1", "::1", "localhost"}
+# F-047 : la boucle locale RÉELLE, lue sur le pair de socket. Sert de porte
+# aux routes admin quand aucun token n'est configuré — voir
+# `_is_strictly_local_peer`.
+_LOOPBACK_NETWORKS = (ip_network("127.0.0.0/8"), ip_network("::1/128"))
 _WSL_NAT_NETWORK = ip_network("172.16.0.0/12")
 _FORWARDED_CLIENT_HEADERS = (
     "forwarded",
@@ -372,8 +376,37 @@ async def private_access_gate(request: Request, call_next):
     async def pass_through():
         return _with_security_headers(await call_next(request))
 
-    if not _ACCESS_TOKEN or path in _PUBLIC_PATHS:
+    if path in _PUBLIC_PATHS:
         return await pass_through()
+
+    # F-047 — le gate ADMIN est évalué AVANT le raccourci « pas de token ».
+    #
+    # AVANT : `if not _ACCESS_TOKEN or path in _PUBLIC_PATHS: pass_through()`.
+    # Sans `CORE_ACCESS_TOKEN`, le middleware rend la main SANS jamais appeler
+    # `_requires_admin_access` : les préfixes admin (`/api/desktop`,
+    # `/api/vision`, `/api/agents`, `/api/chat`, `/api/intel`,
+    # `/api/market/mt5`) devenaient publics. Le serveur écoute sur
+    # 0.0.0.0:8000 (main.py:1018 et start_all.sh:18), et le mode
+    # « local-open » se définissait par la seule ABSENCE de token, pas par
+    # une écoute restreinte à la boucle locale — cas le plus courant
+    # précisément (un `.env` sans token).
+    #
+    # Le mode local-open est conservé tel quel pour `/api/*` : c'est le
+    # confort de dev qui reste voulu, et rien n'y est plus exposé qu'avant.
+    # Ce qui change, c'est que l'absence de token n'ouvre plus les routes
+    # admin à un pair distant : sans `CORE_ADMIN_TOKEN`, elles exigent un
+    # pair RÉELLEMENT en boucle locale ; avec, elles exigent le token —
+    # exactement comme quand `CORE_ACCESS_TOKEN` est défini.
+    needs_admin = _requires_admin_access(request.method, path)
+    if not _ACCESS_TOKEN:
+        if needs_admin and not (
+            _is_strictly_local_peer(request) or _is_admin_request(request)
+        ):
+            return _with_security_headers(JSONResponse(
+                {"detail": "Local-only route: loopback client or CORE_ADMIN_TOKEN required"},
+                status_code=403))
+        return await pass_through()
+
     if path in _PROTECTED_NON_API_PATHS or path.startswith(("/docs/", "/redoc/")):
         if _is_authenticated_request(request):
             return await pass_through()
@@ -383,12 +416,40 @@ async def private_access_gate(request: Request, call_next):
     if not path.startswith("/api/"):
         return await pass_through()
     if _is_authenticated_request(request):
-        if _requires_admin_access(request.method, path) and not _is_admin_request(request):
+        if needs_admin and not _is_admin_request(request):
             detail = "CORE_ADMIN_TOKEN is not configured" if not _ADMIN_TOKEN else "Core Equity admin token required"
             return _with_security_headers(JSONResponse({"detail": detail}, status_code=403))
         return await pass_through()
 
     return _with_security_headers(JSONResponse({"detail": "Core Equity access token required"}, status_code=401))
+
+def _is_strictly_local_peer(request: Request) -> bool:
+    """F-047 — le PAIR DE SOCKET est-il vraiment en boucle locale ?
+
+    NON falsifiable : on ne lit que `request.client.host`, que le client ne
+    peut pas choisir (il vient de l'accept() du serveur).
+
+    C'est la différence avec `_is_local_client`, qui autorise aussi :
+      - l'en-tête `Host` — choisi librement par le client
+        (`curl -H "Host: localhost:8000"`) ;
+      - la plage `172.16.0.0/12` — la NAT Windows et une bonne partie des
+        réseaux de conteneurs, pas « la machine du propriétaire ».
+
+    Ces deux signaux restent valables pour decideR qu'un token n'est pas
+    demandé (confort de dev local). Ils ne doivent JAMAIS ouvrir une route
+    admin : `/api/desktop/launch/app` exécute un process, `/api/desktop/
+    mouse/click` pilote la souris, `/api/chat` donne le terminal à un LLM.
+    """
+    host = request.client.host if request.client else ""
+    try:
+        addr = ip_address(host)
+    except ValueError:
+        return False
+    # ATTENTION : `addr in _LOOPBACK_NETWORKS` sur un TUPLE teste
+    # l'ÉGALITÉ (une adresse IP n'est jamais égale à un réseau), pas
+    # l'appartenance. Il faut itérer explicitement.
+    return any(addr in net for net in _LOOPBACK_NETWORKS)
+
 
 # Start background collector on startup
 @app.on_event("startup")
