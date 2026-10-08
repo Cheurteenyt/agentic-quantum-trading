@@ -66,21 +66,52 @@ class TestQueueSha(unittest.TestCase):
 
 
 class TestTerminal(unittest.TestCase):
+    """P0 2026-10-09 : la terminalité exige l'identité d'exécution —
+    le spec_sha seul laissait passer un changement de protocole,
+    d'univers ou de deps (la mesure change, le skip non)."""
+
+    ID = "a1b2c3d4e5f60718"
+
+    def _ok(self, prev, sha="abc", ident=None):
+        return rw._is_terminal(prev, sha, self.ID if ident is None else ident)
+
     def test_done_terminal(self):
-        self.assertTrue(
-            rw._is_terminal({"state": "DONE", "spec_sha": "abc"}, "abc"))
+        self.assertTrue(self._ok(
+            {"state": "DONE", "spec_sha": "abc",
+             "execution_identity": self.ID}))
 
     def test_permanent_terminal(self):
-        self.assertTrue(rw._is_terminal(
-            {"state": "FAILED_PERMANENT", "spec_sha": "abc"}, "abc"))
+        self.assertTrue(self._ok(
+            {"state": "FAILED_PERMANENT", "spec_sha": "abc",
+             "execution_identity": self.ID}))
 
     def test_permanent_sans_sha_rejoue(self):
         # l'item PR-160 (sans spec_sha) n'était PAS terminal — le bug audit
-        self.assertFalse(rw._is_terminal({"state": "FAILED_PERMANENT"}, "abc"))
+        self.assertFalse(
+            self._ok({"state": "FAILED_PERMANENT"}, "abc"))
 
     def test_spec_modifie_remesure(self):
-        self.assertFalse(rw._is_terminal(
-            {"state": "DONE", "spec_sha": "abc"}, "zzz"))
+        self.assertFalse(self._ok(
+            {"state": "DONE", "spec_sha": "abc",
+             "execution_identity": self.ID}, "zzz"))
+
+    def test_sans_identite_rejoue(self):
+        # l'item ère PR-161 (avant le scellement) : protocole/deps
+        # d'origine invérifiables → re-mesure (fail-closed)
+        self.assertFalse(
+            self._ok({"state": "DONE", "spec_sha": "abc"}))
+
+    def test_identite_differente_remesure(self):
+        # LE BUG P0 : protocole/univers/deps changés → la mesure a changé
+        # même si spec_sha ET engine_sha sont identiques
+        self.assertFalse(self._ok(
+            {"state": "DONE", "spec_sha": "abc",
+             "execution_identity": "ANCIENNE-IDENTITE"}))
+
+    def test_identite_attendue_jamais_vide(self):
+        # execution_identity() hache le canonique : le sha ATTENDU n'est
+        # jamais "" — donc un item sans identité ne peut pas coller
+        self.assertEqual(len(rw.execution_identity("e")), 16)
 
 
 class TestMigration(unittest.TestCase):
@@ -252,6 +283,30 @@ class TestStatusCounts(unittest.TestCase):
                          {"done": 1, "failed_permanent": 1,
                           "failed_retryable": 0, "remaining": 2})
 
+    def test_manifest_avec_identite_compte_juste(self):
+        # P0 2026-10-09 : le manifeste scelle l'identité attendue — un item
+        # dont l'identité stockée diffère (ou manque) est REMAINING, pas done
+        manifest = [{"id": "a", "sha": "s1", "identity": "I1"},
+                    {"id": "b", "sha": "s2", "identity": "I2"}]
+        items = {"a": {"state": "DONE", "spec_sha": "s1",
+                       "execution_identity": "I1"},
+                 "b": {"state": "DONE", "spec_sha": "s2",
+                       "execution_identity": "I2"}}
+        self.assertEqual(rw._status_counts(items, manifest, 2),
+                         {"done": 2, "failed_permanent": 0,
+                          "failed_retryable": 0, "remaining": 0})
+        # identité obsolète → re-mesure : le status doit le montrer
+        items["a"]["execution_identity"] = "ANCIENNE"
+        self.assertEqual(rw._status_counts(items, manifest, 2)["remaining"], 1)
+        self.assertEqual(rw._status_counts(items, manifest, 2)["done"], 1)
+        # identité absente (ère PR-161) → remaining
+        del items["b"]["execution_identity"]
+        self.assertEqual(rw._status_counts(items, manifest, 2)["remaining"], 2)
+        # manifeste pré-scellement (sans identity) → ancienne sémantique
+        vieux = [{"id": "a", "sha": "s1"}]
+        self.assertEqual(
+            rw._status_counts(items, vieux, 1)["done"], 1)
+
 
 class TestQueueShaDone(unittest.TestCase):
     def test_done_exclu_du_sel(self):
@@ -413,7 +468,7 @@ class TestEngineSha(unittest.TestCase):
 class TestRunWorker(unittest.TestCase):
     """La boucle complète avec le moteur mocké — skip/résumé/terminal."""
 
-    def _run(self, tmp: Path, fake, max_retries=3):
+    def _run(self, tmp: Path, fake, max_retries=3, body: str = SPEC_BODY):
         patches = [
             mock.patch.object(rw, "RUNTIME", tmp / "rt"),
             mock.patch.object(rw, "CHECKPOINT",
@@ -429,7 +484,7 @@ class TestRunWorker(unittest.TestCase):
             mock.patch.object(rr, "run_discovery", fake),
             mock.patch.object(rr, "_passes", lambda res, spec: False),
         ]
-        q = _mk_queue(tmp, {"EXP-T1.json": SPEC_BODY})
+        q = _mk_queue(tmp, {"EXP-T1.json": body})
         for p in patches:
             p.start()
         try:
@@ -459,10 +514,147 @@ class TestRunWorker(unittest.TestCase):
             self.assertEqual(
                 ck["manifest"],
                 [{"id": "EXP-T1",
-                  "sha": ck["items"]["EXP-T1"]["spec_sha"]}])
-            # 2e lancement : la spec est SKIPPÉE (pas de re-mesure)
+                  "sha": ck["items"]["EXP-T1"]["spec_sha"],
+                  "identity":
+                  ck["items"]["EXP-T1"]["execution_identity"]}])
+            # P0 : l'item scelle son identité d'exécution (16 hex)
+            self.assertEqual(
+                len(ck["items"]["EXP-T1"]["execution_identity"]), 16)
+            # 2e lancement : la spec est SKIPPÉE (pas de re-mesure) —
+            # l'identité recalculée est identique (même proto/deps/engine)
             self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
             self.assertEqual(calls, ["EXP-T1"])
+
+    def test_changement_de_protocole_remesure(self):
+        """LE test P0 (audit 2026-10-08, action 5 / §15) : active.yaml peut
+        changer un seuil sous le même protocol_id — la spec doit être
+        RE-MESURÉE alors que son fichier (spec_sha) est intact. Sur le code
+        d'avant (skip par spec_sha seul), les 2e et 3e lancements skippaient
+        tous : c'est la mutation négative du bug."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            ck_path = tmp / "rt" / "grind_checkpoint.json"
+            calls = []
+
+            def fake(spec, db_path=None):
+                calls.append(spec["id"])
+                return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
+                        "snapshot": "s"}
+
+            with mock.patch.object(rw, "_protocol_sha", lambda: "PROTO-A"):
+                self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1"])
+            ident_a = json.loads(
+                ck_path.read_text())["items"]["EXP-T1"]["execution_identity"]
+            self.assertEqual(len(ident_a), 16)
+
+            # même protocole → SKIP
+            with mock.patch.object(rw, "_protocol_sha", lambda: "PROTO-A"):
+                self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1"])
+
+            # protocole CHANGÉ → RE-MESURE (le bug P0 était un skip ici)
+            with mock.patch.object(rw, "_protocol_sha", lambda: "PROTO-B"):
+                self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1", "EXP-T1"],
+                             "un changement de protocole DOIT re-mesurer "
+                             "une spec DONE — le skip par spec_sha seul "
+                             "réutilisait le résultat d'une autre mesure")
+            ident_b = json.loads(
+                ck_path.read_text())["items"]["EXP-T1"]["execution_identity"]
+            self.assertNotEqual(ident_a, ident_b)
+
+            # même nouveau protocole → re-skip
+            with mock.patch.object(rw, "_protocol_sha", lambda: "PROTO-B"):
+                self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1", "EXP-T1"])
+
+    def test_changement_de_deps_remesure(self):
+        """Un patch numpy change un quantile au 16ᵉ chiffre, donc un
+        t-statistique au 3ᵉ : deux runs « identiques » sur deux versions
+        de numpy ne sont pas le même résultat. Le skip doit le voir."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            calls = []
+
+            def fake(spec, db_path=None):
+                calls.append(spec["id"])
+                return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
+                        "snapshot": "s"}
+
+            with mock.patch.object(rw, "deps_sha",
+                                   lambda: "numpy=1.26|pandas=2.2"):
+                self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+                self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1"])
+
+            with mock.patch.object(rw, "deps_sha",
+                                   lambda: "numpy=1.27|pandas=2.2"):
+                self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1", "EXP-T1"],
+                             "un changement de deps DOIT re-mesurer")
+
+    def test_changement_d_univers_remesure(self):
+        """univ10.yaml modifié GARDE SON NOM — le sha du manifest est la
+        seule défense (§7 de l'audit : universe_sha n'était pas branché).
+        La population statistique change → la spec doit être re-mesurée."""
+        body = SPEC_BODY + "universe: univ-p0\n"
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            uv_dir = tmp / "universes"
+            uv_dir.mkdir(parents=True)
+            (uv_dir / "univ-p0.yaml").write_text(
+                "symbols:\n  BTCUSDT:\n    bars: 100\n", encoding="utf-8")
+            calls = []
+
+            def fake(spec, db_path=None):
+                calls.append(spec["id"])
+                return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
+                        "snapshot": "s"}
+
+            import scripts.universe as uv
+            with mock.patch.object(uv, "UNIVERSE_DIR", uv_dir):
+                self.assertEqual(self._run(tmp, fake, body=body), rw.EXIT_OK)
+                self.assertEqual(calls, ["EXP-T1"])
+                # même manifest → SKIP
+                self.assertEqual(self._run(tmp, fake, body=body), rw.EXIT_OK)
+                self.assertEqual(calls, ["EXP-T1"])
+
+                # manifest MODIFIÉ SOUS LE MÊME NOM → RE-MESURE
+                (uv_dir / "univ-p0.yaml").write_text(
+                    "symbols:\n  BTCUSDT:\n    bars: 999\n", encoding="utf-8")
+                self.assertEqual(self._run(tmp, fake, body=body), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1", "EXP-T1"],
+                             "un manifest d'univers modifié sous le même "
+                             "nom DOIT re-mesurer")
+
+    def test_item_ancien_sans_identite_remesure(self):
+        """Un item ère PR-161 (DONE, spec_sha, SANS execution_identity) :
+        son protocole/deps d'origine sont invérifiables → re-mesure
+        fail-closed, puis l'identité est rescellée et le skip redevient
+        possible."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            ck_path = tmp / "rt" / "grind_checkpoint.json"
+            calls = []
+
+            def fake(spec, db_path=None):
+                calls.append(spec["id"])
+                return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
+                        "snapshot": "s"}
+
+            self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1"])
+            # rétrograder l'item à l'ère PR-161 (sans identité)
+            ck = json.loads(ck_path.read_text())
+            del ck["items"]["EXP-T1"]["execution_identity"]
+            ck_path.write_text(json.dumps(ck))
+            # re-lancement : RE-MESURE (visible)
+            self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1", "EXP-T1"])
+            # l'identité est rescellée → skip normal
+            self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
+            self.assertEqual(calls, ["EXP-T1", "EXP-T1"])
 
     def test_permanent_terminal(self):
         with tempfile.TemporaryDirectory() as td:
