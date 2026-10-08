@@ -303,16 +303,65 @@ def run_stack(events: list[dict], capital: float, size_fn,
             "fees": fees_tot, "funding": fund_tot}
 
 
+def stamp_expanding_q66(events: list[dict], min_hist: int = 30,
+                        q: float = 2 / 3) -> tuple[list[dict], float]:
+    """C-B3 — colle `_q66_asof` sur chaque event.
+
+    AVANT (le bug) :
+
+        k = int(len(cascade) * 0.7)
+        q66 = np.nanquantile([e["al_score"] for e in cascade[:k]], 2/3)
+
+    Un SEUL quantile, calculé sur les 70 % premiers du sample (car
+    `collect_featured` trie par `ts_ms`, anti_liq.py:83), puis appliqué à
+    TOUS les événements — y compris les 30 % finaux. Le seuil de sizing au
+    temps t voyait donc jusqu'à 70 % d'histoire future : look-ahead plein.
+
+    Ici le seuil au temps t ne voit que les scores ANTERIEURS à t, sur un
+    quantile EXPANDING — le même contrat que `the_machine.gate_expanding`
+    (PR-167), qui a déjà été corrigé pour ce motif.
+
+    Pendant le warm-up (`len(hist) < min_hist`) le seuil est NaN et
+    l'event n'est PAS gaté : c'est la sémantique de `gate_expanding`
+    (`elif np.isfinite(s): gated.append(e)`), pas une invention ici.
+
+    Renvoie (events triés, dernier q66 as-of) pour le rapport.
+    """
+    ordre = sorted(events, key=lambda x: x["ts_ms"])
+    hist: list[float] = []
+    last = float("nan")
+    for e in ordre:
+        sc = e.get("al_score", float("nan"))
+        if len(hist) >= min_hist:
+            last = float(np.nanquantile(hist, q))
+            e["_q66_asof"] = last
+        else:
+            e["_q66_asof"] = float("nan")
+        if np.isfinite(sc):
+            hist.append(sc)
+    return ordre, last
+
+
 def size_by_policy(policy: dict[str, float], gate_thr: float):
     """cascade : cool si score calme, 0 si chaud (gate) ; autres : plat.
-    Score NaN (fenêtre pas assez remplie) = flat 0.05, la baseline."""
+    Score NaN (fenêtre pas assez remplie) = flat 0.05, la baseline.
+
+    C-B3 : le seuil lu `_q66_asof` (quantile EXPANDING posé par
+    `stamp_expanding_q66`), pas le scalaire `gate_thr`. Le scalaire reste
+    le REPLI pour un event sans estampille — c'est lui qui évite que les
+    trois appels `size_by_policy(..., q66)` cessent de fonctionner, et les
+    stratégies funding_div/confluence ne l'utilisent de toute façon pas.
+    """
     def fn(e: dict) -> float:
         s = e.get("strategy")
         if s == "cascade":
             sc = e.get("al_score", float("nan"))
             if np.isnan(sc):
                 return 0.05
-            if sc >= gate_thr:
+            thr = e.get("_q66_asof", gate_thr)
+            if np.isnan(thr):
+                return policy["cascade"]      # warm-up : pas de gate
+            if sc >= thr:
                 return 0.0
             return policy["cascade"]
         return policy.get(s, 0.0)
@@ -345,8 +394,11 @@ def main() -> int:
         e["hold_h"] = 24
         e["fee_rt_bps"] = MAKER_RT
     add_rolling_scores(cascade)
-    k = int(len(cascade) * 0.7)
-    q66 = float(np.nanquantile([e["al_score"] for e in cascade[:k]], 2/3))
+    # C-B3 : seuil AS-OF par événement (quantile expanding sur les seuls
+    # scores antérieurs). L'ancien `q66` était un scalaire calculé sur les
+    # 70 % premiers du sample puis appliqué aux 30 % finaux — look-ahead.
+    # `q66` reste le DERNIER seuil as-of, pour le rapport seulement.
+    cascade, q66 = stamp_expanding_q66(cascade)
 
     # --- funding_div + confluence (univers complet) ---
     fdiv, conf = collect_funding_strategies(con)
