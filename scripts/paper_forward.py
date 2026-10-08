@@ -252,13 +252,34 @@ def main() -> int:
     fh = pd.read_sql_query("SELECT symbol, funding_time, rate FROM funding_history", con)
     btc = load_df(con, "BTCUSDT")
 
+    # FIX F-043 — la boucle était (candidat × symbole). Conséquences
+    # mesurées sur le nightly : load_df rejoué 8 × 586 = 4 688 fois,
+    # le filtrage du funding par symbole rescannait les 2,14 M lignes de
+    # funding_history à CHACUNE de ces itérations, et price_signals était
+    # recalculé 4 fois par symbole alors qu'il ne dépend que de (df, btc).
+    # Résultat : ~20 min par invocation, et l'unité appelle ce script
+    # DEUX fois → 40 min sur un budget de 60, ce qui suffit à faire
+    # sauter TimeoutStartSec et donc 20 ExecStart= derrière.
+    #
+    # On inverse : le symbole en boucle EXTERNE, et on mémoïse par
+    # symbole ce qui ne dépend que de lui. L'ordre d'insertion change,
+    # sans conséquence : chaque ligne est indépendante, la dédup est un
+    # SELECT avant INSERT et l'INSERT est OR IGNORE sur une PK.
+    funding_by_symbol: dict[str, pd.DataFrame] = {
+        s: g for s, g in fh.groupby("symbol")}
+
     opened = closed_n = 0
-    for name, horizon, direction in CANDIDATES:
-        for sym in sorted(symbols):
-            df = load_df(con, sym)
-            if df is None or len(df) < 400:
-                continue
-            fh_sym = fh[fh.symbol == sym]
+    for sym in sorted(symbols):
+        df = load_df(con, sym)
+        if df is None or len(df) < 400:
+            continue
+        # même forme qu'un filtrage par symbole sans correspondance :
+        # un DataFrame vide aux mêmes colonnes → .empty est True
+        fh_sym = funding_by_symbol.get(sym)
+        if fh_sym is None:
+            fh_sym = fh.iloc[0:0]
+        _sig: dict | None = None      # price_signals, calculé À LA DEMANDE
+        for name, horizon, direction in CANDIDATES:
             if name in ("funding_prix_divergence_short",
                         "funding_div_plus_vwap_short"):
                 if fh_sym.empty:
@@ -269,6 +290,7 @@ def main() -> int:
                     # NaN (pas pd.NA) : le dénominateur nul doit donner un
                     # dev NaN (comparaison False), pas exploser astype(float)
                     # — le crash TypeError 'NAType' du nightly du 07/10 03:24
+                    # (fix F-039 sur les 3 occurrences de ce motif)
                     vwap = ((tp * df["volume"]).rolling(168).sum()
                             / df["volume"].rolling(168).sum().replace(0, float("nan")))
                     dev = ((df["close"] - vwap) / vwap).astype(float)
@@ -279,10 +301,11 @@ def main() -> int:
                     continue
                 ev = funding_extreme_events(fh_sym)
             else:
-                sig = dict((n, (d, s)) for n, d, s in price_signals(df, btc))
-                if name not in sig:
+                if _sig is None:      # une seule fois par symbole (F-043)
+                    _sig = dict((n, (d, s)) for n, d, s in price_signals(df, btc))
+                if name not in _sig:
                     continue
-                ev = df.index[sig[name][1].fillna(False)]
+                ev = df.index[_sig[name][1].fillna(False)]
             # événements frais uniquement
             ev = pd.DatetimeIndex([t for t in ev if t.timestamp() * 1000 >= since_ms])
             for ts in ev:
@@ -314,11 +337,9 @@ def main() -> int:
                     ret = ((exit_price - entry_price) / entry_price * 100 * direction
                            - COST_PCT + fund_col)
                     status = "closed"
-                    closed_n += 1
                 else:
                     exit_price = exit_ts = ret = None
                     status = "open"
-                    closed_n += 0
                 f7, v7, l24 = probe_fields(con, sym, sig_ts)   # sonde P3
                 if not fund7_gate_pass(name, sym, f7):
                     continue   # gate fund7 : pas de carburant → pas de trade
@@ -331,6 +352,13 @@ def main() -> int:
                     (name, sym, horizon, direction, sig_ts, entry_ts, entry_price,
                      exit_ts, exit_price, ret, fund_col, status, now, f7, v7, l24))
                 opened += 1
+                # F-044 : `closed_n` ne doit compter que des trades
+                # RÉELLEMENT persistés. L'ancien `closed_n += 1` était
+                # avant le gate fund7 : un trade rejeté par le gate était
+                # compté « clôturé » alors qu'aucune ligne n'était écrite,
+                # et le rapport l'annonçait (L552).
+                if status == "closed":
+                    closed_n += 1
 
     # ——— le CANDIDAT QUALITÉ : cascade ∩ funding-rank-bas (25/09) ———
     # le rang cross-sectionnel du funding parmi les 6 majeures À L'INSTANT
