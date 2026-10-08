@@ -55,9 +55,33 @@ PROTECTED = re.compile(r"(ce001|ce-001|thread|draft|README|source_snapshot)", re
 
 
 def dated_files(pattern: str) -> list[Path]:
-    """Fichiers d'une famille, du plus récent au plus ancien (mtime)."""
+    """Fichiers d'une famille, du plus récent au plus ancien.
+
+    Le tri se fait sur `(mtime, nom)`. AVANT il portait sur le `mtime` seul,
+    ce qui avait deux défauts :
+
+      1. **Instable.** `sorted()` étant stable, deux fichiers de mtime égale
+         gardent l'ordre de `glob()`, qui est l'ordre du système de fichiers
+         (scandir), pas un ordre défini. Le test `test_keeps_newest_n`
+         échouait 7 fois sur 8 dans un sandbox où la résolution de mtime est
+         grossière.
+
+      2. **Le tri pouvait supprimer le MAJEUR.** C'est le défaut grave :
+         `prune()` SUPPRIME les fichiers au-delà de la rétention. Deux
+         rapports écrits dans la même seconde — cas réel, la campagne
+         nocturne produit plusieurs rapports d'un coup — ont des mtimes
+         identiques, et c'est alors l'ordre de création qui décide quel
+         rapport survit. Démontré : 6 fichiers de mtime identique, création
+         0→5 supprime le `…20260900…`, création 5→0 supprime le `…20260905…`.
+
+    Le nom porte la date (`campaign-nightly-20260904T120000Z-x.md`), donc
+    le tie-break par nom est un ordre de temps RÉEL et lisible — pas un
+    arbitraire. `reverse=True` s'applique aux deux composantes, donc le plus
+    récent reste en tête.
+    """
     files = list(REPORTS.glob(pattern))
-    return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+    return sorted(files, key=lambda p: (p.stat().st_mtime, p.name),
+                  reverse=True)
 
 
 def prune(apply: bool) -> list[tuple[Path, str]]:
@@ -73,7 +97,11 @@ def prune(apply: bool) -> list[tuple[Path, str]]:
     for html in REPORTS.glob("*.html"):
         pdfs = list(REPORTS.glob(html.stem + "*.pdf"))
         if pdfs:
-            newest_pdf = max(pdfs, key=lambda p: p.stat().st_mtime)
+            # même tie-break que dated_files : deux PDF de mtime égale
+            # donnaient le premier de `glob()`, arbitrairement. Ici l'impact
+            # est moindre (on compare juste une date), mais la décision
+            # « le PDF existe-t-il déjà » doit être reproductible.
+            newest_pdf = max(pdfs, key=lambda p: (p.stat().st_mtime, p.name))
             if newest_pdf.stat().st_mtime >= html.stat().st_mtime:
                 actions.append((html, "delete (pdf plus récent présent)"))
     if not apply:
