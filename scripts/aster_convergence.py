@@ -105,8 +105,15 @@ def main() -> int:
         lecture = {
             3: "**CONFLUENCE 3/3**", 2: "convergence 2/3",
             -3: "**CONFLUENCE 3/3 (short)**", -2: "convergence 2/3 (short)",
-        }.get(bias + fund_bias * 0, "")  # fund lu séparément ci-dessous
-        if bias >= 2 and fund_bias != 0:
+        }.get(bias + fund_bias, "")
+        # FIX ronde 8 (D-09, fossil daté d43969f) : le lookup ignorait le
+        # funding (terme de fund_bias multiplié par zéro) — le funding ne
+        # comptait JAMAIS dans le label : les clés ±3 étaient inatteignables
+        # et la docstring « les TROIS lentilles » promettait une confluence
+        # que le code ne pouvait pas produire. Et l'annotation ci-dessous
+        # n'était déclenchée que pour un bias long maximal (jamais en short)
+        # — symétrisée.
+        if abs(bias) >= 2 and fund_bias != 0:
             lecture += " · funding " + ("élevé (crowded long)" if fund_bias > 0
                                         else "négatif (crowded short)")
         row = f"| ${t} | {vx_s} | {calls} | {doi_s} | {fund_s} | {lecture or '—'} |"
