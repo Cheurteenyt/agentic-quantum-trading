@@ -252,6 +252,10 @@ async def get_gold_analysis():
         "instrument":   "XAUUSD",
         "markdown":     analysis["markdown"],
         "bias":         analysis["bias_data"],
+        # FIX ronde 8 : un JSON Gemini absent/cassé laissait bias = {} en
+        # silence — indistinguable d'une analyse valide amputée pour les
+        # consommateurs. Le drapeau rend l'échec de parsing VISIBLE.
+        "bias_parsed":  bool(analysis.get("bias_data")),
         "sources_used": len(sources_content.split("---")),
         "cached":       False,
     }
@@ -274,6 +278,7 @@ async def get_gold_bias():
         if age < 3600:
             return {
                 "bias":      data.get("bias", {}),
+                "bias_parsed": bool(data.get("bias")),
                 "age_min":   round(age / 60, 1),
                 "cached":    True,
                 "instrument": "XAUUSD",
@@ -282,6 +287,7 @@ async def get_gold_bias():
     result = await get_gold_analysis()
     return {
         "bias":       result.get("bias", {}),
+        "bias_parsed": bool(result.get("bias")),
         "age_min":    0,
         "cached":     False,
         "instrument": "XAUUSD",

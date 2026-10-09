@@ -2262,7 +2262,15 @@ export default function AlphaLabPage() {
 
   const runCopyPreview = async (market: Market) => {
     setSelectedMarket(market)
-    const price = market.probability_mid || market.last_price || market.yes_ask || market.yes_bid || 0.5
+    // FIX ronde 8 : le fallback a 0.5 fabriquait un prix d'entree pour un
+    // marche SANS prix (tape affiche honnetement « - ») — le garde-fou
+    // backend missing_price etait contourne et le PnL affichait un resultat
+    // calcule sur une entree inventee.
+    const price = market.probability_mid || market.last_price || market.yes_ask || market.yes_bid
+    if (!price || price <= 0) {
+      setError("Aucun prix de marche disponible — simulation impossible")
+      return
+    }
     const mark = Math.min(0.99, Math.max(0.01, price * 1.08))
     const result = await post<SimulationResult>("/alpha/simulate/prediction-copy", {
       capital: 100,

@@ -24,6 +24,27 @@ const SEVERITY_LABELS: Record<string, string> = {
   low: "Monitor",
 }
 
+// FIX ronde 8 : le merge préfixait les nouveaux items sans jamais re-trier —
+// après le 2e poll, un signal low fraîchement arrivé s'affichait au rang 01
+// au-dessus d'un critical, avec le badge rank + « N live signals » qui
+// présentaient ce pseudo-classement comme un classement métier. Même ordre
+// que le backend (main.py : severity DESC, |avg_funding| DESC).
+const SEVERITY_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
+
+export function sortOpportunities(rows: Opportunity[]): Opportunity[] {
+  const fundingAbs = (o: Opportunity): number => {
+    const details = o.details as { avg_funding?: unknown } | null
+    const n = Number(details?.avg_funding)
+    return Number.isFinite(n) ? Math.abs(n) : 0
+  }
+  return [...rows].sort((a, b) => {
+    const rankA = SEVERITY_RANK[String(a.severity).toLowerCase()] ?? 0
+    const rankB = SEVERITY_RANK[String(b.severity).toLowerCase()] ?? 0
+    if (rankA !== rankB) return rankB - rankA
+    return fundingAbs(b) - fundingAbs(a)
+  })
+}
+
 const getOpportunityTone = (opportunity: Opportunity): string => {
   const type = `${opportunity.type || ""}`.toLowerCase()
   const severity = `${opportunity.severity || ""}`.toLowerCase()
@@ -107,7 +128,7 @@ export function OpportunityFeed() {
         setOpportunities((prev) => {
           const ids = new Set(prev.map((item) => `${item.type}_${item.symbol}`))
           const fresh = payload.opportunities.filter((item: Opportunity) => !ids.has(`${item.type}_${item.symbol}`))
-          return [...fresh, ...prev].slice(0, 20)
+          return sortOpportunities([...fresh, ...prev]).slice(0, 20)
         })
       } catch {}
     }
