@@ -328,8 +328,15 @@ async def launch_ninjatrader():
     }
 
 
+class LaunchFullRequest(BaseModel):
+    # ronde 11 : le password passait en QUERY PARAM (?password=…) — fuite
+    # dans les access-logs uvicorn/proxy. Le body est le canal du pair
+    # nt8_login (LoginRequest), même contrat ici.
+    password: str = ""
+
+
 @router.post("/launch/ninjatrader/full")
-async def launch_ninjatrider_full(password: str = ""):
+async def launch_ninjatrider_full(req: LaunchFullRequest):
     """
     Launcher complet NT8 : lance l'app, attend, clique le champ mot de passe, tape le mdp, Enter.
     Si aucun password fourni, utilise la variable d'environnement NT8_PASSWORD.
@@ -339,7 +346,7 @@ async def launch_ninjatrider_full(password: str = ""):
         raise HTTPException(503, "windows-mcp non connecte")
 
     # Use provided password or fallback to env var
-    pwd_to_use = password or NT8_PASSWORD
+    pwd_to_use = req.password or NT8_PASSWORD
     if not pwd_to_use:
         return {"error": "NT8_PASSWORD not set in environment and no password provided"}
 
@@ -358,22 +365,22 @@ async def launch_ninjatrider_full(password: str = ""):
     # Étape 3 : Cliquer dans le champ password (coordonnées par défaut)
     client.call_tool("Move", {"x": 960, "y": 540})
     time.sleep(0.3)
-    client.call_tool("Click", {"coordinates": [960, 540], "button": "left"})
+    r_click = client.call_tool("Click", {"coordinates": [960, 540], "button": "left"})
     time.sleep(0.5)
 
     # Étape 4 : Taper le mot de passe
-    client.call_tool("Type", {"text": pwd_to_use})
+    r_type = client.call_tool("Type", {"text": pwd_to_use})
     await asyncio.sleep(0.3)
 
     # Étape 5 : Enter pour se connecter
-    client.call_tool("Shortcut", {"keys": "Enter"})
+    r_enter = client.call_tool("Shortcut", {"keys": "Enter"})
     await asyncio.sleep(3)
 
     # Étape 6 : Screenshot après connexion
     ss2 = mcp_screenshot()
 
     return {
-        "success": True,
+        "success": _tool_ok(result, r_click, r_type, r_enter, ss2),
         "message": f"NT8 lancé et connecté automatiquement",
         "before_login_image": ss1.get("image"),
         "after_login_image": ss2.get("image"),
@@ -479,6 +486,24 @@ NT8_INDICATORS = {
 CHART_DEFAULT = {"x": 960, "y": 540}
 
 
+def _tool_ok(*results) -> bool:
+    """Le succès se DÉRIVE des results MCP, il ne se déclare pas.
+
+    Ronde 11 : 8 handlers renvoyaient « success: True » codé dur — une
+    action ratée (Timeout 30s, isError MCP) était rapportée comme réussie
+    au frontend. mouse_click/keyboard_input dérivaient déjà du result :
+    cette convention est étendue aux autres handlers."""
+    for r in results:
+        if not isinstance(r, dict):
+            return False
+        if r.get("error"):
+            return False
+        inner = r.get("result")
+        if isinstance(inner, dict) and inner.get("isError"):
+            return False
+    return True
+
+
 def _nt8_add_indicator(client: _MCPClient, indicator_name: str) -> dict:
     """
     Ajoute un indicateur dans NT8 via windows-mcp.
@@ -492,7 +517,7 @@ def _nt8_add_indicator(client: _MCPClient, indicator_name: str) -> dict:
     cx, cy = CHART_DEFAULT["x"], CHART_DEFAULT["y"]
 
     # 1. Clic droit sur le chart
-    client.call_tool("Click", {
+    r1 = client.call_tool("Click", {
         "coordinates": [cx, cy],
         "button": "right",
     })
@@ -500,25 +525,26 @@ def _nt8_add_indicator(client: _MCPClient, indicator_name: str) -> dict:
 
     # 2. Clique sur "Indicators..." dans le menu contextuel
     # Position par défaut : ~100px sous le clic, aligné gauche
-    client.call_tool("Click", {
+    r2 = client.call_tool("Click", {
         "coordinates": [cx - 200, cy + 100],
         "button": "left",
     })
     time.sleep(0.8)
 
     # 3. Tape le nom de l'indicateur dans le champ de recherche
-    client.call_tool("Type", {"text": indicator_name})
+    r3 = client.call_tool("Type", {"text": indicator_name})
     time.sleep(0.5)
 
     # 4. Clique sur le premier résultat (Enter = sélection + ajout dans NT8)
-    client.call_tool("Shortcut", {"keys": "Enter"})
+    r4 = client.call_tool("Shortcut", {"keys": "Enter"})
     time.sleep(0.5)
 
     # 5. Clique OK pour confirmer
-    client.call_tool("Shortcut", {"keys": "Enter"})
+    r5 = client.call_tool("Shortcut", {"keys": "Enter"})
     time.sleep(0.5)
 
-    return {"success": True, "indicator": indicator_name, "action": "add"}
+    return {"success": _tool_ok(r1, r2, r3, r4, r5),
+            "indicator": indicator_name, "action": "add"}
 
 
 def _nt8_remove_indicator(client: _MCPClient, indicator_name: str) -> dict:
@@ -531,22 +557,23 @@ def _nt8_remove_indicator(client: _MCPClient, indicator_name: str) -> dict:
       4. OK pour confirmer
     """
     # Ctrl+I ouvre la fenêtre des indicateurs
-    client.call_tool("Shortcut", {"keys": "Ctrl+I"})
+    r1 = client.call_tool("Shortcut", {"keys": "Ctrl+I"})
     time.sleep(0.8)
 
     # Tape le nom pour filtrer
-    client.call_tool("Type", {"text": indicator_name})
+    r2 = client.call_tool("Type", {"text": indicator_name})
     time.sleep(0.5)
 
     # Supprime l'indicateur sélectionné
-    client.call_tool("Shortcut", {"keys": "Delete"})
+    r3 = client.call_tool("Shortcut", {"keys": "Delete"})
     time.sleep(0.3)
 
     # Confirme
-    client.call_tool("Shortcut", {"keys": "Enter"})
+    r4 = client.call_tool("Shortcut", {"keys": "Enter"})
     time.sleep(0.3)
 
-    return {"success": True, "indicator": indicator_name, "action": "remove"}
+    return {"success": _tool_ok(r1, r2, r3, r4),
+            "indicator": indicator_name, "action": "remove"}
 
 
 @router.post("/ninjatrader/indicator")
@@ -604,7 +631,7 @@ async def nt8_snapshot():
             text_data += item.get("text", "")
 
     return {
-        "success": True,
+        "success": _tool_ok(result),
         "ui_text": text_data[:5000],  # Tronqué pour éviter payload trop gros
         "raw": result,
     }
@@ -617,9 +644,9 @@ async def nt8_refresh():
     if not client.connected:
         raise HTTPException(503, "windows-mcp non connecte")
 
-    client.call_tool("Shortcut", {"keys": "F5"})
+    r = client.call_tool("Shortcut", {"keys": "F5"})
     time.sleep(0.5)
-    return {"success": True, "action": "refresh"}
+    return {"success": _tool_ok(r), "action": "refresh"}
 
 
 @router.post("/ninjatrader/zoom")
@@ -631,14 +658,14 @@ async def nt8_zoom(direction: str = "in", amount: int = 3):
 
     cx, cy = CHART_DEFAULT["x"], CHART_DEFAULT["y"]
     if direction == "in":
-        client.call_tool("Scroll", {
+        r = client.call_tool("Scroll", {
             "x": cx, "y": cy, "direction": "up", "amount": amount,
         })
     else:
-        client.call_tool("Scroll", {
+        r = client.call_tool("Scroll", {
             "x": cx, "y": cy, "direction": "down", "amount": amount,
         })
-    return {"success": True, "action": f"zoom_{direction}", "amount": amount}
+    return {"success": _tool_ok(r), "action": f"zoom_{direction}", "amount": amount}
 
 
 @router.post("/ninjatrader/login")
@@ -662,22 +689,22 @@ async def nt8_login(req: LoginRequest):
 
     client.call_tool("Move", {"x": pwd_x, "y": pwd_y})
     time.sleep(0.3)
-    client.call_tool("Click", {"coordinates": [pwd_x, pwd_y], "button": "left"})
+    r_click = client.call_tool("Click", {"coordinates": [pwd_x, pwd_y], "button": "left"})
     time.sleep(0.5)
 
     # Étape 3: Taper le mot de passe
-    client.call_tool("Type", {"text": req.password})
+    r_type = client.call_tool("Type", {"text": req.password})
     time.sleep(0.3)
 
     # Étape 4: Enter pour se connecter
-    client.call_tool("Shortcut", {"keys": "Enter"})
+    r_enter = client.call_tool("Shortcut", {"keys": "Enter"})
     time.sleep(3)
 
     # Étape 5: Screenshot après connexion pour confirmer
     after_ss = mcp_screenshot()
 
     return {
-        "success": True,
+        "success": _tool_ok(r_click, r_type, r_enter, after_ss),
         "message": f"Login envoyé — click({pwd_x},{pwd_y}) → type(password) → Enter",
         "before_image": before_ss.get("image"),
         "after_image": after_ss.get("image"),
@@ -747,7 +774,7 @@ async def nt8_timeframe(req: TimeframeRequest):
     result = mcp_screenshot()
 
     return {
-        "success": True,
+        "success": _tool_ok(result),
         "timeframe": req.timeframe,
         "image": result.get("image"),
     }
@@ -799,7 +826,7 @@ async def nt8_data_box():
             parsed["indicators"][name] = match.group(1)
 
     return {
-        "success": True,
+        "success": _tool_ok(result),
         "data": parsed,
         "element_count": len(elements),
     }
