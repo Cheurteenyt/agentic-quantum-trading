@@ -37,7 +37,7 @@ from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.aster_indicators import atr as _true_atr  # noqa: E402
 from scripts.funding_series import FundingSeries, funding_series_all  # noqa: E402,F401
 from scripts.portfolio_sim import (  # noqa: E402
-    KDB, MAJORS, HOLD_H, LIQ_MOVE_PCT, btc_regime_series, run_sim)
+    KDB, MAJORS, HOLD_H, btc_regime_series, liq_move_for, run_sim)
 
 REPORTS = ROOT / "reports"
 SIZE = 0.05
@@ -158,10 +158,16 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
                     fund_h = float(ft[1][_k])
             fund_pct = fund_h * HOLD_H * 20 / 100
             pnl_pct = ret * 20 + fund_pct - fees_pct
-            liq = mae >= LIQ_MOVE_PCT or pnl_pct <= -100
+            # Fossile ronde 5 : LIQ_MOVE_PCT était un seuil PLAT calculé à
+            # l'import (100/20 − 2,5 = 2,5 %) — coïncide avec les majeures
+            # (mm 2,5) mais ignore les memecoins (16,66 % → distance 0 à
+            # 20x = liquidé à l'entrée) et n'était ni prudent ni compté si
+            # la table était absente. liq_move_for applique le modèle F-038.
+            _liq_move = liq_move_for(sym, 20)
+            liq = mae >= _liq_move or pnl_pct <= -100
             # le REGISTRE de liquidation : prix de mort exact + bougie
             # où le high le franchit (le short meurt AU-DESSUS de l'entrée)
-            liq_price = entry * (1 + LIQ_MOVE_PCT / 100)
+            liq_price = entry * (1 + _liq_move / 100)
             liq_ts = None
             for j in range(ei, exit_j + 1):
                 if highs[j] >= liq_price:

@@ -280,7 +280,10 @@ def run_stack(events: list[dict], capital: float, size_fn,
               "pnl": pnl, "balance": balance, "liq": liq,
               "entry": e.get("entry"), "margin": margin,
               "liq_price": e.get("liq_price") if liq else None,
-              "liq_ts": liq_ts_dt}
+              "liq_ts": liq_ts_dt,
+              # Fossile ronde 5 : le registre n'avait pas le levier du trade
+              # — son fallback « prix de mort » utilisait 100/3−0.5 en dur
+              "lev": e.get("lev")}
         if liq:
             # le sort est scellé à l'entrée (MAE connu) : booké immédiatement
             balance += pnl
@@ -453,8 +456,12 @@ def main() -> int:
         for t in liqs:
             lp = t.get("liq_price")
             if lp is None and t.get("entry"):
-                # fallback : prix de mort théorique depuis le levier
-                lp = t["entry"] * (1 + (100 / 3 - 0.5) / 100)
+                # fallback : prix de mort théorique depuis le LEVIER RÉEL du
+                # trade (fossile ronde 5 : l'ancien 100/3−0.5 en dur donnait
+                # 32,83 % quel que soit le symbole — ~2× trop haut pour un
+                # memecoin à 16,66 % de maintenance, et figeait pré-F-038)
+                lp = t["entry"] * (1 + liq_move_for(
+                    t["sym"], t.get("lev") or 3) / 100)
             lt = t.get("liq_ts")
             # PR-169 (P2) : le ternaire coupait la ligne markdown AVANT les
             # colonnes Perte/Balance dès que liq_ts existait (4 colonnes
