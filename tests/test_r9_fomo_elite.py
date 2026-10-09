@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import contextlib
 import json
 import sys
 import tempfile
@@ -146,10 +147,8 @@ class DaemonReloadTests(unittest.TestCase):
 
         async def runner():
             writer = types.SimpleNamespace(log_session_end=lambda n: None)
-            try:
+            with contextlib.suppress(KeyboardInterrupt):
                 await fd.daemon_loop("uuid", [], writer)
-            except KeyboardInterrupt:
-                pass
 
         try:
             asyncio.run(runner())
@@ -180,10 +179,8 @@ class DaemonReloadTests(unittest.TestCase):
 
         async def runner():
             writer = types.SimpleNamespace(log_session_end=lambda n: None)
-            try:
+            with contextlib.suppress(KeyboardInterrupt):
                 await fd.daemon_loop("uuid", [], writer)
-            except KeyboardInterrupt:
-                pass
 
         try:
             asyncio.run(runner())
