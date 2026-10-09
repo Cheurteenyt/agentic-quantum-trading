@@ -7,6 +7,10 @@ Sécurités :
   - checkpoint ATOMIQUE : tmp + fsync + rename (jamais de JSON tronqué)
   - checkpoint COMPLET en WAITING_RESOURCE (jamais de perte de progression)
   - spec_sha comparé au skip (une spec modifiée est re-mesurée)
+  - execution_identity comparée au skip (P0 2026-10-09 : un seuil de
+    protocole, un manifest d'univers ou un patch numpy changeaient la
+    MESURE sans changer le spec_sha — le résultat DONE était skippé
+    à tort ; l'identité par item est désormais l'autorité du skip)
   - retry CLASSIFIÉ : PERMANENT (spec invalide) vs RETRYABLE (I/O, DB)
   - exit codes : 0 = DONE, 1 = DONE_WITH_ERRORS/STOPPED, 42 = WAITING_RESOURCE
   - SIGTERM/SIGINT : status STOPPED (jamais DONE)
@@ -251,8 +255,21 @@ def deps_sha() -> str:
     return "|".join(parts)
 
 
+def _protocol_sha() -> str:
+    """Le sha du protocole actif (PR-150) — lu ICI et non passé : il décrit
+    un fichier du dépôt, pas un paramètre du run. Un échec de lecture est
+    une chaîne vide, pas une exception : l'absence de protocole est un état
+    identifiable, pas une raison de tomber (même doctrine que deps_sha)."""
+    try:
+        from scripts.research_runner import protocol_sha as _proto
+        return _proto()
+    except (OSError, ImportError, ValueError):
+        return ""
+
+
 def _execution_identity_for(engine_sha: str, spec_sha: str = "",
-                            db_snapshot: str = "", git_sha: str = "") -> str:
+                            db_snapshot: str = "", git_sha: str = "",
+                            universe_sha: str = "") -> str:
     """L'identité d'exécution complète, lue sur disque.
 
     `protocol_sha` est lu ici (et non passé) parce qu'il décrit un fichier
@@ -260,19 +277,85 @@ def _execution_identity_for(engine_sha: str, spec_sha: str = "",
     que l'oracle de matrice ferme — un seuil de protocole peut changer sous
     le même `protocol_id`.
 
-    `universe_sha` est laissé vide ici : il dépend de l'univers de la spec,
-    donc c'est à l'appelant de le passer (il a la spec en main). Le canal
+    `universe_sha` est calculé par l'appelant quand la spec est en main
+    (`_spec_execution_identity`) : l'univers dépend de la spec. Le canal
     reste ouvert et l'oracle le vérifie.
     """
-    proto = ""
-    try:
-        from scripts.research_runner import protocol_sha as _proto
-        proto = _proto()
-    except (OSError, ImportError, ValueError):
-        proto = ""
     return execution_identity(
-        engine_sha, spec_sha=spec_sha, db_snapshot=db_snapshot,
-        protocol_sha=proto, deps_sha=deps_sha(), git_sha=git_sha or "",
+        engine_sha, spec_sha=spec_sha, universe_sha=universe_sha,
+        db_snapshot=db_snapshot, protocol_sha=_protocol_sha(),
+        deps_sha=deps_sha(), git_sha=git_sha or "",
+    )
+
+
+def _universe_sha_of(spec: dict) -> str:
+    """Le sha du manifest d'univers d'une spec DÉJÀ PARSÉE (aucun re-parse).
+    Une spec sans univers, ou un manifest illisible, = "" : l'absence est
+    une composante de l'identité, pas une erreur — et "" ne peut jamais
+    coller à une identité stockée qui porterait un univers réel."""
+    if not spec or not spec.get("universe"):
+        return ""
+    try:
+        from scripts.research_runner import universe_sha as _usha
+        return _usha(str(spec["universe"])) or ""
+    except (OSError, ImportError, ValueError):
+        return ""
+
+
+def _spec_universe_sha(path: Path) -> str:
+    """Le sha du manifest d'univers lu depuis le FICHIER — au moment du
+    skip, la spec n'est pas encore chargée et c'est le fichier sur disque
+    qui décrit ce qui SERAIT mesuré (le commentaire de `_is_terminal`).
+    Total : toute erreur de lecture/parse = "" (la spec sera de toute
+    façon refusée à l'exécution par load_spec)."""
+    try:
+        import yaml
+    except ImportError:
+        return ""
+    try:
+        spec = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        return _universe_sha_of(spec) if isinstance(spec, dict) else ""
+    except (OSError, ValueError, TypeError, yaml.YAMLError):
+        return ""
+
+
+def _spec_execution_identity(path: Path, spec_sha: str, engine_sha: str, *,
+                             protocol_sha: str = "",
+                             deps_sha: str = "") -> str:
+    """L'identité d'exécution d'UN ITEM — l'autorité du skip (P0).
+
+    Composées : engine (les modules de mesure, #211), spec (le sha du
+    fichier), universe (le manifest d'univers), protocol (active.yaml)
+    et deps (numpy/pandas/scipy/pyarrow). Le canonique est exactement
+    celui de `execution_identity()` — la matrice de l'oracle s'applique.
+
+    Deux composantes de `execution_identity()` sont VOLONTAIREMENT hors
+    de l'identité d'item (db_snapshot="" et git="" dans le canonique) :
+
+      - `db_snapshot` : la db est appendée en CONTINU (PR-163, doctrine
+        testée — `test_db_derivee_transporte_quand_meme`). Inclure le
+        snapshot global re-mesurerait TOUT à chaque nuit d'append.
+        L'invalidation par fenêtre scientifique (append hors fenêtre =
+        skip, correction historique = re-run) est le chantier
+        `dataset_window_sha` ; un remplacement réel reste un geste
+        opérateur (--reset).
+
+      - le `git_sha` du DÉPÔT : un commit de docs/frontend/worker ne
+        change pas la mesure — le périmètre exact de ENGINE_FILES (#211)
+        est porté par la composante engine. Inclure le git global
+        re-mesurerait TOUT à chaque commit de docs.
+
+    `protocol_sha` et `deps_sha` sont passés par l'appelant (scellés UNE
+    fois par campagne dans run_worker) : ce sont des états de
+    l'environnement au démarrage, pas des paramètres par item — même
+    doctrine que engine_sha calculé une fois."""
+    return execution_identity(
+        engine_sha,
+        spec_sha=spec_sha,
+        universe_sha=_spec_universe_sha(path),
+        protocol_sha=protocol_sha,
+        deps_sha=deps_sha,
+        git_sha="",
     )
 
 EXIT_OK = 0
@@ -396,11 +479,22 @@ def _git_engine_dirty() -> bool:
     return any(not l.startswith("??") for l in proc.stdout.splitlines())
 
 
-def _is_terminal(prev: dict, spec_sha: str) -> bool:
-    """LA définition unique de « terminal » (PR-161) : l'item porte le
-    même spec_sha ET est DONE ou FAILED_PERMANENT. Un FAILED_PERMANENT
-    sans spec_sha (item legacy) n'est PAS terminal — il est re-mesuré."""
+def _is_terminal(prev: dict, spec_sha: str, execution_identity: str) -> bool:
+    """LA définition unique de « terminal » (PR-161, étendue P0 2026-10-09) :
+    l'item porte le même spec_sha, la MÊME identité d'exécution, et est
+    DONE ou FAILED_PERMANENT.
+
+    L'identité est l'AUTORITÉ du skip (audit 2026-10-08, action 5) : le
+    spec_sha seul ne prouvait pas « même mesure » — un seuil de protocole
+    (active.yaml sous le même protocol_id), un manifest d'univers (même
+    nom de fichier) ou un patch numpy changeaient la MESURE sans toucher
+    ni le spec_sha ni engine_sha, et le résultat DONE était skippé alors
+    qu'il décrivait une autre exécution. Un item SANS identité (ère
+    PR-161, produit avant le scellement) n'est PAS terminal : son
+    protocole/deps d'origine sont invérifiables — il est re-mesuré
+    (fail-closed, même doctrine que les items legacy sans spec_sha)."""
     return (prev.get("spec_sha") == spec_sha
+            and prev.get("execution_identity") == execution_identity
             and prev.get("state") in ("DONE", "FAILED_PERMANENT"))
 
 
@@ -531,20 +625,31 @@ def _status_counts(items: dict, manifest: list | None = None,
     terminal = ("DONE", "FAILED_PERMANENT")
 
     if manifest:
-        ids = [m.get("id") for m in manifest]
-        shas = {m.get("id"): m.get("sha") for m in manifest}
+        entries = {m.get("id"): m for m in manifest}
+        ids = list(entries)
 
         def _terminal_ok(iid: str) -> bool:
             it = items.get(iid) or {}
-            return (it.get("state") in terminal
-                    and it.get("spec_sha") == shas.get(iid))
+            m = entries.get(iid) or {}
+            if it.get("state") not in terminal:
+                return False
+            if it.get("spec_sha") != m.get("sha"):
+                return False
+            # P0 2026-10-09 : l'identité scellée au manifeste doit aussi
+            # correspondre — un changement de protocole/univers/deps rend
+            # l'item NON terminal (la boucle le re-mesurera) et le status
+            # doit le montrer. Un manifeste pré-scellement (sans identity)
+            # garde l'ancienne sémantique.
+            if ("identity" in m
+                    and it.get("execution_identity") != m["identity"]):
+                return False
+            return True
 
-        done = sum(1 for i in ids if (items.get(i) or {}).get("state")
-                   == "DONE" and items[i].get("spec_sha") == shas.get(i))
+        done = sum(1 for i in ids
+                   if _terminal_ok(i) and items[i]["state"] == "DONE")
         permanent = sum(1 for i in ids
-                        if (items.get(i) or {}).get("state")
-                        == "FAILED_PERMANENT"
-                        and items[i].get("spec_sha") == shas.get(i))
+                        if _terminal_ok(i)
+                        and items[i]["state"] == "FAILED_PERMANENT")
         remaining = sum(1 for i in ids if not _terminal_ok(i))
     else:
         done = sum(1 for v in items.values() if v.get("state") == "DONE")
@@ -646,8 +751,24 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     # changer sous le même nom, et un patch numpy décale un t-statistique.
     # Ces trois choses-là ne touchent aucun module de mesure — donc
     # engine_sha reste identique — alors que le résultat, si.
-    ck["execution_identity"] = _execution_identity_for(
+    # P0 2026-10-09 : protocole et deps sont scellés UNE fois par campagne
+    # (des états de l'environnement au démarrage, comme engine_sha) et
+    # servent aux identités PAR ITEM — l'autorité réelle du skip.
+    proto_sha = _protocol_sha()
+    deps = deps_sha()
+    campaign_ident = _execution_identity_for(
         engine, spec_sha="", db_snapshot=db_snap, git_sha=git_sha)
+    # l'identité PRÉCÉDENTE est comparée AVANT d'être rescellée : un
+    # protocole ou un patch numpy changé entre deux campagnes doit être
+    # VISIBLE (la terminalité par item décide, l'opérateur voit pourquoi
+    # la nuit re-mesure).
+    if (ck.get("execution_identity")
+            and ck["execution_identity"] != campaign_ident):
+        print(f"[worker] identité d'exécution de campagne changée "
+              f"({ck['execution_identity']} → {campaign_ident}) — les "
+              "items dont l'identité par item diffère seront RE-MESURÉs",
+              flush=True)
+    ck["execution_identity"] = campaign_ident
     ck["db_snapshot"] = db_snap
     ck["queue_sha"] = queue_sha
     ck["schema_version"] = SCHEMA_VERSION
@@ -668,9 +789,16 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     candidates: list[str] = list(ck.get("candidates", []))
 
     # le MANIFEST de la campagne est scellé au checkpoint (auditable) —
-    # la campagne exécute exactement cette liste matérialisée au démarrage
+    # la campagne exécute exactement cette liste matérialisée au démarrage.
+    # P0 2026-10-09 : chaque entrée scelle AUSSI l'identité d'exécution
+    # attendue — les counts du status restent ainsi alignés sur ce que la
+    # boucle fera (un item dont l'identité stockée diffère est « remaining »).
     ck["queue_total"] = len(spec_tuples)
-    ck["manifest"] = [{"id": sid, "sha": sha} for _, sid, sha in spec_tuples]
+    ck["manifest"] = [
+        {"id": sid, "sha": sha,
+         "identity": _spec_execution_identity(
+             f, sha, engine, protocol_sha=proto_sha, deps_sha=deps)}
+        for f, sid, sha in spec_tuples]
 
     print(f"[worker] job {job_id} · {len(spec_tuples)} specs · "
           f"{len(items)} déjà traitées · moteur {engine}", flush=True)
@@ -709,11 +837,22 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         # №P1-2 : le SKIP compare le spec_sha — une spec MODIFIÉE sous le
         # même id est re-mesurée (l'ancien ne comparait que l'id)
         prev = items.get(spec_id, {})
-        # PR-161 : FAILED_PERMANENT est VRAIMENT terminal — via _is_terminal
-        # qui exige le spec_sha (l'item PR-160 ne le portait pas et était
-        # donc re-joué à l'infini malgré le commentaire)
-        if _is_terminal(prev, start_sha):
+        # PR-161 : FAILED_PERMANENT est VRAIMENT terminal — via _is_terminal.
+        # P0 2026-10-09 : la terminalité exige AUSSI l'identité d'exécution
+        # — un seuil de protocole, un manifest d'univers ou un patch numpy
+        # changent la MESURE sans toucher le spec_sha ni engine_sha ; le
+        # résultat DONE d'une autre exécution ne doit pas être skippé.
+        if _is_terminal(prev, start_sha, _spec_execution_identity(
+                f, start_sha, engine,
+                protocol_sha=proto_sha, deps_sha=deps)):
             continue
+        # l'item AURAIT été terminal sous l'ancienne règle (spec_sha+état) :
+        # la seule raison de la re-mesure est l'identité — visible.
+        if (prev.get("spec_sha") == start_sha
+                and prev.get("state") in ("DONE", "FAILED_PERMANENT")):
+            print(f"[worker] {spec_id} : identité d'exécution absente ou "
+                  "différente — RE-MESURE (protocole/univers/deps)",
+                  flush=True)
 
         # №P1-1 : le garde-fou ressource RETENTE LA MÊME SPEC et le
         # checkpoint préserve les items (jamais de perte de progression)
@@ -740,6 +879,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
 
         retries = 0
         spec_sha = start_sha  # par défaut ; l'essai qui réussit le rescelle
+        uni_sha = ""  # le sha d'univers de la spec réellement chargée
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 # PR-162 : le sha EXÉCUTÉ fait foi — lecture, parse, puis
@@ -748,6 +888,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                 # prochaine tentative repart de zéro
                 raw = f.read_bytes()
                 spec = load_spec(f)
+                uni_sha = _universe_sha_of(spec)
                 if f.read_bytes() != raw:
                     raise RuntimeError(
                         "spec modifiée pendant la lecture — reprise")
@@ -781,7 +922,11 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     print(f"[worker]   → CANDIDATE", flush=True)
                 items[spec_id] = {
                     "state": "DONE", "verdict": verdict,
-                    "spec_sha": spec_sha, "git_sha": git_sha}
+                    "spec_sha": spec_sha, "git_sha": git_sha,
+                    "execution_identity": execution_identity(
+                        engine, spec_sha=spec_sha, universe_sha=uni_sha,
+                        protocol_sha=proto_sha, deps_sha=deps,
+                        git_sha="")}
                 break
             except Exception as exc:
                 retries = attempt
@@ -796,6 +941,10 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     items[spec_id] = {
                         "state": "FAILED_PERMANENT", "spec_sha": spec_sha,
                         "git_sha": git_sha,
+                        "execution_identity": execution_identity(
+                            engine, spec_sha=spec_sha, universe_sha=uni_sha,
+                            protocol_sha=proto_sha, deps_sha=deps,
+                            git_sha=""),
                         "error": f"{err_type}: {exc}", "attempt": attempt,
                         "timestamp": _now_iso()}
                     had_errors = True
