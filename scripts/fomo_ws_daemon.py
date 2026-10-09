@@ -120,8 +120,13 @@ def read_jwt():
         capture_output=True, text=True, timeout=90)
     jwt = r.stdout.strip().strip('"')
     if len(jwt) < 100:
-        raise RuntimeError(f"le JWT illisible via CDP : {r.stdout[:80]} {r.stderr[:120]}")
-    JWT_CACHE.write_text(jwt)
+        # pas de stdout/stderr dans le message : le CDP peut y échoer le token
+        raise RuntimeError(
+            f"le JWT illisible via CDP (stdout {len(r.stdout)} chars, "
+            f"stderr {len(r.stderr)} chars)"
+        )
+    from scripts.secret_io import write_secret
+    write_secret(JWT_CACHE, jwt)
     log(f"le JWT rafraîchi (exp dans {jwt_exp(jwt)-int(time.time())}s)")
     return jwt
 

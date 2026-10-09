@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
+from scripts.secret_io import write_secret  # noqa: E402
 STATE_F = ROOT / "data" / "fomo" / "session_state.json"
 JWT_CACHE = ROOT / "data" / "fomo" / "ws_jwt_cache.txt"
 
@@ -77,7 +78,7 @@ def main():
             try:
                 cached = JWT_CACHE.read_text().strip().strip('"') if JWT_CACHE.exists() else ""
                 if cached != tok:
-                    JWT_CACHE.write_text(tok)
+                    write_secret(JWT_CACHE, tok)
             except Exception:
                 pass
             state = {"status": "ok", "exp": exp, "checked_at": now}
@@ -94,7 +95,7 @@ def main():
             if exp2 and exp2 - now > 600:
                 log("session SAUVÉE par le reload — le Privy a re-authentifié silencieusement")
                 try:
-                    JWT_CACHE.write_text(tok2)
+                    write_secret(JWT_CACHE, tok2)
                 except Exception:
                     pass
                 state = {"status": "revived", "exp": exp2, "checked_at": now}
