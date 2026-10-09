@@ -132,6 +132,9 @@ async def send_message(req: ChatRequest):
 @router.get("/history")
 async def get_history(limit: int = 20):
     """Retourne l'historique des conversations."""
+    # R9 : clamp — limit=0 => [-0:] renvoyait la LISTE ENTIÈRE, limit négatif
+    # inversait le sens du slice (même pattern corrigé ailleurs)
+    limit = max(1, min(int(limit), 100))
     files = sorted(HISTORY_DIR.glob("chat_*.json"))[-limit:]
     history = []
     for f in reversed(files):

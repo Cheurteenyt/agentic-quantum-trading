@@ -90,6 +90,10 @@ async def get_signals(limit: int = 20):
     signals_dir = Path("data/signals")
     if not signals_dir.exists():
         return {"signals": []}
+    # R9 : clamp — limit=0 => [-0:] renvoyait la LISTE ENTIÈRE (chaque signal
+    # JSON chargé en RAM à chaque poll), limit négatif inversait le sens du
+    # slice (sous-ensemble décalé présenté comme les « dernières »)
+    limit = max(1, min(int(limit), 100))
     files = sorted(signals_dir.glob("signal_*.json"))[-limit:]
     signals = []
     for f in reversed(files):
