@@ -285,7 +285,7 @@ def check_g3(add, root: Path, ptxt: str | None = None,
                 f"producteur du contrat {table} absent")
             return
         ptxt = prod.read_text(encoding="utf-8-sig", errors="replace")
-    m = re.search(rf"CREATE TABLE IF NOT EXISTS {table}\s*\((.*?)\)",
+    m = re.search(rf"CREATE TABLE IF NOT EXISTS {table}\s*\((.*?)\)",  # nosec B608 — motif de CONTRAT (regex), aucun SQL exécuté
                   ptxt, re.S)
     if not m:
         add("G3", CONTRACT["producer"], 0, f"DDL de {table} introuvable")
