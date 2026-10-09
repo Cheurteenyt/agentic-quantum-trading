@@ -720,7 +720,7 @@ def _is_permanent_error(exc: Exception) -> bool:
 def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     from scripts.research_runner import (
         load_spec, run_discovery, write_artifacts, _log_ledger,
-        _passes, _resource_guard)
+        _passes, _resource_guard, bh_min_perms)
 
     db_path = db_path or ROOT / "data" / "warehouse" / "klines.db"
     pid = os.getpid()
@@ -837,6 +837,29 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     items: dict[str, dict] = ck.get("items", {})
     candidates: list[str] = list(ck.get("candidates", []))
 
+    # N1-bis (bug-hunter ronde 4, C1) : le worker mesure un LOT — la même
+    # loi que le grind (PR-198) : n_perm est dimensionné pour que le BH du
+    # `select` soit ATTEIGNABLE. Le défaut (99) plafonne la p à 0,01 : dès
+    # que le lot dépasse 10 specs, AUCUN candidat du worker ne peut
+    # franchir le BH au rang 1 (0,01 > q/m), quel que soit son edge — le
+    # contrôle multiplicatif était un refus automatique déguisé en filtre.
+    # La queue bonsai fait 37 specs : plancher 0,01 vs seuil 0,0027.
+    n_perm = bh_min_perms(len(spec_tuples))
+    ck["n_perm"] = n_perm
+    # provenance : un item DONE mesuré sous un AUTRE plan de permutation
+    # porte une p non comparable au BH du lot actuel — signalé, sans
+    # re-mesure forcée (le skip reste la compétence de l'identité, PR #220)
+    _stale_perm = sorted(
+        sid for sid, it in items.items()
+        if it.get("state") == "DONE"
+        and it.get("n_perm") is not None and it.get("n_perm") != n_perm)
+    if _stale_perm:
+        ck["n_perm_stale"] = _stale_perm
+        print(f"[worker] ATTENTION n_perm : {len(_stale_perm)} item(s) DONE "
+              f"mesurés sous un autre plan de permutation — leurs p ne sont "
+              f"pas comparables au BH du lot actuel (--reset pour re-mesurer)",
+              flush=True)
+
     # le MANIFEST de la campagne est scellé au checkpoint (auditable) —
     # la campagne exécute exactement cette liste matérialisée au démarrage.
     # P0 2026-10-09 : chaque entrée scelle AUSSI l'identité d'exécution
@@ -866,7 +889,8 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         for f, sid, sha in spec_tuples]
 
     print(f"[worker] job {job_id} · {len(spec_tuples)} specs · "
-          f"{len(items)} déjà traitées · moteur {engine}", flush=True)
+          f"{len(items)} déjà traitées · moteur {engine} · "
+          f"n_perm {n_perm}", flush=True)
 
     exit_code = EXIT_OK
     had_errors = False
@@ -984,7 +1008,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                 # item JAMAIS terminal.
                 dws_exec = _dws_now(
                     db_path, int(spec["data"]["validation_end"]))
-                res = run_discovery(spec, db_path=db_path)
+                res = run_discovery(spec, db_path=db_path, n_perm=n_perm)
                 verdict = res.get("verdict", "?")
                 n = res.get("n", 0)
                 mean = res.get("mean", float("nan"))
@@ -1009,7 +1033,8 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                         engine, spec_sha=spec_sha, universe_sha=uni_sha,
                         protocol_sha=proto_sha, deps_sha=deps,
                         git_sha=""),
-                    "dataset_window_sha": dws_exec}
+                    "dataset_window_sha": dws_exec,
+                    "n_perm": n_perm}
                 break
             except Exception as exc:
                 retries = attempt

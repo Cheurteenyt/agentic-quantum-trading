@@ -529,7 +529,7 @@ class TestRunWorker(unittest.TestCase):
             ck_path = tmp / "rt" / "grind_checkpoint.json"
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, n_perm=99):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -573,7 +573,7 @@ class TestRunWorker(unittest.TestCase):
             ck_path = tmp / "rt" / "grind_checkpoint.json"
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -614,7 +614,7 @@ class TestRunWorker(unittest.TestCase):
             tmp = Path(td)
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -644,7 +644,7 @@ class TestRunWorker(unittest.TestCase):
                 "symbols:\n  BTCUSDT:\n    bars: 100\n", encoding="utf-8")
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -675,7 +675,7 @@ class TestRunWorker(unittest.TestCase):
             ck_path = tmp / "rt" / "grind_checkpoint.json"
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -699,7 +699,7 @@ class TestRunWorker(unittest.TestCase):
             ck_path = tmp / "rt" / "grind_checkpoint.json"
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, n_perm=99):
                 calls.append(spec["id"])
                 raise ValueError("spec invalide (test)")
 
@@ -719,7 +719,7 @@ class TestRunWorker(unittest.TestCase):
             tmp = Path(td)
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, n_perm=99):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 1, "mean": 0.0,
                         "snapshot": "s"}

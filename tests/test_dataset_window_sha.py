@@ -273,7 +273,7 @@ class TestDwsSkipCycle(unittest.TestCase):
             db = _db(tmp / "k.db")
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -297,7 +297,7 @@ class TestDwsSkipCycle(unittest.TestCase):
             db = _db(tmp / "k.db")
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -328,7 +328,7 @@ class TestDwsSkipCycle(unittest.TestCase):
             db = _db(tmp / "k.db")
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -350,7 +350,7 @@ class TestDwsSkipCycle(unittest.TestCase):
             db = _db(tmp / "k.db")
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 return {"verdict": "DISCOVERY_FAIL", "n": 5, "mean": 0.1,
                         "snapshot": "s"}
@@ -378,7 +378,7 @@ class TestDwsSkipCycle(unittest.TestCase):
             db = _db(tmp / "k.db")
             calls = []
 
-            def fake(spec, db_path=None):
+            def fake(spec, db_path=None, **_kw):
                 calls.append(spec["id"])
                 raise ValueError("spec invalide (test)")
 
