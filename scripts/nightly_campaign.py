@@ -42,6 +42,7 @@ from backend.services.backtest_v2.candidates import (  # noqa: E402
     Candidate,
     CandidateRegistry,
 )
+from backend.services.backtest_v2.gates import bars_per_year  # noqa: E402
 from backend.services.backtest_v2.multiplicity import audit_campaign  # noqa: E402
 from backend.services.backtest_v2.reporting import (  # noqa: E402
     build_report,
@@ -175,6 +176,47 @@ def check_readiness(klines_db: Path = KLINES_DB) -> dict:
         con.close()
 
 
+def _ppy_for_lanes(survivors: list[dict]) -> tuple[int | None, str]:
+    """La frequence d'annualisation des Sharpe OOS fournis.
+
+    H-28 (audit ronde 4) : le moteur annualise chaque Sharpe a la
+    frequence REELLE de ses barres (1h -> 8760, engine.bars_per_year),
+    mais audit_campaign restait sur son defaut 365 — l'ecart-type du
+    Sharpe annualise etait sqrt(365/n) au lieu de sqrt(8760/n), z trop
+    grand d'un facteur sqrt(24) = 4,899, p-valeurs trop petites, seuil
+    effectif de Bonferroni 3,93 au lieu de 19,2 : des lanes sans edge
+    passaient la correction de multiplicite.
+
+    Les survivors sont annotes avec leur intervalle par run_nightly.
+    Campagne MIXTE : on prend le ppy MAXIMUM (le plus STRICT) et la note
+    le dit — corriger a un ppy unique une campagne d'intervalles divers
+    est une approximation assumee, jamais un silentieux.
+
+    Retourne (ppy, note) ; ppy=None quand aucune lane mesurable ne porte
+    d'intervalle (audit_campaign n'en a alors pas besoin)."""
+    ppys: set[int] = set()
+    for s in survivors:
+        if s.get("sharpe_oos") is None:
+            continue
+        dt = _INTERVAL_MS.get(str(s.get("interval", "")))
+        if dt:
+            ppys.add(bars_per_year(dt))
+    if not ppys:
+        if any(s.get("sharpe_oos") is not None for s in survivors):
+            # fail-closed : sans intervalle, la correction retomberait
+            # SILENCIEUSEMENT sur 365/an — le bug H-28 exactement
+            raise ValueError(
+                "survivor(s) mesuré(s) sans intervalle annoté — "
+                "l'appelant doit annoter s['interval'] (H-28)")
+        return None, ""
+    if len(ppys) == 1:
+        return ppys.pop(), ""
+    ppy = max(ppys)
+    return ppy, (
+        f"campagne mixte ({len(ppys)} frequences) : ppy={ppy} "
+        "(max, le plus strict) applique a toutes les lanes")
+
+
 def audit_from_campaign(campaign: dict, n_obs_per_lane: int) -> dict:
     """Applique la correction de multiplicite au resultat d'une campagne.
 
@@ -182,20 +224,32 @@ def audit_from_campaign(campaign: dict, n_obs_per_lane: int) -> dict:
     combinaisons testees, pas le nombre de survivants : une lane rejetee a
     quand meme consomme un essai. Ne corriger que sur les survivants revient a
     ignorer les tickets perdants.
+
+    H-28 : les Sharpe OOS fournis sont annualises a la frequence REELLE
+    des barres (8760 en 1h) — la correction est calibree sur la MEME
+    frequence (cf. _ppy_for_lanes), sinon le seuil de Bonferroni est
+    faux d'un facteur sqrt(ppy_reel/ppy_corrige).
     """
-    sharpes = [s.get("sharpe_oos") for s in campaign.get("survivors", [])]
+    survivors = campaign.get("survivors", [])
+    sharpes = [s.get("sharpe_oos") for s in survivors]
+    ppy, note = _ppy_for_lanes(survivors)
+    kwargs = {} if ppy is None else {"periods_per_year": ppy}
     a = audit_campaign(
         n_tested=max(1, campaign.get("tested", 0)),
         sharpes_oos=sharpes,
         n_obs_per_lane=n_obs_per_lane,
+        **kwargs,
     )
+    detail = dict(a.detail)
+    if note:
+        detail["ppy"] = note
     return {
         "n_tested": a.n_tested,
         "n_gate_survivors": a.n_gate_survivors,
         "n_after_multiplicity": a.n_after_multiplicity,
         "expected_by_chance": a.expected_by_chance,
         "verdict": a.verdict,
-        "detail": a.detail,
+        "detail": detail,
     }
 
 
@@ -410,6 +464,11 @@ def run_nightly(
                 combined["accepted"] += report.accepted
                 combined["rejected"] += report.rejected
                 combined["errored"] += report.errored
+                # H-28 : chaque survivor porte son intervalle — la
+                # correction de multiplicite doit etre calibree sur la
+                # MEME frequence que l'annualisation du Sharpe OOS.
+                for s in report.survivors:
+                    s["interval"] = itv
                 combined["survivors"].extend(report.survivors)
     finally:
         con_read.close()

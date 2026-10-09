@@ -15,9 +15,13 @@ reopen au meme open) pour continuer a collecter le funding periodiquement.
 
 Le PnL de la strategie = derive du sous-jacent (exposition directionnelle
 volontairement faible, quasi-neutre) MOINS les frais/slippage PLUS le funding
-encaisse. On assume ici une exposition directionnelle faible : la derive est
-minee par construction (position maintenue dans le sens collecteur, pas tradee
-sur le trend).
+encaisse. H-46 (audit ronde 4) : la jambe funding manquait AUX RENDEMENTS
+(trade.net_return et courbe d'equite) — elle n'existait que dans la
+comptabilite des couts (costs.funding_usd), donc le moteur jugeait la
+strategie SANS son bord. Elle est accrue desormais barre par barre, as-of,
+signee par le cote porte. On assume ici une exposition directionnelle
+faible : la derive est minee par construction (position maintenue dans le
+sens collecteur, pas tradee sur le trend).
 
 REGLE ABSOLUE (docs/08-contributing.md, baselines.py) :
     le signal (le sens collecteur) est une info EXOGENE au prix (il vient du
@@ -97,6 +101,10 @@ class Trade:
     exit_price: float
     reason: str  # 'roll' | 'stop' | 'eod'
     worst_adverse_pct: float = 0.0  # FIX audit v3 : le MAE reellement observe
+    # H-46 : le funding ENCAISSE pendant le trade (signe par le cote) —
+    # c'est LE bord du carry : il appartient au rendement, pas seulement
+    # a la comptabilite des couts.
+    funding_return: float = 0.0
 
     @property
     def gross_return(self) -> float:
@@ -104,7 +112,12 @@ class Trade:
 
     @property
     def net_return(self) -> float:
-        return self.gross_return - FEE_FRACTION_ROUND_TRIP
+        # H-46 : le net porte la jambe funding — avant le fix, une strategie
+        # de collecte etait jugee sur prix - frais SANS son bord (barres
+        # plates + funding +10 bps/8h en short : -16 bps mesures au lieu
+        # de +552 bps reels).
+        return (self.gross_return + self.funding_return
+                - FEE_FRACTION_ROUND_TRIP)
 
     @property
     def holding_bars(self) -> int:
@@ -121,7 +134,8 @@ def _side_from_rate(avg_bps_per_8h: float) -> str | None:
 
 
 def simulate(
-    bars: Sequence[Bar], params: dict, side_fn, hold_max_bars: int
+    bars: Sequence[Bar], params: dict, side_fn, hold_max_bars: int,
+    fser=None,
 ) -> tuple[list[Trade], list[float]]:
     """Simule la strategie. Renvoie (trades clotures, rendement par barre).
 
@@ -131,10 +145,17 @@ def simulate(
     full-sample (le futur ne choisit plus le cote du passe) ; il est
     re-evalue a chaque open, avec renversement si le cote collecteur change.
     La position est roulee tous les hold_max_bars et coupee par un stop.
+
+    H-46 : `fser` (FundingSeries ou duck-type rate_asof) alimente la jambe
+    funding — accrue dans le trade ET l'equite a chaque barre portee,
+    pro-rata de la frequence des barres, as-of strict (le taux connu a
+    l'ouverture de la barre, jamais du futur). fser=None : aucune jambe
+    (0.0 explicite, le comportement "funding indisponible").
     """
     n = len(bars)
     bar_ret: list[float] = [0.0] * n
     stop_frac = float(params["stop_bps"]) / 10_000.0
+    hours_per_bar = _bar_hours(bars)
 
     trades: list[Trade] = []
     pos_open = False
@@ -144,6 +165,23 @@ def simulate(
     held = 0
     last_mark = 0.0  # dernier prix de valorisation de la position ouverte
     worst = 0.0      # FIX audit v3 : le MAE reellement observe
+    acc_funding = 0.0  # H-46 : le funding accrue du trade en cours
+
+    def accrue_funding(i: int) -> None:
+        """H-46 : le funding ENCAISSE par le cote porte, accrue dans le
+        trade ET l'equite sur la barre i. funding > 0 : un short encaisse
+        (-pos_sd rend la jambe positive). Pro-rata de la frequence des
+        barres (hours_per_bar / 8h), taux as-of — le taux connu a
+        l'ouverture de la barre, jamais un print futur."""
+        nonlocal acc_funding
+        if fser is None:
+            return
+        rate = fser.rate_asof(bars[i].ts)
+        if rate is None:
+            return
+        fund_leg = -pos_sd * (rate / 10_000.0) * (hours_per_bar / 8.0)
+        acc_funding += fund_leg
+        bar_ret[i] += fund_leg
 
     def open_at(i: int, price: float, sd: int) -> None:
         nonlocal pos_sd, entry_price, entry_index, held, pos_open, last_mark, worst
@@ -159,7 +197,7 @@ def simulate(
         bar_ret[i] += -FEE_FRACTION_PER_FILL
 
     def close_trade(idx: int, price: float, reason: str) -> None:
-        nonlocal pos_open, entry_price, entry_index, held, last_mark, worst
+        nonlocal pos_open, entry_price, entry_index, held, last_mark, worst, acc_funding
         if not pos_open:
             return
         # Jambe de sortie : du dernier mark au prix de sortie REEL (stop, open
@@ -175,10 +213,12 @@ def simulate(
                 exit_price=price,
                 reason=reason,
                 worst_adverse_pct=worst,
+                funding_return=acc_funding,
             )
         )
         pos_open = False
         held = 0
+        acc_funding = 0.0
 
     for i in range(1, n):
         bar = bars[i]
@@ -202,12 +242,16 @@ def simulate(
             if pos_sd == 1:
                 stop_price = entry_price * (1.0 - stop_frac)
                 if bar.low <= stop_price:
+                    # H-46 : la barre de stop est PORTEE — son funding est
+                    # accrue avant la cloture (le fix lot2 F6 de funding_fade)
+                    accrue_funding(i)
                     close_trade(i, stop_price, "stop")
                 else:
                     worst = max(worst, (entry_price - bar.low) / entry_price)
             else:
                 stop_price = entry_price * (1.0 + stop_frac)
                 if bar.high >= stop_price:
+                    accrue_funding(i)
                     close_trade(i, stop_price, "stop")
                 else:
                     worst = max(worst, (bar.high - entry_price) / entry_price)
@@ -225,7 +269,15 @@ def simulate(
         #    Pour une barre portee sans evenement, c'est le close-to-close
         #    d'avant ; la difference porte sur l'entree (base = open reel) et
         #    la barre de sortie (bookee au prix de sortie, pas 0).
+        #    H-46 : le funding de la barre portee est accrue sur la MEME
+        #    barre (trade + equite) — avant le fix, l'integralite du bord du
+        #    carry vivait dans costs.funding_usd (comptabilite) et n'entrait
+        #    JAMAIS dans les rendements juges par le moteur. Le roulement de
+        #    duree (C) ne pre-accrue PAS : la position rouverte au meme open
+        #    est accrue ici, une seule fois ; la barre de stop (B) est
+        #    pre-accruee car elle ne passe pas par D (position fermee).
         if pos_open:
+            accrue_funding(i)
             bar_ret[i] += pos_sd * (bar.close / last_mark - 1.0)
             last_mark = bar.close
 
@@ -369,7 +421,8 @@ def evaluate(params: dict, bars: Sequence[Bar]) -> StrategyEval:
             return None
         return s
 
-    trades, bar_ret = simulate(bars, params, side_fn, hold_max_bars)
+    trades, bar_ret = simulate(bars, params, side_fn, hold_max_bars,
+                               fser=fser)
 
     trade_returns = [t.net_return for t in trades]
     if trades:
