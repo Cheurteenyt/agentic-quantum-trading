@@ -1221,6 +1221,22 @@ def _assert_safe_bind(host: str, reload: bool) -> None:
         f"dans backend/.env")
 
 
+# ── R9 : l'aggregator Intel n'était JAMAIS démarré ──────────────────────────
+# start_aggregator() n'avait AUCUN appelant : _batch_loop ne tournait pas,
+# pending_signals n'était ni drainé ni nettoyé (croissance infinie), le
+# cooldown restait inopérant (il n'est mis à jour que dans _batch_loop) et
+# _broadcast_callback restait None — les signaux intel n'atteignaient jamais
+# le WS frontend pendant que /api/intel/* répondait success: true.
+# Handler startup DISTINCT de startup_event : la zone de startup_event est
+# déjà modifiée par une PR ouverte ; un handler séparé en fin de fichier
+# fusionne sans conflit.
+@app.on_event("startup")
+async def _start_intel_aggregator() -> None:
+    from services.intel_aggregator import start_aggregator
+
+    await start_aggregator()
+
+
 if __name__ == "__main__":
     import uvicorn
     # S2 : la boucle locale par défaut. Auparavant c'était 0.0.0.0, ce
