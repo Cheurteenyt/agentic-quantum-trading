@@ -28,10 +28,13 @@ id: EXP-T1
 hypothesis: test de collision/migration
 data:
   symbols: [BTCUSDT]
-  train_start: "2025-01-01"
-  train_end: "2025-02-01"
-  validation_start: "2025-02-01"
-  validation_end: "2025-03-01"
+  # P0-③ : les fenêtres sont des int ms epoch (format réel des specs de
+  # prod — l'ancienne fixture en dates ISO ne survivait qu'au mock de
+  # run_discovery : int("2025-01-01") est un FAILED_PERMANENT en vrai run)
+  train_start: 1735689600000
+  train_end: 1738368000000
+  validation_start: 1738368000000
+  validation_end: 1740787200000
 signal:
   feature: funding_rate
   op: ">="
@@ -66,24 +69,26 @@ class TestQueueSha(unittest.TestCase):
 
 
 class TestTerminal(unittest.TestCase):
-    """P0 2026-10-09 : la terminalité exige l'identité d'exécution —
-    le spec_sha seul laissait passer un changement de protocole,
-    d'univers ou de deps (la mesure change, le skip non)."""
+    """P0 2026-10-09 + P0-③ : la terminalité exige l'identité d'exécution
+    ET l'état des données sous la fenêtre scientifique — le spec_sha seul
+    laissait passer un changement de protocole, d'univers, de deps ou une
+    correction historique de données (la mesure change, le skip non)."""
 
     ID = "a1b2c3d4e5f60718"
 
-    def _ok(self, prev, sha="abc", ident=None):
-        return rw._is_terminal(prev, sha, self.ID if ident is None else ident)
+    def _ok(self, prev, sha="abc", ident=None, dws="d1"):
+        return rw._is_terminal(prev, sha,
+                               self.ID if ident is None else ident, dws)
 
     def test_done_terminal(self):
         self.assertTrue(self._ok(
             {"state": "DONE", "spec_sha": "abc",
-             "execution_identity": self.ID}))
+             "execution_identity": self.ID, "dataset_window_sha": "d1"}))
 
     def test_permanent_terminal(self):
         self.assertTrue(self._ok(
             {"state": "FAILED_PERMANENT", "spec_sha": "abc",
-             "execution_identity": self.ID}))
+             "execution_identity": self.ID, "dataset_window_sha": "d1"}))
 
     def test_permanent_sans_sha_rejoue(self):
         # l'item PR-160 (sans spec_sha) n'était PAS terminal — le bug audit
@@ -93,20 +98,45 @@ class TestTerminal(unittest.TestCase):
     def test_spec_modifie_remesure(self):
         self.assertFalse(self._ok(
             {"state": "DONE", "spec_sha": "abc",
-             "execution_identity": self.ID}, "zzz"))
+             "execution_identity": self.ID, "dataset_window_sha": "d1"},
+            "zzz"))
 
     def test_sans_identite_rejoue(self):
         # l'item ère PR-161 (avant le scellement) : protocole/deps
         # d'origine invérifiables → re-mesure (fail-closed)
         self.assertFalse(
-            self._ok({"state": "DONE", "spec_sha": "abc"}))
+            self._ok({"state": "DONE", "spec_sha": "abc",
+                      "dataset_window_sha": "d1"}))
 
     def test_identite_differente_remesure(self):
         # LE BUG P0 : protocole/univers/deps changés → la mesure a changé
         # même si spec_sha ET engine_sha sont identiques
         self.assertFalse(self._ok(
             {"state": "DONE", "spec_sha": "abc",
-             "execution_identity": "ANCIENNE-IDENTITE"}))
+             "execution_identity": "ANCIENNE-IDENTITE",
+             "dataset_window_sha": "d1"}))
+
+    def test_sans_dws_rejoue(self):
+        # l'item ère pré-P0-③ : les données d'origine sont invérifiables →
+        # re-mesure une fois puis scellé (fail-closed)
+        self.assertFalse(
+            self._ok({"state": "DONE", "spec_sha": "abc",
+                      "execution_identity": self.ID}))
+
+    def test_dws_different_remesure(self):
+        # LE BUG P0-③ : une correction historique DANS la fenêtre change la
+        # mesure même si spec_sha et identité d'exécution sont identiques
+        self.assertFalse(self._ok(
+            {"state": "DONE", "spec_sha": "abc",
+             "execution_identity": self.ID, "dataset_window_sha": "d2"}))
+
+    def test_dws_incalculable_jamais_terminal(self):
+        # dws incalculable (None) : impossible de prouver que la mesure
+        # DONE décrit les données d'aujourd'hui → jamais de skip
+        self.assertFalse(
+            self._ok({"state": "DONE", "spec_sha": "abc",
+                      "execution_identity": self.ID,
+                      "dataset_window_sha": "d1"}, dws=None))
 
     def test_identite_attendue_jamais_vide(self):
         # execution_identity() hache le canonique : le sha ATTENDU n'est
@@ -511,17 +541,24 @@ class TestRunWorker(unittest.TestCase):
             self.assertEqual(ck["schema_version"], rw.SCHEMA_VERSION)
             self.assertEqual(ck["items"]["EXP-T1"]["state"], "DONE")
             self.assertEqual(len(ck["items"]["EXP-T1"]["spec_sha"]), 16)
+            # P0-③ : l'item DONE porte le dws d'exécution, le manifeste
+            # scelle le dws attendu — les deux coïncident sur db absente
+            dws_it = ck["items"]["EXP-T1"]["dataset_window_sha"]
+            self.assertTrue(dws_it.startswith("dws-"))
+            self.assertEqual(len(dws_it), 20)
             self.assertEqual(
                 ck["manifest"],
                 [{"id": "EXP-T1",
                   "sha": ck["items"]["EXP-T1"]["spec_sha"],
                   "identity":
-                  ck["items"]["EXP-T1"]["execution_identity"]}])
+                  ck["items"]["EXP-T1"]["execution_identity"],
+                  "dws": dws_it}])
             # P0 : l'item scelle son identité d'exécution (16 hex)
             self.assertEqual(
                 len(ck["items"]["EXP-T1"]["execution_identity"]), 16)
             # 2e lancement : la spec est SKIPPÉE (pas de re-mesure) —
-            # l'identité recalculée est identique (même proto/deps/engine)
+            # l'identité et la fenêtre recalculées sont identiques
+            # (même proto/deps/engine, db absente constante)
             self.assertEqual(self._run(tmp, fake), rw.EXIT_OK)
             self.assertEqual(calls, ["EXP-T1"])
 

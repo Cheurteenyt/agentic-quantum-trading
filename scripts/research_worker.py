@@ -46,6 +46,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import yaml
+
+from scripts.label_matrix import dataset_window_sha  # noqa: E402 (P0-③)
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -479,23 +483,62 @@ def _git_engine_dirty() -> bool:
     return any(not l.startswith("??") for l in proc.stdout.splitlines())
 
 
-def _is_terminal(prev: dict, spec_sha: str, execution_identity: str) -> bool:
-    """LA définition unique de « terminal » (PR-161, étendue P0 2026-10-09) :
-    l'item porte le même spec_sha, la MÊME identité d'exécution, et est
-    DONE ou FAILED_PERMANENT.
+def _is_terminal(prev: dict, spec_sha: str, execution_identity: str,
+                 dws: str | None) -> bool:
+    """LA définition unique de « terminal » (PR-161, étendue P0 2026-10-09,
+    COMBINÉE avec le P0-③ audit 2026-10-08) : l'item porte le même
+    spec_sha, la MÊME identité d'exécution, le MÊME état des données sous
+    sa fenêtre scientifique (dataset_window_sha), et est DONE ou
+    FAILED_PERMANENT.
 
-    L'identité est l'AUTORITÉ du skip (audit 2026-10-08, action 5) : le
-    spec_sha seul ne prouvait pas « même mesure » — un seuil de protocole
-    (active.yaml sous le même protocol_id), un manifest d'univers (même
-    nom de fichier) ou un patch numpy changeaient la MESURE sans toucher
-    ni le spec_sha ni engine_sha, et le résultat DONE était skippé alors
-    qu'il décrivait une autre exécution. Un item SANS identité (ère
-    PR-161, produit avant le scellement) n'est PAS terminal : son
-    protocole/deps d'origine sont invérifiables — il est re-mesuré
-    (fail-closed, même doctrine que les items legacy sans spec_sha)."""
+    Deux AUTORITÉS du skip, chacune fail-closed :
+    - l'identité d'exécution (audit 2026-10-08, action 5) : le spec_sha
+      seul ne prouvait pas « même mesure » — un seuil de protocole
+      (active.yaml sous le même protocol_id), un manifest d'univers (même
+      nom de fichier) ou un patch numpy changeaient la MESURE sans toucher
+      ni le spec_sha ni engine_sha, et le résultat DONE était skippé alors
+      qu'il décrivait une autre exécution. Un item SANS identité (ère
+      PR-161, produit avant le scellement) n'est PAS terminal : son
+      protocole/deps d'origine sont invérifiables — il est re-mesuré.
+    - le dataset_window_sha (P0-③, §8 de l'audit) : le spec_sha ne voit
+      pas les DONNÉES — une correction historique DANS la fenêtre
+      scientifique d'une spec DONE exige une re-mesure, tandis qu'un
+      append AU-DELÀ de validation_end (l'actif continue d'exister) ne
+      doit pas invalider. Un item SANS dws (ère pré-P0-③) ou un dws
+      incalculable (None) n'est PAS terminal : on ne peut pas prouver que
+      la mesure DONE décrit les données d'aujourd'hui.
+    (Fail-closed, même doctrine que les items legacy sans spec_sha.)"""
     return (prev.get("spec_sha") == spec_sha
             and prev.get("execution_identity") == execution_identity
+            and dws is not None
+            and prev.get("dataset_window_sha") == dws
             and prev.get("state") in ("DONE", "FAILED_PERMANENT"))
+
+
+def _spec_validation_end(path: Path) -> int | None:
+    """P0-③ : validation_end de la spec (int ms epoch) — parse TOLÉRANT.
+    Au SKIP la spec n'est pas encore passée par load_spec (elle n'est lue
+    qu'après le garde ressource) et un fichier illisible ne doit pas
+    casser la boucle : None = dws incalculable = pas de skip (fail-closed,
+    le run normal classera la spec)."""
+    try:
+        spec = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+        v = (spec.get("data") or {}).get("validation_end")
+        return int(v) if v is not None else None
+    except Exception:
+        return None
+
+
+def _dws_now(db_path: Path, v_end: int | None) -> str | None:
+    """Le dataset_window_sha COURANT pour une fenêtre — None (non
+    terminal, pas de skip) si la fenêtre est inconnue ou si la db est
+    présente mais illisible (fail-closed)."""
+    if v_end is None:
+        return None
+    try:
+        return dataset_window_sha(db_path, v_end)
+    except sqlite3.Error:
+        return None
 
 
 def _migrate_checkpoint(ck: dict, db_snap: str, engine_sha: str,
@@ -642,6 +685,12 @@ def _status_counts(items: dict, manifest: list | None = None,
             # garde l'ancienne sémantique.
             if ("identity" in m
                     and it.get("execution_identity") != m["identity"]):
+                return False
+            # P0-③ : le dws attendu par le manifeste — un item DONE dont la
+            # fenêtre de données a changé depuis sa mesure n'est plus done
+            # (dws=None au manifeste = incalculable, aucune exigence ajoutée)
+            if (m.get("dws") is not None
+                    and it.get("dataset_window_sha") != m.get("dws")):
                 return False
             return True
 
@@ -793,11 +842,27 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
     # P0 2026-10-09 : chaque entrée scelle AUSSI l'identité d'exécution
     # attendue — les counts du status restent ainsi alignés sur ce que la
     # boucle fera (un item dont l'identité stockée diffère est « remaining »).
+    # P0-③ : le manifeste scelle AUSSI l'état des données sous la fenêtre
+    # scientifique de chaque spec (dws), FIGÉ AU DÉMARRAGE — sémantique
+    # « la campagne exécute exactement ce manifest ». Les specs qui
+    # partagent la même validation_end partagent UN SEUL calcul (le hash
+    # complet d'une fenêtre est coûteux : déduplication côté appelant,
+    # dataset_window_sha est volontairement pure et sans cache). Une
+    # correction qui arrive PENDANT la campagne sera détectée au prochain
+    # démarrage (le manifeste est alors recalculé sur le nouvel état).
+    dws_by_spec: dict[str, str | None] = {}
+    dws_by_end: dict[int | None, str | None] = {}
+    for mf, msid, msha in spec_tuples:
+        v_end = _spec_validation_end(mf)
+        if v_end not in dws_by_end:
+            dws_by_end[v_end] = _dws_now(db_path, v_end)
+        dws_by_spec[msid] = dws_by_end[v_end]
     ck["queue_total"] = len(spec_tuples)
     ck["manifest"] = [
         {"id": sid, "sha": sha,
          "identity": _spec_execution_identity(
-             f, sha, engine, protocol_sha=proto_sha, deps_sha=deps)}
+             f, sha, engine, protocol_sha=proto_sha, deps_sha=deps),
+         "dws": dws_by_spec[sid]}
         for f, sid, sha in spec_tuples]
 
     print(f"[worker] job {job_id} · {len(spec_tuples)} specs · "
@@ -842,16 +907,24 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         # — un seuil de protocole, un manifest d'univers ou un patch numpy
         # changent la MESURE sans toucher le spec_sha ni engine_sha ; le
         # résultat DONE d'une autre exécution ne doit pas être skippé.
+        # P0-③ (audit 2026-10-08) : le spec_sha ne voit pas les DONNÉES —
+        # une correction historique DANS la fenêtre scientifique d'une
+        # spec DONE exige une re-mesure ; un append AU-DELÀ de
+        # validation_end (l'actif continue d'exister) ne doit pas la
+        # provoquer. Le dws est celui du manifeste (figé au démarrage de
+        # campagne) ; None = incalculable = pas de skip (fail-closed).
+        dws_now = dws_by_spec.get(spec_id)
         if _is_terminal(prev, start_sha, _spec_execution_identity(
                 f, start_sha, engine,
-                protocol_sha=proto_sha, deps_sha=deps)):
+                protocol_sha=proto_sha, deps_sha=deps), dws_now):
             continue
         # l'item AURAIT été terminal sous l'ancienne règle (spec_sha+état) :
-        # la seule raison de la re-mesure est l'identité — visible.
+        # la seule raison de la re-mesure est l'identité ou la fenêtre —
+        # visible.
         if (prev.get("spec_sha") == start_sha
                 and prev.get("state") in ("DONE", "FAILED_PERMANENT")):
-            print(f"[worker] {spec_id} : identité d'exécution absente ou "
-                  "différente — RE-MESURE (protocole/univers/deps)",
+            print(f"[worker] {spec_id} : identité/fenêtre absentes ou "
+                  "différentes — RE-MESURE (protocole/univers/deps/données)",
                   flush=True)
 
         # №P1-1 : le garde-fou ressource RETENTE LA MÊME SPEC et le
@@ -880,6 +953,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
         retries = 0
         spec_sha = start_sha  # par défaut ; l'essai qui réussit le rescelle
         uni_sha = ""  # le sha d'univers de la spec réellement chargée
+        dws_exec = None  # P0-③ : le dws d'EXÉCUTION (scellé sur la spec exécutée)
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 # PR-162 : le sha EXÉCUTÉ fait foi — lecture, parse, puis
@@ -902,6 +976,14 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     raise ValueError(
                         f"spec.id {spec.get('id')!r} ≠ nom de fichier "
                         f"{spec_id!r} — renommage ou collision")
+                # P0-③ : le dws d'EXÉCUTION — scellé sur la spec exécutée
+                # (miroir du « sha EXÉCUTÉ fait foi »), calculé PRÉ-mesure :
+                # si une correction historique arrive PENDANT la mesure, le
+                # dws scellé (pré) ≠ dws courant (post) → re-mesure
+                # (fail-closed). None (spec mal typée / db illisible) =
+                # item JAMAIS terminal.
+                dws_exec = _dws_now(
+                    db_path, int(spec["data"]["validation_end"]))
                 res = run_discovery(spec, db_path=db_path)
                 verdict = res.get("verdict", "?")
                 n = res.get("n", 0)
@@ -926,7 +1008,8 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     "execution_identity": execution_identity(
                         engine, spec_sha=spec_sha, universe_sha=uni_sha,
                         protocol_sha=proto_sha, deps_sha=deps,
-                        git_sha="")}
+                        git_sha=""),
+                    "dataset_window_sha": dws_exec}
                 break
             except Exception as exc:
                 retries = attempt
@@ -937,7 +1020,8 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     time.sleep(10 * attempt)
                 elif _is_permanent_error(exc):
                     # №P1-8 : les erreurs PERMANENTES sont FAILED_PERMANENT —
-                    # le spec_sha+git_sha rendent la terminalité RÉELLE
+                    # le spec_sha+git_sha+dataset_window_sha rendent la
+                    # terminalité RÉELLE
                     items[spec_id] = {
                         "state": "FAILED_PERMANENT", "spec_sha": spec_sha,
                         "git_sha": git_sha,
@@ -945,6 +1029,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                             engine, spec_sha=spec_sha, universe_sha=uni_sha,
                             protocol_sha=proto_sha, deps_sha=deps,
                             git_sha=""),
+                        "dataset_window_sha": dws_exec,
                         "error": f"{err_type}: {exc}", "attempt": attempt,
                         "timestamp": _now_iso()}
                     had_errors = True
@@ -954,7 +1039,7 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     # retraitées au prochain lancement
                     items[spec_id] = {
                         "state": "FAILED_RETRYABLE", "spec_sha": spec_sha,
-                        "git_sha": git_sha,
+                        "git_sha": git_sha, "dataset_window_sha": dws_exec,
                         "error": f"{err_type}: {exc}", "attempt": attempt,
                         "timestamp": _now_iso()}
                     had_errors = True
