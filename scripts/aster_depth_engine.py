@@ -284,11 +284,23 @@ def _watchdog() -> None:
             os._exit(1)
 
 
-def prune_old(con: sqlite3.Connection) -> int:
-    """Prune 30 j des tables OMBRE (les tables de prod restent à depth_collector)."""
+def prune_old(db_path: "Path | str") -> int:
+    """Prune 30 j des tables OMBRE (les tables de prod restent à depth_collector).
+
+    D-01 (ronde 5, prouvé par exécution) : l'ancien code recevait la
+    connexion de la boucle asyncio et l'utilisait DANS un thread worker
+    via asyncio.to_thread → sqlite3.ProgrammingError (« SQLite objects
+    created in a thread can only be used in that same thread ») au PREMIER
+    changement de jour — le pruner mourait silencieusement ~5 min après
+    chaque démarrage et la rétention 30 j ne s'exécutait jamais
+    (croissance disque non bornée sur l'hôte de tous les services).
+    La connexion est désormais jetable et OUVERTE DANS le thread : aucun
+    partage inter-threads, timeout=30 pour attendre les verrous du
+    sampler (INSERT OR REPLACE toutes les SAMPLE_SEC)."""
     global _in_prune, _last_progress
     _in_prune = True
     cur = None
+    con = sqlite3.connect(str(db_path), timeout=30)
     try:
         con.execute("CREATE INDEX IF NOT EXISTS idx_depth_bins_ts ON depth_bins(ts)")
         con.execute("CREATE INDEX IF NOT EXISTS idx_depth_meta_ts ON depth_meta(ts)")
@@ -297,6 +309,7 @@ def prune_old(con: sqlite3.Connection) -> int:
         con.execute("DELETE FROM depth_meta WHERE ts < ?", (cutoff,))
         con.commit()
     finally:
+        con.close()
         _in_prune = False
         _last_progress = time.time()
     return cur.rowcount if cur is not None else 0
@@ -507,10 +520,17 @@ class Engine:
             await asyncio.sleep(300)
             day = int(time.time() // 86400)
             if day != last_day:
-                removed = await asyncio.to_thread(prune_old, self.con)
-                last_day = day
-                if removed:
-                    print(f"[prune] {removed} lignes ombre > {RETENTION_DAYS}j", flush=True)
+                try:
+                    removed = await asyncio.to_thread(prune_old, DB_PATH)
+                    last_day = day
+                    if removed:
+                        print(f"[prune] {removed} lignes ombre > {RETENTION_DAYS}j", flush=True)
+                except Exception as exc:
+                    # D-01 : un échec de prune ne doit plus tuer la tâche en
+                    # silence — trace + re-tentative au prochain cycle (300 s)
+                    print(f"[prune] échec ({type(exc).__name__}: {exc}) — "
+                          "re-tentative au prochain cycle", file=sys.stderr,
+                          flush=True)
 
 
 async def main_async(accept_offsets: tuple[int, ...]) -> int:
