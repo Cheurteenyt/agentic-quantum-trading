@@ -24,10 +24,6 @@ SLOW_FILES: dict[str, str] = {
     # (cout de derivation repetee). Hors-ligne mais trop lent pour le gate.
     # Chemin de reintegradation : profiler/cacher les derivations, issue #235.
     "test_onchain_admin_auth": "lent (>420 s, 684 fns) — cf. issue #235",
-    # 414 fns en 64 s + 3 echecs ACTUELS documentes dans l'issue #235
-    # (divergence code/tests jamais visible car exclu par substring).
-    # A reparer avant reintegration.
-    "test_onchain_entity_chain_gaps": "3 echecs actuels — cf. issue #235",
 }
 """Fichiers de tests exclus du mode --fast, un nom exact + la raison.
 
@@ -36,6 +32,13 @@ Historique (H-58) : l'ancien filtre excluait par SUBSTRING
 tournaient JAMAIS en CI, dont 7 fichiers verts et rapides (mesure ronde 8 :
 <= 0,4 s chacun). Le defaut est desormais « executer » : seul un fichier
 explicitement listé ici, avec sa raison, est saute.
+
+Issue #235 (ronde 11) : test_onchain_entity_chain_gaps (414 fns) est
+REINTEGRE — ses 3 echecs etaient des defauts du TEST, pas du code
+(2 tests non-hermetiques qui ne contrôlaient pas runtime_preflight ;
+1 test à timestamps fossiles mai 2026 vs fenetre glissante 30 j), fixes
+dans la PR. Cout : ~74 s local (le plus lent du gate, raison suffisant
+pour rester hors nightly-only).
 """
 
 BASELINE = ROOT / ".github" / "test-count-baseline.txt"

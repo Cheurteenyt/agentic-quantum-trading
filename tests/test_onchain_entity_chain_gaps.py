@@ -27070,8 +27070,36 @@ class OnchainEntityChainGapTests(unittest.TestCase):
             "blockers": ["queue_view_read_only"],
         }
 
+        # Issue #235 : le 3e producteur d'état (runtime_preflight) doit être
+        # contrôlé par le test — sans ce mock, le verdict dépend d'un fichier
+        # de truth source présent uniquement sur la machine de dev
+        # (source_truth_file_missing → blocked_actionable → 'blocked').
+        fake_preflight = {
+            "ok": True,
+            "dry_run": True,
+            "preflight_status": "ready",
+            "mode": "core_equity_agent_os_lite_runtime_preflight",
+            "runtime_policy": {
+                "wsl_failure_alone_is_fatal": False,
+                "windows_workspace_is_valid_fallback": True,
+                "legacy_memory_md_is_source_of_truth": False,
+                "must_select_one_task_only": True,
+                "no_op_audit_receipts_allowed": False,
+            },
+            "selected_runtime": {"runtime_id": "current_python_process"},
+            "runtime_candidates": [],
+            "source_of_truth_files": [],
+            "missing_source_truth_files": [],
+            "qdrant_status": "not_required",
+            "run_lane_status": {"ready_for_execution_contract": False},
+            "degraded_conditions": [],
+            "blockers": [],
+        }
+
         with patch("services.onchain_engine.get_core_equity_agent_os_lite_state_snapshot", return_value=fake_snapshot), patch(
             "services.onchain_engine.get_core_equity_agent_os_lite_task_queue_view", return_value=fake_queue
+        ), patch(
+            "services.onchain_engine.get_core_equity_agent_os_lite_runtime_preflight", return_value=fake_preflight
         ):
             report = onchain_engine.get_core_equity_agent_os_lite_schedule_activation_checklist(
                 dry_run=True,
@@ -27238,8 +27266,34 @@ class OnchainEntityChainGapTests(unittest.TestCase):
             "blockers": [],
         }
 
+        # Même herméticité que test_..._is_read_only : le runtime_preflight
+        # est le 3e producteur d'état et doit être mocké (issue #235).
+        fake_preflight = {
+            "ok": True,
+            "dry_run": True,
+            "preflight_status": "ready",
+            "mode": "core_equity_agent_os_lite_runtime_preflight",
+            "runtime_policy": {
+                "wsl_failure_alone_is_fatal": False,
+                "windows_workspace_is_valid_fallback": True,
+                "legacy_memory_md_is_source_of_truth": False,
+                "must_select_one_task_only": True,
+                "no_op_audit_receipts_allowed": False,
+            },
+            "selected_runtime": {"runtime_id": "current_python_process"},
+            "runtime_candidates": [],
+            "source_of_truth_files": [],
+            "missing_source_truth_files": [],
+            "qdrant_status": "not_required",
+            "run_lane_status": {"ready_for_execution_contract": False},
+            "degraded_conditions": [],
+            "blockers": [],
+        }
+
         with patch("services.onchain_engine.get_core_equity_agent_os_lite_state_snapshot", return_value=fake_snapshot), patch(
             "services.onchain_engine.get_core_equity_agent_os_lite_task_queue_view", return_value=fake_queue
+        ), patch(
+            "services.onchain_engine.get_core_equity_agent_os_lite_runtime_preflight", return_value=fake_preflight
         ):
             report = onchain_engine.get_core_equity_agent_os_lite_schedule_activation_checklist(
                 dry_run=True,
@@ -37980,6 +38034,11 @@ class OnchainEntityChainGapTests(unittest.TestCase):
         self.assertEqual(job, ("ok",))
 
     def test_amount_usd_quarantine_gate_excludes_poisoned_rows_read_only(self) -> None:
+        # Issue #235 : timestamps FRAIS obligatoires — le scan filtre
+        # timestamp >= now - 30 jours ; des timestamps fixes (mai 2026)
+        # deviennent fossiles avec le passage du temps et le scan exclut
+        # silencieusement toutes les rows (échec fossile jamais vu en CI).
+        fresh_ts = int(time.time()) - 300
         conn = sqlite3.connect(str(self.onchain_db))
         bad_token = "0x" + "8" * 40
         good_token = "0x" + "7" * 40
@@ -38005,7 +38064,7 @@ class OnchainEntityChainGapTests(unittest.TestCase):
                         tx_hash,
                         "bsc",
                         block_number,
-                        1_778_200_000 + block_number,
+                        fresh_ts + block_number,
                         "0x" + "2" * 40,
                         "Unknown DEX",
                         token_in,
