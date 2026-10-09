@@ -16,10 +16,12 @@ Ces tests verrouillent :
 """
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -94,13 +96,34 @@ class TestRatchetCompte(unittest.TestCase):
         self.assertEqual(ratchet_verdict(1427, self._baseline("1300\n")), 0)
 
     def test_baseline_absente_fail_open_documente(self):
-        # doctrine ratchet ronde 7 : un dépôt sans baseline ne casse pas
-        self.assertEqual(
-            ratchet_verdict(10, Path("/nonexistent/test-count-baseline.txt")), 0
-        )
+        # doctrine ratchet ronde 7 : un dépôt sans baseline ne casse pas LE DEV
+        # (env nettoyé : en CI, GITHUB_ACTIONS=true → fail-closed, voir R5)
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(
+                ratchet_verdict(10, Path("/nonexistent/test-count-baseline.txt")), 0
+            )
 
     def test_baseline_illisible_fail_open(self):
-        self.assertEqual(ratchet_verdict(10, self._baseline("pas-un-nombre\n")), 0)
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(ratchet_verdict(10, self._baseline("pas-un-nombre\n")), 0)
+
+    # R5 (audit Sonnet 5.5) : sur le runner, supprimer (ou corrompre) la
+    # baseline ne doit PAS désactiver le garde en silence — rouge.
+
+    def test_baseline_absente_fail_closed_en_ci(self):
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+            self.assertEqual(
+                ratchet_verdict(10, Path("/nonexistent/test-count-baseline.txt")), 1
+            )
+
+    def test_baseline_illisible_fail_closed_en_ci(self):
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+            self.assertEqual(ratchet_verdict(10, self._baseline("pas-un-nombre\n")), 1)
+
+    def test_baisse_refusee_meme_en_ci(self):
+        # le gate de baisse ne change pas selon l'environnement
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+            self.assertEqual(ratchet_verdict(1299, self._baseline("1300\n")), 1)
 
 
 class TestAntiRegressionSource(unittest.TestCase):
