@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -58,6 +59,11 @@ VERDICTS = CONSUMING | {"PREREG", "DISCOVERY_PASS", "DISCOVERY_FAIL"}
 # v3 : les verdicts DISCOVERY_* sont loggés en mode discovery (hors budget
 # scientifique, jamais promote) — ils TRACENT la pression de sélection
 # (N_discovery, brief V3 §75) sans toucher le budget de confirmation.
+# N5 (audit Sonnet 5.5) : une entrée `superseded: <ref>` (p. ex. PR-143,
+# correction de causalité) ne compte PLUS comme preuve : hors statut,
+# hors multiplicité, hors budget, hors DUPLICATE (une re-mesure post
+# correctif doit être possible). L'entrée reste au fichier : l'historique
+# n'est jamais supprimé, seulement invalidé.
 DEFAULT_BUDGET = {"total_experiments": 20, "per_family": 5, "per_strategy": 3, "max_parameter_variants": 12,
                   "prior_trials": 0}   # PR-175 (B3) : les essais ANTÉRIEURS au ledger (policy.yaml)
 EXIT_OK, EXIT_ERR, EXIT_DUP, EXIT_STOP = 0, 2, 3, 4
@@ -146,8 +152,10 @@ def load(ledger: Path, effective: datetime | None) -> list[dict]:
             "_mode": e.get("mode", "confirmation"),       # v3 : les essais legacy = confirmations
             "_snapshot": e.get("snapshot", "default"),
             # FIX v3 : une discovery ne consomme JAMAIS le budget scientifique
+            # N5 : une entrée superseded ne consomme rien non plus
             "_consumes": (e.get("verdict") not in ("PREREG",)) and not bf
-                         and e.get("mode", "confirmation") != "discovery",
+                         and e.get("mode", "confirmation") != "discovery"
+                         and not e.get("superseded"),
             "family": slug(e.get("family", "")), "strategy": slug(e.get("strategy", "")),
         })
         out.append(e)
@@ -177,8 +185,11 @@ def confirmation_multiplicity(entries) -> int:
     """Le N de multiplicité = les CONFIRMATIONS cumulées (jamais remis à
     zéro par la semaine) — UNE seule définition, utilisée par assess()
     ET par le bloc STATE (fix v15 №6 : le STATE gonflait le N avec les
-    discoveries et affichait un seuil plus sévère que le checker)."""
+    discoveries et affichait un seuil plus sévère que le checker).
+    N5 : les entrées superseded (p. ex. pré-PR-143, look-ahead) ne comptent
+    plus comme preuve — le N repart des mesures post-correctif."""
     return sum(1 for e in entries if e.get("verdict") != "PREREG"
+               and not e.get("superseded")
                and e.get("_mode", "confirmation") == "confirmation")
 
 
@@ -193,10 +204,12 @@ def assess(entries, budget, now, family, strategy, hypothesis, params,
     # FIX v3 (dédupe sémantique research_os) : DUPLICATE ≠ REPLICATION ≠
     # transition discovery→confirmation — l'ancien dedup aveugle au mode
     # aurait bloqué la confirmation d'une découverte du même couple.
+    # N5 : les entrées superseded ne bloquent plus une re-mesure — c'est
+    # leur but (re-mesurer après correction, p. ex. post PR-143).
     d = dedup_verdict(mode, hh, ph, snapshot,
                       [{"mode": e.get("_mode", "confirmation"), "hh": e["_hh"],
                         "ph": e["_ph"], "snapshot": e.get("_snapshot", "default")}
-                       for e in entries])
+                       for e in entries if not e.get("superseded")])
     if d == "DUPLICATE":
         e = next(x for x in entries if x["_hh"] == hh and x["_ph"] == ph
                  and x.get("_snapshot", "default") == snapshot
@@ -283,7 +296,10 @@ def status_md(entries, budget, now, effective) -> str:
     week = iso_week(now)
     cap_entries = [e for e in entries if not e.get("reverify")]
     total, by_fam, by_str = week_usage(cap_entries, week)
-    v = Counter(e.get("verdict") for e in entries)
+    # N5 : les verdicts superseded ne comptent plus comme preuve —
+    # comptés à part, jamais dans la ligne des verdicts actifs
+    sup = [e for e in entries if e.get("superseded")]
+    v = Counter(e.get("verdict") for e in entries if not e.get("superseded"))
     n_all = confirmation_multiplicity(entries)   # le MÊME N que le checker
     n_bf = sum(1 for e in entries if e["_backfill"] and e.get("verdict") != "PREREG")
     cap = [f"{f} {c}/{budget['per_family']}" for f, c in sorted(by_fam.items()) if c >= budget["per_family"]]
@@ -296,8 +312,10 @@ def status_md(entries, budget, now, effective) -> str:
     raw_cap = [f"{f} {c}/{budget['per_family']}"
                for f, c in sorted(raw_fam.items()) if c >= budget["per_family"]]
     lines = [BEGIN,
-             f"- Ledger : **{len(entries)}** entrées ({n_all} essais, dont {n_bf} backfill hors budget) — "
-             + " · ".join(f"{k} {v[k]}" for k in ("PASS", "FAIL", "NUL", "SOUS_PUISSANT", "INCONCLU", "PREREG") if v[k]),
+             f"- Ledger : **{len(entries)}** entrées ({n_all} essais, dont {n_bf} backfill hors budget"
+             + (f", {len(sup)} superseded hors preuve" if sup else "") + ") — "
+             + " · ".join(f"{k} {v[k]}" for k in ("PASS", "FAIL", "NUL", "SOUS_PUISSANT", "INCONCLU", "PREREG") if v[k])
+             + (" · superseded : " + ", ".join(sorted({str(e["superseded"]) for e in sup})) if sup else ""),
              f"- Budget semaine {week} (effet policy : {effective.date() if effective else 'n/a'}) : "
              f"**{total}/{budget['total_experiments']}** consommés (hors re-vérifications exemptées), reste {max(0, budget['total_experiments'] - total)}",
              f"- Familles bloquantes hors reverify : {', '.join(cap) if cap else 'aucune'}",
@@ -597,6 +615,51 @@ def cmd_selftest(a) -> int:
     return EXIT_OK
 
 
+def cmd_supersede(a) -> int:
+    """N5 : marque `superseded: <by>` sur les entrées antérieures à --before.
+
+    Une entrée superseded cesse de compter comme preuve (statut, N de
+    multiplicité, budget) mais reste au fichier : l'historique n'est
+    jamais supprimé, seulement invalidé. Idempotent — relancer ne
+    re-marque rien. Écriture ATOMIQUE (tmp + os.replace).
+    """
+    p = Path(a.ledger)
+    if not p.exists():
+        print("registre vide — rien à marquer")
+        return EXIT_OK
+    before = parse_dt(a.before)
+    marked, kept = 0, 0
+    out_lines: list[str] = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            e = json.loads(line)
+        except json.JSONDecodeError:
+            raise ValueError(f"{p} : JSON invalide, corrigez avant de superseder")
+        ts = parse_dt(e.get("ts") or e.get("date") or "1970-01-01")
+        if ts < before and not e.get("superseded"):
+            e["superseded"] = a.by
+            if a.reason:
+                e["superseded_reason"] = a.reason
+            marked += 1
+        else:
+            kept += 1
+        out_lines.append(json.dumps(e, ensure_ascii=False, sort_keys=True))
+    fd, tmp = tempfile.mkstemp(dir=str(p.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(out_lines) + ("\n" if out_lines else ""))
+        os.replace(tmp, p)   # atomique : le lecteur ne voit jamais un fichier à moitié écrit
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+    print(f"supersede : {marked} entrée(s) marquées `{a.by}` (avant {a.before}), "
+          f"{kept} inchangées — le statut, le N et le budget ne les comptent plus")
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--ledger", default=str(DEFAULT_LEDGER))
@@ -637,6 +700,13 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--md", action="store_true")
     sy = sub.add_parser("sync-state")
     sy.add_argument("--state", default=str(DEFAULT_STATE))
+    su = sub.add_parser("supersede",
+                        help="marque les entrées antérieures à une date comme superseded (N5)")
+    su.add_argument("--before", required=True,
+                    help="date ISO — les entrées STRICTEMENT antérieures sont marquées")
+    su.add_argument("--by", required=True,
+                    help="référence du correctif qui invalide (p. ex. PR-143)")
+    su.add_argument("--reason", help="pourquoi ces verdicts ne comptent plus")
     sub.add_parser("selftest")
     return p
 
@@ -646,7 +716,8 @@ def main(argv=None) -> int:
     try:
         return {"check": cmd_check, "log": cmd_log, "status": cmd_status,
                 "sync-state": cmd_sync_state, "selftest": cmd_selftest,
-                "state": cmd_state, "current": cmd_current}[a.cmd](a)
+                "state": cmd_state, "current": cmd_current,
+                "supersede": cmd_supersede}[a.cmd](a)
     except ValueError as e:
         print(f"erreur : {e}")
         return EXIT_ERR
