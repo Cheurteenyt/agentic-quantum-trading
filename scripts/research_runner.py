@@ -55,7 +55,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.aster_indicators import volume_z  # noqa: E402
 from scripts.label_matrix import (  # noqa: E402
-    LABEL_VERSION, build_matrix, snapshot_id)
+    LABEL_VERSION, build_matrix, dataset_window_sha, snapshot_id)
 from scripts.research_os import (  # noqa: E402
     DataScope, DataView, Mode, ScopeViolation, load_confirmation_protocol)
 
@@ -92,6 +92,28 @@ def load_spec(path: Path) -> dict:
               "validation_end"):
         if k not in d:
             raise ValueError(f"spec.data incomplète : '{k}' manquant")
+    # R6 A4 : les fenêtres sont des INT ms epoch — une date ISO crashe en
+    # int() profond au milieu de run_discovery (FAILED_PERMANENT sans
+    # message exploitable) alors que le refus PRÉCOCE est limpide. Aucune
+    # spec réelle du repo n'est en ISO (audit ronde 6 : 0 contrevenant).
+    for k in ("train_start", "train_end", "validation_start",
+              "validation_end"):
+        v = d[k]
+        if isinstance(v, bool) or not isinstance(v, int):
+            raise ValueError(
+                f"spec.data.{k} = {v!r} : attendu un int ms epoch — une "
+                "date ISO n'est pas mesurable (le worker scelle le "
+                "dataset_window_sha sur cette fenêtre)")
+    # R6 A3 : le kernel ne résout que l'intervalle 1h (label_matrix et les
+    # features en dur) — un timeframe déclaré ≠ 1h serait mesuré en 1h
+    # EN SILENCE. Toute valeur présente est vérifiée (absent = hérité du
+    # protocole, aucun changement de comportement pour les specs réelles).
+    tf = spec.get("timeframe")
+    if tf is not None and str(tf) != "1h":
+        raise ValueError(
+            f"spec.timeframe = {tf!r} : le kernel ne résout que '1h' — "
+            "une autre valeur serait mesurée en 1h en silence (corrigez "
+            "le champ ou retirez-le)")
     # FIX v8 (rapport GLM 5.3 №1) : la spec doit déclarer des opérateurs
     # EXISTANTS — refus précoce plutôt qu'interprétation fausse au masque
     sig = spec["signal"]
@@ -752,6 +774,11 @@ def run_discovery(spec: dict, db_path: Path = KDB,
             "protocol_sha": protocol_sha(),
             "protocol_id": load_confirmation_protocol().get("protocol_id"),
             "snapshot": snapshot_id(db_path),
+            # R6 A1 : le hash FENÊTRÉ des données — la confirmation le
+            # compare (pas le snapshot global) pour rester robuste aux
+            # appends nocturnes tout en bloquant les corrections historiques
+            "dataset_window_sha": dataset_window_sha(
+                db_path, int(d["validation_end"])),
             "scope": {"mode": Mode.DISCOVERY.value,
                       "start": view.start_ms, "end": view.end_ms}}
 
@@ -860,17 +887,42 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
         if s.get("frozen_thresholds"):
             frozen, frozen_src = s["frozen_thresholds"], "discovery_artifact"
             # FIX v16 (PR-149 Bloc B4) : la confirmation est LIÉE à
-            # l'artefact de découverte qui l'a fondée — même spec_sha, même
-            # snapshot, même protocole, sinon la porte est bloquée (une
-            # spec A + des seuils de découverte B ne fait pas une preuve)
+            # l'artefact de découverte qui l'a fondée — même spec_sha,
+            # même protocole, même état des données, sinon la porte est
+            # bloquée (une spec A + des seuils de découverte B ne fait
+            # pas une preuve).
+            # R6 A1 : le gate de fraîcheur des DONNÉES compare désormais
+            # le hash FENÊTRÉ [0, validation_end) — l'ancien snapshot
+            # GLOBAL bloquait la confirmation à chaque append nocturne
+            # entre découverte et confirmation (CONFIRMATION_BLOCKED,
+            # re-discovery obligatoire pour rien). Artefact AVEC dws :
+            # une correction DANS la fenêtre bloque, un append au-delà
+            # est tracé et non bloquant. Artefact legacy (sans dws) :
+            # gate strict inchangé (fail-closed des deux ères).
             cur_snap = snapshot_id(db_path)
             problems = []
+            gate_notes = []
             if s.get("spec_execution_sha") != spec_execution_sha(spec):
                 problems.append(f"spec d'exécution {s.get('spec_execution_sha')} ≠ "
                                 f"courant {spec_execution_sha(spec)}")
-            if s.get("snapshot") != cur_snap:
+            dws_disc = s.get("dataset_window_sha")
+            if dws_disc is not None:
+                dws_cur = dataset_window_sha(db_path, int(d["validation_end"]))
+                if dws_disc != dws_cur:
+                    problems.append(
+                        f"données sous la fenêtre scientifique {dws_disc} ≠ "
+                        f"courantes {dws_cur} (correction historique — "
+                        "re-discovery obligatoire)")
+                if s.get("snapshot") != cur_snap:
+                    gate_notes.append(
+                        f"db a dérivé depuis la découverte ({s.get('snapshot')} → "
+                        f"{cur_snap}) — append au-delà de validation_end, "
+                        "non bloquant (gate fenêtré A1)")
+            elif s.get("snapshot") != cur_snap:
                 problems.append(f"snapshot {s.get('snapshot')} ≠ courant "
                                 f"{cur_snap}")
+            for gn in gate_notes:
+                print(f"[confirm] {gn}", flush=True)
             d_proto = s.get("protocol_id")
             cur_proto = load_confirmation_protocol().get("protocol_id")
             if d_proto and d_proto != cur_proto:
@@ -883,7 +935,9 @@ def run_confirmation(spec: dict, db_path: Path = KDB,
                                  "universe_sha": s.get("universe_sha"),
                                  "protocol_sha": s.get("protocol_sha"),
                          "snapshot": cur_snap,
-                         "protocol_id": d_proto}
+                         "protocol_id": d_proto,
+                         "dataset_window_sha": dws_disc,
+                         "gate_notes": gate_notes}
     if frozen is None and not repair:
         return {"verdict": "CONFIRMATION_BLOCKED", "slots_consumed": 0,
                 "reason": ("aucun artefact de découverte avec frozen_thresholds "
@@ -1411,9 +1465,23 @@ def cmd_grind(a) -> int:
         print(f"queue vide : {q}")
         return 0
     order = {"tiny": 0, "small": 1, "medium": 2, "large": 3}
-    specs.sort(key=lambda f: order.get(
-        (json.loads(f.read_text(encoding="utf-8")).get("compute", {})
-         .get("class", "small")), 1))
+
+    def _compute_class(f: Path) -> str:
+        # C3 (bug-hunter ronde 4) : la queue admet .yaml/.yml/.json — le
+        # tri parsait tout en JSON et crashait (json.JSONDecodeError) sur
+        # une spec YAML VALIDE avant la moindre mesure. yaml.safe_load
+        # couvre les deux formats (YAML ⊇ JSON) ; un fichier illisible au
+        # tri est classé par défaut — la mesure (load_spec) le jugera.
+        try:
+            doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            print(f"[grind] {f.name} : YAML illisible au tri "
+                  f"({type(exc).__name__}) — classe par défaut, la mesure "
+                  f"jugera", flush=True)
+            return "small"
+        return (doc or {}).get("compute", {}).get("class", "small")
+
+    specs.sort(key=lambda f: order.get(_compute_class(f), 1))
     ok_guard, why = _resource_guard()
     if not ok_guard:
         print(f"grind : WAITING_RESOURCE — {why} (exit 42, pas un succès)")

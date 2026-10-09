@@ -83,8 +83,11 @@ if fp.exists():
 # 4. LES GRADUATIONS IMMINENTES (bonding_pct ≥ 88 %, les plus fraîches)
 # MIGRATION REST (29/09) : fomo_new_coins mort → snapshot REST bonding
 # (fomo_rest.db fomo_rest_snapshots endpoint='bonding_snapshot', même forme).
-fo = sqlite3.connect(str(ROOT / "data" / "fomo" / "fomo_rest.db"), timeout=30)
+# D-10 (ronde 6) : le connect était HORS du try — un répertoire data/fomo
+# absent tuait le brief entier (traceback, sections 5-6 + log perdus) au
+# lieu d'une section « indispo » comme les autres.
 try:
+    fo = sqlite3.connect(str(ROOT / "data" / "fomo" / "fomo_rest.db"), timeout=30)
     rows = []
     for mint, raw, cap in fo.execute(
             "SELECT entity_id, data, captured_at FROM fomo_rest_snapshots "

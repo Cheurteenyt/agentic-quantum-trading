@@ -18,6 +18,27 @@ interface UseSignalsOptions {
   refreshInterval?: number
 }
 
+// r7 : le tri utilisait `localeCompare` — un tri ALPHABÉTIQUE
+// ("critical" < "high" < "low" < "medium") : un signal LOW passait
+// devant un MEDIUM sur le board. Le rang est métier, pas
+// lexicographique.
+const PRIORITY_RANK: Record<SignalPriority, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+}
+
+/** Tri métier : priorité (critical d'abord), puis timestamp décroissant.
+ *  Exporté pour test — le hook ne porte que la donnée. */
+export function sortSignals(signals: Signal[]): Signal[] {
+  return [...signals].sort((a, b) => {
+    const priorityDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]
+    if (priorityDiff !== 0) return priorityDiff
+    return b.timestamp - a.timestamp
+  })
+}
+
 /**
  * useSignals — Fetch + filtre les signals trading avec pagination
  */
@@ -99,11 +120,7 @@ export function useSignals({ autoRefresh = true, refreshInterval = 30000 }: UseS
   }, [signals])
 
   // Tri par priorité puis timestamp
-  const sorted = [...signals].sort((a, b) => {
-    const priorityDiff = a.priority.localeCompare(b.priority)
-    if (priorityDiff !== 0) return priorityDiff
-    return b.timestamp - a.timestamp
-  })
+  const sorted = sortSignals(signals)
 
   return {
     signals: sorted,

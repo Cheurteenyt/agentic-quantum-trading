@@ -222,6 +222,10 @@ async def get_recent_signals(limit: int = 20) -> list[IntelSignal]:
     # Récupère investigations et filtre celles avec "signal" flag
     all_invs = agent.list_active_investigations()
 
+    # R9 : clamp — limit=0 => [-0:] renvoyait la LISTE ENTIÈRE, limit négatif
+    # inversait le sens du slice (même pattern corrigé ailleurs)
+    limit = max(1, min(int(limit), 100))
+
     signals = []
     for inv in all_invs[-limit:]:
         if inv.get("result", {}).get("triggered_signal"):

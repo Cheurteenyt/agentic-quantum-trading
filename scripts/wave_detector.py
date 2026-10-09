@@ -83,7 +83,10 @@ def x_velocity(symbol: str, today: str) -> tuple[int, float | None]:
         (n_yday,) = con.execute(
             "SELECT COALESCE(SUM(n), 0) FROM x_mentions WHERE symbol = ? AND day = "
             "date(?, '-1 day')", (symbol, today)).fetchone()
-        ratio = (n_today / n_yday) if n_yday else (2.0 if n_today else None)
+        # un ratio exige une base hier >= 1 : hier = 0 signifie "premiere
+        # apparition" OU trou du harvest — ce n'est PAS un embrasement mesure,
+        # et le ratio fabrique a 2.0 octroyait le max de points de velocite
+        ratio = (n_today / n_yday) if n_yday >= 1 else None
         return int(n_today), ratio
     except Exception:  # noqa: BLE001
         return 0, None

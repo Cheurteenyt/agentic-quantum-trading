@@ -101,11 +101,17 @@ def parse_frame(raw: str | bytes) -> list[dict]:
     for d in msg:
         try:
             mark, idx = float(d["p"]), float(d["i"])
+            # D-08 (ronde 6) : un index manquant/nul produisait une prime
+            # FICTIVE 0.0 — indistinguishable d'une vraie prime nulle dans
+            # premium_history (le consommateur crowding_composite absorbe le
+            # faux zéro). On saute la row, comme une frame corrompue.
+            if not idx:
+                continue
             out.append({
                 "symbol": str(d["s"]),
                 "mark": mark,
                 "idx": idx,
-                "prem": round((mark / idx - 1) * 100, 6) if idx else 0.0,
+                "prem": round((mark / idx - 1) * 100, 6),
                 "rate": float(d["r"]),
                 "next_funding_ms": int(d["T"]),
                 "captured_at_ms": now_ms,

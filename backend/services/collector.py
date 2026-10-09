@@ -10,6 +10,7 @@ Plus besoin de processus séparé.
 
 import asyncio
 import json
+import os
 import time
 from collections import deque
 from datetime import datetime, timezone
@@ -229,8 +230,14 @@ def handle_trades(coin: str, data: list):
             s.last_price = px
 
         # 1. Feed footprint engine
+        # R9 : le global footprint_manager n'est initialisé que par
+        # _get_footprint_manager() (appelé uniquement depuis handle_l2_book) —
+        # or trades est souscrit AVANT l2Book et à chaque reconnexion : tout
+        # trade arrivant avant le premier l2Book levait AttributeError (None)
+        # avalé par l'except — la footprint perdait ces trades en silence.
+        # Le sibling _get_smart_engine() ci-dessous fait déjà le lazy-init.
         try:
-            footprint_manager.process_trade(coin, px, sz, side, ts_ms / 1000.0)
+            _get_footprint_manager().process_trade(coin, px, sz, side, ts_ms / 1000.0)
         except Exception:
             pass
         
@@ -358,10 +365,16 @@ async def snapshot_loop(coins: list[str], interval: float = 5.0):
                 continue
             path = SNAPSHOT_DIR / f"{coin.lower()}_latest.json"
             try:
-                path.write_text(
+                # R9 : write_text tronque puis écrit (non atomique) — un
+                # read_text concurrent tombant dans la fenêtre de troncature
+                # levait JSONDecodeError => HTTP 500 intermittent sur
+                # /api/market/snapshot/{coin}. tmp + os.replace : atomique.
+                tmp = path.with_suffix(".json.tmp")
+                tmp.write_text(
                     json.dumps(state.markets[coin].snapshot(), indent=2),
                     encoding="utf-8",
                 )
+                os.replace(tmp, path)
             except Exception as e:
                 logger.error(f"Snapshot error: {e}")
 

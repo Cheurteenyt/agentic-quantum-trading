@@ -202,9 +202,16 @@ async def analyze_chart(req: AnalyzeRequest):
 
     # Charge l'image
     if req.screenshot_path:
-        path = Path(req.screenshot_path)
-        if path.exists():
-            img_b64 = base64.b64encode(path.read_bytes()).decode()
+        # R9 : le code lisait N'IMPORTE QUEL chemin du serveur et envoyait son
+        # contenu en base64 à l'API Gemini (exfiltration possible de .env,
+        # clés, DBs via des notes ciblées). La route est admin-only, mais la
+        # boucle locale (local-open / tunnel CF) la rend atteignable.
+        # Jail : seul le contenu de data/screenshots est lisible, par NOM de
+        # fichier (jamais de chemin relatif/absolu vers l'extérieur).
+        _name = Path(req.screenshot_path).name
+        _jail = (SCREENSHOTS_DIR / _name).resolve()
+        if _jail.is_relative_to(SCREENSHOTS_DIR.resolve()) and _jail.is_file():
+            img_b64 = base64.b64encode(_jail.read_bytes()).decode()
 
     if not img_b64:
         # Prend un screenshot via windows-mcp
@@ -264,6 +271,9 @@ async def latest_analysis():
 @router.get("/history")
 async def analysis_history(limit: int = 10):
     """Historique des analyses."""
+    # R9 : clamp — limit=0 => [-0:] renvoyait la LISTE ENTIÈRE, limit négatif
+    # inversait le sens du slice (même pattern corrigé ailleurs)
+    limit = max(1, min(int(limit), 100))
     files   = sorted(SIGNALS_DIR.glob("vision_*.json"))[-limit:]
     history = []
     for f in reversed(files):

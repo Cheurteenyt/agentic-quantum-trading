@@ -62,6 +62,24 @@ def no_arm(reason, detail=None):
     return 1
 
 
+def qa_gate(returncode: int, output: str) -> bool:
+    """A5 : le QA passe ssi les DEUX preuves concordent — la sortie dit
+    « PASS — 0 échec » ET le process sort 0.
+
+    Deux failles ici avant le fix :
+    1. C'était un `or` : la moitié du critère suffisait. Un QA qui
+       imprime des échecs en sortant 0 (comptage cassé, wrapper, sandbox)
+       armait le pont ; inversement un QA qui sort != 0 après avoir
+       imprimé le résumé vert (crash final, timeout propre) armait aussi.
+       Fail-closed : les deux preuves, ou rien.
+    2. Le pivot de contenu était la sous-chaîne « 0 échec » — qui MATCHE
+       « 1**0 échec**(s) », « 2**0 échec**(s) », etc. : un QA rouge à 10,
+       20… échecs imprimait un faux vert. Le pivot est maintenant la
+       chaîne exacte imprimée par qa_kscript_x501.py en cas de PASS.
+    """
+    return "PASS — 0 échec" in output and returncode == 0
+
+
 def main():
     t0 = time.time()
 
@@ -113,8 +131,7 @@ def main():
     # ---- A5 : QA statique kScript (0 échec requis) -------------------------
     r = subprocess.run([sys.executable, str(KS_DIR / "qa_kscript_x501.py")],
                        capture_output=True, text=True, timeout=60)
-    qa_ok = "0 échec" in (r.stdout + r.stderr) or r.returncode == 0
-    if not qa_ok:
+    if not qa_gate(r.returncode, r.stdout + r.stderr):
         return no_arm("A5 QA kScript en échec", (r.stdout + r.stderr)[-300:])
 
     # ---- A6 (advisory, non bloquant) : score ML gate appris ----------------

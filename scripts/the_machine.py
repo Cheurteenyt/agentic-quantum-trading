@@ -40,7 +40,7 @@ from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.full_arsenal_2 import collect as collect_arsenal  # noqa: E402
 from scripts.portfolio_sim import (  # noqa: E402
-    KDB, MAJORS, btc_regime_series, lev_capped, liq_params, monthly_rows)
+    KDB, MAJORS, btc_regime_series, lev_capped, maint_for, monthly_rows)
 
 
 def _maint_of(symbol: str, fallback: float) -> float:
@@ -49,8 +49,14 @@ def _maint_of(symbol: str, fallback: float) -> float:
     Lu au runtime, pas codé en dur : c'était justement l'erreur de F-038 —
     une constante qui ne correspondait pas à exchangeInfo. `fallback` sert
     si le symbole est absent de la table (les Synthetic : SCR, SI…).
+
+    r7 : le repli est désormais COMPTÉ (LIQ_FALLBACK_COUNT, publié dans le
+    rapport portfolio-sim par replis_check()) — le `.get(symbol,
+    (fallback, 0.0))[0]` substituait en silence. MAINT_MAJORS/MAINT_MEME
+    sont lues au temps d'IMPORT : deux substitutions potentielles, aucune
+    trace avant ce fix.
     """
-    return liq_params().get(symbol, (fallback, 0.0))[0]
+    return maint_for(symbol, fallback)
 
 
 # FIX F-038 : les marges sont LUES, plus codées. Vérifié en base au moment du

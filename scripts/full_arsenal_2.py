@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.backtest_indicators import load_df  # noqa: E402
 from scripts.paper_forward import funding_div_mask  # noqa: E402
 from scripts.portfolio_sim import (  # noqa: E402
-    KDB, MAINT_PCT, MAJORS, btc_regime_series, lev_capped, liq_params,
+    KDB, MAINT_PCT, MAJORS, btc_regime_series, lev_capped, maint_for,
     monthly_rows)
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, MAKER_RT, TAKER_RT, funding_hourly_all, run_stack)
@@ -229,7 +229,11 @@ def main() -> int:
         # la borne. Le levier par stream est plafonné par symbole.
         med = float(np.median([e.get("atr_pct", 2.0) or 2.0 for e in ev]))
         for e in ev:
-            mm = liq_params().get(e["sym"], (MAINT_PCT, 0.0))[0]
+            # r7 : maint_for compte la substitution (avant : .get(...) repli
+            # plat MAINT_PCT silencieux — miroir exact du bug #213 corrigé
+            # dans liq_move_for mais jamais porté ici ; un memecoin à 16,66 %
+            # y lisait 2,5 % et surestimait son « Lev sûr » publié).
+            mm = maint_for(e["sym"], MAINT_PCT)
             lev = max(1, int(100 / (mae_max + mm)))
             e["lev"] = lev_capped(e["sym"], lev)
             e["atr_ref"] = med

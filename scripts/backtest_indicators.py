@@ -33,6 +33,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts import aster_indicators as ta  # noqa: E402
+# NB : PAS d'import module-level de portfolio_sim ici — portfolio_sim
+# importe load_df de CE module (l.43) : un import top-level créerait un
+# cycle. Les imports différés vivent dans la fonction du rapport.
 
 KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
@@ -346,13 +349,24 @@ def main() -> int:
         pass
 
     # paramètres de liquidation RÉELS par symbole (exchangeInfo → liq_params)
-    liq_params: dict[str, dict] = {}
+    # Fossile ronde 5 : l'ancien `mm or 0` transformait une marge de
+    # maintenance NULL en 0 → seuil 100/L AU LIEU DE 100/L − mm → à 10x,
+    # 10,0 % au lieu de 7,5 % (majeures) : la section « Risque de
+    # LIQUIDATION » du rapport nocturne SOUS-COMPTAIT les liquidations ;
+    # et la table absente passait en silence (except pass → que des « — »).
+    # Désormais : max_lev garde son garde fail-closed (NULL → 0 → levier
+    # non proposé), et le SEUIL passe par liq_move_for (marge réelle,
+    # repli PRUDENT compté pour un symbole hors table, non-viable → 0.0).
+    liq_maxlev: dict[str, float] = {}
     try:
-        for sym, maxlev, mm in con.execute(
+        for sym, maxlev, _mm in con.execute(
             "SELECT symbol, max_leverage, maint_margin_pct FROM liq_params"):
-            liq_params[sym] = {"max_lev": maxlev or 0, "mm": mm or 0}
-    except sqlite3.OperationalError:
-        pass
+            liq_maxlev[sym] = maxlev or 0
+    except sqlite3.OperationalError as exc:
+        print(f"[backtest_indicators] table liq_params illisible ({exc}) : "
+              "section liquidation au repli PRUDENT de portfolio_sim "
+              "(chaque symbole compté dans LIQ_FALLBACK_COUNT)",
+              file=sys.stderr)
 
     def cost_of(sym: str) -> float:
         # fees taker 8 bps RT + slippage mesuré ×2 (aller-retour)
@@ -535,6 +549,12 @@ def main() -> int:
         lines.append(f"| {name} | +{h}h | {len(evs)} | " + " | ".join(cells) + " |")
 
     if confirmed_cells:
+        # imports DIFFÉRÉS (cycle : portfolio_sim importe load_df de ce
+        # module) — le seuil passe par le modèle F-038 officiel : marge
+        # réelle, repli PRUDENT compté pour un symbole hors table,
+        # non-viable → 0.0
+        from scripts.portfolio_sim import liq_move_for
+        import scripts.portfolio_sim as _psim
         lines += ["", "## Risque de LIQUIDATION selon le levier (confirmés)", "",
                   "Part des trades dont l'excursion adverse touche ~100/levier %", "",
                   "| Signal | H | 3x | 5x | 10x |", "|---|---|---|---|---|"]
@@ -542,16 +562,15 @@ def main() -> int:
             cells = []
             for L in (3, 5, 10):
                 tradeable = [1 for _m, d, sym in md
-                             if liq_params.get(sym, {}).get("max_lev", 0) >= L]
+                             if liq_maxlev.get(sym, 0) >= L]
                 if not tradeable:
                     cells.append("— (levier n'existe pas)")
                     continue
                 n_liq = 0
                 for _m, d, sym in md:
-                    if liq_params.get(sym, {}).get("max_lev", 0) < L:
+                    if liq_maxlev.get(sym, 0) < L:
                         continue
-                    mm = liq_params[sym]["mm"]
-                    th = 100.0 / L - mm  # seuil réel : marge init − marge maint
+                    th = liq_move_for(sym, L)  # 100/L − mm (réel, repli compté)
                     if (d > 0 and _m <= -th) or (d < 0 and _m >= th):
                         n_liq += 1
                 cells.append(f"{n_liq/len(tradeable)*100:.1f} % (n={len(tradeable)})")
@@ -561,6 +580,12 @@ def main() -> int:
             "levier plafonné au max réellement autorisé par symbole (PONS/CATE/MEME : 3x).",
             "Un % de liquidation > 0 rend la stratégie morte au levier considéré —",
             "la médiane positive ne sauve pas un compte liquidé."]
+        if _psim.LIQ_FALLBACK_COUNT or _psim.LIQ_NON_VIABLE:
+            lines.append(
+                f"Compteurs de repli : {_psim.LIQ_FALLBACK_COUNT} symbole(s) "
+                "hors table liq_params (repli PRUDENT), "
+                f"{_psim.LIQ_NON_VIABLE} trade(s) à levier non viable "
+                "(liquidés à l'entrée).")
 
     expected = tested_cells * 0.025
     lines += [

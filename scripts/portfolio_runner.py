@@ -1044,6 +1044,15 @@ def wallet_for_run(run_id: str, db_path: Path = KDB, capital: float = 100.0,
         out["window_dd_breach"] = [
             k for k, w in per_window.items()
             if w["max_dd_pct"] > out["max_window_loss_pct"]]
+        # C4 (bug-hunter ronde 4) : une fenêtre à DD INCONNU (marks
+        # partiels, dd_status=UNKNOWN) n'est pas un dépassement MESURÉ —
+        # mais le fail-open du filtre (nan > plafond = False) la rendait
+        # invisible dans le rapport officiel, en contradiction avec le
+        # gate fail-closed du confirm (FIX v14 : un DD inconnu n'est plus
+        # un PASS). Le rapport la NOMME explicitement.
+        out["window_dd_unknown"] = [
+            k for k, w in per_window.items()
+            if w.get("dd_status") == "UNKNOWN"]
     return out
 
 
@@ -1113,13 +1122,24 @@ def wallet_report_block(w: dict) -> str:
             f"(ROI {bl['roi_pct']:+.2f} %, DD {bl['max_dd_pct']:.2f} %) — "
             "l'edge doit BATTRE ça |")
     if w.get("per_window"):
+        def _dd_cell(v: dict) -> str:
+            # C4 : « nan % » n'est pas un chiffre — le DD d'une fenêtre à
+            # marks partiels est INCONNU, on l'écrit, on ne l'imprime pas
+            # comme une valeur
+            if v.get("dd_status") == "UNKNOWN" or np.isnan(v["max_dd_pct"]):
+                return "INCONNU (marks partiels)"
+            return f"{v['max_dd_pct']:.2f} %"
         pw = " · ".join(
-            f"{k} {v['max_dd_pct']:.2f} %" for k, v in w["per_window"].items())
+            f"{k} {_dd_cell(v)}" for k, v in w["per_window"].items())
         lines.append(f"| DD par fenêtre gelée | {pw} "
                      f"(plafond {w['max_window_loss_pct']:.0f} %) |")
         if w.get("window_dd_breach"):
             lines.append(f"| ⚠️ DÉPASSEMENT plafond DD | "
                          f"{', '.join(w['window_dd_breach'])} |")
+        if w.get("window_dd_unknown"):
+            lines.append(f"| ⚠️ DD INCONNU (marks partiels — le gate de "
+                         f"confirmation refuse ces fenêtres) | "
+                         f"{', '.join(w['window_dd_unknown'])} |")
     lines.append("")
     return "\n".join(lines)
 
@@ -1150,6 +1170,9 @@ def cli_portfolio(a) -> int:
         if w.get("window_dd_breach"):
             print(f"  ⚠️ DD fenêtre > plafond {w['max_window_loss_pct']:.0f} % : "
                   f"{', '.join(w['window_dd_breach'])}")
+        if w.get("window_dd_unknown"):
+            print(f"  ⚠️ DD INCONNU (marks partiels) : "
+                  f"{', '.join(w['window_dd_unknown'])}")
     (rdir / "wallet.json").write_text(
         json.dumps(w, ensure_ascii=False, indent=1, default=float),
         encoding="utf-8")

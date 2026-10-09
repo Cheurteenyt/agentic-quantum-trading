@@ -271,10 +271,19 @@ def _closed_trades(spec: dict, events: list[dict], db_path: Path,
                     k1 = int(np.searchsorted(fs.times_ms,
                                              ot + h1 * H_MS, side="right"))
                     # FIX v15 (№2) : distinguer « aucun print observé » d'un
-                    # « funding = 0 réel » — règle du kernel : connu si
-                    # (début ≥ 1er print OU prints dans la fenêtre) ET
-                    # fin ≤ dernier print
-                    in_era = (ot >= fs.times_ms[0]) or (k1 > k0)
+                    # « funding = 0 réel ». C2bis (bug-hunter ronde 4) : le
+                    # forward gardait la clause `or (k1 > k0)` que PR-166 a
+                    # supprimée du KERNEL (label_matrix : « connu = commencé
+                    # après le premier print, point ») — une fenêtre qui
+                    # straddle le PREMIER print était « connue » avec un
+                    # partiel présenté comme complet (pré-listing-funding).
+                    # Le gate de maturation fund_known_pct et les rets du
+                    # forward doivent utiliser la MÊME convention que le
+                    # protocole backtest, sinon un candidat peut maturer
+                    # READY sur une couverture que la confirmation aurait
+                    # comptée inconnue, et le gate vs_pass compare deux
+                    # grandeurs définies différemment.
+                    in_era = ot >= fs.times_ms[0]
                     covered = (ot + h1 * H_MS) <= fs.times_ms[-1]
                     # FIX v15 (№4) : le TROU INTERNE — une fenêtre de
                     # durée ≥ l'intervalle observé du calendrier, sans

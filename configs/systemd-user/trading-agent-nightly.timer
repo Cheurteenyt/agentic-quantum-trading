@@ -1,8 +1,12 @@
 [Unit]
-Description=Campagne nocturne trading-agent (quotidienne a 03h00)
+Description=Campagne nocturne trading-agent (quotidienne a 03h10, APRÈS le producteur X 02:40)
 
 [Timer]
-OnCalendar=*-*-* 03:00:00
+# FIX R9 : 03:00 -> 03:10. aster_convergence consomme x_pressure (écrit par
+# x_aster_pulse, désormais à 02:40) : le consommateur doit suivre le
+# producteur, le précéder. fomo-nightly reste à 03:55 (wave_detector lit le
+# harvest X frais, il suit aussi).
+OnCalendar=*-*-* 03:10:00
 Persistent=true
 RandomizedDelaySec=300
 

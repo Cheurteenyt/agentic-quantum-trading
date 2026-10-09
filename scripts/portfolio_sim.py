@@ -89,6 +89,14 @@ _LIQ_PARAMS: dict[str, tuple[float, float]] | None = None
 # table (la plus conservatrice), jamais une constante plate. Et il est
 # COMPTÉ, pour qu'un rapport puisse dire combien de trades reposaient sur
 # une marge substituée.
+#
+# Le compteur couvre TROIS sites de substitution (r7) :
+#   liq_move_for  — marge inconnue -> _maint_prudent() ;
+#   lev_capped    — symbole absent OU max_leverage NULL -> _lev_prudent() ;
+#   maint_for     — marge inconnue -> repli par catégorie explicite
+#                   (the_machine._maint_of, full_arsenal_2 « Lev sûr »).
+# Publication : portfolio_sim.main() écrit la ligne de garde-fou
+# (replis_check()) dans le rapport et sur stdout.
 LIQ_FALLBACK_COUNT = 0
 
 # Positions dont le levier est non VIABLE à la marge du symbole
@@ -186,16 +194,66 @@ def lev_capped(symbol: str, lev: float) -> float:
     `liq_params` — ACNUSD1, CTUSDT, METAUSD1, PAIDUSDT, QNTUSDT, SCRUSDT,
     SIUSDT, XDPUSDT. Ce n'est pas théorique.
 
+    Deuxième trou (r7) : le cas `mx <= 0` — ligne PRÉSENTE mais
+    max_leverage NULL (chargé 0.0, l.119) — retombait sur
+    `return min(lev, mx) if mx > 0 else lev` et rendait `lev` INCHANGÉ :
+    le plafond était ignoré ET le compteur muet, pour un défaut miroir
+    de F-047 resté vivant après le fix des symboles absents.
+    tests/test_f038_liq_maint.py:155 skippait explicitement ce chemin
+    (`if mx <= 0: continue`) : aucun test ne le verrouillait.
+
     Repli : le plus BAS max_leverage observé, et `LIQ_FALLBACK_COUNT`
-    incrémenté.
+    incrémenté — une seule place de comptage, pour les absences ET les
+    max_leverage inconnus.
+    """
+    global LIQ_FALLBACK_COUNT
+    entree = liq_params().get(symbol)
+    if entree is None or entree[1] <= 0:
+        # absent OU max_leverage inconnu (NULL chargé 0.0) : le plafond
+        # n'est pas une donnée. Repli prudent, et COMPTÉ — un run sur une
+        # table trouée se voit désormais, au lieu de passer pour borné.
+        LIQ_FALLBACK_COUNT += 1
+        return min(lev, _lev_prudent())
+    return min(lev, entree[1])
+
+
+def maint_for(symbol: str, fallback: float) -> float:
+    """La marge de maintenance du symbole, repli EXPLICITEMENT compté.
+
+    Le `.get(symbol, (fallback, 0.0))[0]` en ligne donnait la bonne valeur
+    en SILENCE : si `symbol` est absent de `liq_params`, le repli
+    `fallback` nourrissait le calcul sans qu'aucun octet du rapport ne le
+    dise. Trois replis de marge, zéro compteur : `_maint_of` de
+    the_machine (MAINT_MAJORS/MAINT_MEME, lues au temps d'IMPORT), le
+    « Lev sûr » de full_arsenal_2 (miroir exact du bug #213 corrigé dans
+    liq_move_for, jamais porté là).
+
+    Le repli reste la valeur PAR CATÉGORIE (2,5 majeures, 16,66 meme) —
+    c'est le meilleur estimateur quand la catégorie est connue ; le repli
+    PRUDENT global (_maint_prudent, max observé) serait FAUX pour la
+    catégorie opposée. Seule la SUBSTITUTION est désormais comptée.
     """
     global LIQ_FALLBACK_COUNT
     entree = liq_params().get(symbol)
     if entree is None:
         LIQ_FALLBACK_COUNT += 1
-        return min(lev, _lev_prudent())
-    mx = entree[1]
-    return min(lev, mx) if mx > 0 else lev
+        return float(fallback)
+    return entree[0]
+
+
+def replis_check() -> str:
+    """La ligne de garde-fou du rapport : combien de lectures de
+    marge/plafond ont reposé sur une SUBSTITUTION (pas une donnée).
+
+    Compteurs lus au moment de l'appel — le rapport doit être écrit après
+    les runs qui consomment liq_move_for/lev_capped/maint_for, sinon les
+    compteurs ne reflètent que le début du process.
+    """
+    n = LIQ_FALLBACK_COUNT
+    if n <= 0:
+        return "replis marge/plafond substitués : 0 (OK)"
+    return (f"replis marge/plafond substitués : {n} ⚠ ({n} lectures sans "
+            f"donnée liq_params — marges/leviers de repli appliqués)")
 
 
 def btc_regime_series() -> pd.Series:
@@ -384,6 +442,11 @@ def main() -> int:
     pnl_gap = abs(sum_pnl - (real["balance"] - args.capital))
     checks.append(f"somme PnL mensuels vs total : écart ${pnl_gap:.4f} "
                   + ("OK" if pnl_gap < 0.01 else "✗ BUG"))
+    # r7 : les compteurs de substitution, LUS APRÈS les runs (real +
+    # oracle), publiés dans le rapport ET sur stdout. Avant, ils
+    # n'étaient lus par AUCUN rapport — le commentaire « un run sur une
+    # base absente se VOIT donc » était faux.
+    checks.append(replis_check())
 
     def fmt_table(rows: list[dict], label: str) -> list[str]:
         ls = [f"### {label}", "",

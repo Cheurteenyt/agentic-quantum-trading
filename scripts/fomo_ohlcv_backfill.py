@@ -117,7 +117,8 @@ def fresh_jwt(retries: int = 3) -> str:
             tok = _fresh_jwt_daemon()
             if tok:
                 try:
-                    _JWT_CACHE.write_text(json.dumps(
+                    from scripts.secret_io import write_secret
+                    write_secret(_JWT_CACHE, json.dumps(
                         {"token": tok, "exp": _jwt_exp(tok)}))
                 except Exception:
                     pass

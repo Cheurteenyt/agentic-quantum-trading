@@ -18,12 +18,20 @@ ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" script
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --trends
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --list "https://x.com/i/lists/2102847500323336698" --scrolls 8
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest-list.json --query watchlist-live
-ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_aster_pulse.py
+# FIX R9 : l'ExecStart x_aster_pulse a été DÉPLACÉ après fetch_x_posts
+# --parse-calls + score_x_calls --score (il était ici) : _calls() lit
+# x_calls, rempli pour la nuit courante par --parse-calls — avant le
+# déplacement, les longs/shorts/consensus écrits dans x_pressure ET
+# x_signal_history reflétaient les calls de la VEILLE alors que les
+# mentions du même row étaient du jour.
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --list "https://x.com/i/lists/1798011740065792264" --scrolls 6
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_harvest.py --list "https://x.com/i/lists/1837997582423077109" --scrolls 6
 ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --ingest-json data/x_harvest/latest-list.json --query public-lists
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/fetch_x_posts.py --parse-calls
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/score_x_calls.py --score
+# FIX R9 : x_aster_pulse déplacé ICI (voir commentaire du déplacement plus
+# haut) — après parse-calls + scoring, pour lire les calls du jour.
+ExecStart=-"/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/x_aster_pulse.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/registre_board.py
 ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/html_to_pdf.py reports/registre-board.html
 TimeoutStartSec=3600
