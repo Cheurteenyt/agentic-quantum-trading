@@ -1,8 +1,11 @@
 [Unit]
-Description=x-nightly — le nocturne x décalé (anti-contension avec aster 03:00)
+Description=x-nightly — le nocturne x en PREMIER (02:40) : le producteur x_aster_pulse doit précéder son consommateur aster_convergence (trading-agent-nightly 03:10) et rester avant fomo 03:55 (wave_detector lit le harvest X frais)
 
 [Timer]
-OnCalendar=*-*-* 03:20:00
+# FIX R9 : 03:20 -> 02:40. Le consommateur aster_convergence (lentille X de
+# x_pressure) tournait à 03:00 AVANT son producteur (03:20) : la lentille X
+# du rapport de convergence était structurellement à J-1, tous les soirs.
+OnCalendar=*-*-* 02:40:00
 RandomizedDelaySec=120
 Persistent=true
 
