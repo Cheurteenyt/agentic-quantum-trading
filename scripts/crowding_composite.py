@@ -358,7 +358,9 @@ def compute_symbol(con: sqlite3.Connection, sym: str) -> list[dict]:
     for i in range(24, len(bars)):
         ot, close_i, _ = bars[i]
         t_close = ot + H
-        if close_i <= 0:
+        # close NULL (collecteur) : la garde d'origine (close_i <= 0) crashait
+        # ici même (None <= 0 => TypeError) au lieu de sauter la bougie
+        if close_i is None or close_i <= 0:
             continue
         comps: dict[str, float] = {}
         # volume dirige
@@ -368,8 +370,12 @@ def compute_symbol(con: sqlite3.Connection, sym: str) -> list[dict]:
         ref_keys = [k for k in day_keys if d0.isoformat() > k >= lo_date.isoformat()]
         if vol24 > 0 and len(ref_keys) >= VOL_MIN_DAYS:
             med = statistics.median(day_vol[k] for k in ref_keys)
-            if med > 0:
-                ret24 = close_i / bars[i - 24][1] - 1.0
+            # la base i-24 est d'une AUTRE bougie : elle n'a pas passé la garde
+            # close_i <= 0 ci-dessus (close 0/NULL du collecteur) — sans garde
+            # ici, --full crashe (ZeroDivisionError / TypeError) au lieu de skipper
+            ref24 = bars[i - 24][1]
+            if med > 0 and ref24 and ref24 > 0:
+                ret24 = close_i / ref24 - 1.0
                 sign = 1.0 if ret24 > 0 else (-1.0 if ret24 < 0 else 0.0)
                 comps["volume"] = clip(math.log2(max(vol24 / med, 1e-9))
                                        / VOL_SCALE_LOG2) * sign
