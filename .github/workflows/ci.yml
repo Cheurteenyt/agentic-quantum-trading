@@ -1,10 +1,20 @@
 name: CI
-on: [push, pull_request, merge_group]
+on:
+  push:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+  schedule:
+    # full-suite nocturne (02:30 UTC) — R1 : le « lent » doit tourner chaque nuit
+    - cron: "30 2 * * *"
 permissions:
   contents: read
 
 jobs:
   test:
+    # sobriété : le cron nocturne ne relance PAS le gate standard —
+    # il exécute uniquement full-suite (ci-dessous)
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -31,6 +41,16 @@ jobs:
           fi
       - name: Run tests
         run: python scripts/run_tests.py --fast
+      # R1 (audit Sonnet 5.5) : le gate --fast saute SLOW_FILES (nom exact +
+      # raison) — l'écart exécutés/découverts doit rester visible, sinon un
+      # fichier peut disparaître du gate sans que rien ne le signale.
+      - name: Visibilité R1 — exécutés vs découverts
+        if: always()
+        run: |
+          disc=$(python -c "import unittest; print(unittest.defaultTestLoader.discover('tests').countTestCases())")
+          base=$(cat .github/test-count-baseline.txt)
+          echo "::notice::suite complète = $disc tests découverts ; gate --fast baseline = $base ; l'écart = SLOW_FILES (justifié ligne par ligne dans scripts/run_tests.py)"
+          echo "::notice::la suite COMPLÈTE (SLOW_FILES inclus) tourne à chaque push main + chaque nuit : job full-suite ci-dessous"
       - name: Research integrity (invariants I001-I008)
         run: python scripts/research_integrity.py
       - name: Audit check (bloquant sur --fail-on)
@@ -41,6 +61,7 @@ jobs:
   # est l'équivalent exact du gate pyflakes côté Python : il attrape les
   # symboles non définis, que rien ne vérifiait.
   frontend:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,6 +86,7 @@ jobs:
   # et la régression de tests, pas les failles. Ces trois étapes ferment ce
   # trou. Les seuils sont mesurés, pas devinés.
   security:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -175,3 +197,31 @@ jobs:
             echo "::error::la dette bandit de la PR ($total) dépasse celle de main ($ref_main)"
             exit 1
           fi
+
+  # ─── R1 (audit Sonnet 5.5) : le « lent » doit tourner, pas être ignoré ───
+  # Le gate PR reste --fast (temps réel) ; SLOW_FILES (test_onchain_admin_auth,
+  # 684 fns, >420 s) n'y tourne JAMAIS — c'est exactement l'angle mort qui a
+  # laissé 3 échecs réels invisibles pendant des semaines (issue #235).
+  # Ce job exécute la suite COMPLÈTE à chaque push main, chaque nuit
+  # (02:30 UTC) et à la demande. Un échec ici = un vrai signal (issue #235,
+  # constat 2 : 684 fns d'auth jamais exécutées).
+  full-suite:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dependencies
+        run: pip install --no-deps -r requirements.lock --quiet
+      - name: Suite COMPLÈTE (SLOW_FILES inclus) — BLOQUANT
+        run: python scripts/run_tests.py
+      - name: Exécutés vs découverts (écart = SLOW_FILES)
+        if: always()
+        run: |
+          disc=$(python -c "import unittest; print(unittest.defaultTestLoader.discover('tests').countTestCases())")
+          echo "::notice::full-suite exécutée ; $disc tests découverts au total ; l'écart avec le compte exécuté ci-dessus = SLOW_FILES (raison documentée ligne par ligne dans scripts/run_tests.py)"
