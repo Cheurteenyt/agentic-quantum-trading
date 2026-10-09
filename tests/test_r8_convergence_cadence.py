@@ -177,10 +177,15 @@ class _ConvergenceFixture(unittest.TestCase):
         con.commit(); con.close()
         con = sqlite3.connect(self.kdb)
         con.execute("CREATE TABLE oi_history (symbol TEXT, open_interest REAL, captured_at_ms INTEGER)")
+        # captured_at_ms est un EPOCH MILLISECONDS : la garde de fraîcheur 6 h
+        # (_oi_velocity, #243) mute un snapshot vieux de plus de 6 h. Les
+        # littéraux 1/2 (1970) silencieux avant #243 rendaient la lentille OI
+        # muette : la confluence 3/3 devenait inatteignable dans les tests.
+        now_ms = time.time() * 1000
         data = [
-            ("TESTLUSDT", 100.0, 1), ("TESTLUSDT", 110.0, 2),   # ΔOI +10 %
-            ("TESTSUSDT", 100.0, 1), ("TESTSUSDT", 90.0, 2),    # ΔOI -10 %
-            ("TESTNUSDT", 100.0, 1), ("TESTNUSDT", 90.0, 2),
+            ("TESTLUSDT", 100.0, now_ms - 7200_000), ("TESTLUSDT", 110.0, now_ms),   # ΔOI +10 %
+            ("TESTSUSDT", 100.0, now_ms - 7200_000), ("TESTSUSDT", 90.0, now_ms),    # ΔOI -10 %
+            ("TESTNUSDT", 100.0, now_ms - 7200_000), ("TESTNUSDT", 90.0, now_ms),
         ]
         con.executemany("INSERT INTO oi_history VALUES (?,?,?)", data)
         con.commit(); con.close()
