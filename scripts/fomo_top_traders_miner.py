@@ -25,22 +25,24 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+
+from scripts.fomo_knum import knum  # noqa: E402
+
 DB = ROOT / "data" / "fomo" / "fomo_swaps.db"
 LOCK = ROOT / "data" / "fomo" / ".top_traders_miner.lock"
 
 TRADES_RE = re.compile(
     r"([^\n]+)\n\$([\d,]+(?:\.\d+)?) invested • ([\w ]+)\n[+\-−]\n\$([\d,]+(?:\.\d+)?)\n[▲▼]\n([\d.,]+)%")
 SWAPS_RE = re.compile(
-    r"([^\n]+)\n(Buy|Sell)\n\$([\d,]+(?:\.\d+)?)\n\$([\d.,]+[KMB]?) MC\n(\d+[smhd])\n")
+    r"([^\n]+)\n(Buy|Sell)\n\$([\d,]+(?:\.\d+)?)\n\$([\d.,]+[KMBT]?) MC\n(\d+[smhd])\n")
 POS_RE = re.compile(
-    r"(?=\n([^\n]+)\n([\d.,]+[KMB]?) \1\n\$([\d,]+(?:\.\d+)?)\n[▲▼]\n([\d.]+)%\n)")
-STATS_RE = re.compile(r"(\d+d \dh+) avg\. hold\n([\d.KM]+) trades\nJoined (\w+ \d{4})")
+    r"(?=\n([^\n]+)\n([\d.,]+[KMBT]?) \1\n\$([\d,]+(?:\.\d+)?)\n[▲▼]\n([\d.]+)%\n)")
+STATS_RE = re.compile(r"(\d+d \dh+) avg\. hold\n([\d.KMT]+) trades\nJoined (\w+ \d{4})")
 TOP5_RE = re.compile(r"#(\d) Trade\n\+\n\$([\d,]+(?:\.\d+)?)\n\(\n[▲▼]\n([\d.]+)%\n\)")
 GL_RE = re.compile(r"\n\$([\d,]+(?:\.\d+)?)\n-\$([\d,]+(?:\.\d+)?)\n24h\n")
 
-
-def knum(s):
-    return float(s.replace(",", "")) if s else None
+# (knum a déménagé dans scripts/fomo_knum.py — ronde 11 : le double local
+# levait ValueError sur tout suffixe, la quantité POS abrégée tuait la ligne.)
 
 
 def ensure_db():
