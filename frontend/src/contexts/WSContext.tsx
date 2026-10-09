@@ -35,13 +35,22 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
+    // r7 : le cleanup appelait `close()` — qui déclenche `onclose` — qui
+    // re-programmait `setTimeout(connect, 3000)` JAMAIS annulé : après un
+    // démontage (navigation SPA, HMR, StrictMode double-mount), un
+    // WebSocket zombie était recréé toutes les 3 s sur un composant mort,
+    // indéfiniment. Flag `disposed` + timer annulé dans le cleanup.
+    let disposed = false
+    let retry: ReturnType<typeof setTimeout> | undefined
+
     function connect() {
+      if (disposed) return
       const ws = new WebSocket(`${WS_ROOT}/ws`)
       wsRef.current = ws
       ws.onopen = () => setConnected(true)
       ws.onclose = () => {
         setConnected(false)
-        setTimeout(connect, 3000)
+        if (!disposed) retry = setTimeout(connect, 3000)
       }
       ws.onerror = () => ws.close()
       ws.onmessage = e => {
@@ -49,7 +58,11 @@ export function WSProvider({ children }: { children: React.ReactNode }) {
       }
     }
     connect()
-    return () => wsRef.current?.close()
+    return () => {
+      disposed = true
+      if (retry) clearTimeout(retry)
+      wsRef.current?.close()
+    }
   }, [])
 
   return (

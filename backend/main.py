@@ -92,7 +92,11 @@ from services.arkham_scraper import get_arkham_scraper
 MT5_URL = "http://host.docker.internal:8765"
 
 # ── XAU price cache ─────────────────────────────────────────
-_XAU_CACHE = {"data": {"price": 4679.0, "bid": 4679.0, "ask": 4679.0, "change_24h": 0.0, "source": "fallback"}, "ts": 0}
+# r7 : le cache initial était pré-rempli avec 4679.0 « fallback » — un
+# prix d'or INVENTÉ servi pendant les premières secondes après boot (et
+# jusqu'au premier fetch réussi), affiché comme prix live. Démarrage
+# vide : le premier appel fetch, et sur échec il reste {}.
+_XAU_CACHE: dict = {"data": {}, "ts": 0}
 _XAU_CACHE_TTL = 30
 
 _BINANCE_CACHE = {"data": {}, "ts": 0}
@@ -554,21 +558,7 @@ async def startup_event():
             if not collector_state.markets:
                 continue
             xau_data = _fetch_xau_price()
-            payload = {
-                "type": "market_update",
-                "ts": time.time(),
-                "hyperliquid": {
-                    coin: {
-                        "px": m.last_price,
-                        "bid": m.orderbook["bids"][0].get("px", m.last_price) if m.orderbook.get("bids") and len(m.orderbook["bids"]) > 0 else m.last_price,
-                        "ask": m.orderbook["asks"][0].get("px", m.last_price) if m.orderbook.get("asks") and len(m.orderbook["asks"]) > 0 else m.last_price,
-                        "change_24h": 0.0,
-                    }
-                    for coin, m in collector_state.markets.items()
-                    if m.last_price > 0
-                },
-                "xauusd": xau_data,
-            }
+            payload = _market_update_payload(collector_state.markets, xau_data, time.time())
             try:
                 await ws_manager.broadcast(payload)
             except Exception:
@@ -640,7 +630,11 @@ def _fetch_xau_price() -> dict:
     if now - _XAU_CACHE["ts"] < _XAU_CACHE_TTL:
         return _XAU_CACHE["data"]
     import urllib.request, json
-    result = {"price": 4679.0, "bid": 4679.0, "ask": 4679.0, "change_24h": 0.0, "source": "fallback"}
+    # r7 : le repli « 4679.0 » était un prix INVENTÉ renvoyé sur échec
+    # réseau — même faille que le 78407.5 de BTC. Rien = {} : le frontend
+    # firstFiniteNumber gère l'absence, pas un faux prix d'une autre
+    # époque.
+    result: dict = {}
     try:
         req = urllib.request.Request("https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=5d", headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -659,9 +653,6 @@ def _fetch_xau_price() -> dict:
     _XAU_CACHE = {"data": result, "ts": now}
     return result
 
-    _XAU_CACHE = {"data": result, "ts": now}
-    return result
-
 
 def _fetch_binance_prices() -> dict[str, dict[str, float]]:
     """Fetch BTC, ETH live prices from Binance public API."""
@@ -669,7 +660,7 @@ def _fetch_binance_prices() -> dict[str, dict[str, float]]:
     now = time.time()
     if now - _BINANCE_CACHE["ts"] < _BINANCE_CACHE_TTL:
         return _BINANCE_CACHE["data"]
-    
+
     import urllib.request, json
     result: dict[str, dict[str, float]] = {}
     for symbol in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]:
@@ -690,20 +681,65 @@ def _fetch_binance_prices() -> dict[str, dict[str, float]]:
     _BINANCE_CACHE = {"data": result, "ts": now}
     return result
 
+
+def _market_update_payload(markets: dict, xau_data: dict, ts: float) -> dict:
+    """Le payload broadcast 2s, construit ici (fonction pure, testable).
+
+    r7 : `change_24h: 0.0` n'est PLUS sérialisé. Le collector ne diffuse
+    que les px — l'ancien 0.0 codé en dur partait pour CHAQUE coin à
+    CHAQUE tick, et le TickerStrip l'affichait « +0.00% » en vert
+    (change >= 0), un faux signal haussier permanent. Le frontend teste
+    déjà `change != null` : un champ absent n'affiche RIEN (TopBar
+    l'écarte déjà via firstUsefulPercent — preuve que le champ était
+    connu faux).
+    """
+    return {
+        "type": "market_update",
+        "ts": ts,
+        "hyperliquid": {
+            coin: {
+                "px": m.last_price,
+                "bid": m.orderbook["bids"][0].get("px", m.last_price) if m.orderbook.get("bids") and len(m.orderbook["bids"]) > 0 else m.last_price,
+                "ask": m.orderbook["asks"][0].get("px", m.last_price) if m.orderbook.get("asks") and len(m.orderbook["asks"]) > 0 else m.last_price,
+            }
+            for coin, m in markets.items()
+            if m.last_price > 0
+        },
+        "xauusd": xau_data,
+    }
+
+
 @app.get("/api/market/prices", tags=["market"])
 async def get_prices():
     """Get current prices for BTC, ETH, XAU from live sources."""
     binance = _fetch_binance_prices()
     xau_data = _fetch_xau_price()
-    
-    btc = binance.get("btc", {"price": 78407.5, "change_24h": 0.0})
-    eth = binance.get("eth", {"price": 2359.75, "change_24h": 0.0})
-    
+
+    # r7 : AUCUN prix inventé. L'ancien fallback hardcodé (78407.5 /
+    # 2359.75 — un instantané d'une autre époque) était renvoyé comme prix
+    # LIVE dès que l'appel d'un SEUL symbole réussissait : `source =
+    # "binance+scrape" if binance else "fallback"` masquait l'échec
+    # partiel, et le Dashboard affichait un BTC fantôme avec badge LIVE.
+    # Un prix indisponible est None — le frontend
+    # (firstFiniteNumber/firstUsefulPercent) passe alors à la source
+    # suivante au lieu d'afficher un chiffre faux.
+    btc = binance.get("btc")
+    eth = binance.get("eth")
+
+    if btc and eth:
+        source = "binance"
+    elif btc or eth:
+        source = "binance-partial"
+    else:
+        source = "unavailable"
+
     return {
-        "btc": {"price": btc["price"], "change_24h": btc["change_24h"]},
-        "eth": {"price": eth["price"], "change_24h": eth["change_24h"]},
+        "btc": {"price": btc["price"] if btc else None,
+                "change_24h": btc["change_24h"] if btc else None},
+        "eth": {"price": eth["price"] if eth else None,
+                "change_24h": eth["change_24h"] if eth else None},
         "xau": xau_data,
-        "source": "binance+scrape" if binance else "fallback",
+        "source": source,
     }
 
 # =========================================================
