@@ -32,15 +32,29 @@ def log(m):
 
 
 def knum(s):
-    return float(s.replace(",", "")) if s else None
+    """'1,234.5' => 1234.5 ; '1.2K'/'1.2M'/'1.2B' => échelle appliquée.
+
+    R9 : l'UI fomo abrège les gros PnL (K/M/B) — sans échelle, une valeur
+    abrégée ne matchait plus le motif de rang (rang entier perdu, chaîne
+    monotone cassée)."""
+    if not s:
+        return None
+    s = s.strip().replace(",", "")
+    m = re.fullmatch(r"([+-]?[\d.]+)([KMB]?)", s, re.IGNORECASE)
+    if not m:
+        return None
+    v = float(m.group(1))
+    mult = {"k": 1e3, "m": 1e6, "b": 1e9}.get((m.group(2) or "").lower(), 1.0)
+    return v * mult
 
 
 # le bloc leaderboard : [rang.] nom @handle + $PnL N+
+# FIX R9 : [KMB]? — l'UI abrège les gros PnL, un rang abrégé était perdu
 LB_RE = re.compile(
-    r"(?=(?:^|\n)(\d+)\.\n([^\n@]+)\n@([\w\-]+)\n\+\n\$([\d,]+(?:\.\d+)?)\n(\d+)\+\n)")
+    r"(?=(?:^|\n)(\d+)\.\n([^\n@]+)\n@([\w\-]+)\n\+\n\$([\d,]+(?:\.\d+)?[KMB]?)\n(\d+)\+\n)")
 # le podium : nom @handle + $PnL N+ (sans rang devant)
 POD_RE = re.compile(
-    r"(?=(?:^|\n)([^\n@\.]+)\n@([\w\-]+)\n\+\n\$([\d,]+(?:\.\d+)?)\n(\d+)\+\n)")
+    r"(?=(?:^|\n)([^\n@\.]+)\n@([\w\-]+)\n\+\n\$([\d,]+(?:\.\d+)?[KMB]?)\n(\d+)\+\n)")
 
 
 def parse_leaderboard_text(text):
@@ -117,8 +131,13 @@ def main():
         rows = parse_leaderboard_text(text)
         log(f"leaderboard parse : {len(rows)} traders")
         if len(rows) < 10:
-            # la page = peut-être un onglet périodique — on garde quand même
-            log(f"AVERTISSEMENT : {len(rows)} lignes seulement — le format a pu changer")
+            # FIX R9 : ABORT sans écriture — le DELETE intégral ci-dessous +
+            # la régénération de top_handles écrasaient l'élite avec les 3
+            # handles d'un parse partiel (onglet périodique capturé, format
+            # changé). L'ancien snapshot reste en base, l'élite est gardée.
+            log(f"ABORT : {len(rows)} lignes seulement (< 10) — le format a "
+                f"pu changer : rien n'est écrit, l'élite précédente est gardée")
+            return 1
 
         now = int(time.time())
         con = sqlite3.connect(DB, timeout=30)
