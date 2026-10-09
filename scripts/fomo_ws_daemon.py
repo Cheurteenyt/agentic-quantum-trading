@@ -17,6 +17,7 @@ ARCHITECTURE v2 :
     automatiquement, les froids sont désabonnés (budget 78 topics)
 """
 import asyncio
+import contextlib
 import base64
 import fcntl
 import json
@@ -844,6 +845,7 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
 
 
 async def daemon_loop(user_uuid, seed_mints, writer, run_until_ts=None):
+    global TOP_HANDLES
     backoff = 5
     while True:
         try:
@@ -853,6 +855,17 @@ async def daemon_loop(user_uuid, seed_mints, writer, run_until_ts=None):
                 return n, dur
         except Exception as e:
             writer.log_session_end(-1)
+            # FIX R9 : recharger l'élite à CHAQUE reconnexion — le harvester
+            # horaire écrit top_handles dans ws_config.json et son contrat
+            # (« épinglés à la prochaine reconnexion, ≤ 1 h ») confondait
+            # reconnexion et restart : le service tourne 24/7, sans reload
+            # l'élite restait figée sur les handles du boot.
+            # contextlib.suppress (forme acceptée par le ratchet except-pass).
+            with contextlib.suppress(Exception):
+                new_top = load_top_handles()
+                if new_top != TOP_HANDLES:
+                    TOP_HANDLES = new_top
+                    log(f"top_handles rechargés : {len(TOP_HANDLES)} handles")
             log(f"session perdue : {str(e)[:120]} → reconnexion dans {backoff}s")
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 300)
@@ -909,7 +922,13 @@ async def discover_uuid():
         await asyncio.sleep(25)
         rd.cancel()
         if found:
-            CONFIG.write_text(json.dumps({"user_uuid": list(found)[0]}))
+            # FIX R9 : FUSIONNER au lieu d'écraser — top_handles (harvester
+            # horaire) vit dans ce JSON et disparaissait à la première
+            # redécouverte d'UUID ; l'élite repassait silencieusement aux 8
+            # handles codés jusqu'à la prochaine passe harvester + restart.
+            cfg = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+            cfg["user_uuid"] = list(found)[0]
+            CONFIG.write_text(json.dumps(cfg))
             print(f"config écrite : {CONFIG}", flush=True)
         os._exit(0)
 
