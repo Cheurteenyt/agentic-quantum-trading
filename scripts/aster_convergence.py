@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,30 +27,43 @@ KDB = ROOT / "data" / "warehouse" / "klines.db"
 REPORTS = ROOT / "reports"
 
 
-def _x_pressure() -> dict[str, dict]:
+def _x_pressure(max_age_s: float = 26 * 3600) -> dict[str, dict]:
+    """Pression X par ticker, filtrée par fraîcheur.
+
+    x_aster_pulse réécrit x_pressure en INSERT OR REPLACE par ticker : si le
+    pulse ne tourne plus (crash, service off), une ligne fossile votait
+    indéfiniment dans la confluence. 26 h = 1 cycle nightly + marge."""
     try:
         con = sqlite3.connect(XDB, timeout=60)
         rows = con.execute(
-            "SELECT ticker, posts, velocity, longs, shorts FROM x_pressure"
+            "SELECT ticker, posts, velocity, longs, shorts, captured_at "
+            "FROM x_pressure"
         ).fetchall()
         con.close()
+        now = time.time()
         return {t: {"posts": p, "vx": v, "longs": lo, "shorts": sh}
-                for t, p, v, lo, sh in rows}
+                for t, p, v, lo, sh, cap in rows
+                if cap and now - float(cap) <= max_age_s}
     except sqlite3.OperationalError:
         return {}
 
 
-def _oi_velocity() -> dict[str, float]:
-    """ΔOI % entre les deux derniers snapshots par symbole."""
+def _oi_velocity(max_stale_h: float = 6.0) -> dict[str, float]:
+    """ΔOI % entre les deux derniers snapshots par symbole — le plus récent
+    doit être FRAIS : le composite crowding impose OI_MAX_STALE_H = 6 h, ici
+    un oi-collector arrêté 3 jours produisait un ΔOI fossile affiché comme
+    actuel et votant dans la confluence."""
     out: dict[str, float] = {}
     try:
         con = sqlite3.connect(KDB, timeout=60)
+        now_ms = time.time() * 1000
         for (sym,) in con.execute("SELECT DISTINCT symbol FROM oi_history"):
             pts = con.execute(
                 "SELECT open_interest, captured_at_ms FROM oi_history "
                 "WHERE symbol = ? ORDER BY captured_at_ms DESC LIMIT 2",
                 (sym,)).fetchall()
-            if len(pts) == 2 and pts[1][0]:
+            if len(pts) == 2 and pts[1][0] and pts[0][1] \
+                    and now_ms - float(pts[0][1]) <= max_stale_h * 3600_000:
                 out[sym[:-4]] = (pts[0][0] - pts[1][0]) / pts[1][0] * 100
         con.close()
     except sqlite3.OperationalError:
