@@ -17,6 +17,7 @@ ARCHITECTURE v2 :
     automatiquement, les froids sont désabonnés (budget 78 topics)
 """
 import asyncio
+import contextlib
 import base64
 import fcntl
 import json
@@ -854,13 +855,12 @@ async def daemon_loop(user_uuid, seed_mints, writer, run_until_ts=None):
             # (« épinglés à la prochaine reconnexion, ≤ 1 h ») confondait
             # reconnexion et restart : le service tourne 24/7, sans reload
             # l'élite restait figée sur les handles du boot.
-            try:
+            # contextlib.suppress (forme acceptée par le ratchet except-pass).
+            with contextlib.suppress(Exception):
                 new_top = load_top_handles()
                 if new_top != TOP_HANDLES:
                     TOP_HANDLES = new_top
                     log(f"top_handles rechargés : {len(TOP_HANDLES)} handles")
-            except Exception:
-                pass  # l'ancien set reste valable
             log(f"session perdue : {str(e)[:120]} → reconnexion dans {backoff}s")
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 300)
