@@ -34,7 +34,11 @@ class ConnectionManager:
     async def broadcast(self, data: dict):
         """Envoie des données à TOUS les clients connectés."""
         dead = []
-        for ws in self.active:
+        # R9 : itérer la liste vivante avec des await entre chaque envoi —
+        # un connect()/disconnect() concurrent (rechargement de page) levait
+        # RuntimeError: list changed size during iteration, avalé par
+        # l'appelant : les clients restants perdaient le tick sans trace.
+        for ws in list(self.active):
             try:
                 await ws.send_json(data)
             except Exception as e:
