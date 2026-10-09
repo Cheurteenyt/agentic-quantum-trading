@@ -43,6 +43,8 @@ from pathlib import Path
 from curl_cffi import requests as cffi
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.secret_io import write_secret  # noqa: E402
 JWT_CACHE = ROOT / "data" / "fomo" / "ws_jwt_cache.txt"
 FOMO_DB = ROOT / "data" / "fomo" / "fomo.db"          # lecture seule (mode=ro)
 DB = ROOT / "data" / "fomo" / "fomo_rest.db"          # LA base du collector
@@ -113,7 +115,7 @@ def refresh_jwt_via_cdp() -> str | None:
             jwt = (pg.evaluate("() => localStorage.getItem('privy:token')")
                    or "").strip().strip('"')
             if len(jwt) > 100:
-                JWT_CACHE.write_text(jwt)
+                write_secret(JWT_CACHE, jwt)
                 return jwt
         return None
     finally:

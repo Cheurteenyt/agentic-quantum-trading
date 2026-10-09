@@ -7,6 +7,7 @@ Rien ne s'affiche à l'écran, rien ne va dans l'historique du shell.
 from __future__ import annotations
 
 import getpass
+import os
 import re
 import sys
 import time
@@ -17,10 +18,19 @@ ROOT = Path(__file__).resolve().parents[1]
 ENV = ROOT / ".env"
 
 
-LOG = Path("/tmp/save_key.log")
+# FIX ronde 8 : le log vivait dans un dossier temporaire partagé
+# (world-readable, nom prédictible, open("a") suit les symlinks) et
+# journalisait le DÉBUT de la clé — un préfixe de secret + un fichier
+# suivable par n'importe quel process local, c'est une fuite en 2 lignes.
+# Log désormais sous data/ (git-ignoré, répertoire privé), créé 0600,
+# O_NOFOLLOW, et SANS aucun fragment de clé.
+LOG = ROOT / "data" / "save_key.log"
+
 
 def log(msg: str) -> None:
-    with open(LOG, "a") as f:
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(LOG, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "a") as f:
         f.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
 
 
@@ -32,7 +42,8 @@ def main() -> int:
     values = {}
     for k, label in fields:
         v = getpass.getpass(f"{label} : ").strip()
-        log(f"{k} : {len(v)} caractères, début={v[:6]!r}")
+        # JAMAIS de fragment de la valeur dans le log (diagnostic = présence + taille)
+        log(f"{k} : ok, {len(v)} caractères")
         values[k] = v
     missing = [k for k, v in values.items() if not v]
     if missing:
@@ -53,6 +64,6 @@ def main() -> int:
         log("succès : les 2 valeurs enregistrées")
         return 0
     log("échec : vérification finale échouée")
-    print("ERREUR : vérification échouée (détails dans /tmp/save_key.log)",
+    print(f"ERREUR : vérification échouée (détails dans {LOG})",
           file=sys.stderr)
     return 1

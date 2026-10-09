@@ -681,7 +681,8 @@ def init_web_agent(api_key: str = FIRECRAWL_API_KEY) -> FirecrawlWebAgent:
     """Initialise l'instance globale du web-agent."""
     global _web_agent_instance
     _web_agent_instance = FirecrawlWebAgent(api_key)
-    print(f"[WEB-AGENT] Initialized with Firecrawl API (key: {api_key[:10]}...)")
+    # pas de fragment de clé dans les journaux (ronde 8)
+    print("[WEB-AGENT] Initialized with Firecrawl API (key: set)")
     return _web_agent_instance
 
 
