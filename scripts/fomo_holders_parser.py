@@ -23,9 +23,9 @@ HOLD_BLOCK = re.compile(
     r"(?m)^([^\n$]+)\n(\d+[dhm\d ]*) avg\. hold\n"
     r"(?:Received from external wallet\n)?"
     r"\$([\d,]+(?:\.\d+)?)\n"
-    r"([\d.,]+[KMB]?) ([A-Z0-9\u4e00-\u9fff/\-]+)\n"
-    r"([+\-])\n\$([\d,]+(?:\.\d+)?)\n[▲▼]\n([\d.,]+)%\n"
-    r"\$([\d.,]+[KMB]?) MC\n\$([\d.,]+)\n")
+    r"([\d.,]+[KMBT]?) ([A-Z0-9\u4e00-\u9fff/\-]+)\n"
+    r"([+\-−])\n\$([\d,]+(?:\.\d+)?)\n[▲▼]\n([\d.,]+)%\n"
+    r"\$([\d.,]+[KMBT]?) MC\n\$([\d.,]+)\n")
 
 
 def parse_holders(text, ticker):
@@ -65,13 +65,13 @@ def parse_token_header(text):
     """Le header de la page token : MC, prix, holders, liquidité, top-10
     holding, la pression acheteurs/vendeurs du panneau droit."""
     def grab(label):
-        m = re.search(re.escape(label) + r"\s*\n?\s*\$?([\d.,]+[KMBkmb]?)", text)
+        m = re.search(re.escape(label) + r"\s*\n?\s*\$?([\d.,]+[KMBTkmbt]?)", text)
         return m.group(1) if m else None
 
-    holders = re.search(r"Holders\s*\n?\s*([\d.,]+[KMBkmb]?)", text)
+    holders = re.search(r"Holders\s*\n?\s*([\d.,]+[KMBTkmbt]?)", text)
     top10 = re.search(r"Top 10 holding\s*\n?\s*([\d.]+)%", text)
-    liq = re.search(r"Liquidity\s*\n?\s*\$?([\d.,]+[KMBkmb]?)", text)
-    mc = re.search(r"Market cap\s*\n?\s*\$([\d.,]+[KMB]?)", text)
+    liq = re.search(r"Liquidity\s*\n?\s*\$?([\d.,]+[KMBTkmbt]?)", text)
+    mc = re.search(r"Market cap\s*\n?\s*\$([\d.,]+[KMBT]?)", text)
     buys = re.search(r"([\d,]+) buys\s*\n?\s*([\d,]+) sells", text)
     buyers = re.search(r"([\d,]+) buyers\s*\n?\s*([\d,]+) sellers", text)
     return {
@@ -89,7 +89,7 @@ def parse_token_header(text):
 # ============================ LES SWAPS D'UN TOKEN ============================
 # La structure du tab Swaps : Handle | Buy/Sell | $montant | $MC | temps
 SWAP_ROW = re.compile(
-    r"(?m)^([^\n$]+)\n(Buy|Sell)\n\$([\d,]+(?:\.\d+)?)\n\$([\d.,]+[KMB]?)\n(\d+[smhd])\n")
+    r"(?m)^([^\n$]+)\n(Buy|Sell)\n\$([\d,]+(?:\.\d+)?)\n\$([\d.,]+[KMBT]?)\n(\d+[smhd])\n")
 
 
 def parse_token_swaps(text):
@@ -108,7 +108,7 @@ def parse_about(text):
     out = {}
     m = re.search(r"Launchpad\s*\n?\s*([^\n]+)", text)
     out["launchpad"] = m.group(1).strip() if m else None
-    m = re.search(r"Supply\s*\n?\s*([\d.,]+[KMB]?)", text)
+    m = re.search(r"Supply\s*\n?\s*([\d.,]+[KMBT]?)", text)
     out["supply"] = m.group(1) if m else None
     m = re.search(r"Network\s*\n?\s*([^\n]+)", text)
     out["network"] = m.group(1).strip() if m else None

@@ -31,30 +31,30 @@ def log(m):
     print(f"[{time.strftime('%H:%M:%S')}] {m}", flush=True)
 
 
-def knum(s):
-    """'1,234.5' => 1234.5 ; '1.2K'/'1.2M'/'1.2B' => échelle appliquée.
-
-    R9 : l'UI fomo abrège les gros PnL (K/M/B) — sans échelle, une valeur
-    abrégée ne matchait plus le motif de rang (rang entier perdu, chaîne
-    monotone cassée)."""
-    if not s:
-        return None
-    s = s.strip().replace(",", "")
-    m = re.fullmatch(r"([+-]?[\d.]+)([KMB]?)", s, re.IGNORECASE)
-    if not m:
-        return None
-    v = float(m.group(1))
-    mult = {"k": 1e3, "m": 1e6, "b": 1e9}.get((m.group(2) or "").lower(), 1.0)
-    return v * mult
+# (knum a déménagé dans scripts/fomo_knum.py — ronde 11 : le contrat commun
+# ajoute T, le moins typographique U+2212 et les formats fr « 1.234,5 ».)
+from scripts.fomo_knum import knum  # noqa: E402
 
 
 # le bloc leaderboard : [rang.] nom @handle + $PnL N+
 # FIX R9 : [KMB]? — l'UI abrège les gros PnL, un rang abrégé était perdu
+# FIX R11 : [KMBT]? + signe typographique (les perdants « -\n$1.2K » ne
+# matchaient pas : le '+' était hardcodé). Le signe est un groupe CAPTURÉ
+# appliqué par _signed (knum normalise U+2212).
 LB_RE = re.compile(
-    r"(?=(?:^|\n)(\d+)\.\n([^\n@]+)\n@([\w\-]+)\n\+\n\$([\d,]+(?:\.\d+)?[KMB]?)\n(\d+)\+\n)")
+    r"(?=(?:^|\n)(\d+)\.\n([^\n@]+)\n@([\w\-]+)\n([+\-−])\n\$([\d,]+(?:\.\d+)?[KMBT]?)\n(\d+)\+\n)")
 # le podium : nom @handle + $PnL N+ (sans rang devant)
 POD_RE = re.compile(
-    r"(?=(?:^|\n)([^\n@\.]+)\n@([\w\-]+)\n\+\n\$([\d,]+(?:\.\d+)?[KMB]?)\n(\d+)\+\n)")
+    r"(?=(?:^|\n)([^\n@\.]+)\n@([\w\-]+)\n([+\-−])\n\$([\d,]+(?:\.\d+)?[KMBT]?)\n(\d+)\+\n)")
+
+
+def _signed(pnl_str, sign):
+    """La valeur signée : l'UI porte le signe sur SA PROPRE ligne (avant le
+    $) ; les perdants « -\n$1.2K » étaient invisibles avant la ronde 11."""
+    v = knum(pnl_str)
+    if v is not None and sign in ("-", "\u2212"):
+        v = -v
+    return v
 
 
 def parse_leaderboard_text(text):
@@ -63,8 +63,9 @@ def parse_leaderboard_text(text):
     dans le texte). L'ALL = la sous-suite monotone PnL-décroissante des rangs
     4→100 qui démarre au PnL global max, + le podium 1-3 au-dessus."""
     numbered = []  # (rank, pnl, name, handle, trades)
-    for rank, name, handle, pnl, trades in LB_RE.findall(text):
-        numbered.append((int(rank), knum(pnl), name.strip(), handle, int(trades)))
+    for rank, name, handle, sign, pnl, trades in LB_RE.findall(text):
+        numbered.append((int(rank), _signed(pnl, sign), name.strip(), handle,
+                         int(trades)))
     if not numbered:
         return []
     numbered.sort(key=lambda r: (r[0], -(r[1] or 0)))
@@ -88,8 +89,8 @@ def parse_leaderboard_text(text):
     # le podium all-time : les non-numérotés au PnL > le rang 4
     known = {h for _, _, _, h, _ in all_rows}
     podium = []
-    for name, handle, pnl, trades in POD_RE.findall(text):
-        p = knum(pnl)
+    for name, handle, sign, pnl, trades in POD_RE.findall(text):
+        p = _signed(pnl, sign)
         if handle not in known and p is not None and p > floor:
             podium.append((p, name.strip(), handle, int(trades)))
     podium.sort(reverse=True)
