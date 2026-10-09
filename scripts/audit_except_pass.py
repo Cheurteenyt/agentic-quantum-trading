@@ -86,12 +86,15 @@ def _top(courant: dict[str, int], n: int = 15) -> list[tuple[str, int]]:
     return sorted(courant.items(), key=lambda kv: (-kv[1], kv[0]))[:n]
 
 
-def _charger_base() -> dict[str, int]:
-    if not BASELINE.exists():
+def _charger_base(path: Path | str | None = None) -> dict[str, int]:
+    # argparse fournit une str ; la référence par défaut reste le
+    # baseline committé (BASELINE).
+    p = Path(path) if path else BASELINE
+    if not p.exists():
         return {}
     try:
         return {k: int(v) for k, v in
-                json.loads(BASELINE.read_text(encoding="utf-8")).items()}
+                json.loads(p.read_text(encoding="utf-8")).items()}
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return {}
 
@@ -120,7 +123,7 @@ def cmd_list(a) -> int:
 
 def cmd_check(a) -> int:
     courant = mesurer()
-    base = _charger_base()
+    base = _charger_base(getattr(a, "baseline", None))
     if not base:
         print("::error::référence absente — "
               "`python3 scripts/audit_except_pass.py --reset` "
@@ -167,6 +170,13 @@ def main(argv=None) -> int:
     p.add_argument("--list", action="store_true",
                    help="liste chaque occurrence (fichier:ligne)")
     p.add_argument("--check", action="store_true", help="gate CI (rochet)")
+    p.add_argument("--baseline", type=str, default=None,
+                   help="référence ALTERNATIVE (chemin d'un JSON de comptes). "
+                        "C'est le rochet dette_PR <= dette_main : la CI "
+                        "compare l'arbre courant au baseline de origin/main, "
+                        "pas au baseline COMMITTÉ dans la branche — une PR "
+                        "peut sinon relever sa propre référence (--reset) et "
+                        "faire taire l'alarme.")
     p.add_argument("--reset", action="store_true",
                    help="réécrit la référence (PR de réduction)")
     a = p.parse_args(argv)

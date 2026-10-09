@@ -125,6 +125,21 @@ jobs:
       - name: "Ratchet except-pass (BLOQUANT, 207 mesurés)"
         run: python scripts/audit_except_pass.py --check
 
+      # r7 — le ratchet ci-dessus compare l'arbre au baseline COMMITTÉ
+      # dans la branche testée : une PR peut donc faire `--reset`, relever
+      # sa propre référence et faire taire l'alarme. Ce second gate
+      # compare au baseline de origin/main (fetch-depth: 0 ci-dessus) :
+      # la dette d'une PR ne peut plus dépasser celle de main.
+      - name: "Rochet dette_PR <= dette_main (except-pass, BLOQUANT)"
+        run: |
+          if git show origin/main:.github/except-pass-baseline.json \
+              > /tmp/main_except_pass.json 2>/dev/null; then
+            python scripts/audit_except_pass.py --check \
+              --baseline /tmp/main_except_pass.json
+          else
+            echo "::notice::baseline absent sur origin/main — comparaison sautée"
+          fi
+
       # Le scan bandit COMPLET trouve 500+ avis (373 B608 sur du SQL
       # formaté, 118 B310, 12 B301, 8 B324, 8 B108). Les rendre bloquants
       # ferait échouer la CI immédiatement et l'oracle serait ignoré. On
@@ -143,3 +158,20 @@ jobs:
             exit 1
           fi
           echo "::notice::stock bandit ${total}/${ref} — à réduire progressivement"
+
+      # r7 — même rochet que except-pass : une PR ne peut pas relever le
+      # baseline committé pour cacher sa dette. Comparaison à origin/main
+      # (fetch-depth: 0) : dette_PR <= dette_main.
+      - name: "Rochet dette_PR <= dette_main (bandit, BLOQUANT)"
+        run: |
+          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null \
+                  | grep -c "^>> Issue:" || true)
+          if ! ref_main=$(git show origin/main:.github/bandit-baseline.txt 2>/dev/null); then
+            echo "::notice::baseline bandit absent sur origin/main — comparaison sautée"
+            exit 0
+          fi
+          echo "bandit vs main : $total (main $ref_main)"
+          if [ "$total" -gt "$ref_main" ]; then
+            echo "::error::la dette bandit de la PR ($total) dépasse celle de main ($ref_main)"
+            exit 1
+          fi
