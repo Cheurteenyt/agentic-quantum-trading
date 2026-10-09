@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts import aster_indicators as ta  # noqa: E402
+from scripts.funding_align import align_funding_rate  # noqa: E402
 # NB : PAS d'import module-level de portfolio_sim ici — portfolio_sim
 # importe load_df de CE module (l.43) : un import top-level créerait un
 # cycle. Les imports différés vivent dans la fonction du rapport.
@@ -404,11 +405,10 @@ def main() -> int:
         # DIVERGENCE FUNDING/PRIX (ingénieux) : la foule empile des longs
         # (funding qui accélère) pendant que le prix chute ≥ 3 %/24h →
         # short ; miroir → long
-        g = fh[fh.symbol == sym].set_index("funding_time")["rate"]
-        g = pd.to_numeric(g, errors="coerce").dropna()
-        rate_h = g.sort_index()
-        rate_h.index = pd.to_datetime(rate_h.index, unit="ms")
-        rate_aligned = rate_h.reindex(df.index, method="ffill", limit=8)
+        # ronde 11 : helper blindé — funding_time NULL/dupliqué ou unité s
+        # crashait le reindex nu ou muait l'accel en silence (dates 1970).
+        rate_aligned = align_funding_rate(fh[fh.symbol == sym], df.index,
+                                          limit=8)
         accel = rate_aligned.diff(3)
         pchg = df["close"].pct_change(24)
         # déviation VWAP 7j (pour les combos d'épuisement)

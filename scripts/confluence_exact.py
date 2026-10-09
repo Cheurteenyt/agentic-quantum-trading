@@ -29,11 +29,11 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
-from scripts.paper_forward import funding_div_mask  # noqa: E402
+from scripts.funding_align import align_funding_rate  # noqa: E402
 from scripts.portfolio_sim import KDB, btc_regime_series, monthly_rows  # noqa: E402
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, MAKER_RT, TAKER_RT, collect_funding_strategies, funding_hourly_all,
-    run_stack)
+    run_stack, stamp_expanding_q66)
 
 REPORTS = ROOT / "reports"
 HOLD = 24
@@ -52,7 +52,6 @@ def collect_conf_exact(con: sqlite3.Connection,
         fh_sym = fh[fh.symbol == sym]
         if fh_sym.empty:
             continue
-        mask = funding_div_mask(df, fh_sym)
         tp = (df["high"] + df["low"] + df["close"]) / 3
         # FIX F-039 : un sentinelle pd.NA sur un dénominateur nul fait
         # basculer la série en dtype OBJECT dès qu'une fenêtre roulante est
@@ -66,13 +65,12 @@ def collect_conf_exact(con: sqlite3.Connection,
         vwap = ((tp * df["volume"]).rolling(168).sum()
                 / df["volume"].rolling(168).sum().replace(0, float("nan")))
         dev = ((df["close"] - vwap) / vwap).astype(float)
-        # la confluence vedette v5 = ACCEL funding + ÉTIREMENT vwap only
-        # (le -3%/24h appartient à funding_prix_divergence seule)
-        accel_only = mask & True
-        # reconstruire l'accel sans le filtre de prix :
-        rate = fh_sym.set_index("funding_time")["rate"].astype(float).sort_index()
-        rate.index = pd.to_datetime(rate.index, unit="ms")
-        aligned = rate.reindex(df.index, method="ffill", limit=8)
+        # la confluence vedette v5 = ACCEL funding + ÉTIREMENT vwap — 2 jambes
+        # (le -3%/24h de la définition à 3 jambes appartient à
+        # funding_prix_divergence seule ; le header du rapport dit maintenant
+        # la même chose). ronde 11 : helper blindé — funding_time NULL/dup/s
+        # crashait le reindex nu ou muait l'accel en silence.
+        aligned = align_funding_rate(fh_sym, df.index, limit=8)
         accel = aligned.diff(3) > 0
         mask = (accel & (dev > 3 * dev.rolling(168).std())).fillna(False)
         idx = df.index
@@ -118,8 +116,14 @@ def main() -> int:
         e["hold_h"] = 24
         e["fee_rt_bps"] = MAKER_RT
     add_rolling_scores(cascade)
-    q66 = float(np.nanquantile(
-        [e["al_score"] for e in cascade[:int(len(cascade) * 0.7)]], 2/3))
+    # C-B3 (ronde 11) : le seuil de gate était UN SEUL quantile calculé sur
+    # les 70 % PREMIERS du sample puis appliqué à TOUS les événements — le
+    # sizing au temps t voyait jusqu'à 70 % d'histoire FUTURE (look-ahead
+    # plein, le motif corrigé dans stacked_portfolio). Le seuil est
+    # maintenant EXPANDING posé par événement : au temps t il ne voit que
+    # les scores antérieurs ; pendant le warm-up (< 30 obs) il est NaN et
+    # l'event n'est PAS gaté (sémantique gate_expanding).
+    cascade, _q66_last = stamp_expanding_q66(cascade)
     fdiv, conf_proxy = collect_funding_strategies(con)
     con.close()
 
@@ -141,7 +145,11 @@ def main() -> int:
                 sc = e.get("al_score", float("nan"))
                 if np.isnan(sc):
                     return 0.05
-                return 0.0 if sc >= q66 else 0.045
+                # C-B3 : seuil EXPANDING posé par event, pas le scalaire
+                thr = e.get("_q66_asof", float("nan"))
+                if np.isnan(thr):
+                    return 0.045   # warm-up : pas de gate (gate_expanding)
+                return 0.0 if sc >= thr else 0.045
             if s == "funding_div":
                 return 0.015
             if s == "confluence":
@@ -173,7 +181,8 @@ def main() -> int:
     lines = [
         "# LA CONFLUENCE EXACTE — la définition v5 dans le wallet séquentiel",
         f"{datetime.now(timezone.utc):%d/%m/%Y %H:%M} UTC — funding accel + "
-        f"prix -3%/24h + dev > 3σ(168), short 24h, 3x taker.", "",
+        f"dev > 3σ(168), short 24h, 3x taker. 2 jambes : le prix -3%/24h "
+        f"de la v5 à 3 jambes appartient à funding_prix_divergence seule.", "",
         "## Le signal brut", "",
         f"- {n} événements sur 1 an (l'univers 1h complet)",
         f"- WR horizon-fixe 24h : **{wr:.1f} %**",

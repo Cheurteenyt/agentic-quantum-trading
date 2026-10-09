@@ -32,6 +32,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
 from scripts.backtest_indicators import load_df  # noqa: E402
+from scripts.funding_align import align_funding_rate  # noqa: E402
 from scripts.portfolio_sim import KDB, MAJORS, btc_regime_series, monthly_rows  # noqa: E402
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, MAKER_RT, funding_hourly_all, run_stack)
@@ -67,10 +68,10 @@ def enrich(con: sqlite3.Connection, events: list[dict]) -> list[dict]:
         fh_sym = by_sym_fh.get(sym)
         accel_ts = set()
         if fh_sym is not None and len(fh_sym):
-            rate = fh_sym.set_index("funding_time")["rate"].astype(
-                float).sort_index()
-            rate.index = pd.to_datetime(rate.index, unit="ms")
-            aligned = rate.reindex(df.index, method="ffill", limit=8)
+            # ronde 11 : helper blindé — funding_time NULL/dupliqué ou unité
+            # s crashait le reindex (NaT non monotone / labels dupliqués)
+            # ou muaient l'accel en silence (dates 1970).
+            aligned = align_funding_rate(fh_sym, df.index, limit=8)
             accel = (aligned.diff(3) > 0).fillna(False)
             idx_ns = df.index.astype("datetime64[ns]").asi8
             accel_ts = {int(idx_ns[t]) for t in np.where(accel)[0]}
@@ -96,8 +97,10 @@ def main() -> int:
     add_rolling_scores(events)
     events = enrich(con, events)
     fh = funding_hourly_all()
-    q66 = float(np.nanquantile(
-        [e["al_score"] for e in events[:int(len(events) * 0.7)]], 2/3))
+    # (le q66 scalaire figurait ici — MORT : aucun rung ne le lisait ; et
+    # le motif « quantile sur les 70 % premiers » est le look-ahead C-B3
+    # corrigé dans stacked_portfolio. Supprimé, pas estampillé : le ladder
+    # ne gate rien.)
 
     # les rungs — conditions imbriquées
     rungs = [
