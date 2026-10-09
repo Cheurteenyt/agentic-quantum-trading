@@ -84,6 +84,69 @@ def label_hash(snapshot: str, horizons: tuple[int, ...]) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
+# P0-③ (audit 2026-10-08) : dataset_window_sha est une FONCTION PURE —
+# volontairement SANS cache mtime : preuve exécutée, plusieurs filesystems
+# arrondissent st_mtime_ns (deux écritures successives partagent le même
+# mtime ET la même size) → un cache (path, end, mtime, size) réserverait
+# l'ANCIEN hash après une correction historique : le bug P0-③ recréé.
+# La déduplication du coût (37 specs de même fenêtre) se fait CÔTÉ
+# APPELANT, au démarrage de campagne (research_worker, sémantique
+# « manifeste scellé »).
+
+
+def dataset_window_sha(db_path: Path, end_ms: int) -> str:
+    """Le hash des données STRICTEMENT sous la fenêtre scientifique qui
+    se termine à end_ms (demi-ouvert [0, end_ms)) : klines 1h avec
+    open_time < end_ms + funding_history avec funding_time < end_ms.
+
+    P0-③ (audit 2026-10-08) : le spec_sha seul ne voit pas les DONNÉES —
+    une correction historique DANS la fenêtre d'une spec DONE changeait
+    la mesure sans provoquer de re-mesure, et réciproquement l'append en
+    queue de db (l'actif continue d'exister) ne doit PAS invalider. Ce
+    hash sépare les deux : il bouge si et seulement si le contenu sous la
+    fenêtre bouge.
+
+    Bornes (protocole PR-163 : fenêtres historiques figées) :
+    - borne GAUCHE = première barre (pas train_start) : les features
+      expanding (warmup, volume_z n=20) chargent TOUT l'historique
+      antérieur — une correction avant train_start déplace les seuils
+      DANS la fenêtre ;
+    - borne DROITE = validation_end : au-delà, un append ne touche ni les
+      labels train ni les labels de validation (entry+H <= train_end pour
+      le train, la vue validation coupe à validation_end).
+
+    Demi-ouvert : une barre open_time == end_ms n'appartient PAS à la
+    fenêtre (convention [start, end) du runner). Seul l'intervalle 1h est
+    haché (la mesure ne résout que lui). Une db ABSENTE = hash du vide
+    (déterministe) : le skip reste stable tant qu'elle n'apparaît pas.
+    Une db PRÉSENTE mais illisible LÈVE (fail-closed à l'appelant)."""
+    db_path = Path(db_path)
+    h = hashlib.sha256()
+    if db_path.exists():
+        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            for sym, ots, o, hi, lo, cl, v in con.execute(
+                    "SELECT symbol, open_time, open, high, low, close, "
+                    "volume FROM klines WHERE interval='1h' AND "
+                    "open_time < ? ORDER BY symbol, open_time",
+                    (int(end_ms),)):
+                h.update(f"{sym}|{ots}|{o}|{hi}|{lo}|{cl}|{v};".encode())
+            try:
+                for sym, ft, rate in con.execute(
+                        "SELECT symbol, funding_time, rate FROM "
+                        "funding_history WHERE funding_time < ? "
+                        "ORDER BY symbol, funding_time",
+                        (int(end_ms),)):
+                    h.update(f"F|{sym}|{ft}|{rate};".encode())
+            except sqlite3.Error:
+                h.update(b"F|absent;")
+        finally:
+            con.close()
+    else:
+        h.update(b"absent;")
+    return f"dws-{h.hexdigest()[:16]}"
+
+
 def _build_symbol(con: sqlite3.Connection, sym: str,
                   horizons: tuple[int, ...], fser: FundingSeries | None
                   ) -> dict[str, np.ndarray]:
