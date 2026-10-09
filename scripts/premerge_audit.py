@@ -42,7 +42,7 @@ def api(method: str, path: str, payload: dict | None = None):
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(f"{API}/repos/{REPO}/{path}", data=data,
                                  headers=HDR, method=method)
-    with urllib.request.urlopen(req) as r:
+    with urllib.request.urlopen(req) as r:  # nosec B310 — URL constantes https de l'API GitHub (doctrine bandit du repo)
         return json.loads(r.read() or b"{}")
 
 
