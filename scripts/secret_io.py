@@ -13,6 +13,7 @@ repo, dont le tmp pré-rename était resté en 0644 — TOCTOU corrigé ici).
 """
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -36,8 +37,8 @@ def write_secret(path: Path | str, data: str | bytes) -> None:
         os.chmod(tmp_name, 0o600)  # mkstemp est déjà 0600 ; ceinture de bretelles
         os.replace(tmp_name, p)
     except Exception:
-        try:
+        # cleanup best-effort : si le tmp est déjà parti, l'erreur primaire
+        # (relancée juste après) reste la seule qui compte.
+        with contextlib.suppress(OSError):
             os.unlink(tmp_name)
-        except OSError:
-            pass
         raise

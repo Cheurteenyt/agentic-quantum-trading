@@ -18,6 +18,7 @@ existe déjà en 0644.
 from __future__ import annotations
 
 import ast
+import contextlib
 import os
 import stat
 import sys
@@ -86,10 +87,10 @@ class TestWriteSecret(unittest.TestCase):
 
         def reader():
             while not stop.is_set():
-                try:
+                # le fichier peut être absent le temps du rename : absent = on
+                # réessaie (l'oracle compte les CONTENUS lus, jamais un échec)
+                with contextlib.suppress(FileNotFoundError):
                     seen.add(self.target.read_text())
-                except FileNotFoundError:
-                    pass
 
         t = threading.Thread(target=reader, daemon=True)
         t.start()
