@@ -65,7 +65,7 @@ Suppression locale (décision explicite, visible en review) :
 noyau (`tests/test_r12_deep_audit.py`) utilise ce marqueur car il **injecte**
 volontairement les fossiles pour prouver la détection.
 
-### Couche 3 — le protocole de merge scripté (`scripts/premerge_audit.sh`)
+### Couche 3 — le protocole de merge scripté (`scripts/premerge_audit.py`)
 
 Le re-audit avant merge, exécuté manuellement depuis la ronde 10, devient un
 script à gates : (1) fetch et capture de `origin/main` ; (2) CI verte sur le
@@ -96,4 +96,4 @@ extrêmes sont interdits.
     python3 scripts/deep_audit.py --reset          # réécrit la référence (PR de réduction)
     python3 scripts/deep_audit.py --json out.json  # sortie machine diffable
     python3 scripts/run_tests.py deep_audit        # les 22 mutations négatives du noyau
-    GH=<token> bash scripts/premerge_audit.sh 255  # protocole de merge complet
+    GH=<token> bash scripts/premerge_audit.py 255  # protocole de merge complet
