@@ -1,0 +1,45 @@
+{
+ "backend/routers/onchain.py": {
+  "G4": 3
+ },
+ "backend/routers/vision.py": {
+  "G4": 1
+ },
+ "backend/services/alpha_wallets.py": {
+  "G4": 1
+ },
+ "backend/services/entity_intelligence.py": {
+  "G4": 1
+ },
+ "backend/services/onchain/aster/aster_paper_trading_sandbox.py": {
+  "G4": 3
+ },
+ "backend/services/onchain/aster/backtest_strategy_discovery.py": {
+  "G4": 2
+ },
+ "backend/services/onchain/aster/data_sources/source_validation.py": {
+  "G4": 1
+ },
+ "backend/services/onchain/aster/monitor_optimized_longs.py": {
+  "G4": 1
+ },
+ "backend/services/onchain/behavioral_evidence_bridge.py": {
+  "G4": 2
+ },
+ "backend/services/onchain_engine.py": {
+  "G4": 38
+ },
+ "tests/test_backtest_v2_costs.py": {
+  "G2": 1
+ },
+ "tests/test_discord_bot_unit.py": {
+  "G2": 1
+ },
+ "tests/test_onchain_entity_chain_gaps.py": {
+  "G2": 240,
+  "G8": 34
+ },
+ "tests/test_refresh_aster_cache.py": {
+  "G2": 1
+ }
+}

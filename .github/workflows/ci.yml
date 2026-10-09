@@ -56,6 +56,27 @@ jobs:
       - name: Audit check (bloquant sur --fail-on)
         run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
 
+      # r12 (docs/41) — les classes de bugs réellement rencontrées
+      # deviennent des détecteurs : unités s/ms (P0 ronde 10), fossiles de
+      # tests (#235), contrat x_pressure, faux succès codé dur (#249),
+      # fail-open de gate (R5). Rochet : la dette (G2 243, G4 53, G8 34
+      # mesurés au jour 0) cesse de croître, fichier par fichier ; les
+      # classes à 0 (G1, G3, G5, G9) sont une protection pure.
+      - name: "Rochet deep-audit (BLOQUANT) — classes G, doctrine docs/41"
+        run: python scripts/deep_audit.py --check
+
+      # même second gate que except-pass : une PR ne peut pas faire
+      # --reset, relever sa propre référence et faire taire l'alarme —
+      # la dette PR <= la dette main.
+      - name: "Rochet dette_PR <= dette_main (deep-audit, BLOQUANT)"
+        run: |
+          if git show origin/main:.github/deep-audit-baseline.json \
+              > /tmp/main_deep_audit.json 2>/dev/null; then
+            python scripts/deep_audit.py --check --baseline /tmp/main_deep_audit.json
+          else
+            echo "::notice::baseline deep-audit absente sur origin/main — comparaison sautée (PR d'introduction)"
+          fi
+
   # ─── 3.7 : le frontend était le seul pan sans oracle ───
   # 42 fichiers TS/TSX, 0 test, aucun typecheck en CI. `tsc --noEmit`
   # est l'équivalent exact du gate pyflakes côté Python : il attrape les
