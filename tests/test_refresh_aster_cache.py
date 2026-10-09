@@ -5,6 +5,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))   # refresh_aster_cache importe aster_rate
+# (ronde 6 : ce test ne passait SEUL que si un autre test, plus tôt dans
+# l'ordre alphabétique de découverte, avait déjà inséré scripts/ au path —
+# fragile et faux en isolation)
 
 import importlib.util  # noqa: E402
 import json  # noqa: E402

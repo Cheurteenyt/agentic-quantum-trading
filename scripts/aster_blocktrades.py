@@ -162,7 +162,12 @@ def http_get_json(url: str, retries: int = 3) -> tuple[list | dict, int | None]:
                 log("  429 rate limit, cooldown 65s")
                 time.sleep(65.0)
                 continue
-            if exc.code in (418, 5, 502, 503) and attempt < retries:
+            # D-03 (ronde 6) : le 418 (ban IP — doctrine aster_rate :
+            # 2 min → 3 jours) n'est PAS retenté : marteler un serveur qui
+            # a banni l'IP prolonge le ban, il tombe dans le raise. Et le
+            # littéral `5` n'existe pas en code HTTP (typo pour 500) : le
+            # 500 est désormais retenté comme 502/503.
+            if exc.code in (500, 502, 503) and attempt < retries:
                 time.sleep(delay)
                 delay *= 2
                 continue

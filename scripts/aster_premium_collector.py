@@ -37,7 +37,12 @@ def main() -> int:
                 aster_rate.note_weight(getattr(r, "headers", None), "aster_premium")
                 d = json.load(r)
             mark, idx = float(d["markPrice"]), float(d["indexPrice"])
-            prem = (mark / idx - 1) * 100 if idx else 0.0
+            # D-08 (ronde 6) : un index manquant/nul fabriquait une prime
+            # FICTIVE 0.0 stockée en base — indistinguishable d'une vraie
+            # prime nulle pour crowding_composite. On saute la mesure.
+            if not idx:
+                continue
+            prem = (mark / idx - 1) * 100
             con.execute("INSERT OR IGNORE INTO premium_history VALUES (?,?,?,?,?,?,?)",
                         (sym, mark, idx, round(prem, 6),
                          float(d["lastFundingRate"]),
