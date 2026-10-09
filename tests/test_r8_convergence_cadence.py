@@ -167,7 +167,13 @@ class _ConvergenceFixture(unittest.TestCase):
             ("TESTN", 10, 2.0, 2, 9),   # short sans funding
             ("TESTQ", 2, 0.0, 2, 0),    # < 3 posts : lentille X muette
         ]
-        con.executemany("INSERT INTO x_pressure VALUES (?,?,?,?,?, '2026-10-08')", rows)
+        # captured_at est un timestamp EPOCH SECONDS (x_aster_pulse écrit
+        # now) — l'interaction r9 (#243 fraîcheur × #237 fixture) : une
+        # date ISO lève ValueError au filtre float(cap) ajouté par #243.
+        # La fixture suit le contrat réel du producteur.
+        con.executemany(
+            "INSERT INTO x_pressure VALUES (?,?,?,?,?, ?)",
+            [(r[0], r[1], r[2], r[3], r[4], time.time()) for r in rows])
         con.commit(); con.close()
         con = sqlite3.connect(self.kdb)
         con.execute("CREATE TABLE oi_history (symbol TEXT, open_interest REAL, captured_at_ms INTEGER)")
