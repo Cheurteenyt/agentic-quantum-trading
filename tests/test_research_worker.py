@@ -194,15 +194,23 @@ class TestMigration(unittest.TestCase):
             self.assertIn("MOTEUR a changé", note)
 
     def test_engine_sha_at_commit_reel(self):
-        # intégration : le moteur à 440648e est calculable depuis git —
+        # intégration : le moteur à HEAD est calculable depuis git —
         # PR-179 : un clone SHALLOW (l'ancien défaut CI) n'a pas les
-        # ancêtres → skip propre au lieu d'un faux échec
+        # ancêtres → skip propre au lieu d'un faux échec.
+        # Ronde 11 : l'assert portait sur 440648e (ère PR-160) — il
+        # supposait que TOUS les modules de la clôture existaient à ce
+        # commit. C'est faux dès qu'un module de mesure y entre
+        # (funding_align, r11) : _engine_sha_at renvoie alors None =
+        # INVÉRIFIABLE, le contrat fail-closed (la migration archive la
+        # campagne). L'assert réel : HEAD est toujours calculable, un
+        # SHA inconnu ne l'est jamais — et l'ère PR-160 est désormais
+        # volontairement invérifiable (test_ère_pr160_couvre le chemin).
         shallow = subprocess.run(
             ["git", "rev-parse", "--is-shallow-repository"],
             capture_output=True, text=True, cwd=ROOT).stdout.strip()
         if shallow == "true":
-            self.skipTest("clone shallow : l'ancêtre 440648e est absent")
-        self.assertIsNotNone(rw._engine_sha_at("440648e"))
+            self.skipTest("clone shallow : les ancêtres sont absents")
+        self.assertIsNotNone(rw._engine_sha_at("HEAD"))
         self.assertIsNone(rw._engine_sha_at("0000000"))
 
     def test_db_derivee_transporte_quand_meme(self):
