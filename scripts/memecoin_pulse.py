@@ -73,13 +73,30 @@ def funding_row(symbol: str) -> tuple[float | None, float | None]:
                 or float(cached_at) <= 0 \
                 or time.time() - float(cached_at) > 25 * 3600:
             return None, None
-        rate = entry.get("data", {}).get("latest_funding_rate")
+        data = entry.get("data", {})
+        rate = data.get("latest_funding_rate")
         if rate is None:
             return None, None
         r = float(rate) * 100.0
-        return r, r * 3 * 365
+        # FIX ronde 8 (cadence) : le cache MESURE l'intervalle réel par
+        # symbole (refresh_aster_cache, médiane des gaps — FIX F12) mais le
+        # consommateur annualisait à 3 règlements/8 h figés. Sur le cache
+        # réel : 14/25 symboles de l'univers de convergence mal annualisés
+        # (×8 pour un 1 h comme MEMEUSDT, ×2 pour un 4 h) — la colonne
+        # « Funding ann. » et les seuils −30/+50 évaluaient une quantité
+        # différente selon la cadence du symbole. Fallback 8 h = cadence
+        # standard quand l'intervalle n'est pas mesuré.
+        return r, r * _per_day_for(data.get("funding_interval_hours")) * 365
     except Exception:  # noqa: BLE001
         return None, None
+
+
+def _per_day_for(interval_h) -> float:
+    """Règlements/jour réels d'après l'intervalle mesuré (8 h par défaut)."""
+    try:
+        return 24.0 / float(interval_h) if interval_h else 3.0
+    except (TypeError, ValueError):
+        return 3.0
 
 
 def liq_24h(symbol: str) -> tuple[int, float]:

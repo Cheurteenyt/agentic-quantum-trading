@@ -35,6 +35,17 @@ REPORTS = ROOT / "reports"
 BPS_PER_8H_TO_ANNUAL_PCT = 3 * 365 / 100  # 3 reglements/jour, 100 bps = 1 %
 SEUIL_EXTREME_ANN = 50.0  # % annualises
 
+
+def _per_day_for(interval_h) -> float:
+    """Règlements/jour réels d'après l'intervalle MESURÉ par le refresher
+    (FIX F12, médiane des gaps) — le champ du cache est étiqueté « per_8h »
+    mais porte du per-intervalle : annualiser à 3/8 h figés mentait de ×2
+    (4 h) à ×8 (1 h). Fallback 8 h = cadence standard si non mesuré."""
+    try:
+        return 24.0 / float(interval_h) if interval_h else 3.0
+    except (TypeError, ValueError):
+        return 3.0
+
 # FIX F-041 : la fraîcheur du cache funding est un CONTRAT, pas une
 # information. Le cache est un SNAPSHOT live (F-030) : chaque symbole porte
 # son propre `cached_at`, et 48 des 73 symboles de la prod ont > 25 h
@@ -61,8 +72,10 @@ def load_fresh_ranked(max_age_s: float = FUNDING_MAX_AGE_S) -> tuple[list[dict],
     rejected = 0
     for sym, entry in cache.get("symbols", {}).items():
         data = entry.get("data") or {}
-        latest = _ann_pct(data.get("latest_funding_bps_per_8h"))
-        avg = _ann_pct(data.get("avg_funding_bps_per_8h"))
+        latest = _ann_pct(data.get("latest_funding_bps_per_8h"),
+                          data.get("funding_interval_hours"))
+        avg = _ann_pct(data.get("avg_funding_bps_per_8h"),
+                       data.get("funding_interval_hours"))
         if latest is None or avg is None:
             continue
         age = now - float(entry.get("cached_at") or 0)
@@ -99,8 +112,10 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _ann_pct(bps_per_8h: float | None) -> float | None:
-    return bps_per_8h * BPS_PER_8H_TO_ANNUAL_PCT if bps_per_8h is not None else None
+def _ann_pct(bps_per_8h: float | None, interval_h=None) -> float | None:
+    if bps_per_8h is None:
+        return None
+    return bps_per_8h * (_per_day_for(interval_h) * 365 / 100)
 
 
 def load_ranked() -> list[dict]:
