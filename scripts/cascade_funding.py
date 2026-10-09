@@ -34,7 +34,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts.anti_liq import add_rolling_scores, collect_featured  # noqa: E402
-from scripts.portfolio_sim import KDB, monthly_rows  # noqa: E402
+from scripts.portfolio_sim import (  # noqa: E402
+    KDB, liq_move_for, monthly_rows)
 from scripts.stacked_portfolio import (  # noqa: E402
     CAPITAL, MAKER_RT, run_stack)
 
@@ -116,7 +117,9 @@ def main() -> int:
         return (e["price_ret_short"] * 20
                 + fh.get(e["sym"], 0.0) * 24 * 20 / 100
                 - MAKER_RT * 20 / 100)
-    liq_tr = np.array([e["mae_adverse"] >= 4.5 for e in train])
+    liq_tr = np.array([
+        e["mae_adverse"] >= liq_move_for(e["sym"], 20)
+        for e in train])
     pnl_tr = np.array([margin_pnl(e) for e in train])
 
     q33, q66 = np.nanquantile(fp_tr, [1/3, 2/3])
