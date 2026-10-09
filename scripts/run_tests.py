@@ -10,6 +10,7 @@ Exit code 1 si un test echoue — utilisable tel quel en cron.
 """
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -64,19 +65,34 @@ def _without_slow(suite) -> unittest.TestSuite:
 
 
 def ratchet_verdict(tests_run: int, baseline_path: Path) -> int:
-    """0 = ok, 1 = le compte a baissé. Hausse libre (baseline mise à jour
-    en commit par la PR qui fait monter), baisse = refus.
+    """0 = ok, 1 = le compte a baissé (ou baseline absente/illisible en CI).
+    Hausse libre (baseline mise à jour en commit par la PR qui fait monter),
+    baisse = refus.
 
-    Fail-open volontaire si la baseline est absente/illisible (doctrine
-    du ratchet CI ronde 7 : un dépôt sans baseline ne doit pas casser).
+    LOCAL : fail-open si la baseline est absente/illisible (doctrine du
+    ratchet CI ronde 7 : un dépôt sans baseline ne doit pas casser le dev).
+    CI (GITHUB_ACTIONS) : fail-CLOSED — sur le runner, une baseline absente
+    ou illisible doit être ROUGE, sinon supprimer le fichier désactive le
+    garde en silence (audit Sonnet 5.5, R5).
     """
+    in_ci = bool(os.environ.get("GITHUB_ACTIONS"))
     if not baseline_path.exists():
-        print(f"  ratchet : baseline absente ({baseline_path.name}) — pas de gate")
+        if in_ci:
+            print(
+                f"  ratchet : baseline absente ({baseline_path.name}) — "
+                "FAIL-CLOSED en CI : le garde ne peut pas être désactivé "
+                "en supprimant le fichier ; commitez une baseline."
+            )
+            return 1
+        print(f"  ratchet : baseline absente ({baseline_path.name}) — pas de gate (local)")
         return 0
     try:
         expected = int(baseline_path.read_text().strip())
     except ValueError:
-        print("  ratchet : baseline illisible — pas de gate")
+        if in_ci:
+            print("  ratchet : baseline illisible — FAIL-CLOSED en CI (commitez une baseline exploitable)")
+            return 1
+        print("  ratchet : baseline illisible — pas de gate (local)")
         return 0
     if tests_run < expected:
         print(
