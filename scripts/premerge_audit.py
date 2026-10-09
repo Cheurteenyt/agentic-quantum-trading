@@ -61,7 +61,8 @@ def gate(name: str, ok: bool, detail: str = "") -> None:
 
 
 def ci_verdict(sha: str) -> str:
-    """success | pending | failure — sur tous les check-runs du sha."""
+    """success | pending | failure — sur tous les check-runs du sha.
+    'skipped' (ex. full-suite sautée en event PR) n'est pas un échec."""
     try:
         d = api("GET", f"commits/{sha}/check-runs?per_page=100")
     except urllib.error.HTTPError as e:
@@ -69,8 +70,10 @@ def ci_verdict(sha: str) -> str:
     runs = d.get("check_runs", [])
     if not runs or any(r["status"] != "completed" for r in runs):
         return "pending"
-    return "success" if {r["conclusion"] for r in runs} == {"success"} \
-        else "failure"
+    concl = {r["conclusion"] for r in runs}
+    if concl <= {"success", "skipped"} and "success" in concl:
+        return "success"
+    return "failure"
 
 
 def wait_ci(sha: str, minutes: int = 40) -> str:
