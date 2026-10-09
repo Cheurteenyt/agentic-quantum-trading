@@ -88,7 +88,10 @@ def _get(url: str, *, headers: dict | None = None, params: dict | None = None,
         if st == 429 and attempt < RETRIES - 1:
             time.sleep(BACKOFF_429[min(attempt, len(BACKOFF_429) - 1)])
             continue
-        if st == 403 and attempt < RETRIES - 1:
+        # D-06 (ronde 6) : la docstring promet UN SEUL retry 403 — l'ancien
+        # `attempt < RETRIES - 1` en accordait 2 (403 aux tentatives 0 ET 1
+        # passaient toutes deux) : le pattern martelé qui a coûté le flag.
+        if st == 403 and attempt == 0:
             time.sleep(BACKOFF_403)  # un seul retry espacé, jamais de martèle
             continue
         if st >= 500 and attempt < RETRIES - 1:
