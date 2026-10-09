@@ -114,12 +114,16 @@ def main() -> int:
         # backtest des indicateurs X (il faut ~3 semaines de points pour
         # que la règle N≥10 signifie quelque chose)
         calls_total = r["longs"] + r["shorts"]
+        # None = aucun call aujourd'hui : stocker 0.0 le rendrait indistinguable
+        # d'un consensus neutre reel (calls longs == shorts), et la table est
+        # la matiere premiere du futur backtest des indicateurs X
         consensus = ((r["longs"] - r["shorts"]) / calls_total
-                     if calls_total else 0.0)
+                     if calls_total else None)
         con.execute(
             "INSERT OR REPLACE INTO x_signal_history VALUES (?,?,?,?,?,?,?,?,?,?)",
             (today, r["ticker"], r["posts"], r["authors"], r["velocity"],
-             r["longs"], r["shorts"], round(consensus, 3),
+             r["longs"], r["shorts"],
+             None if consensus is None else round(consensus, 3),
              r["engagement"], now))
     con.commit()
     con.close()
