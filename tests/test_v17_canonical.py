@@ -119,7 +119,15 @@ class TestFundingPrintsForward(unittest.TestCase):
                             "('BTCUSDT','1h',?,100,101,99,100,1.0)",
                             (i * H,))
             # des prints à +2h et +4h d'un trade entré à 0h (+ un print
-            # à +7h pour couvrir la fenêtre jusqu'à sa sortie à +6h)
+            # à +7h pour couvrir la fenêtre jusqu'à sa sortie à +6h).
+            # C2bis (ronde 4) : un print à 0h — l'ère funding commence
+            # AVANT l'entrée, sinon la fenêtre (0, 6h] straddle le
+            # PREMIER print et la règle PR-166 (le kernel l'épingle,
+            # le forward l'applique désormais aussi) la déclare
+            # INCONNUE. Le print 0h est hors fenêtre (exclusif à
+            # gauche) : les assertions d'horodatage sont inchangées.
+            con.execute("INSERT INTO funding_history VALUES "
+                        "('BTCUSDT', ?, 0.0004)", (0,))
             con.execute("INSERT INTO funding_history VALUES "
                         "('BTCUSDT', ?, 0.0005)", (2 * H,))
             con.execute("INSERT INTO funding_history VALUES "
