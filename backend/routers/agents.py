@@ -176,6 +176,9 @@ def get_all_signals(limit: int = 50):
     if not SIGNALS_DIR.exists():
         return {"signals": []}
 
+    # FIX ronde 8 : [-0:] renvoie la LISTE ENTIÈRE — limit=0 (et tout
+    # limit <= 0) était un piège public ; même clamp que main.py:911.
+    limit = max(1, min(int(limit), 100))
     all_files = sorted(SIGNALS_DIR.glob("*.json"))[-limit:]
     signals   = []
     for f in reversed(all_files):

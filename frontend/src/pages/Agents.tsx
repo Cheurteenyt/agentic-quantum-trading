@@ -76,6 +76,7 @@ export default function AgentsPage() {
   const [stats, setStats] = useState<Record<string, number> | null>(null)
   const [signals, setSignals] = useState<Record<string, unknown>[]>([])
   const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState("all")
   const [intelGoal, setIntelGoal] = useState("Scrape the title and a short summary of example.com")
   const [intelUrl, setIntelUrl] = useState("https://example.com")
@@ -100,18 +101,35 @@ export default function AgentsPage() {
 
   const refresh = async () => {
     try {
+      // FIX ronde 8 : sans check res.ok, une 401/500 (gate admin actif,
+      // backend éteint) retournait le payload d'erreur JSON {detail:...} →
+      // running=false → badge « INACTIF » et « No signals » ALORS QUE
+      // l'agent tournait — l'erreur réseau seule déclenchait le catch.
       const [agentStatus, signalStats, signalFeed] = await Promise.all([
-        fetch(`${API}/status`).then((response) => response.json()),
-        fetch(`${API}/signals/stats`).then((response) => response.json()),
-        fetch(`${API}/signals?limit=20`).then((response) => response.json()),
+        fetch(`${API}/status`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status} /status`)
+          return r.json()
+        }),
+        fetch(`${API}/signals/stats`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status} /signals/stats`)
+          return r.json()
+        }),
+        fetch(`${API}/signals?limit=20`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status} /signals`)
+          return r.json()
+        }),
       ])
 
       setStatus(agentStatus)
       setStats(signalStats)
       setSignals(signalFeed.signals || [])
       setRunning(Boolean(agentStatus.running))
+      setError(null)
     } catch (error) {
       console.error("Failed to refresh agents page:", error)
+      // l'état réel est INCONNU : on n'affiche ni « INACTIF » ni
+      // « No signals » (les données précédentes restent à l'écran)
+      setError("État indisponible — réponse du backend invalide ou refusée")
     }
   }
 
@@ -168,14 +186,23 @@ export default function AgentsPage() {
         </div>
       </div>
 
+      {error && (
+        <div className="badge badge-bearish" style={{ marginBottom: 12, display: "inline-block" }} role="alert">
+          {error}
+        </div>
+      )}
+
       <div className="stat-grid" style={{ marginBottom: 16 }}>
         <div className="stat-box">
           <div className="stat-box-label">Agent Status</div>
           <div
             className="stat-box-value"
-            style={{ color: running ? "var(--green)" : "var(--red)", fontSize: 18 }}
+            style={{
+              color: error ? "var(--amber)" : running ? "var(--green)" : "var(--red)",
+              fontSize: 18,
+            }}
           >
-            {running ? "EN COURS" : "INACTIF"}
+            {error ? "ÉTAT INCONNU" : running ? "EN COURS" : "INACTIF"}
           </div>
         </div>
         {stats && (
