@@ -210,3 +210,8 @@ class TestPuissancePortee(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPiegeVerrou(unittest.TestCase):
+    def test_doit_echouer_pour_prouver_le_verrou(self):
+        self.assertEqual(1, 2, "PIÈGE: ce test doit échouer pour tester le gate")
