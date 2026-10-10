@@ -116,7 +116,12 @@ class TestNoFossileRestant(unittest.TestCase):
         self.assertNotIn("LIQ_MOVE_PCT", src.replace(
             "# Fossile ronde 5 : LIQ_MOVE_PCT était un seuil PLAT", ""),
             "le seuil plat calculé à l'import est réapparu")
-        self.assertIn("liq_move_for(sym, 20)", src)
+        # #201 : le levier de scénario est UNE constante (SCENARIO_LEV), pas un
+        # littéral 20 répété ici et dans le pnl. On épingle la FORME (constante),
+        # pas la valeur — sinon ce test lui-même devient le fossile.
+        self.assertIn("liq_move_for(sym, SCENARIO_LEV)", src,
+                      "le seuil doit être calculé au MÊME levier que le label")
+        self.assertNotIn("liq_move_for(sym, 20)", src)
 
 
 if __name__ == "__main__":
