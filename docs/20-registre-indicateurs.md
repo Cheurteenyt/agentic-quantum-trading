@@ -119,6 +119,14 @@ ci-dessous sont cohérentes avec cette re-mesure ; le résumé d'état :
 3. La première verte / le re-break / le squeeze : chaque rebond micro est un faux signal de fin.
 4. Le maker (GTX) n'est pas une option — c'est la condition d'existence du 20x.
 5. Cross-check deux implémentations indépendantes sur les mêmes événements avant de croire un chiffre.
+6. **Le modèle de liquidation est une approximation au 1er palier (issue #212).**
+   `liq_move_for(sym, lev) = 100/lev − maintMarginPercent(sym)` ; le pourcentage vient
+   d'`exchangeInfo` et décrit le **premier bracket**. Aster liquide par **paliers de notionnel**
+   (`leverageBrackets` avec `cum`) : au-delà, la marge requise monte, donc la liquidation réelle
+   arrive **plus tôt** que la formule — le biais est **optimiste à fort notionnel**, jamais
+   prudent. La donnée manque (endpoint **signé**, `-1102` sans clé API wallet). Conséquence :
+   ne pas appeler ce chiffre « la valeur réelle », et **ne pas en tirer une conclusion de risque
+   sur des notionnels élevés**. À faible notionnel les deux coïncident.
 
 
 ---

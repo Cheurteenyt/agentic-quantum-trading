@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""F-038 — la marge de maintenance est le maintMarginPercent RÉEL par symbole.
+"""F-038 — la marge de maintenance vient du maintMarginPercent par symbole.
+
+(« RÉEL » au sens : lu dans exchangeInfo / liq_params, PAS une constante
+codée en dur. La nuance #212 est ailleurs : c'est le taux du PREMIER palier,
+pas le taux effectif d'une position à fort notionnel — voir la classe
+TestApproximationPremierPalier.)
 
 Le bug : MAINT_PCT = 0,5 codé en dur alors que liq_params (extrait
 d'exchangeInfo) dit 2,5 % pour les 6 majeures et 16,66 % pour la population
@@ -23,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts import portfolio_sim as ps  # noqa: E402
 from scripts.portfolio_sim import (  # noqa: E402
-    MAINT_PCT, lev_capped, liq_move_for, liq_params)
+    lev_capped, liq_move_for, liq_params)
 
 MAJORS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
 
@@ -219,7 +224,75 @@ class TestNoLiquidationsByConstruction(unittest.TestCase):
         """Le fix ne doit PAS altérer les leviers valides."""
         from scripts.portfolio_sim import liq_move_for
         self.assertGreater(liq_move_for("BTCUSDT", 10), 0.0)
-        self.assertAlmostEqual(liq_move_for("BTCUSDT", 10), 7.5)
+
+
+class TestApproximationPremierPalier(unittest.TestCase):
+    """Issue #212 (P1 §27) — le modèle est une approximation au 1er PALIER.
+
+    `liq_move_for` utilise `maintMarginPercent` d'`exchangeInfo`, qui décrit
+    le PREMIER bracket de notionnel. Aster liquide par paliers
+    (`leverageBrackets`, avec `cum`) : au-delà du 1er, la marge requise monte,
+    donc la liquidation réelle arrive PLUS TÔT — le biais est OPTIMISTE à fort
+    notionnel. Les paliers sont hors de portée (endpoint SIGNÉ, -1102 sans clé
+    API wallet).
+
+    Ce qu'on peut verrouiller sans la donnée :
+      1. la docstring DIT l'approximation (sinon un lecteur croit à l'exactitude) ;
+      2. on n'appelle plus le chiffre « la valeur réelle » ;
+      3. à FAIBLE notionnel, `liq_move_for` coïncide avec le 1er palier — c'est
+         l'acceptance (3) de l'issue, vérifiable sur la formule elle-même.
+    """
+
+    def test_la_docstring_declare_l_approximation(self):
+        import scripts.portfolio_sim as ps
+        doc = ps.liq_move_for.__doc__ or ""
+        self.assertIn("1er PALIER", doc,
+                      "la docstring doit dire l'approximation #212")
+        self.assertIn("leverageBrackets", doc,
+                      "la docstring doit nommer la donnée manquante")
+        self.assertIn("SIGNÉ", doc,
+                      "la docstring doit dire POURQUOI la donnée manque")
+
+    def test_on_ne_pretend_plus_a_la_valeur_reelle(self):
+        """Le mot exact qui rendait la lecture trompeuse (« la valeur réelle »)
+        ne doit pas revenir dans la docstring.
+
+        On pin le MOTIF D'OVERCLAIM (« la valeur réelle »), pas le mot isolé
+        « réelle » : la docstring d'en-tête du module dit légitimement
+        « donné publique, réelle ». Vérifier le mot seul ferait échouer un
+        texte honnête — c'est le sens du syntagme qui ment, pas le qualificatif.
+        """
+        import scripts.portfolio_sim as ps
+        doc = ps.liq_move_for.__doc__ or ""
+        self.assertNotIn("la valeur réelle", doc)
+        self.assertNotIn("valeur exacte", doc)
+
+    def test_le_registre_porte_la_limite(self):
+        """`docs/20` est le fichier que lit l'agent : la limite doit y être."""
+        reg = (ROOT / "docs" / "20-registre-indicateurs.md").read_text(encoding="utf-8")
+        self.assertIn("#212", reg)
+        self.assertIn("1er palier", reg)
+
+    def test_a_faible_notionnel_la_formule_est_le_1er_palier(self):
+        """Acceptance (3) de #212 : à faible notionnel, `liq_move_for` DOIT
+        coïncider avec le 1er bracket — les deux ne peuvent diverger que par
+        les paliers supérieurs, absents ici. On le prouve sur la formule :
+        seuil = 100/lev − maint_1er_bracket, exactement."""
+        from scripts.portfolio_sim import liq_move_for
+        memo, fb = ps._LIQ_PARAMS, ps.LIQ_FALLBACK_COUNT
+        try:
+            ps._LIQ_PARAMS = {"BTCUSDT": (2.5, 20.0), "PIREUSDT": (25.0, 2.0)}
+            ps.LIQ_FALLBACK_COUNT = 0
+            for lev in (1, 2, 4, 10, 20):
+                attendu = 100.0 / lev - 2.5
+                if attendu <= 0:
+                    self.assertEqual(liq_move_for("BTCUSDT", lev), 0.0)
+                else:
+                    self.assertAlmostEqual(liq_move_for("BTCUSDT", lev), attendu,
+                                           places=9)
+            self.assertAlmostEqual(liq_move_for("BTCUSDT", 10), 7.5)
+        finally:
+            ps._LIQ_PARAMS, ps.LIQ_FALLBACK_COUNT = memo, fb
 
 
 if __name__ == "__main__":
