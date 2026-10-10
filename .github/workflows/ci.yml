@@ -93,6 +93,19 @@ jobs:
               # Preuves du ledger hors des dossiers ci-dessus (cf. test) :
               - 'docs/21-vagues-registre.md'
               - 'reports/al-gradient-reproof-2026-10-07.md'
+              # Entrées lues par `audit_check.py` (contrôles BLOQUANTS
+              # A1/A2/A4/C1/C2/E1/E2) — même raison : ce sont des fichiers
+              # que l'oracle LIT, donc les modifier peut le faire rougir.
+              # `.zcode/**` = les prompts d'agent (injectAgentsMd, cible
+              # 60-70, appel de lab_ledger) ; `docs/lab/**` = mortuary +
+              # hypothèses pré-enregistrées ; le `.service` = la carte des
+              # scripts de la campagne nocturne ; `docs/25` = le MC courant.
+              # Mesuré : retirer `lab_ledger.py` de quant-researcher.md fait
+              # rougir A4 ; retirer une famille du mortuary fait rougir C1.
+              - '.zcode/**'
+              - 'docs/lab/**'
+              - 'docs/25-openmarket-x501.md'
+              - 'configs/systemd-user/trading-agent-nightly.service'
             frontend:
               - 'frontend/**'
             docs:
