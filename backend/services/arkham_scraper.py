@@ -1755,7 +1755,7 @@ class ArkhamScraper:
             try:
                 self._save_cache()
             except Exception:
-                pass
+                logger.warning("[ARKHAM] cache token_detail non sauvegarde", exc_info=True)
 
         return result
 
@@ -2037,7 +2037,7 @@ class ArkhamScraper:
                 try:
                     result["transaction_count"] = int(tx_data["result"], 16)
                 except (ValueError, TypeError):
-                    pass
+                    logger.debug("[ARKHAM] transaction_count illisible (hex invalide)", exc_info=True)
 
         except Exception as e:
             logger.error(f"[ARKHAM] Erreur blockchain data pour {address}: {e}")
@@ -2134,7 +2134,7 @@ class ArkhamScraper:
                     seen.add(addr)
                     result['tokens'].append({'contract': addr, 'symbol': '', 'name': ''})
         except Exception:
-            pass
+            logger.debug("[ARKHAM] token parsing ignore (adresse illisible)", exc_info=True)
         
         # Cache result
         self._cache.setdefault('addresses', {})[address.lower()] = result
@@ -2298,7 +2298,7 @@ class ArkhamScraper:
                     if holders:
                         logger.info(f"[ARKHAM] {len(holders)} holders via Etherscan pour {token_address[:10]}...")
             except Exception:
-                pass
+                logger.warning("[ARKHAM] holders via Etherscan ignore", exc_info=True)
 
         # ── Tiers 4: Fallback Transfer events ──
         if not holders and api_key:
