@@ -10,12 +10,22 @@ on:
 permissions:
   contents: read
 
+# Concurrency : un push qui écrase le précédent (force-push, PR mise à jour)
+# annule le run encore en cours de l'ANCIEN commit — sans ça, deux runs
+# tournent en parallèle sur le même head, et le plus lent peut rapporter
+# « vert » sur un état déjà remplacé. cancel-in-progress = le dernier état
+# fait foi. (Sobriété : évite de payer des runs fantômes.)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     # sobriété : le cron nocturne ne relance PAS le gate standard —
     # il exécute uniquement full-suite (ci-dessous)
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -105,6 +115,7 @@ jobs:
   frontend:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -130,6 +141,7 @@ jobs:
   security:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -267,3 +279,29 @@ jobs:
         run: |
           disc=$(python -c "import unittest; print(unittest.defaultTestLoader.discover('tests').countTestCases())")
           echo "::notice::full-suite exécutée ; $disc tests découverts au total ; l'écart avec le compte exécuté ci-dessus = SLOW_FILES (raison documentée ligne par ligne dans scripts/run_tests.py)"
+
+  # ─── GATE AGRÉGÉ — le SEUL check à mettre en required status check ───
+  # docs/41 + branche protégée : au lieu de lister test/frontend/security
+  # dans le branch protection (3 checks à maintenir synchrones, un oubli =
+  # un gate contournable), UN job `gate` dépend des trois. Le branch
+  # protection exige `gate` → impossible de merger si l'un des trois est
+  # rouge. C'est le verrou « aucune IA ne fait n'importe quoi » : un push
+  # qui casse un oracle ne peut pas atteindre main.
+  #
+  # Il ne tourne PAS sur le cron nocturne (schedule n'a que full-suite) et
+  # pas sur push direct main (le gate a déjà couru sur le commit poussé via
+  # le job test ; sur main le merge_group gate suffit). Sur PR et merge_group
+  # uniquement — là où une IA pourrait proposer un merge.
+  gate:
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    needs: [test, frontend, security]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Vérifier que les 3 gates sont verts
+        run: |
+          # `needs` garantit que ce job ne démarre QUE si test+frontend+
+          # security ont réussi. S'il tourne, tout est vert : on l'affirme
+          # explicitement pour que le check `gate` soit le seul required.
+          echo "::notice::gate agrégé VERT — test + frontend + security OK"
+          echo "Seul check requis par le branch protection : ce job 'gate'."
