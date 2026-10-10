@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import scripts.anti_liq as anti_liq  # noqa: E402
+from scripts import portfolio_sim as ps  # noqa: E402
 from scripts.portfolio_sim import liq_move_for  # noqa: E402
 
 
@@ -56,6 +57,24 @@ class ScenarioLevSingleSourceTests(unittest.TestCase):
 
 
 class LabelEtSeuilCoherentsTests(unittest.TestCase):
+    """HERMÉTIQUE : `liq_params` est injecté (comme `test_p1_liq_fallback`),
+    jamais lu depuis la base. Un test qui lit le `data/` réel passe sur un
+    poste AVEC base et échoue en CI (gitignoré) — le défaut corrigé en #275.
+    """
+
+    def setUp(self) -> None:
+        self._memo = ps._LIQ_PARAMS
+        self._fb = ps.LIQ_FALLBACK_COUNT
+        self._nv = ps.LIQ_NON_VIABLE
+        ps._LIQ_PARAMS = {"BTCUSDT": (2.5, 20.0), "PIREUSDT": (25.0, 2.0)}
+        ps.LIQ_FALLBACK_COUNT = 0
+        ps.LIQ_NON_VIABLE = 0
+
+    def tearDown(self) -> None:
+        ps._LIQ_PARAMS = self._memo
+        ps.LIQ_FALLBACK_COUNT = self._fb
+        ps.LIQ_NON_VIABLE = self._nv
+
     def test_pnl_et_liquidation_au_meme_levier(self) -> None:
         """Sur un major (mm = 2,5 %), à 20x : pnl = ret*20, et le seuil de
         liquidation vaut 100/20 − 2,5 = 2,5 %. Donc un mouvement de −2,5 %
@@ -73,9 +92,11 @@ class LabelEtSeuilCoherentsTests(unittest.TestCase):
         Deux symboles de mm différents à même levier ont des seuils distincts —
         c'est le cœur de F-038."""
         lev = anti_liq.SCENARIO_LEV
-        major = liq_move_for("BTCUSDT", lev)       # mm 2,5 %
-        memecoin = liq_move_for("INCONNUUSDT", lev)  # repli prudent (mm plus haut)
-        self.assertNotAlmostEqual(major, memecoin, places=6)
+        major = liq_move_for("BTCUSDT", lev)     # mm 2,5 % → 100/20 − 2,5 = 2,5
+        pire = liq_move_for("PIREUSDT", lev)     # mm 25 %  → 0 (liquidé à l'entrée)
+        self.assertNotAlmostEqual(major, pire, places=6)
+        self.assertAlmostEqual(major, 100 / lev - 2.5, places=9)
+        self.assertEqual(pire, 0.0)
 
     def test_seuil_jamais_negatif(self) -> None:
         """#202 : la garde réelle (raise) protège l'exécution."""
