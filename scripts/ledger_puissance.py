@@ -60,6 +60,12 @@ def _run_dir(ref: str | None, runs_dir: Path) -> Path | None:
     trouver un dossier présent dans `runs_dir`, sinon None."""
     if not ref:
         return None
+    # Un `ref` mal typé (int, list, dict — le ledger est écrit à la main par
+    # des agents, un `ref: 12345` est possible) ne doit PAS faire crasher
+    # l'oracle : `Path(12345)` lève TypeError. Un run introuvable est un
+    # DÉFAUT à signaler (NO_RUN), pas une exception qui tue le gate.
+    if not isinstance(ref, str):
+        return None
     p = Path(ref)
     # candidats : le parent, puis les parents proches (un run peut être
     # .../runs/EXP-x/report.md -> EXP-x, ou .../EXP-x/attempts/001/... )

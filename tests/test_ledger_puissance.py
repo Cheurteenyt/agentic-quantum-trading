@@ -208,5 +208,21 @@ class TestPuissancePortee(unittest.TestCase):
                           "un ref qui ne pointe vers aucun run = n perdu")
 
 
+    def test_ref_mal_type_ne_crase_pas_l_oracle(self):
+        """BUG RÉEL trouvé par fuzz (2026-10-10) : un `ref` non-string
+        (int/list/dict — le ledger est écrit à la main) faisait CRASHER
+        l'oracle (`Path(12345)` -> TypeError), tuant le gate au lieu de
+        signaler le défaut. Un run introuvable = NO_RUN, pas une exception."""
+        with _Fixture([], {}) as f:
+            (f.ledger).write_text(json.dumps({
+                "date": "2026-10-05", "hypothesis": "h", "hypothesis_hash": "h",
+                "family": "f", "strategy": "s", "verdict": "DISCOVERY_FAIL",
+                "ref": 12345}) + "\n", encoding="utf-8")  # ref = int, pas str
+            pb = f.problemes()
+            self.assertTrue(pb, "un ref mal typé doit être signalé, pas avalé")
+            self.assertIn("NO_RUN", [p["kind"] for p in pb],
+                          "un ref illisible = run introuvable (NO_RUN)")
+
+
 if __name__ == "__main__":
     unittest.main()

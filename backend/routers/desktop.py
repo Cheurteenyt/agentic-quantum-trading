@@ -250,6 +250,10 @@ async def take_screenshot():
 @router.get("/screenshots")
 async def list_screenshots(limit: int = 10):
     """Liste les derniers screenshots."""
+    # R9 : clamp — limit=0 => [-0:] renvoyait la LISTE ENTIÈRE (tous les
+    # .jpg chargés), limit négatif inversait le sens du slice (même pattern
+    # corrigé dans intel.py / market.py — celui-ci avait été manqué).
+    limit = max(1, min(int(limit), 100))
     files  = sorted(SCREENSHOTS_DIR.glob("*.jpg"))[-limit:]
     result = []
     for f in reversed(files):
