@@ -288,12 +288,15 @@ jobs:
   # rouge. C'est le verrou « aucune IA ne fait n'importe quoi » : un push
   # qui casse un oracle ne peut pas atteindre main.
   #
-  # Il ne tourne PAS sur le cron nocturne (schedule n'a que full-suite) et
-  # pas sur push direct main (le gate a déjà couru sur le commit poussé via
-  # le job test ; sur main le merge_group gate suffit). Sur PR et merge_group
-  # uniquement — là où une IA pourrait proposer un merge.
+  # CONDITION = la MÊME que le job `test` (`!= schedule`), PAS restreinte à
+  # pull_request/merge_group. Piège mesuré sur #259 : avec un `if` limité à
+  # `pull_request`, un simple PUSH sur la branche PR faisait sortir
+  # `gate: skipped` (event=push), et le DERNIER check-run devenait SKIPPED
+  # → un required check sur `gate` serait resté bloqué sur la PR. En
+  # alignant la condition sur celle de `test`, `gate` tourne dès que les 3
+  # jobs tournent, et rend toujours un success/failure, jamais un skip.
   gate:
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    if: github.event_name != 'schedule'
     needs: [test, frontend, security]
     runs-on: ubuntu-latest
     timeout-minutes: 5
