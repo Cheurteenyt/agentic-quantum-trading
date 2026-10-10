@@ -156,10 +156,34 @@ jobs:
       - name: Oracle pyflakes (noms indéfinis — BLOQUANT)
         run: |
           pip install pyflakes --quiet
+          # Garde fail-CLOSED. Sans elle, un pyflakes absent ou cassé rend une
+          # sortie VIDE ; `grep "undefined name '"` ne matche alors rien, donc
+          # la marche PASSE. C'est le défaut exact corrigé sur le gate bandit
+          # (PR #281), resté ici. On ne se contente pas d'`import pyflakes` :
+          # on sonde une exécution réelle sur un fichier SAIN — ça vérifie que
+          # l'outil tourne ET qu'il sait rendre « propre » (exit 0).
+          printf 'x = 1\n' > /tmp/pf_probe.py
+          if ! python -m pyflakes /tmp/pf_probe.py; then
+            echo "::error::pyflakes ne tourne pas (ou signale un fichier sain) — le gate ne peut pas mesurer"
+            exit 1
+          fi
           if python -m pyflakes scripts backend discord_bot agent tests | grep "undefined name '"; then
             echo "::error::undefined name détecté — corrige ou importe"
             exit 1
           fi
+          # SYNTAXE — le grep ci-dessus ne l'attrape PAS : pyflakes dit
+          # « invalid syntax » OU « '(' was never closed » selon l'erreur,
+          # jamais « undefined name ». Énumérer ces messages serait fragile
+          # (constaté : deux erreurs, deux messages). On compile donc pour de
+          # vrai — message-indépendant, et ça couvre AUSSI les fichiers
+          # qu'aucun test n'importe (16 scripts orphelins à la racine
+          # aujourd'hui) : pour eux, rien d'autre ne verrait le défaut.
+          # Mesuré : une syntaxe cassée dans scripts/repair_partial_klines.py
+          # passait le grep historique.
+          python -m compileall -q -f scripts backend discord_bot agent tests || {
+            echo "::error::syntaxe Python invalide — un fichier ne compile pas (voir ci-dessus)"
+            exit 1
+          }
       # pytest exécute nativement les unittest.TestCase (parité prouvée E0 :
       # 2851 tests). -n auto parallélise. --fast garde la sélection actuelle
       # (run_tests.py) le temps de la migration vers les marqueurs.

@@ -515,6 +515,71 @@ class TestRochetDeDetteFailClosed(unittest.TestCase):
             "\n→ ajoute le garde `git rev-parse --verify --quiet origin/main`")
 
 
+class TestOracleGrepFailClosed(unittest.TestCase):
+    """Un oracle qui lit la sortie d'un outil via `grep` doit le sonder avant.
+
+    Le défaut, corrigé deux fois : `python -m <outil> ... | grep <motif>`. Si
+    l'outil est absent ou cassé, la sortie est VIDE, `grep` ne matche rien, et
+    la marche **PASSE** — en annonçant zéro problème. Le gate mesure alors
+    « rien » et le lit comme « tout va bien ».
+
+    Constaté et reproduit :
+      - **bandit** (10/10) : `bandit` absent -> `total=0` -> `0 > 519` faux ->
+        vert. Corrigé par `python -c "import bandit"` (PR #281) ;
+      - **pyflakes** (11/10) : pyflakes absent -> sortie vide -> `grep
+        "undefined name '"` ne matche rien -> vert. Corrigé par une SONDE
+        d'exécution (`python -m pyflakes` sur un fichier sain, exit 0 attendu)
+        — plus fort qu'un `import`, car ça prouve que l'outil tourne vraiment.
+
+    Ce test exige que TOUT oracle `python -m X | grep` garde X. En ajouter un
+    sans garde rougit ici.
+    """
+
+    def _steps(self):
+        import yaml
+        doc = yaml.safe_load(CI.read_text(encoding="utf-8"))
+        for job in doc["jobs"].values():
+            for step in (job.get("steps") or []):
+                yield step
+
+    def test_au_moins_deux_oracles_grep(self):
+        """Garde-fou : si la détection casse, le test suivant passe à vide."""
+        n = sum(1 for s in self._steps()
+                if re.search(r"python -m \w+[^\n]*\|[^\n]*grep",
+                             s.get("run") or ""))
+        self.assertGreaterEqual(n, 2, f"oracles grep détectés : {n}")
+
+    def test_chaque_oracle_grep_sonde_son_outil(self):
+        """La garde doit être une forme EXÉCUTABLE, pas une mention.
+
+        Première version de ce test : `f"import {outil}" in run`. Elle passait
+        à tort — le COMMENTAIRE de l'étape pyflakes contient les mots
+        « `import pyflakes` » (pour expliquer qu'on ne s'en contente pas), et
+        le test comptait ce commentaire comme une garde. On n'exige donc que
+        des formes réellement exécutées :
+          - la sonde   `if ! python -m <outil>`  (l'outil tourne vraiment) ;
+          - l'import   `python -c "import <outil>"`.
+        """
+        manquants = []
+        for s in self._steps():
+            run = s.get("run") or ""
+            outils = {m.group(1) for m in re.finditer(
+                r"python -m (\w+)[^\n]*\|[^\n]*grep", run)}
+            for outil in outils:
+                garde = (f"if ! python -m {outil}" in run
+                         or f'python -c "import {outil}"' in run)
+                if not garde:
+                    manquants.append(
+                        f"{s.get('name') or '(sans nom)'} : `{outil}` piped "
+                        f"vers grep sans garde exécutable")
+        self.assertEqual(
+            manquants, [],
+            "ces oracles lisent la sortie d'un outil sans vérifier qu'il "
+            "tourne : s'il est absent, la sortie est vide et la marche PASSE.\n  "
+            + "\n  ".join(manquants) +
+            '\n→ ajoute `python -c "import X"` ou une sonde `if ! python -m X`')
+
+
 class TestLeRepliSansPyYAMLEstFidele(unittest.TestCase):
     """Les DEUX chemins de lecture doivent rendre le MÊME filtre.
 
