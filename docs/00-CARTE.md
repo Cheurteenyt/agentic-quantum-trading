@@ -1,6 +1,6 @@
 # CARTE DU PROJET — un seul endroit pour tout trouver
 
-> Mise à jour : 01/10/2026 (restructure domaines + nettoyage corruption merge).
+> Mise à jour : 10/10/2026 (ajout de la section GATE DE VÉRIFICATION + statut des chiffres).
 > Navigation docs : [`docs/README.md`](README.md) · Structure : [`PROJECT_STRUCTURE.md`](../PROJECT_STRUCTURE.md) · Lab : [`lab/README.md`](lab/README.md)
 
 **Domaines** : ASTER ≠ FOMO ≠ OPENMARKET ≠ X — ne pas mélanger métriques ni reports.
@@ -12,6 +12,25 @@
 | FOMO | [`fomo/README.md`](fomo/README.md) |
 | OpenMarket | [`openmarket/README.md`](openmarket/README.md) |
 | Lab grind | [`lab/README.md`](lab/README.md) |
+
+---
+
+## ✅ GATE DE VÉRIFICATION (avant tout commit / PR — voir `AGENTS.md`)
+
+Toute IA DOIT faire passer ces oracles depuis la racine. Un rouge = VRAI défaut
+à corriger ou à déroger explicitement (jamais masquer). Doctrine : [`41-methode-audit-profond.md`](41-methode-audit-profond.md).
+
+| Oracle | Ce qu'il garantit |
+|---|---|
+| `scripts/run_tests.py --fast` | la suite ne régresse pas (2162 tests) |
+| `scripts/deep_audit.py --check` | classes G1-G10 rochétées (fail-open, faux succès, path ROOT…) |
+| `scripts/claim_verify.py --all` | chaque fait F-XXX est corroboré (42/42) |
+| `scripts/research_integrity.py` | invariants I001-I009 |
+| `scripts/ledger_provenance.py` (N5) | verdict du ledger = verdict du DERNIER run |
+| `scripts/ledger_puissance.py` (N6) | chaque verdict vivant porte un n ≥ 10 |
+| `scripts/audit_path_root.py` (G10) | `parents[N]` résout à la racine |
+
+**⚠️ Chiffres MORTS, ne jamais citer comme edges** : `+5 082 %/an`, `+1 498 %/an`, `+3 905 %/an` (F-033/F-034 — 20 liqs, DD 99,2 %, final $1). Vérité courante : `research/STATE.md` + `docs/20-registre-indicateurs.md`. Le README et `docs/21-vagues-registre.md` (historique daté) ne sont PAS l'état courant.
 
 ---
 
