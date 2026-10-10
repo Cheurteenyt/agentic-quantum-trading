@@ -17,16 +17,17 @@ MAJ manuelle : 2026-10-06. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/l
 - Historique vivant (par semaine) :
   - 2026-W41 : 16 lots · 16 tranchées · 0 candidats · {'DISCOVERY_FAIL': 16}
 - Définition de « fini » hebdo : ≥ 1 lot exécuté ET journalisé, ≥ 1 hypothèse tranchée. Un FAIL est un résultat (fausse piste fermée).
-- **Échéances dépassées : 8** hypothèse(s) pré-enregistrée(s) sans verdict vivant (+ 3 non joignable(s), sans `stratégie :`).
+- **Échéances dépassées : 9** hypothèse(s) pré-enregistrée(s) sans verdict vivant (+ 2 non joignable(s), sans `stratégie :`).
   - `cusum-regime-shift` → verdict(s) superseded
   - `depth-imbalance` → jamais tranchée
   - `holdout-x` → jamais tranchée
   - `liq-echo` → jamais tranchée
   - `long-flush-bounce` → jamais tranchée
+  - `premium-fade-listing` → verdict(s) superseded
   - `premium-torsion` → jamais tranchée
   - `vol-spike-amplifier` → jamais tranchée
   - `w42-reconstruction` → verdict(s) superseded
-  - (❓ non joignables, sans `stratégie :` à corriger : `execution-slippage-protocol`, `premium-fade-listing`, `qubo-w41-trois-chantiers`)
+  - (❓ non joignables, sans `stratégie :` unique : `execution-slippage-protocol` = protocole de mesure, `qubo-w41-trois-chantiers` = plan multi-chantiers — ni l'un ni l'autre n'est une stratégie exécutable, donc pas de `stratégie :` à déclarer sans inventer)
 
 
 ## Verdicts qui comptent
