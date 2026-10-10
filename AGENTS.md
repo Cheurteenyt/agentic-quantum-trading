@@ -22,7 +22,7 @@ Projet UNIQUE (machine omarchy, SSD monté) :
 
 ---
 
-# ⚙️ ENVIRONNEMENT (omarchy, depuis 2026-09)
+# ⚡ ENVIRONNEMENT (omarchy, depuis 2026-09)
 
 - Python : **géré par uv** — `.venv/` à la racine créé via `uv venv`
   (CPython 3.13 géré par uv, PAS le python pacman). Installs UNIQUEMENT via
@@ -34,6 +34,43 @@ Projet UNIQUE (machine omarchy, SSD monté) :
   (NE PAS lancer la campagne à la main en parallèle du timer)
 - Runbook pipeline/backtest : `docs/13-orchestration.md`
 - Tests rapides (hors réseau) : `.venv/bin/python scripts/run_tests.py --fast`
+
+---
+
+# 🚦 GATE DE VÉRITÉ — OBLIGATOIRE avant tout commit / PR
+
+> **Toute IA qui touche ce repo DOIT faire passer ces commandes depuis la
+> racine** (chemin quoté). Elles sont le contrat : la CI les rejoue à chaque
+> push, un PR rouge est refusé. Ne PAS les contourner, ne PAS les « corriger »
+> en baissant un baseline sans PR dédiée.
+
+```bash
+cd "/run/media/cheurteen/Jeux SSD/trading-agent"
+.venv/bin/python scripts/run_tests.py --fast          # suite (2162 tests, 2 échecs connus/pré-existants)
+.venv/bin/python scripts/deep_audit.py --check         # rochet classes G1-G10 (bloquant)
+.venv/bin/python scripts/claim_verify.py --all         # preuves F-XXX (42/42 attendu)
+.venv/bin/python scripts/research_integrity.py         # invariants I001-I009
+.venv/bin/python scripts/ledger_provenance.py          # N5 : ledger ↔ runs (verdict du DERNIER attempt)
+.venv/bin/python scripts/ledger_puissance.py           # N6 : chaque verdict vivant porte son n ≥ 10
+.venv/bin/python scripts/audit_path_root.py            # G10 : parents[N] résout à la racine
+.venv/bin/python -m pyflakes backend scripts tests     # noms indéfinis (bloquant)
+```
+
+**Si l'un de ces oracles rougit : c'est un VRAI défaut, pas un obstacle.** Le
+corriger, ou documenter une dérogation explicite (`n_degression` dans le
+ledger, `# deep-audit:ignore[=Gx]` dans le code) — jamais masquer en silence.
+Doctrine complète : `docs/41-methode-audit-profond.md`.
+
+**Ne JAMAIS citer un chiffre de performance sans son statut.** Les chiffres
+`+5 082 %/an`, `+1 498 %/an`, `+3 905 %/an` sont **MORTS** (F-033/F-034) :
+20 liqs réelles, DD 99,2 %, final $1. La vérité courante est dans
+`research/STATE.md` + `docs/20-registre-indicateurs.md`, PAS dans le README
+ni les vieux registres. Le registre `docs/21-vagues-registre.md` est
+historique daté — ses chiffres d'époque ne sont pas des edges actuelles.
+
+**`onchain_engine.py` = 101 663 lignes.** Ne PAS le lire en entier. Cibler
+par fonction. C'est un monolithe connu (48% du backend) — ne pas ajouter de
+fonction sans chercher l'existante d'abord (duplication = le défaut dominant).
 
 ---
 
@@ -264,6 +301,9 @@ Deux modes, deux budgets (policy.yaml + lab_ledger v3) :
 - **CONFIRMATION** : pré-enregistré, protocole gelé, le budget 20/sem
   s'applique ; N de multiplicité CUMULATIF (jamais remis à zéro par la
   semaine).
+- **La policy est dans `agent/policy.yaml`** (PAS à la racine) — `prior_trials:
+  341` y est défini ; c'est ce qui alimente le N de Bonferroni (341 + confirmations
+  vivantes + 1). La chercher à la racine donne un `prior=0` silencieux et un N faux.
 - **PREFLIGHT avant tout run couplé à la DB** : `python scripts/preflight.py
   ...` — IMPORT OK ≠ PIPELINE OK (le crash open_time du 05/10). Un smoke
   test sur données réelles est la règle.
