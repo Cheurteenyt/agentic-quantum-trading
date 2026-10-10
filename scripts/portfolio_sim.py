@@ -138,10 +138,23 @@ def liq_params() -> dict[str, tuple[float, float]]:
 def liq_move_for(symbol: str, lev: float) -> float:
     """Le mouvement adverse qui liquide CE symbole (100/L − maintMarginPercent).
 
-    Symbole présent dans `liq_params` : la valeur réelle.
+    Symbole présent dans `liq_params` : `maintMarginPercent` vient
+    d'`exchangeInfo` (donnée publique, réelle).
     Symbole ABSENT : repli PRUDENT (la plus haute marge observée), et
     `LIQ_FALLBACK_COUNT` est incrémenté. Un repli optimiste rendrait le
     modèle flatteur ; cf. le commentaire de `LIQ_FALLBACK_COUNT`.
+
+    ⚠️ APPROXIMATION AU 1er PALIER (issue #212, P1 §27). `maintMarginPercent`
+    est le taux du PREMIER bracket, pas le taux effectif de la position.
+    Aster liquide par PALIERS de notionnel (`leverageBrackets`, avec `cum`) :
+    au-delà du 1er palier, la marge de maintien requise augmente, donc la
+    liquidation réelle arrive PLUS TÔT que ne le prédit cette formule — le
+    modèle est légèrement OPTIMISTE à fort notionnel, jamais prudent.
+    Les paliers ne sont pas dans ce dépôt : `GET /fapi/v3/leverageBrackets`
+    est un endpoint SIGNÉ (testé : HTTP 400 / -1102 sans clé API wallet).
+    Tant que la donnée manque, cette fonction reste une approximation :
+    ne pas la présenter comme EXACTE dans un rapport, et ne pas en tirer
+    une conclusion de risque sur des notionnels élevés.
     """
     global LIQ_FALLBACK_COUNT, LIQ_NON_VIABLE
     # lev <= 0 : un spec/event mal formé (lev: 0 ou négatif — écrit à la main
