@@ -138,7 +138,15 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
             if ei + HOLD_H >= len(idx_ns):
                 continue
             entry = opens[ei]
-            if entry <= 0 or t < 200 or np.isnan(atr_pct[t]) or np.isnan(vwap_dev[t]):
+            # isfinite (pas isnan) : atr_pct/vwap_dev viennent de /close,
+            # /vwap168 — une division par un prix à 0 donnerait inf, et
+            # np.isnan(inf) == False (le garde laisserait passer l'inf).
+            # isfinite couvre nan ET inf. Données prod propres (0 close=0 sur
+            # 16,8 M) : c'est une défense, pas un bug actif — mais le garde
+            # doit être correct quelle que soit la donnée.
+            if (entry <= 0 or t < 200
+                    or not np.isfinite(atr_pct[t])
+                    or not np.isfinite(vwap_dev[t])):
                 continue
             exit_j = ei + HOLD_H - 1
             if exit_j >= len(idx_ns):
