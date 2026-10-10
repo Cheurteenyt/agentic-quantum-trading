@@ -36,6 +36,7 @@ disparaît. Le remède est de DÉRIVER le filtre du scope, pas de le maintenir
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 import unittest
@@ -235,6 +236,108 @@ class TestRegression1009(unittest.TestCase):
             self.assertTrue((ROOT / r).is_dir(), f"{r}/ n'existe pas")
             self.assertTrue(list((ROOT / r).rglob("*.py")),
                             f"{r}/ n'a aucun .py — requalifier le filtre")
+
+
+LEDGER = ROOT / "research" / "evidence" / "facts.jsonl"
+
+
+def _couvert(path: str, patterns: list[str]) -> bool:
+    """Le chemin est-il couvert par un motif `dir/**`, ou listé exactement ?
+
+    Volontairement MINIMAL : on n'imite pas picomatch (dont la sémantique de
+    `**`/`*` est subtile et versionnée). On vérifie la seule propriété qui
+    compte — ce chemin déclenche-t-il `core` ou `ci` ? Les deux formes
+    utilisées dans le workflow sont `dir/**` (préfixe) et le fichier exact.
+
+    Ce matcher est plus STRICT que picomatch : un motif à joker comme
+    `requirements*.txt` ne matchera pas `requirements.txt` ici. C'est voulu —
+    l'erreur va dans le sens sûr (exiger une entrée explicite), jamais dans
+    le sens « couvert à tort ».
+    """
+    for p in patterns:
+        if p.endswith("/**"):
+            prefix = p[:-3]
+            if path == prefix or path.startswith(prefix + "/"):
+                return True
+        elif p == path:
+            return True
+    return False
+
+
+def _chemins_du_ledger() -> list[tuple[str, str]]:
+    """(id, chemin) de chaque fait du ledger qui déclare une preuve."""
+    if not LEDGER.exists():
+        raise AssertionError(f"ledger introuvable : {LEDGER}")
+    out: list[tuple[str, str]] = []
+    for ligne in LEDGER.read_text(encoding="utf-8").splitlines():
+        ligne = ligne.strip()
+        if not ligne:
+            continue
+        fait = json.loads(ligne)
+        p = fait.get("path")
+        if p:
+            out.append((fait.get("id", "?"), p))
+    if not out:
+        raise AssertionError("ledger vide — le test ne mesurerait rien")
+    return out
+
+
+class TestLesPreuvesDuLedgerDeclenchentLeGate(unittest.TestCase):
+    """Tout fichier de preuve du ledger doit déclencher `t1-core`.
+
+    `claim_verify.py` (step BLOQUANT de t1-core) relit chaque fait de
+    `research/evidence/facts.jsonl` contre son fichier de preuve. Ce fichier
+    peut vivre N'IMPORTE OÙ — deux d'entre eux étaient hors de `core` :
+    `docs/21-vagues-registre.md` (F-033/F-034/F-035) et
+    `reports/al-gradient-reproof-2026-10-07.md` (F-037).
+
+    Mesuré : retirer `Décision requise` du rapport F-037 fait passer
+    `claim_verify` à `41/42 SUPPORTED — LE LEDGER EST CONTREDIT`. Comme le
+    fichier est un `.md`, une telle PR était classée `docs`-only, `t1-core`
+    sortait `skipped`, et la contradiction partait sur `main` sans être vue.
+
+    Ce test DÉRIVE les chemins du ledger : ajouter un fait qui pointe un
+    nouveau fichier force à élargir le filtre — sinon il rougit ici.
+    """
+
+    def setUp(self):
+        self.f = _filtres()
+
+    def test_le_ledger_est_lisible(self):
+        faits = _chemins_du_ledger()
+        self.assertGreater(len(faits), 10,
+                           "ledger suspicieusement court — parse cassé ?")
+
+    def test_chaque_preuve_declenche_un_palier(self):
+        declencheurs = self.f["core"] + self.f["ci"]
+        manquants = []
+        for fid, path in _chemins_du_ledger():
+            if not _couvert(path, declencheurs):
+                manquants.append(f"{fid} -> {path}")
+        self.assertEqual(
+            manquants, [],
+            "ces preuves du ledger ne déclenchent AUCUN palier : modifier le "
+            "fichier casserait claim_verify sans que la CI s'en aperçoive.\n"
+            "  " + "\n  ".join(manquants) +
+            "\n→ ajoute-les au filtre `core` de .github/workflows/ci.yml")
+
+    def test_les_deux_cas_mesures_sont_couverts(self):
+        """Épingle nommément les deux chemins du défaut du 10/10."""
+        declencheurs = self.f["core"] + self.f["ci"]
+        for p in ("docs/21-vagues-registre.md",
+                  "reports/al-gradient-reproof-2026-10-07.md"):
+            self.assertTrue(_couvert(p, declencheurs),
+                            f"{p} doit déclencher t1-core (preuve du ledger)")
+
+    def test_le_matcher_lui_meme_est_testable(self):
+        """Garde-fou : si `_couvert` se trompait, tout ce qui précède
+        passerait pour de mauvaises raisons."""
+        self.assertTrue(_couvert("scripts/a.py", ["scripts/**"]))
+        self.assertTrue(_couvert("scripts/deep/b.py", ["scripts/**"]))
+        self.assertFalse(_couvert("scriptsX/a.py", ["scripts/**"]))
+        self.assertTrue(_couvert("docs/x.md", ["docs/x.md"]))
+        self.assertFalse(_couvert("docs/y.md", ["docs/x.md"]))
+        self.assertFalse(_couvert("reports/x.md", ["scripts/**"]))
 
 
 class TestLeRepliSansPyYAMLEstFidele(unittest.TestCase):
