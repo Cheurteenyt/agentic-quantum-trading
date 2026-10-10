@@ -256,7 +256,15 @@ def compute_features(con: sqlite3.Connection, sym: str,
         # corruption) et rendait fund_last tout-NaN en silence
         pass
     return {"open_time_ns": ts,
-            "range_pct": (h - l) / c * 100.0,
+            # Fuzz 2026-10-10 : range_pct = (h-l)/c. Un close à 0 ou négatif
+            # (donnée de bougie pourrie) donnait inf — et inf passe le sens
+            # `>` d'un masque (inf > X == True), comptant une barre morte
+            # comme un signal valide. On nettoie c<=0 en NaN AVANT la
+            # division : NaN est « inconnu », rejeté par les DEUX sens de
+            # comparaison (nan < X et nan > X sont tous deux False), comme
+            # fund_last ci-dessus. Données prod propres (0 close=0 sur
+            # 94k+86k lignes) : défense, pas bug actif.
+            "range_pct": ((h - l) / np.where(c > 0, c, np.nan) * 100.0),
             "volume_z": volume_z(v, n=20).values,
             "ret_1h": cs.pct_change().values * 100.0,
             "fund_last": fund_last}

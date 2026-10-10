@@ -231,5 +231,29 @@ class TestRunner(unittest.TestCase):
         self.assertEqual(res["slots_consumed"], 0)
 
 
+    def test_range_pct_close_zero_est_nan_pas_inf(self):
+        """BUG fuzz 2026-10-10 : range_pct = (h-l)/c. Un close à 0 ou négatif
+        (bougie pourrie) donnait inf — et inf passe le sens `>` d'un masque
+        (inf > X == True), comptant une barre morte comme signal valide. Fix :
+        c<=0 -> NaN avant la division ; NaN est rejeté par les DEUX sens de
+        comparaison (nan < X et nan > X sont False), comme fund_last.
+        Données prod propres (0 close=0) : défense, pas bug actif."""
+        H_MS = 3_600_000
+        # insérer une barre avec close=0 parmi des barres saines
+        self.con.execute(
+            "INSERT INTO klines VALUES ('BTCUSDT','1h',?,?,?,?,?,1.0)",
+            (500 * H_MS, 100.0, 105.0, 95.0, 0.0))  # close = 0 !
+        self.con.commit()
+        feats = rr.compute_features(self.con, "BTCUSDT", db_path=self.db)
+        rp = feats["range_pct"]
+        # la barre pourrie (close=0) doit être NaN, JAMAIS inf
+        self.assertFalse(np.isinf(rp).any(),
+                         "un close<=0 ne doit JAMAIS produire un range_pct=inf")
+        # et la barre saine doit garder sa valeur (pas de régression)
+        barre_saine = rp[0]
+        self.assertTrue(np.isfinite(barre_saine),
+                        "une barre saine doit garder un range_pct fini")
+
+
 if __name__ == "__main__":
     unittest.main()
