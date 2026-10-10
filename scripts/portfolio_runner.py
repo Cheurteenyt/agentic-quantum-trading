@@ -186,6 +186,13 @@ def _portfolio_time_metrics(equity_hourly: list[tuple[int, float]]
     if len(equity_hourly) < 3:
         return None, None
     eqs = np.array([e for _, e in equity_hourly])
+    # Fuzz 2026-10-10 : une courbe portant un inf (bug amont, p.ex. un event
+    # ret_pct=inf non filtré) passait `prev > 0` (inf > 0 == True) puis
+    # `sd <= 0` (nan <= 0 == False) et sortait Sharpe=nan — un chiffre faux
+    # qui a l'air d'un chiffre, silencieux. Même faille que #268 : un garde
+    # `<= 0` / `> 0` n'attrape NI nan NI inf. isfinite en amont ferme les deux.
+    if not np.all(np.isfinite(eqs)):
+        return None, None
     prev = eqs[:-1]
     cur = eqs[1:]
     ok = prev > 0
@@ -194,12 +201,12 @@ def _portfolio_time_metrics(equity_hourly: list[tuple[int, float]]
     r = (cur[ok] / prev[ok] - 1.0)
     sd = float(np.std(r, ddof=1))
     mean_r = float(np.mean(r))
-    if sd <= 0:
+    if not np.isfinite(sd) or sd <= 0:
         return None, None
     sharpe = mean_r / sd * np.sqrt(HOURS_PER_YEAR)
     downside = float(np.sqrt(np.mean(np.minimum(r, 0.0) ** 2)))
     sortino = (mean_r / downside * np.sqrt(HOURS_PER_YEAR)
-               if downside > 0 else None)
+               if np.isfinite(downside) and downside > 0 else None)
     return round(sharpe, 2), (round(sortino, 2) if sortino else None)
 
 
@@ -663,6 +670,18 @@ def block_bootstrap_hourly(hourly_rets: np.ndarray, block_hours: int = 24,
     r = np.asarray(hourly_rets, dtype=float)
     if len(r) < block_hours:
         return {"iters": 0, "note": "pas assez d'heures pour bootstrapper"}
+    # Fuzz 2026-10-10 : un retour horaire NaN/inf (bug amont non filtré)
+    # passait le bootstrap ; `if sd > 0` (nan > 0 == False) forçait alors
+    # Sharpe=0 pour cet échantillon — un 0 FAUX qui biaise l'IC95 vers le
+    # bas, silencieusement (moins visible qu'un nan, tout aussi faux). Même
+    # famille que le fix _portfolio_time_metrics : filtrer les non-finis en
+    # AMONT et COMPTER ceux retirés (transparence — un bootstrap sur données
+    # propres doit dire combien de points il a écartés).
+    n_non_finis = int((~np.isfinite(r)).sum())
+    r = r[np.isfinite(r)]
+    if len(r) < block_hours:
+        return {"iters": 0, "note": "pas assez d'heures finies pour bootstrapper",
+                "n_non_finis_ecartes": n_non_finis}
     rng = np.random.default_rng(seed)
     n = len(r)
     n_blocks = int(np.ceil(n / block_hours))
@@ -690,6 +709,7 @@ def block_bootstrap_hourly(hourly_rets: np.ndarray, block_hours: int = 24,
                             float(np.percentile(tstats, 97.5))],
             "bootstrap_mass_mean_gt0": float((means > 0).mean()),
             "n_neg_mean": n_neg,
+            "n_non_finis_ecartes": n_non_finis,
             "n_replications": iters}
 
 
