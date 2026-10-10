@@ -31,3 +31,11 @@ matplotlib>=3.8
 curl_cffi>=0.7.0
 discord.py>=2.4
 pyyaml>=6.0
+
+# ─── Outillage qualité (E0, revue d'architecture 2026-10-10) ───
+# pytest exécute nativement les unittest.TestCase (2851 tests, parité
+# confirmée avec run_tests.py). Marqueurs @slow/@needs_db/@network
+# remplacent la sélection par substring (classe de bug #236).
+pytest>=8
+pytest-xdist>=3
+ruff>=0.6

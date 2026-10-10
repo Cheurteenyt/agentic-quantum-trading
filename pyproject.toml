@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-quantum-trading"
+version = "0.0.0"
+description = "Research-grade trading system for Aster DEX perpetuals"
+requires-python = ">=3.13"
+# Dépendances RUNTIME du noyau de recherche. Le backend FastAPI et le
+# frontend gardent leurs requirements séparés (frontend/ a son propre
+# package.json) — ce pyproject ne décrit QUE le noyau + l'outillage de
+# qualité, pour ne pas coupler les deux mondes.
+dependencies = [
+    "numpy",
+    "pandas",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# Outillage de qualité/CI. Séparé du runtime pour que `pip install .`
+# reste léger et que la CI installe explicitement ce dont elle a besoin.
+test = [
+    "pytest>=8",
+    "pytest-xdist>=3",   # -n auto (palier T1/T2 en parallèle)
+]
+lint = [
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+# pytest exécute nativement les unittest.TestCase du repo (2851 tests).
+# On NE remplace PAS run_tests.py du jour au lendemain : les deux
+# coexistent le temps de la migration (voir AGENTS.md, section gate).
+#
+# testpaths explicite : sans ça, pytest ramasse les tests de backend/ et
+# les fixtures orphelines de tests/archive_studies/ (dont un import mort
+# révélé par la migration — cf. § collection plus bas).
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# ── Marqueurs (remplace la sélection par sous-chaîne de run_tests.py) ──
+# Classe de bug #236 : run_tests.py excluait des fichiers par SUBSTRING
+# (SLOW_MARKERS), ce qui a fait disparaître 48,8% de la suite du gate en
+# silence. Les marqueurs sont EXPLICITES : on exclut par marqueur, jamais
+# par nom de fichier deviné.
+markers = [
+    "slow: tests > 60 s (exclus du gate --fast/palier T1, tournent en T3 nuit)",
+    "needs_db: tests qui ouvrent un vrai fichier de warehouse (data/ git-ignoré) — hors CI sans données",
+    "network: tests qui frappent une API externe (jamais en CI)",
+]
+
+# ── Robustesse de collection ──
+# tests/archive_studies/ contient un test dont l'import est mort
+# (block_bootstrap renommé). unittest le saute en silence ; pytest fait
+# échouer la collection. On l'exclut EXPLICITEMENT (nom de module exact +
+# raison), pas par substring — même discipline que les marqueurs.
+norecursedirs = [
+    "tests/archive_studies",   # étude archivée, import mort (block_bootstrap)
+    "*.egg-info",
+    ".git",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+]
+
+# Le gate CI garde le compte « exécutés/découverts » : addopts affiche le
+# résumé, et -p no:cacheprovider évite d'écrire .pytest_cache dans le repo.
+addopts = "-ra -q"
+
+[tool.ruff]
+# ruff = pyflakes (F) + pycodestyle (E/W) + bugs (B) + import (I).
+# On cible le noyau en priorité ; le backend monolithique suit quand il
+# est découpé. line-length aligné sur le style existant du repo.
+line-length = 100
+target-version = "py313"
+src = ["."]
+
+[tool.ruff.lint]
+# F = pyflakes (noms indéfinis, imports inutilisés) — déjà bloquant en CI.
+# E9 = erreur de syntaxe. I = ordre des imports. B = bugs (bugbear).
+# On n'active PAS le formatage agressif (E7xx/W) pour ne pas réécrire
+# 300k lignes d'un coup.
+select = ["F", "E9", "I", "B"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+# Les tests importent des fixtures et font des assertions longues.
+"tests/**" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["scripts", "services", "backend"]
