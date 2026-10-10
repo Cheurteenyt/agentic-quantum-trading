@@ -37,7 +37,8 @@ ci-dessous sont cohérentes avec cette re-mesure ; le résumé d'état :
 > Ordre des entrées : tilt × meme (frontière) → session parallèle Aster
 > (vol_spike, carte hold meme, autopsie, volspike_meme) → lifecycle v2
 > mobula → H1 absorption → H2/H3 CVD → QUBO poids + wall-clock + re-cascade
-> → garde wallet DD → **QUBO joint poids×levier (le record +5 082 %)** →
+> → garde wallet DD → QUBO joint poids×levier (~~le record +5 082 %~~ —
+> ⛔ MORT, cf. F-033 : 20 liqs / DD 99,2 % / final $1) →
 > H2bis/H3bis capitulation+sweep → TAIL survivor au sizing réel → hold
 > étendu + carte hold survivor.
 

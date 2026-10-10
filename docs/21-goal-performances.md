@@ -34,7 +34,7 @@ registre docs/20, section 30/09. Le forward paper reste le seul juge.
 |---|---|---|---|---|---|---|---|---|---|
 | **main** (référence) | historiques | 10x/1x/1x/1x | $4 005 | +3 905 %/an | 24,8 % | — | -10,1 % | 0 | au forward |
 | **QUBO poids** (`qubo_sizing.py`) | [0.857, 0.857, 2.0, 1.143] | 10x/1x/1x/1x | $4 639 | +4 539 %/an | 23,4 % | +78,7 % | -14,4 % | 0 | CANDIDAT |
-| **QUBO joint poids×levier** (`qubo_joint_lev.py`) | [0.857, 0.857, 2.0, 0.857] | **11x**/1x/1x/1x | **$5 182** | **+5 082 %/an** | **23,3 %** | **+83,7 %** | -13,4 % | 0 | CANDIDAT — ⚠️ marge MAE 9 % |
+| **QUBO joint poids×levier** (`qubo_joint_lev.py`) | [0.857, 0.857, 2.0, 0.857] | **11x**/1x/1x/1x | ~~$5 182~~ | ~~+5 082 %/an~~ | ~~23,3 %~~ | ~~+83,7 %~~ | -13,4 % | 0 | ⛔ **REFUTÉ — HISTORIQUE SEULEMENT (F-033, PRs #91-95)** : re-mesuré sur données fixées (post fix `fetch_deep_klines`), 20 liquidations réelles, DD 99,2 %, final $1. Chiffres barrés = morts. La marge MAE « 9 % de tête » ne protégeait de rien. |
 
 27/09 : 19+ verdicts consommés (16 nuls/contextes, 3 candidats) ; 2 bugs
 CRITIQUES de la chaîne forward patchés (audit `flow_audit.py`, Ariad) ; les
