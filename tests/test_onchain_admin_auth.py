@@ -20,11 +20,37 @@ from services.core_equity_guards import dry_run_raw_data_collection_payload  # n
 
 
 class OnchainAdminAuthTests(unittest.TestCase):
+    # Issue #235 : l'app était reconstruite à CHAQUE test (setUp), soit
+    # 684 × (FastAPI() + include_router(986 routes) + 1er appel).
+    # Mesuré : le PREMIER POST d'un client coûte ~1,0 s (analyse froide des
+    # routeurs : `get_dependant` récursé ~908 fois via
+    # `_build_dependant_with_parameterless_dependencies`, 14 124 appels
+    # `analyze_param`), les suivants 0,003 s. Payer ce coût 684 fois = >680 s,
+    # d'où l'exclusion du gate.
+    #
+    # L'analyse est DÉTERMINISTE et l'app ne dépend que du ROUTEUR (le token
+    # admin est lu au moment de la requête, pas à la construction) : on la
+    # construit UNE fois, partagée. Le client TestClient est sans état vis-à-vis
+    # des tests (aucun cookie/session) ; les assertions restent identiques.
+    _app = None
+    _client = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._app = FastAPI()
+        cls._app.include_router(onchain_router, prefix="/api/onchain")
+        cls._client = TestClient(cls._app)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._client = None
+        cls._app = None
+
     def setUp(self) -> None:
+        # Le token est restauré PAR TEST (tearDown) : on le capture ici, comme
+        # avant. Seule la construction de l'app a été déplacée au niveau classe.
         self.original_token = os.environ.get("CORE_ADMIN_TOKEN")
-        app = FastAPI()
-        app.include_router(onchain_router, prefix="/api/onchain")
-        self.client = TestClient(app)
+        self.client = self._client
 
     def tearDown(self) -> None:
         if self.original_token is None:

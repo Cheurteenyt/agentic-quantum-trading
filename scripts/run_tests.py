@@ -19,12 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-SLOW_FILES: dict[str, str] = {
-    # 684 fns d'auth, aucun time.sleep, > 420 s mesures ronde 8 sans finir
-    # (cout de derivation repetee). Hors-ligne mais trop lent pour le gate.
-    # Chemin de reintegradation : profiler/cacher les derivations, issue #235.
-    "test_onchain_admin_auth": "lent (>420 s, 684 fns) — cf. issue #235",
-}
+SLOW_FILES: dict[str, str] = {}
 """Fichiers de tests exclus du mode --fast, un nom exact + la raison.
 
 Historique (H-58) : l'ancien filtre excluait par SUBSTRING
@@ -37,8 +32,19 @@ Issue #235 (ronde 11) : test_onchain_entity_chain_gaps (414 fns) est
 REINTEGRE — ses 3 echecs etaient des defauts du TEST, pas du code
 (2 tests non-hermetiques qui ne contrôlaient pas runtime_preflight ;
 1 test à timestamps fossiles mai 2026 vs fenetre glissante 30 j), fixes
-dans la PR. Cout : ~74 s local (le plus lent du gate, raison suffisant
-pour rester hors nightly-only).
+dans la PR. Cout : ~58 s local (le plus lent du gate).
+
+Issue #235 (2e volet, 10/10) : test_onchain_admin_auth (684 fns) est
+REINTEGRE AUSSI — et l'hypothese « cout de derivation cryptographique »
+etait FAUSSE. Profilage a la mesure : ce n'est pas de la crypto, c'est
+l'analyse FROIDE des routeurs, payee une fois par TestClient. Le 1er POST
+d'un client coute ~1,0 s (`get_dependant` recursé ~908 fois via
+`_build_dependant_with_parameterless_dependencies`, 14 124 appels
+`analyze_param` pour 986 routes) ; les suivants 0,003 s. Le `setUp`
+construisait une app NEUVE par test → 684 x 1 s. En construisant l'app une
+seule fois (setUpClass), le fichier passe de >420 s a 4,5 s (684 pass).
+
+DESORMAIS `SLOW_FILES` EST VIDE : plus aucun test n'est exclu du gate.
 """
 
 BASELINE = ROOT / ".github" / "test-count-baseline.txt"
