@@ -11,6 +11,11 @@ Ces tests verrouillent :
   2. l'exclusion = explicite, par nom de module exact, avec raison ;
   3. chaque entrée de SLOW_FILES pointe vers un fichier réel de tests/
      (pas de nom fantôme qui ferait croire à une exclusion maîtrisée) ;
+     NOTE #235 (10/10) : SLOW_FILES est désormais VIDE — les 684 fns
+     d'auth ont été réintégrées (app construite une fois, >420 s → 4,5 s).
+     Les invariants restent vérifiés : sur un dict vide ils sont vacuous,
+     donc on prouve le MÉCANISME sur une entrée INJECTÉE (patch.dict),
+     jamais en sautant le test ;
   4. le compte de tests du mode fast ne peut pas baisser en silence
      (ratchet baseline, modèle bandit-baseline / audit_except_pass).
 """
@@ -53,6 +58,15 @@ class TestSelectionExplicite(unittest.TestCase):
         self.assertEqual(_without_slow(_suite("test_cexactly_local")).countTestCases(), 1)
 
     def test_fichier_liste_slow_est_exclu(self):
+        if not SLOW_FILES:
+            # #235 (10/10) : SLOW_FILES est VIDE — plus aucun test exclu du
+            # gate. Le mécanisme doit quand même marcher ; on le prouve sur une
+            # entrée INJECTÉE plutôt que de sauter silencieusement.
+            with patch.dict(SLOW_FILES, {"test_run_tests_selection": "injecté"}):
+                self.assertEqual(
+                    _without_slow(_suite("test_run_tests_selection")).countTestCases(), 0
+                )
+            return
         key = next(iter(SLOW_FILES))
         self.assertEqual(_without_slow(_suite(key)).countTestCases(), 0)
 
@@ -63,6 +77,13 @@ class TestSelectionExplicite(unittest.TestCase):
 
     def test_l_exclusion_est_par_nom_exact_pas_par_fragment(self):
         # un module qui CONTIENT le nom d'un fichier lent n'est pas exclu
+        if not SLOW_FILES:
+            with patch.dict(SLOW_FILES, {"test_run_tests_selection": "injecté"}):
+                self.assertEqual(
+                    _without_slow(_suite("test_run_tests_selection_variant"))
+                    .countTestCases(), 1
+                )
+            return
         key = next(iter(SLOW_FILES))
         self.assertEqual(
             _without_slow(_suite(key + "_variant")).countTestCases(), 1
