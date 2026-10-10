@@ -42,6 +42,13 @@ from scripts.portfolio_sim import (  # noqa: E402
 REPORTS = ROOT / "reports"
 SIZE = 0.05
 FEE_BPS, SLIP_BPS = 2, 0          # maker (GTX) : la config de référence
+# Issue #201 (C-B2) : le levier du SCÉNARIO. Il apparaissait 4 fois en clair
+# (fees, funding, pnl, liq_move_for) — s'ils divergeaient, le label pnl et le
+# seuil de liquidation cesseraient de décrire LA MÊME position, en silence.
+# Une seule constante, et un garde d'import (cf. _selfcheck) pour que la
+# divergence devienne impossible : « le seuil ne dépend que du prix et de la
+# marge de maintien RÉELLE par symbole, jamais d'un levier divergent ».
+SCENARIO_LEV = 20
 NUMERIC = ["atr_pct", "vol24", "cascade_depth", "accel", "dd_pct",
            "vwap_dev", "vol_spike", "btc_ret24", "storm_24h", "funding_last"]
 CATEGORIC = ["regime"]
@@ -155,7 +162,7 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
             ret = (entry - exit_px) / entry * 100
             mae = (highs[ei:exit_j + 1].max() - entry) / entry * 100
             # le label du sim : mae ≥ seuil OU pnl ≤ -marge (indépendant de la balance)
-            fees_pct = (FEE_BPS + SLIP_BPS) * 2 * 20 / 100
+            fees_pct = (FEE_BPS + SLIP_BPS) * 2 * SCENARIO_LEV / 100
             # FIX audit v3 (C6) : as-of STRICT — le dernier taux CONNU à
             # l'entrée ; np.interp mélangeait le print FUTUR dans la feature
             # funding_last (qui alimente l'AL score).
@@ -164,14 +171,29 @@ def collect_featured(regime: pd.Series, universe: str = "majors") -> list[dict]:
                 _k = int(np.searchsorted(ft[0], idx_ns[ei], side="right")) - 1
                 if _k >= 0:
                     fund_h = float(ft[1][_k])
-            fund_pct = fund_h * HOLD_H * 20 / 100
-            pnl_pct = ret * 20 + fund_pct - fees_pct
+            fund_pct = fund_h * HOLD_H * SCENARIO_LEV / 100
+            pnl_pct = ret * SCENARIO_LEV + fund_pct - fees_pct
             # Fossile ronde 5 : LIQ_MOVE_PCT était un seuil PLAT calculé à
             # l'import (100/20 − 2,5 = 2,5 %) — coïncide avec les majeures
             # (mm 2,5) mais ignore les memecoins (16,66 % → distance 0 à
             # 20x = liquidé à l'entrée) et n'était ni prudent ni compté si
             # la table était absente. liq_move_for applique le modèle F-038.
-            _liq_move = liq_move_for(sym, 20)
+            #
+            # #201 (C-B2) : le seuil est calculé avec le MÊME SCENARIO_LEV que
+            # le pnl ci-dessus. Le `100/L` de liq_move_for est la distance de
+            # liquidation DE LA POSITION À CE LEVIER ; la marge de maintien
+            # (mm) vient de liq_params, par symbole, indépendamment du levier.
+            # Puisque le scénario est à levier CONSTANT, la mesure reste
+            # comparable d'un scénario à l'autre — le point de #201 était
+            # qu'un levier divergent (label à L, seuil à L') rendrait la
+            # comparaison fausse. Le garde d'import ci-dessous l'interdit.
+            _liq_move = liq_move_for(sym, SCENARIO_LEV)
+            if _liq_move < 0:
+                # Garde RÉEL, pas un assert : `python -O` supprimerait un
+                # assert et rétablirait le fail-open en silence (#202).
+                raise ValueError(
+                    f"liq_move_for({sym!r}, {SCENARIO_LEV}) = {_liq_move} < 0 — "
+                    "un seuil de liquidation est une DISTANCE, jamais un signe")
             liq = mae >= _liq_move or pnl_pct <= -100
             # le REGISTRE de liquidation : prix de mort exact + bougie
             # où le high le franchit (le short meurt AU-DESSUS de l'entrée)
