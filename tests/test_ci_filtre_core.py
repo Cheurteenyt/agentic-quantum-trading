@@ -340,6 +340,92 @@ class TestLesPreuvesDuLedgerDeclenchentLeGate(unittest.TestCase):
         self.assertFalse(_couvert("reports/x.md", ["scripts/**"]))
 
 
+class TestLesEntreesDesOraclesDeclenchentLeGate(unittest.TestCase):
+    """Tout fichier LU par un oracle doit déclencher `t1-core`.
+
+    `audit_check.py` (step BLOQUANT) ne fait pas que lire le code : il LIT des
+    fichiers de configuration et de documentation, et rougit s'ils changent.
+    Mesuré :
+      - retirer `lab_ledger.py` de `.zcode/agents/quant-researcher.md`
+        -> contrôle A4 ROUGE ;
+      - retirer une famille du `docs/lab/mortuary.md` -> contrôle C1 ROUGE.
+    Aucun de ces fichiers n'était dans `core` : une PR qui les modifie sortait
+    `skipped`, et la CI ne voyait rien.
+
+    Ce test DÉRIVE les entrées : il extrait les littéraux de chemin des scripts
+    d'oracle, ne garde que ceux qui EXISTENT réellement (ce qui écarte les
+    artefacts de regex comme `data/...`), et exige que chacun soit couvert.
+    Ajouter un `ROOT / "nouveau/fichier"` dans un oracle fait donc rougir ici
+    tant que le filtre n'est pas élargi.
+    """
+
+    ORACLES = (
+        "claim_verify.py", "audit_check.py", "deep_audit.py",
+        "research_integrity.py", "ledger_provenance.py",
+        "ledger_puissance.py", "audit_path_root.py",
+    )
+    # Littéraux de chemin : un dossier de 1er niveau connu, puis la suite.
+    MOTIF = re.compile(
+        r"""["']((?:docs|research|scripts|tests|backend|frontend|discord_bot"""
+        r"""|agent|reports|\.zcode|\.github|configs|deploy|data|rag|archives"""
+        r"""|integrations)/[^"'\n]*?)["']""")
+
+    def setUp(self):
+        self.f = _filtres()
+
+    def _litteraux_reels(self) -> dict[str, set[str]]:
+        """{chemin: {oracles}} — seulement les chemins qui EXISTENT.
+
+        Le filtre d'existence est ce qui rend la dérivation exploitable : il
+        élimine les faux positifs (motifs de regex, chaînes d'affichage) sans
+        exiger une liste blanche à maintenir.
+        """
+        import subprocess
+        tracked = set(subprocess.run(
+            ["git", "ls-files"], cwd=ROOT, capture_output=True,
+            text=True, check=True).stdout.split("\n"))
+        out: dict[str, set[str]] = {}
+        for oracle in self.ORACLES:
+            p = ROOT / "scripts" / oracle
+            if not p.exists():
+                continue
+            for m in self.MOTIF.finditer(p.read_text(encoding="utf-8",
+                                                    errors="replace")):
+                lit = m.group(1)
+                prefixe = lit.rstrip("/") + "/"
+                existe = (ROOT / lit).exists() or any(
+                    t.startswith(prefixe) for t in tracked)
+                if existe:
+                    out.setdefault(lit, set()).add(oracle)
+        return out
+
+    def test_la_derivation_trouve_quelque_chose(self):
+        """Si l'extraction casse, les tests suivants passeraient à vide."""
+        lits = self._litteraux_reels()
+        self.assertGreater(len(lits), 8,
+                           "extraction suspicieusement pauvre — motif cassé ?")
+
+    def test_chaque_entree_d_oracle_declenche_un_palier(self):
+        declencheurs = self.f["core"] + self.f["ci"]
+        manquants = [f"{p} <- {','.join(sorted(o))}"
+                     for p, o in sorted(self._litteraux_reels().items())
+                     if not _couvert(p, declencheurs)]
+        self.assertEqual(
+            manquants, [],
+            "ces fichiers sont LUS par un oracle mais ne déclenchent AUCUN "
+            "palier : les modifier casserait le gate en silence.\n  " +
+            "\n  ".join(manquants) +
+            "\n→ ajoute-les au filtre `core` de .github/workflows/ci.yml")
+
+    def test_les_cas_mesures_du_10_10_sont_couverts(self):
+        declencheurs = self.f["core"] + self.f["ci"]
+        for p in (".zcode/agents/quant-researcher.md",
+                  "docs/lab/mortuary.md",
+                  "configs/systemd-user/trading-agent-nightly.service"):
+            self.assertTrue(_couvert(p, declencheurs),
+                            f"{p} est lu par audit_check -> doit être en core")
+
+
 class TestLeRepliSansPyYAMLEstFidele(unittest.TestCase):
     """Les DEUX chemins de lecture doivent rendre le MÊME filtre.
 
