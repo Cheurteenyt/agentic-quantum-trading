@@ -426,6 +426,95 @@ class TestLesEntreesDesOraclesDeclenchentLeGate(unittest.TestCase):
                             f"{p} est lu par audit_check -> doit être en core")
 
 
+class TestToutPalierFiltreConsulteCi(unittest.TestCase):
+    """Tout palier filtré par chemins doit consulter le filtre `ci`.
+
+    Le même défaut a été trouvé TROIS fois : `t1-core` (#277), `t1-security`
+    (#281), puis `t1-frontend` (10/10). Mécanisme identique à chaque fois :
+    une PR qui modifie la DÉFINITION d'un palier (version de Node, commande,
+    cache, condition) touche `.github/**` → le filtre du langage concerné est
+    `false` → le palier sort `skipped` → et `gate`, qui traite `skipped` comme
+    neutre, laisse passer. **La porte ne se valide jamais elle-même.**
+
+    Ce test l'exige pour TOUS les paliers : en ajouter un filtré par chemins
+    sans `outputs.ci` fait rougir ici, au lieu de laisser un trou silencieux.
+    """
+
+    def _jobs(self) -> dict:
+        import yaml
+        return yaml.safe_load(CI.read_text(encoding="utf-8"))["jobs"]
+
+    def test_au_moins_trois_paliers_filtres(self):
+        """Garde-fou : si la lecture casse, le test suivant passerait à vide."""
+        filtres = [n for n, j in self._jobs().items()
+                   if "needs.changes.outputs." in (j.get("if") or "")]
+        self.assertGreaterEqual(
+            len(filtres), 3,
+            f"paliers filtrés trouvés : {filtres} — extraction cassée ?")
+
+    def test_tous_les_paliers_filtres_consultent_ci(self):
+        manquants = []
+        for nom, job in self._jobs().items():
+            cond = job.get("if") or ""
+            if "needs.changes.outputs." not in cond:
+                continue  # T2/T3/gate : conditionnés par l'ÉVÉNEMENT, pas par chemins
+            if "outputs.ci == 'true'" not in cond:
+                manquants.append(nom)
+        self.assertEqual(
+            manquants, [],
+            "ces paliers sont filtrés par chemins mais ne consultent pas `ci` : "
+            "une PR modifiant leur définition sortirait `skipped`, et `gate` "
+            "laisserait passer.\n  " + "\n  ".join(manquants) +
+            "\n→ ajoute `|| needs.changes.outputs.ci == 'true'` à leur condition")
+
+
+class TestRochetDeDetteFailClosed(unittest.TestCase):
+    """Tout rochet `git show origin/main:` doit d'abord vérifier sa REF.
+
+    Les trois rochets de dette (deep-audit, except-pass, bandit) comparaient
+    `git show origin/main:<baseline>` et, en cas d'échec, se contentaient d'un
+    `::notice::`. Donc si `origin/main` n'était pas résolvable (checkout sans
+    `fetch-depth: 0`, branche par défaut renommée, ref absente…), le rochet
+    mourait EN SILENCE — et une PR pouvait relever son propre baseline sans
+    être rattrapée. Même famille que le rochet de comptage de tests, qui lui
+    était déjà fail-CLOSED (« le garde ne peut pas être désactivé en
+    supprimant le fichier »).
+
+    Le remède distingue les DEUX causes, pour ne pas casser l'introduction
+    d'un baseline (qui s'est faite par PR : #254, #205, #197) :
+      - REF `origin/main` absente            -> ROUGE (infra cassée) ;
+      - ref OK mais CHEMIN absent sur main   -> notice (introduction).
+    """
+
+    def _steps(self):
+        import yaml
+        doc = yaml.safe_load(CI.read_text(encoding="utf-8"))
+        for job in doc["jobs"].values():
+            for step in (job.get("steps") or []):
+                yield step
+
+    def test_au_moins_trois_rochets_de_dette(self):
+        """Garde-fou : si l'extraction casse, le test suivant passerait à vide."""
+        n = sum(1 for s in self._steps()
+                if "git show origin/main:" in (s.get("run") or ""))
+        self.assertGreaterEqual(n, 3, f"rochets de dette trouvés : {n}")
+
+    def test_chaque_rochet_garde_sa_ref(self):
+        manquants = []
+        for s in self._steps():
+            run = s.get("run") or ""
+            if "git show origin/main:" not in run:
+                continue
+            if "rev-parse --verify --quiet origin/main" not in run:
+                manquants.append(s.get("name") or "(étape sans nom)")
+        self.assertEqual(
+            manquants, [],
+            "ces rochets comparent à origin/main sans vérifier que la REF "
+            "existe : si elle disparaît, le rochet meurt en silence.\n  " +
+            "\n  ".join(manquants) +
+            "\n→ ajoute le garde `git rev-parse --verify --quiet origin/main`")
+
+
 class TestLeRepliSansPyYAMLEstFidele(unittest.TestCase):
     """Les DEUX chemins de lecture doivent rendre le MÊME filtre.
 

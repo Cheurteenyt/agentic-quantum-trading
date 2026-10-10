@@ -195,6 +195,18 @@ jobs:
         run: python scripts/deep_audit.py --check
       - name: Rochet dette_PR <= dette_main (deep-audit)
         run: |
+          # Garde fail-CLOSED : sans elle, un `origin/main` non résolvable
+          # (checkout sans fetch-depth: 0, branche par défaut renommée…)
+          # faisait tomber le `git show` dans le `else`, qui n'émettait qu'un
+          # `::notice::` — donc le rochet de dette mourait EN SILENCE, et une
+          # PR pouvait relever son propre baseline sans être rattrapée.
+          # On distingue les deux causes : REF absente = infra cassée -> ROUGE ;
+          # ref OK mais CHEMIN absent sur main = introduction d'un baseline
+          # (cas historique, cf. #254) -> notice, la comparaison n'a pas d'objet.
+          if ! git rev-parse --verify --quiet origin/main >/dev/null; then
+            echo "::error::origin/main introuvable — le rochet dette_PR <= dette_main ne peut pas comparer (checkout avec fetch-depth: 0 ?)"
+            exit 1
+          fi
           if git show origin/main:.github/deep-audit-baseline.json > /tmp/main_deep_audit.json 2>/dev/null; then
             python scripts/deep_audit.py --check --baseline /tmp/main_deep_audit.json
           else
@@ -209,7 +221,16 @@ jobs:
 
   # ═══ PALIER T1 — frontend (≤ 6 min) ═══
   t1-frontend:
-    if: github.event_name != 'schedule' && needs.changes.outputs.frontend == 'true'
+    # `ci` est consulté comme pour t1-core et t1-security : une PR qui modifie
+    # CE job (version de Node, commande, cache) touche `.github/**`, donc
+    # `frontend=false` — sans ce `|| ci`, le palier sortait `skipped` et la
+    # modification du gate frontend n'était jamais validée par le gate
+    # frontend. C'était le dernier palier à ne pas consulter `ci`
+    # (t1-core : #277 ; t1-security : #281 ; ici le 10/10).
+    if: >-
+      github.event_name != 'schedule' &&
+      (needs.changes.outputs.frontend == 'true' ||
+       needs.changes.outputs.ci == 'true')
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -274,6 +295,12 @@ jobs:
         run: python scripts/audit_except_pass.py --check
       - name: Rochet dette_PR <= dette_main (except-pass)
         run: |
+          # Même garde fail-CLOSED que le rochet deep-audit : une REF
+          # non résolvable = ROUGE, un chemin absent sur main = introduction.
+          if ! git rev-parse --verify --quiet origin/main >/dev/null; then
+            echo "::error::origin/main introuvable — le rochet dette_PR <= dette_main ne peut pas comparer (checkout avec fetch-depth: 0 ?)"
+            exit 1
+          fi
           if git show origin/main:.github/except-pass-baseline.json > /tmp/main_except_pass.json 2>/dev/null; then
             python scripts/audit_except_pass.py --check --baseline /tmp/main_except_pass.json
           else
@@ -308,6 +335,13 @@ jobs:
           echo "bandit complet : $total (référence $ref)"
           if [ "$total" -gt "$ref" ]; then
             echo "::error::le stock d'avis bandit a AUGMENTÉ ($total > $ref)"
+            exit 1
+          fi
+          # Même garde fail-CLOSED que les deux autres rochets de dette : une
+          # REF non résolvable = ROUGE (le rochet ne peut pas comparer), un
+          # chemin absent sur main = introduction.
+          if ! git rev-parse --verify --quiet origin/main >/dev/null; then
+            echo "::error::origin/main introuvable — le rochet dette_PR <= dette_main ne peut pas comparer (checkout avec fetch-depth: 0 ?)"
             exit 1
           fi
           if ref_main=$(git show origin/main:.github/bandit-baseline.txt 2>/dev/null); then
