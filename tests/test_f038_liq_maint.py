@@ -204,5 +204,23 @@ class TestNoLiquidationsByConstruction(unittest.TestCase):
         self.assertAlmostEqual(levier_majors_safe(7.84), 100 / 10.84)
 
 
+    def test_lev_nul_ou_negatif_ne_crase_pas(self):
+        """BUG fuzz 2026-10-10 : liq_move_for(sym, 0) levait ZeroDivisionError
+        (100.0/lev sans garde), tuant un run sur un spec mal formé (lev: 0 /
+        négatif, écrit à la main). Un levier non positif n'a aucun sens
+        physique : on borne à 0 (« liquidé à l'entrée ») et on compte
+        (LIQ_NON_VIABLE), comme le cas distance <= 0 de #202."""
+        from scripts.portfolio_sim import liq_move_for
+        for lev in (0, 0.0, -1, -20):
+            self.assertEqual(liq_move_for("BTCUSDT", lev), 0.0,
+                             f"lev={lev} doit borner à 0, pas crasher")
+
+    def test_lev_positif_inchange(self):
+        """Le fix ne doit PAS altérer les leviers valides."""
+        from scripts.portfolio_sim import liq_move_for
+        self.assertGreater(liq_move_for("BTCUSDT", 10), 0.0)
+        self.assertAlmostEqual(liq_move_for("BTCUSDT", 10), 7.5)
+
+
 if __name__ == "__main__":
     unittest.main()

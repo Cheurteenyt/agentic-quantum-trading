@@ -17,6 +17,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -215,6 +216,28 @@ class TestCollectEvents(unittest.TestCase):
         self.assertAlmostEqual(e100["mae_pct"], 20.0, places=6)
         self.assertAlmostEqual(e100["fund_pct"], 0.01, places=9)
         tmp.cleanup()
+
+
+    def test_event_pourri_nan_inf_ne_crompt_pas_le_solde(self):
+        """BUG fuzz 2026-10-10 : un event JSON portant ret_pct=NaN/inf
+        entrait dans `gross` puis `eq` et CORROMPT EN SILENCE le solde, la
+        courbe, les mois, le DD, le ROI — un chiffre faux qui a l'air d'un
+        chiffre. Fail-closed : l'event pourri est skippé ET compté, le solde
+        reste sain. La garde isfinite existe en amont mais pas dans
+        run_wallet (un event rechargé bypass cette étape)."""
+        from scripts.portfolio_runner import run_wallet
+        for pourri in (float("nan"), float("inf"), float("-inf")):
+            r = run_wallet([_ev(ret=pourri)], capital=100)
+            self.assertTrue(math.isfinite(r["solde"]),
+                            f"ret_pct={pourri} a corrompu le solde")
+            self.assertAlmostEqual(r["solde"], 100.0, places=6)
+
+    def test_event_normal_inchange(self):
+        """Le garde ne doit PAS altérer un event valide. _ev défaut = SHORT
+        (side=-1) ; un long (side=+1) sur ret +1 % GAGNE -> solde > capital."""
+        from scripts.portfolio_runner import run_wallet
+        r = run_wallet([_ev(side=1, ret=1.0)], capital=100)
+        self.assertGreater(r["solde"], 100.0)
 
 
 if __name__ == "__main__":
