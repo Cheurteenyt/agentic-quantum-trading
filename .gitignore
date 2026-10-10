@@ -154,3 +154,6 @@ research/runtime/archive/
 
 # les évidences de recherche (re-preuves) entrent dans git
 !reports/al-gradient-reproof-*.md
+
+# état local de l'agent (mémoire de session, cache) — jamais du code
+.workbuddy-ai/

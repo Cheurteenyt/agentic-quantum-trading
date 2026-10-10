@@ -1,7 +1,8 @@
-# STATE — l'état de la recherche (≤ 2 Ko) · à lire EN PREMIER
+# STATE — l'état de la recherche (≤ 3 Ko) · à lire EN PREMIER
 
-MAJ manuelle : 2026-10-06. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/lab_ledger.py sync-state`
-(audit_check F5 échoue s'il est périmé). Tout chiffre ici doit avoir sa commande de reproduction.
+Budget 3000 o contrôlé par `audit_check.py` (C4) — garder ce fichier COURT.
+Généré : LEDGER par `lab_ledger.py sync-state`, Productivité par
+`research_velocity.py --state`. Tout chiffre = sa commande de reproduction.
 
 ## Ledger & budget
 <!-- LEDGER:BEGIN (généré par lab_ledger.py sync-state — ne pas éditer à la main) -->
@@ -13,29 +14,16 @@ MAJ manuelle : 2026-10-06. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/l
 <!-- LEDGER:END -->
 
 ## Productivité (généré : `python scripts/research_velocity.py`)
-- Semaine courante **2026-W41** : **16** lot(s) exécuté(s), **16** hypothèse(s) tranchée(s), **0** candidat(s).
-- Historique vivant (par semaine) :
-  - 2026-W41 : 16 lots · 16 tranchées · 0 candidats · {'DISCOVERY_FAIL': 16}
-- Définition de « fini » hebdo : ≥ 1 lot exécuté ET journalisé, ≥ 1 hypothèse tranchée. Un FAIL est un résultat (fausse piste fermée).
-- **Échéances dépassées : 9** hypothèse(s) pré-enregistrée(s) sans verdict vivant (+ 2 non joignable(s), sans `stratégie :`).
-  - `cusum-regime-shift` → verdict(s) superseded
-  - `depth-imbalance` → jamais tranchée
-  - `holdout-x` → jamais tranchée
-  - `liq-echo` → jamais tranchée
-  - `long-flush-bounce` → jamais tranchée
-  - `premium-fade-listing` → verdict(s) superseded
-  - `premium-torsion` → jamais tranchée
-  - `vol-spike-amplifier` → jamais tranchée
-  - `w42-reconstruction` → verdict(s) superseded
-  - (❓ non joignables, sans `stratégie :` unique : `execution-slippage-protocol` = protocole de mesure, `qubo-w41-trois-chantiers` = plan multi-chantiers — ni l'un ni l'autre n'est une stratégie exécutable, donc pas de `stratégie :` à déclarer sans inventer)
-
+- Semaine **2026-W41** : **16** lots · **16** tranchées · **0** candidats.
+- Historique : 2026-W41 : 16·16·0 {'DISCOVERY_FAIL': 16}
+- « Fini » hebdo = ≥ 1 lot journalisé ET ≥ 1 hypothèse tranchée.
+- **Échéances dépassées : 9** sans verdict vivant (+2 non joignables) : `cusum-regime-shift`, `depth-imbalance`, `holdout-x` (+6) — détail : `python scripts/research_velocity.py`.
 
 ## Verdicts qui comptent
-- Pool OpenMarket v8 : E[R] +0,093 R, IC95 [−0,027 ; +0,223] ; rien ne survit à Bonferroni (N=362) → edge NON établi.
-  Repro : `python3 scripts/studies/x501_openmarket/x501_multiplicity_adapter.py`
-- premium-fade directionnel : CLOS (naked −9,6 bps ; le « 87 % WR » = backtest à coûts 0 bps, non reproductible).
-- premium-fade-listing : KILL ex ante 04/10 (22,2 % de 80 770 trades toxiques > seuil 15 %) — mécanisme gravé CONTEXTE (docs/20).
-- vol_spike_meme re-costé au spread réel : PASS 04/10 (+0,0161 $/trade, 0 liq) — le coût machine = TAKER_RT 28 bps.
+- Pool OpenMarket v8 : E[R] +0,093 R, IC95 [−0,027 ; +0,223] ; rien ne survit à Bonferroni (N=362) → edge NON établi. Repro : `scripts/studies/x501_openmarket/`
+- premium-fade directionnel : CLOS (naked −9,6 bps ; le « 87 % WR » = backtest à coûts 0 bps).
+- premium-fade-listing : KILL ex ante 04/10 (22,2 % de 80 770 trades toxiques > seuil 15 %) — mécanisme CONTEXTE (docs/20).
+- vol_spike_meme re-costé au spread réel : PASS 04/10 (+0,0161 $/trade, 0 liq) — coût machine = TAKER_RT 28 bps.
 - corr_months zero-fill corrigé 05/10 — re-mesure : les verdicts de décorrélation tiennent (−0,055 / −0,650).
 - « +24 %/26 j » survivants : 26 j = aucune info DD → verdict forward 90 j. Aster 13 mois : FORWARD-ONLY.
 - File bugs : reports/aster/bug-hunt-0510/SYNTHESE.md (10 mineurs + 3 suspects).
