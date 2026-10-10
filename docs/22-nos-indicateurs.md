@@ -76,9 +76,14 @@ débloqué toute la frontière ROI/DD.
 **Règle** : les poids et leviers des flux en bits (wᵢ = (1/K) Σ 2^{j-1} xᵢⱼ),
 min xᵀQx + cᵀx avec Q = la covariance des PnL mensuels — annealing classique,
 la formulation prête pour QAOA.
-**Preuve** : +5 082 %/an @ DD 23,3 % (vs +3 905 @ 24,8 à la main) — gagné hors
-échantillon (VAL +77 % vs +60 %).
-**Statut** : CANDIDAT en forward (gelé régime T3 — l'adaptateur parle).
+**Preuve** : ~~+5 082 %/an @ DD 23,3 % (vs +3 905 @ 24,8 à la main) — gagné hors
+échantillon (VAL +77 % vs +60 %).~~
+**Statut** : ⛔ **REFUTÉ — HISTORIQUE SEULEMENT (F-033, PRs #91-95)** : re-mesuré sur
+données fixées (post fix `fetch_deep_klines`, qui corrompait les volumes des gates),
+le point QUBO joint rend **20 liquidations réelles, DD 99,2 %, final $1**. Le chiffre
++5 082 %/an ci-dessus est MORT — conservé pour la méthode (la formulation QUBO
+poids×levier reste valide comme assemblage), PAS comme résultat. Aucune edge
+courante derrière. La formulation prête pour QAOA n'a jamais été promue.
 
 ### 10. L'ADAPTATEUR DE RÉGIME — notre garde statistique
 **Règle** : l'espérance roulante 90 j du flux — sous 0,30 % → sizing ×0,75,

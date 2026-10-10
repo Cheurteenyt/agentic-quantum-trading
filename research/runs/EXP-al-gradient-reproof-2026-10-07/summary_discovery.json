@@ -1,0 +1,7 @@
+{
+  "verdict": "DISCOVERY_FAIL",
+  "n": 1105,
+  "source_n": "reports/al-gradient-reproof-2026-10-07.md:18 — '1105 events majors scorés (1168 collectés, 63 en warm-up NaN)'",
+  "note": "n retrouvé dans le rapport manuel ; ce run n'a pas été produit par le moteur (pas de spec_sha/snapshot protocolaires). Verdict DISCOVERY_FAIL repris tel quel du ledger L96.",
+  "run_id": "EXP-al-gradient-reproof-2026-10-07"
+}

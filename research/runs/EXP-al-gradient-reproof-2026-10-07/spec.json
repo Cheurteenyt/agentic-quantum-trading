@@ -1,0 +1,7 @@
+{
+ "id": "EXP-al-gradient-reproof-2026-10-07",
+ "hypothesis": "RE-PREUVE gradient AL sous formule conforme PR-172 : liq-rate monotone croissant avec le score (train 11,2->26,7 %, val 4,5->15,5 %) mais le gate machine (>= q66) selectionne le tercile le PLUS risqué ; gradient WR DECROISSANT (52,3->45,0 train) — l'ancien 53,7->64,3 (mesuré sous le score buggy, cascade_depth morte) n'est pas reproductible. Décision du sens du gate requise (rapport reports/al-gradient-reproof-2026-10-07.md)",
+ "family": "al-score",
+ "strategy": "gate-al-direction",
+ "source": "report manual reports/al-gradient-reproof-2026-10-07.md (pas de run automate)"
+}
