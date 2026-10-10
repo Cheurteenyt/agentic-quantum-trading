@@ -53,6 +53,13 @@ jobs:
           echo "::notice::la suite COMPLÈTE (SLOW_FILES inclus) tourne à chaque push main + chaque nuit : job full-suite ci-dessous"
       - name: Research integrity (invariants I001-I008)
         run: python scripts/research_integrity.py
+      # N5 (P0) — le ledger est un artefact ÉCRIT À LA MAIN. Sans ce
+      # contrôle, il peut annoncer un PASS que le moteur a re-mesuré en
+      # FAIL depuis (PR#253 a corrigé 81 lignes en aval ; cet oracle rend
+      # la divergence DÉTECTABLE en CI, avant qu'elle ne circule). Le
+      # ledger doit corroborer chacun de ses verdicts par son run.
+      - name: Provenance du ledger (le ledger doit corroborer ses runs)
+        run: python scripts/ledger_provenance.py
       - name: Audit check (bloquant sur --fail-on)
         run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
 
