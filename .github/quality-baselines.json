@@ -1,0 +1,35 @@
+{
+  "_doc": "Baselines de qualité UNIFIÉES (E0, revue d'architecture 2026-10-10). Remplace les 4 fichiers épars (.github/deep-audit-baseline.json, except-pass-baseline.json, test-count-baseline.txt, bandit-baseline.txt) par une SEULE source. Chaque rochet lit SA clé ici. Les anciens fichiers restent lus par leurs scripts pendant la migration ; ce fichier est la vérité de référence.",
+  "_updated": "2026-10-10",
+  "_ratchets": {
+    "except_pass": {
+      "baseline": 205,
+      "direction": "down_only",
+      "note": "except: pass muets. Était 207, réduit à 205 par #262 (normalisation LF a révélé 6 excepts, corrigés). Une réduction est libre (--reset), une augmentation bloquée.",
+      "script": "scripts/audit_except_pass.py --check"
+    },
+    "deep_audit": {
+      "baseline": 330,
+      "direction": "down_only",
+      "note": "classes G1-G10 (fail-open, faux succès, path ROOT...). stable à 330.",
+      "script": "scripts/deep_audit.py --check",
+      "legacy_file": ".github/deep-audit-baseline.json"
+    },
+    "test_count": {
+      "baseline": 1790,
+      "direction": "up_only",
+      "note": "compte de tests du gate --fast NE DOIT JAMAIS descendre. 2162 exécutés aujourd'hui (> 1790, ratchet OK). pytest collecte 2851 (parité unittest confirmée).",
+      "script": "scripts/run_tests.py --fast"
+    },
+    "bandit": {
+      "baseline": 519,
+      "direction": "down_only",
+      "note": "constats bandit backend. Dette assumée, ne doit pas croître.",
+      "script": "bandit -r backend -f json"
+    }
+  },
+  "_pytest": {
+    "collected": 2851,
+    "note": "pytest collecte 2851 tests (parité exacte avec unittest.defaultTestLoader.discover). Le fichier mort tests/archive_studies/test_portfolio_bootstrap_pr6.py (import block_bootstrap disparu) fait 0 cas valide et est exclu par norecursedirs — son exclusion ne change pas le compte."
+  }
+}
