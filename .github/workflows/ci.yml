@@ -118,6 +118,15 @@ jobs:
           python scripts/ledger_provenance.py
           python scripts/ledger_puissance.py
           python scripts/audit_path_root.py
+      # E2-bis (10/10) : claim_verify.py était le SEUL oracle du gate à ne
+      # jamais tourner en CI — il ne s'exécutait qu'à la main, sur un poste où
+      # `reports/` existe. Or il lit `research/evidence/facts.jsonl` (42 faits
+      # F-XXX) et revérifie chaque fait contre le CONTENU des fichiers cités.
+      # Vérifié dans un clone propre (sans .venv, sans reports/ local) : 42/42
+      # SUPPORTED, exit 0 — le seul chemin `reports/` du ledger (F-037) est
+      # TRACKÉ dans git, donc présent au checkout. Stdlib + git uniquement.
+      - name: Vérificateur de preuves (F-XXX — BLOQUANT)
+        run: python scripts/claim_verify.py --all
       # E2 (audit 10/10) : ces trois étapes vivaient en T2, lui-même conditionné
       # à merge_group|workflow_dispatch. Or la merge queue n'est PAS activée sur
       # ce dépôt (0 run merge_group dans tout l'historique) : audit_check et le

@@ -50,7 +50,8 @@ Projet UNIQUE (machine omarchy, SSD monté) :
 > pas activée (0 run `merge_group` dans tout l'historique). Ces oracles ne
 > tournaient JAMAIS en CI ; c'est ce qui a laissé `main` rouge sur `audit_check`
 > C4 sans qu'aucun run ne rougisse. Ils sont désormais en T1 (PR #276).
-> `claim_verify.py` reste à câbler dans le workflow.
+> `claim_verify.py` y est câblé depuis le 10/10 (E2-bis) : vérifié dans un clone
+> propre, 42/42 SUPPORTED, exit 0.
 
 ```bash
 cd "/run/media/cheurteen/Jeux SSD/trading-agent"
