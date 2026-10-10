@@ -1,5 +1,7 @@
 # HYPOTHÈSE PRÉ-ENREGISTRÉE — premium-fade-listing (armée lun 05/10, budget réouvert)
 
+domaine : aster · famille : institutions · stratégie : premium_fade_listing
+
 **Pré-enregistrée le 03/10** (budget épuisé 24/20 — ce fichier ne consomme RIEN, il fige
 les critères AVANT le backtest). Source des critères discriminateurs : simulation
 adversariale Bonsai 03/10 (le desk d'arbitrage de listings), PAS dérivée de nos données.
