@@ -5,33 +5,83 @@ on:
   merge_group:
   workflow_dispatch:
   schedule:
-    # full-suite nocturne (02:30 UTC) — R1 : le « lent » doit tourner chaque nuit
+    # Palier T3 (nuit) — le « lent » et la calibration pleine tournent ici.
     - cron: "30 2 * * *"
 permissions:
   contents: read
 
-# Concurrency : un push qui écrase le précédent (force-push, PR mise à jour)
-# annule le run encore en cours de l'ANCIEN commit — sans ça, deux runs
-# tournent en parallèle sur le même head, et le plus lent peut rapporter
-# « vert » sur un état déjà remplacé. cancel-in-progress = le dernier état
-# fait foi. (Sobriété : évite de payer des runs fantômes.)
+# Concurrency : un push qui écrase le précédent annule le run de l'ANCIEN
+# commit (dernier état fait foi, pas de runs fantômes).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PALIERS (revue d'architecture 2026-10-10, E1). Un seul workflow, découpé en
+# paliers par ÉVÉNEMENT et par CHEMINS MODIFIÉS, pour qu'un test de noyau et
+# un audit de dépendances n'aient plus le même statut, et qu'une PR docs-only
+# ne relance pas la suite Python.
+#
+#   T1  PR / push de branche   ≤ 6 min   noyau + oracles rapides (filtré par chemins)
+#   T2  merge_group (avant main) ≤ 20 min  suite complète + frontend + pip-audit + ratchets
+#   T3  nuit (schedule)         libre     suite lente, bandit complet, calibration pleine
+#
+# Le job `gate` agrège les paliers pertinents selon l'événement et reste le
+# SEUL required status check. Il est TOUJOURS défini (jamais `skipped`) —
+# cf. le piège #259 : un required check skipped bloque la PR pour toujours.
+# ─────────────────────────────────────────────────────────────────────────────
+
 jobs:
-  test:
-    # sobriété : le cron nocturne ne relance PAS le gate standard —
-    # il exécute uniquement full-suite (ci-dessous)
+  # Détection des chemins modifiés : conditionne T1 (une PR docs-only ne
+  # relance pas la suite Python). `dorny/paths-filter` épinglé par SHA.
+  changes:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 5
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docs: ${{ steps.filter.outputs.docs }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'scripts/**'
+              - 'research/**'
+              - 'tests/**'
+              - 'backend/**'
+              - 'pyproject.toml'
+              - 'requirements*.txt'
+              - 'requirements.lock'
+            frontend:
+              - 'frontend/**'
+            docs:
+              - 'docs/**'
+              - '**.md'
+              - 'LICENSE'
+            ci:
+              - '.github/**'
+
+  # ═══ PALIER T1 — PR rapide (≤ 6 min), filtré par chemins ═══
+  # Ne tourne QUE si du code noyau change (pas pour une PR docs-only) — SAUF
+  # en merge_group, où l'on juge l'état fusionné réel et le filtre chemins
+  # serait trompeur (les fichiers modifiés sont ceux de toute la file).
+  # Les oracles déterministes du noyau sont quasi instantanés (0.05–8 s) ;
+  # le coût est la suite --fast.
+  t1-core:
+    if: >-
+      github.event_name != 'schedule' &&
+      (github.event_name == 'merge_group' || needs.changes.outputs.core == 'true')
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          # PR-179 : l'historique COMPLET — les tests de migration
-          # (_engine_sha_at via git show) et les audits mutation en ont
-          # besoin (le shallow clone par défaut n'a que le HEAD)
           fetch-depth: 0
       - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
@@ -39,81 +89,37 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install --no-deps -r requirements.lock --quiet
-      - name: Oracle pyflakes (noms indéfinis — BLOQUANT, B7 audit Sonnet 5.5)
+      - name: Oracle pyflakes (noms indéfinis — BLOQUANT)
         run: |
           pip install pyflakes --quiet
-          # un seul nom indéfini doit faire échouer la CI (C3/C4 ont survécu
-          # à 7 et 2 PR sans cet oracle) ; les warnings "import *" ne
-          # comptent pas (pas de grep sur 'unable to detect')
           if python -m pyflakes scripts backend discord_bot agent tests | grep "undefined name '"; then
             echo "::error::undefined name détecté — corrige ou importe"
             exit 1
           fi
-      - name: Run tests
-        run: python scripts/run_tests.py --fast
-      # R1 (audit Sonnet 5.5) : le gate --fast saute SLOW_FILES (nom exact +
-      # raison) — l'écart exécutés/découverts doit rester visible, sinon un
-      # fichier peut disparaître du gate sans que rien ne le signale.
+      # pytest exécute nativement les unittest.TestCase (parité prouvée E0 :
+      # 2851 tests). -n auto parallélise. --fast garde la sélection actuelle
+      # (run_tests.py) le temps de la migration vers les marqueurs.
+      - name: Suite noyau (--fast, parallèle)
+        run: |
+          pip install pytest==9.1.1 pytest-xdist==3.8.0 --quiet
+          python scripts/run_tests.py --fast
+      - name: Oracles du noyau (provenance, puissance, G10, intégrité)
+        run: |
+          python scripts/research_integrity.py
+          python scripts/ledger_provenance.py
+          python scripts/ledger_puissance.py
+          python scripts/audit_path_root.py
       - name: Visibilité R1 — exécutés vs découverts
         if: always()
         run: |
           disc=$(python -c "import unittest; print(unittest.defaultTestLoader.discover('tests').countTestCases())")
           base=$(cat .github/test-count-baseline.txt)
-          echo "::notice::suite complète = $disc tests découverts ; gate --fast baseline = $base ; l'écart = SLOW_FILES (justifié ligne par ligne dans scripts/run_tests.py)"
-          echo "::notice::la suite COMPLÈTE (SLOW_FILES inclus) tourne à chaque push main + chaque nuit : job full-suite ci-dessous"
-      - name: Research integrity (invariants I001-I008)
-        run: python scripts/research_integrity.py
-      # N5 (P0) — le ledger est un artefact ÉCRIT À LA MAIN. Sans ce
-      # contrôle, il peut annoncer un PASS que le moteur a re-mesuré en
-      # FAIL depuis (PR#253 a corrigé 81 lignes en aval ; cet oracle rend
-      # la divergence DÉTECTABLE en CI, avant qu'elle ne circule). Le
-      # ledger doit corroborer chacun de ses verdicts par son run.
-      - name: Provenance du ledger (le ledger doit corroborer ses runs)
-        run: python scripts/ledger_provenance.py
-      # N6 : un verdict énoncé SANS taille d'échantillon lisible dans son
-      # run ne peut pas être cru — la règle du dépôt est N ≥ 10. Le N de
-      # multiplicité de lab_ledger compte des lignes, pas des observations
-      # (mesuré : 0/16 entrées vivantes portaient un n ; 2 pointaient vers
-      # reports/ ou scripts/ au lieu d'un run).
-      - name: Puissance du ledger (chaque verdict vivant porte son n)
-        run: python scripts/ledger_puissance.py
-      # G10 : un `Path(__file__).resolve().parents[N]` copié d'un en-tête
-      # racine dans un sous-dossier résout vers scripts/ au lieu de la
-      # racine — le script plante au LANCEMENT, jamais à l'import, donc
-      # invisible. Le filet distingue le vrai bug de l'import frère
-      # légitime et du STUDIES_DIR.parents[1] correct.
-      - name: G10 path ROOT (parents[N] doit résoudre à la racine)
-        run: python scripts/audit_path_root.py
-      - name: Audit check (bloquant sur --fail-on)
-        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
+          echo "::notice::suite complète = $disc tests ; gate --fast baseline = $base ; écart = SLOW_FILES"
 
-      # r12 (docs/41) — les classes de bugs réellement rencontrées
-      # deviennent des détecteurs : unités s/ms (P0 ronde 10), fossiles de
-      # tests (#235), contrat x_pressure, faux succès codé dur (#249),
-      # fail-open de gate (R5). Rochet : la dette (G2 243, G4 53, G8 34
-      # mesurés au jour 0) cesse de croître, fichier par fichier ; les
-      # classes à 0 (G1, G3, G5, G9) sont une protection pure.
-      - name: "Rochet deep-audit (BLOQUANT) — classes G, doctrine docs/41"
-        run: python scripts/deep_audit.py --check
-
-      # même second gate que except-pass : une PR ne peut pas faire
-      # --reset, relever sa propre référence et faire taire l'alarme —
-      # la dette PR <= la dette main.
-      - name: "Rochet dette_PR <= dette_main (deep-audit, BLOQUANT)"
-        run: |
-          if git show origin/main:.github/deep-audit-baseline.json \
-              > /tmp/main_deep_audit.json 2>/dev/null; then
-            python scripts/deep_audit.py --check --baseline /tmp/main_deep_audit.json
-          else
-            echo "::notice::baseline deep-audit absente sur origin/main — comparaison sautée (PR d'introduction)"
-          fi
-
-  # ─── 3.7 : le frontend était le seul pan sans oracle ───
-  # 42 fichiers TS/TSX, 0 test, aucun typecheck en CI. `tsc --noEmit`
-  # est l'équivalent exact du gate pyflakes côté Python : il attrape les
-  # symboles non définis, que rien ne vérifiait.
-  frontend:
-    if: github.event_name != 'schedule'
+  # ═══ PALIER T1 — frontend (≤ 6 min) ═══
+  t1-frontend:
+    if: github.event_name != 'schedule' && needs.changes.outputs.frontend == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -133,15 +139,17 @@ jobs:
       - name: Tests (vitest)
         run: npm test
 
-  # ─── S3 : oracles de sécurité ───
-  # F-047 (routes admin ouvertes) et F-048 (XSS) n'ont été trouvés que par
-  # audit LLM : les oracles existants attrapent les NameError, la causalité
-  # et la régression de tests, pas les failles. Ces trois étapes ferment ce
-  # trou. Les seuils sont mesurés, pas devinés.
-  security:
-    if: github.event_name != 'schedule'
+  # ═══ PALIER T1 — sécurité rapide (secrets sur le diff) ═══
+  # Le scan bandit/pip-audit COMPLET est déplacé en T2/T3 : une PR de code
+  # n'a pas besoin d'attendre 500+ avis bandit pour avoir un verdict. Ici on
+  # garde le bloquant à 0 (bind/shell/eval) + gitleaks, rapides.
+  t1-security:
+    if: >-
+      github.event_name != 'schedule' &&
+      (github.event_name == 'merge_group' || needs.changes.outputs.core == 'true')
+    needs: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -152,116 +160,37 @@ jobs:
           cache: pip
       - name: Dépendances
         run: pip install --no-deps -r requirements.lock --quiet
-
-      # BLOQUANT. Les URL des appels sont des constantes https (Yahoo,
-      # Binance, Aster) : B310 n'a rien à voir avec une injection ici.
-      - name: Bandit — bind large, shell, eval (BLOQUANT, 0 attendu)
+      - name: Bandit ciblé (bind/shell/eval, 0 attendu — BLOQUANT)
         run: |
           pip install bandit --quiet
-          # Motifs dont le compte mesuré est 0 : on peut les rendre
-          # bloquants sans casser la CI, et ils couvrent exactement ce
-          # qui a produit F-047 et S2.
-          #   B104 bind sur toutes les interfaces
-          #   B602/B603 subprocess shell / sans liste d'arguments
-          #   B605/B607 start avec shell / avec un chemin
           for t in B104 B602 B603 B605 B607; do
-            if python -m bandit -q -ll -r backend discord_bot scripts -t "$t" \
-               | grep -q "^>> Issue:"; then
+            if python -m bandit -q -ll -r backend discord_bot scripts -t "$t" | grep -q "^>> Issue:"; then
               echo "::error::bandit $t détecté (bind large / shell / eval)"
-              python -m bandit -ll -r backend discord_bot scripts -t "$t" || true
               exit 1
             fi
           done
           echo "bandit ciblé : 0 finding"
-
-      # Secrets dans l'historique COMPLET (fetch-depth: 0) — c'est le
-      # `.env` versionné qu'un scan superficiel ne voit pas.
-      - name: Gitleaks — secrets dans le dépôt ET l'historique (BLOQUANT)
+      - name: Gitleaks — secrets (BLOQUANT)
         run: |
-          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz \
-            | tar xz gitleaks
-          ./gitleaks detect --source . --redact --no-banner \
-            --config .gitleaks.toml --exit-code 1
-
-      # BLOQUANT après le bump de multidict (CVE-2026-104874). `--no-deps`
-      # est nécessaire : la résolution complète du lock échoue sur
-      # coincurve (metadata-generation-failed), et la CI installe justement
-      # avec --no-deps.
-      - name: Pip-audit — CVE des dépendances épinglées (BLOQUANT)
-        run: |
-          pip install pip-audit --quiet
-          python -m pip_audit --no-deps --disable-pip -r requirements.lock
-
-      # `except: pass` est le bug prioritaire n°1 d'AGENTS.md : un
-      # excepteur qui n'avale rien cache une panne derrière un résultat vide
-      # — un collecteur qui échoue « prouve » alors une absence de signal
-      # inexistante. Stock mesuré : 207 sur 84 fichiers. Réduire 207 d'un
-      # coup n'est pas réaliste ; ce qu'il faut, c'est que la dette cesse de
-      # croître et reste visible. ROCHET, comme bandit.
-      - name: "Ratchet except-pass (BLOQUANT, 207 mesurés)"
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --config .gitleaks.toml --exit-code 1
+      - name: Rochet except-pass (BLOQUANT)
         run: python scripts/audit_except_pass.py --check
-
-      # r7 — le ratchet ci-dessus compare l'arbre au baseline COMMITTÉ
-      # dans la branche testée : une PR peut donc faire `--reset`, relever
-      # sa propre référence et faire taire l'alarme. Ce second gate
-      # compare au baseline de origin/main (fetch-depth: 0 ci-dessus) :
-      # la dette d'une PR ne peut plus dépasser celle de main.
-      - name: "Rochet dette_PR <= dette_main (except-pass, BLOQUANT)"
+      - name: Rochet dette_PR <= dette_main (except-pass)
         run: |
-          if git show origin/main:.github/except-pass-baseline.json \
-              > /tmp/main_except_pass.json 2>/dev/null; then
-            python scripts/audit_except_pass.py --check \
-              --baseline /tmp/main_except_pass.json
+          if git show origin/main:.github/except-pass-baseline.json > /tmp/main_except_pass.json 2>/dev/null; then
+            python scripts/audit_except_pass.py --check --baseline /tmp/main_except_pass.json
           else
             echo "::notice::baseline absent sur origin/main — comparaison sautée"
           fi
 
-      # Le scan bandit COMPLET trouve 500+ avis (373 B608 sur du SQL
-      # formaté, 118 B310, 12 B301, 8 B324, 8 B108). Les rendre bloquants
-      # ferait échouer la CI immédiatement et l'oracle serait ignoré. On
-      # garde donc un COMPTE DE RÉFÉRENCE : la CI échoue si le nombre
-      # AUGMENTE. C'est un rochet — on ne peut pas réintroduire un
-      # problème sans le voir, et le stock peut être réduit PR par PR.
-      - name: Bandit complet — ratchet (non bloquant tant que le stock ne monte pas)
-        run: |
-          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null \
-                  | grep -c "^>> Issue:" || true)
-          ref=$(cat .github/bandit-baseline.txt)
-          echo "bandit complet : $total (référence $ref)"
-          if [ "$total" -gt "$ref" ]; then
-            echo "::error::le stock d'avis bandit a AUGMENTÉ ($total > $ref) — "
-            echo "::error::corrige, ou n'augmente pas la référence"
-            exit 1
-          fi
-          echo "::notice::stock bandit ${total}/${ref} — à réduire progressivement"
-
-      # r7 — même rochet que except-pass : une PR ne peut pas relever le
-      # baseline committé pour cacher sa dette. Comparaison à origin/main
-      # (fetch-depth: 0) : dette_PR <= dette_main.
-      - name: "Rochet dette_PR <= dette_main (bandit, BLOQUANT)"
-        run: |
-          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null \
-                  | grep -c "^>> Issue:" || true)
-          if ! ref_main=$(git show origin/main:.github/bandit-baseline.txt 2>/dev/null); then
-            echo "::notice::baseline bandit absent sur origin/main — comparaison sautée"
-            exit 0
-          fi
-          echo "bandit vs main : $total (main $ref_main)"
-          if [ "$total" -gt "$ref_main" ]; then
-            echo "::error::la dette bandit de la PR ($total) dépasse celle de main ($ref_main)"
-            exit 1
-          fi
-
-  # ─── R1 (audit Sonnet 5.5) : le « lent » doit tourner, pas être ignoré ───
-  # Le gate PR reste --fast (temps réel) ; SLOW_FILES (test_onchain_admin_auth,
-  # 684 fns, >420 s) n'y tourne JAMAIS — c'est exactement l'angle mort qui a
-  # laissé 3 échecs réels invisibles pendant des semaines (issue #235).
-  # Ce job exécute la suite COMPLÈTE à chaque push main, chaque nuit
-  # (02:30 UTC) et à la demande. Un échec ici = un vrai signal (issue #235,
-  # constat 2 : 684 fns d'auth jamais exécutées).
-  full-suite:
-    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  # ═══ PALIER T2 — merge queue (avant main, ≤ 20 min) ═══
+  # La suite COMPLÈTE + les rochets lourds (deep-audit, bandit complet,
+  # pip-audit) + frontend complet. C'est l'état fusionné réel qui est jugé.
+  t2-full:
+    if: github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -274,37 +203,104 @@ jobs:
         run: pip install --no-deps -r requirements.lock --quiet
       - name: Suite COMPLÈTE (SLOW_FILES inclus) — BLOQUANT
         run: python scripts/run_tests.py
-      - name: Exécutés vs découverts (écart = SLOW_FILES)
+      - name: Audit check (bloquant sur --fail-on)
+        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
+      - name: Rochet deep-audit (BLOQUANT)
+        run: python scripts/deep_audit.py --check
+      - name: Rochet dette_PR <= dette_main (deep-audit)
+        run: |
+          if git show origin/main:.github/deep-audit-baseline.json > /tmp/main_deep_audit.json 2>/dev/null; then
+            python scripts/deep_audit.py --check --baseline /tmp/main_deep_audit.json
+          else
+            echo "::notice::baseline deep-audit absente sur origin/main — comparaison sautée"
+          fi
+      - name: Pip-audit — CVE (BLOQUANT)
+        run: |
+          pip install pip-audit --quiet
+          python -m pip_audit --no-deps --disable-pip -r requirements.lock
+      - name: Bandit complet — ratchet
+        run: |
+          pip install bandit --quiet
+          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null | grep -c "^>> Issue:" || true)
+          ref=$(cat .github/bandit-baseline.txt)
+          echo "bandit complet : $total (référence $ref)"
+          if [ "$total" -gt "$ref" ]; then
+            echo "::error::le stock d'avis bandit a AUGMENTÉ ($total > $ref)"
+            exit 1
+          fi
+      - name: Rochet dette_PR <= dette_main (bandit)
+        run: |
+          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null | grep -c "^>> Issue:" || true)
+          if ! ref_main=$(git show origin/main:.github/bandit-baseline.txt 2>/dev/null); then
+            echo "::notice::baseline bandit absent sur origin/main — comparaison sautée"; exit 0
+          fi
+          if [ "$total" -gt "$ref_main" ]; then
+            echo "::error::la dette bandit de la PR ($total) dépasse celle de main ($ref_main)"; exit 1
+          fi
+
+  # ═══ PALIER T3 — nuit (schedule, libre) ═══
+  # Le lent doit tourner, pas être ignoré (R1, issue #235 constat 2 :
+  # test_onchain_admin_auth 684 fns jamais exécutées). + gitleaks sur
+  # l'historique complet + calibration pleine du gate.
+  t3-night:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dependencies
+        run: pip install --no-deps -r requirements.lock --quiet
+      - name: Suite COMPLÈTE (SLOW_FILES inclus) — BLOQUANT
+        run: python scripts/run_tests.py
+      - name: Gitleaks — historique complet
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --config .gitleaks.toml --exit-code 1
+      - name: Exécutés vs découverts
         if: always()
         run: |
           disc=$(python -c "import unittest; print(unittest.defaultTestLoader.discover('tests').countTestCases())")
-          echo "::notice::full-suite exécutée ; $disc tests découverts au total ; l'écart avec le compte exécuté ci-dessus = SLOW_FILES (raison documentée ligne par ligne dans scripts/run_tests.py)"
+          echo "::notice::T3 exécutée ; $disc tests découverts au total"
 
-  # ─── GATE AGRÉGÉ — le SEUL check à mettre en required status check ───
-  # docs/41 + branche protégée : au lieu de lister test/frontend/security
-  # dans le branch protection (3 checks à maintenir synchrones, un oubli =
-  # un gate contournable), UN job `gate` dépend des trois. Le branch
-  # protection exige `gate` → impossible de merger si l'un des trois est
-  # rouge. C'est le verrou « aucune IA ne fait n'importe quoi » : un push
-  # qui casse un oracle ne peut pas atteindre main.
+  # ═══ GATE AGRÉGÉ — le SEUL required status check ═══
+  # docs/41 + branche protégée. Le gate dépend des paliers pertinents selon
+  # l'ÉVÉNEMENT (pas selon les chemins — sinon une PR docs-only aurait un
+  # gate vide et skipped, qui bloquerait). Il rend TOUJOURS success/failure,
+  # jamais skipped.
   #
-  # CONDITION = la MÊME que le job `test` (`!= schedule`), PAS restreinte à
-  # pull_request/merge_group. Piège mesuré sur #259 : avec un `if` limité à
-  # `pull_request`, un simple PUSH sur la branche PR faisait sortir
-  # `gate: skipped` (event=push), et le DERNIER check-run devenait SKIPPED
-  # → un required check sur `gate` serait resté bloqué sur la PR. En
-  # alignant la condition sur celle de `test`, `gate` tourne dès que les 3
-  # jobs tournent, et rend toujours un success/failure, jamais un skip.
+  # Astuce : `needs` liste tous les paliers ; les paliers skippés (mauvais
+  # événement/chemin) n'empêchent PAS le gate de tourner grâce à
+  # `if: always() && !cancelled() && !contains(needs.*.result, 'failure')`.
+  # Le gate échoue si UN palier pertinent échoue, passe sinon.
   gate:
-    if: github.event_name != 'schedule'
-    needs: [test, frontend, security]
+    if: always() && !cancelled()
+    needs: [changes, t1-core, t1-frontend, t1-security, t2-full, t3-night]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Vérifier que les 3 gates sont verts
+      - name: Agréger le verdict des paliers
         run: |
-          # `needs` garantit que ce job ne démarre QUE si test+frontend+
-          # security ont réussi. S'il tourne, tout est vert : on l'affirme
-          # explicitement pour que le check `gate` soit le seul required.
-          echo "::notice::gate agrégé VERT — test + frontend + security OK"
+          # Sur un schedule, seuls T3 tourne ; sinon T1 (+T2 en merge_group).
+          # Un palier 'skipped' (filtre chemins/événement) est neutre ; seuls
+          # 'failure'/'cancelled' font échouer le gate. 'success' ou 'skipped'
+          # partout = gate VERT.
+          failed=""
+          for r in "${{ needs.t1-core.result }}" "${{ needs.t1-frontend.result }}" \
+                   "${{ needs.t1-security.result }}" "${{ needs.t2-full.result }}" \
+                   "${{ needs.t3-night.result }}"; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              failed="$failed $r"
+            fi
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::un palier a échoué ($failed) — merge bloqué"
+            exit 1
+          fi
+          echo "::notice::gate VERT — paliers pertinents OK (skipped = filtré, neutre)"
           echo "Seul check requis par le branch protection : ce job 'gate'."
