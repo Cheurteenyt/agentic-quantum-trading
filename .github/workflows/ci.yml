@@ -58,11 +58,24 @@ jobs:
         id: filter
         with:
           filters: |
+            # ⚠️ `core` DOIT couvrir tout ce que le gate ANALYSE lui-même.
+            # Sinon une PR touchant un fichier surveillé est classée core=false,
+            # t1-core/t1-security sautent, et l'erreur passe — alors que le gate
+            # AURAIT su la voir. Défaut trouvé le 10/10 : `discord_bot/**` (22
+            # .py) et `agent/**` (4 .py) sont dans le scope pyflakes/bandit
+            # (lignes du job t1-core/t1-security) mais étaient ABSENTS d'ici —
+            # une PR discord_bot-only ne déclenchait AUCUN palier. Prouvé : un
+            # `undefined name` injecté dans discord_bot/bot.py fait bien rougir
+            # le pyflakes du gate.
+            # Le test tests/test_ci_filtre_core.py verrouille l'équivalence
+            # entre cette liste et le scope déclaré dans les steps du workflow.
             core:
               - 'scripts/**'
               - 'research/**'
               - 'tests/**'
               - 'backend/**'
+              - 'discord_bot/**'
+              - 'agent/**'
               - 'pyproject.toml'
               - 'requirements*.txt'
               - 'requirements.lock'
@@ -73,7 +86,15 @@ jobs:
               - '**.md'
               - 'LICENSE'
             ci:
+              # `.github/**` couvre le workflow ET ses fichiers de référence
+              # (baselines de rochets, .gitleaks.toml, CODEOWNERS…) : une PR qui
+              # les modifie doit passer par les paliers qu'ils gouvernent.
               - '.github/**'
+              # Les gardes hors `.github/` que les steps du workflow lisent ou
+              # exécutent directement, et qui n'appartiennent à aucun autre
+              # filtre : lancer le workflow sans les avoir relus serait un trou.
+              - '.gitleaks.toml'
+              - 'start_all.sh'
 
   # ═══ PALIER T1 — PR rapide (≤ 6 min), filtré par chemins ═══
   # Ne tourne QUE si du code noyau change (pas pour une PR docs-only) — SAUF
