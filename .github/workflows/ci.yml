@@ -69,6 +69,17 @@ jobs:
             # le pyflakes du gate.
             # Le test tests/test_ci_filtre_core.py verrouille l'équivalence
             # entre cette liste et le scope déclaré dans les steps du workflow.
+            #
+            # `core` couvre aussi les fichiers que les ORACLES LISENT (pas
+            # seulement ceux qu'ils exécutent). `claim_verify.py` vérifie
+            # chaque fait du ledger `research/evidence/facts.jsonl` contre son
+            # fichier de preuve — qui peut vivre n'importe où. Deux d'entre eux
+            # étaient hors `core` : modifier `docs/21-vagues-registre.md` (faits
+            # F-033/F-034/F-035) ou `reports/al-gradient-reproof-2026-10-07.md`
+            # (F-037) rendait le fait CONTREDIT (mesuré : 41/42) sans qu'aucun
+            # palier ne tourne. Les preuves du ledger sont donc énumérées
+            # ci-dessous ; le test les DÉRIVE du ledger, donc ajouter un fait
+            # pointant un nouveau fichier force la mise à jour de cette liste.
             core:
               - 'scripts/**'
               - 'research/**'
@@ -79,6 +90,9 @@ jobs:
               - 'pyproject.toml'
               - 'requirements*.txt'
               - 'requirements.lock'
+              # Preuves du ledger hors des dossiers ci-dessus (cf. test) :
+              - 'docs/21-vagues-registre.md'
+              - 'reports/al-gradient-reproof-2026-10-07.md'
             frontend:
               - 'frontend/**'
             docs:
