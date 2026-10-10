@@ -30,13 +30,15 @@ Usage :
 from __future__ import annotations
 
 import json
+import re
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "research" / "ledger" / "trials.jsonl"
+HYPOTHESES = ROOT / "research" / "hypotheses"
 
 # Verdicts qui COMPTENT comme preuve positive (cf. lab_ledger.confirmation).
 POSITIFS = ("PASS", "DISCOVERY_PASS")
@@ -102,6 +104,85 @@ def metriques(entrees: list[dict]) -> dict:
     }
 
 
+# --- Échéances / hypothèses non tranchées (revue Sonnet 5.5, 2026-10-10, P5) ---
+#
+# Fait mesuré : sur 12 hypothèses pré-enregistrées (research/hypotheses/*.md),
+# 8 sont joignables au ledger par leur champ `stratégie :` et AUCUNE n'a de
+# verdict VIVANT (2 FAIL superseded, 6 jamais tranchées). Le retard existait
+# mais était invisible — aucun indicateur ne le disait. On le mesure ici, SANS
+# inventer de date d'échéance : on rapproche chaque hypothèse pré-enregistrée
+# du ledger par sa stratégie déclarée, et on compte celles qui n'ont AUCUN
+# verdict vivant. C'est un fait (pas une estimation), la donnée existe déjà.
+_STRAT_RE = re.compile(r"strat[ée]gie\s*:\s*`?([A-Za-z0-9_\-\.]+)`?")
+
+
+def _declarer_strategie(md_path: Path) -> str | None:
+    """L'identifiant de stratégie déclaré dans un .md d'hypothèse, ou None.
+
+    Chaque hypothèse porte une ligne `stratégie : <id>` (cf. _TEMPLATE.md).
+    C'est la jointure EXACTE avec le champ `strategy` du ledger — pas un
+    matching texte approximatif. None si la ligne manque (hypothèse non
+    joignable : signalé comme défaut de format, jamais deviné)."""
+    try:
+        txt = md_path.read_text("utf-8", errors="ignore")
+    except OSError:
+        return None
+    m = _STRAT_RE.search(txt)
+    return m.group(1).strip() if m else None
+
+
+def hypotheses_en_retard(entrees: list[dict]) -> dict:
+    """Rapproche les hypothèses pré-enregistrées du ledger VIVANT.
+
+    Retourne, par hypothèse :
+      - strategie      : l'id déclaré (ou None si non joignable)
+      - verdicts_vifs  : verdicts vivants trouvés au ledger pour cette stratégie
+      - etat           : 'tranchee' (≥1 verdict vivant) | 'jamais' (aucun) |
+                         'superseded_only' (des verdicts mais tous superseded) |
+                         'non_joignable' (pas de stratégie déclarée)
+
+    Ne fabrique RIEN : si une hypothèse n'a pas de `stratégie :`, elle est
+    'non_joignable' — on ne devine pas sa correspondance.
+    """
+    vifs_par_strat: dict[str, list[str]] = defaultdict(list)
+    histo_par_strat: dict[str, list[str]] = defaultdict(list)
+    for e in entrees:
+        strat = e.get("strategy")
+        if not strat:
+            continue
+        verd = e.get("verdict", "?")
+        histo_par_strat[strat].append(verd)
+        if not e.get("superseded"):
+            vifs_par_strat[strat].append(verd)
+
+    rapport = []
+    if HYPOTHESES.is_dir():
+        for md in sorted(HYPOTHESES.glob("*.md")):
+            if md.stem.startswith("_"):  # gabarit, pas une hypothèse réelle
+                continue
+            strat = _declarer_strategie(md)
+            if not strat:
+                rapport.append({"hypothese": md.stem, "strategie": None,
+                                "verdicts_vifs": [], "etat": "non_joignable"})
+                continue
+            vifs = vifs_par_strat.get(strat, [])
+            if vifs:
+                etat = "tranchee"
+            elif histo_par_strat.get(strat):
+                etat = "superseded_only"
+            else:
+                etat = "jamais"
+            rapport.append({"hypothese": md.stem, "strategie": strat,
+                            "verdicts_vifs": vifs, "etat": etat})
+
+    en_retard = [r for r in rapport
+                 if r["etat"] in ("jamais", "superseded_only")]
+    return {"rapport": rapport, "en_retard": en_retard,
+            "n_en_retard": len(en_retard),
+            "n_non_joignable": sum(1 for r in rapport
+                                   if r["etat"] == "non_joignable")}
+
+
 def bloc_state(m: dict) -> str:
     """Le bloc à afficher dans STATE.md (hors marqueurs générés)."""
     cs = m["cette_semaine"]
@@ -121,6 +202,19 @@ def bloc_state(m: dict) -> str:
     lignes.append(
         "- Définition de « fini » hebdo : ≥ 1 lot exécuté ET journalisé, "
         "≥ 1 hypothèse tranchée. Un FAIL est un résultat (fausse piste fermée).")
+    # échéances : hypothèses pré-enregistrées sans verdict vivant (P5)
+    ret = m.get("retard", {})
+    if ret:
+        lignes.append(
+            f"- **Échéances dépassées : {ret['n_en_retard']}** hypothèse(s) "
+            f"pré-enregistrée(s) sans verdict vivant "
+            f"(+ {ret['n_non_joignable']} non joignable(s), sans "
+            f"`stratégie :`).")
+        for r in ret["en_retard"]:
+            etat = {"jamais": "jamais tranchée",
+                    "superseded_only": "verdict(s) superseded"}.get(
+                        r["etat"], r["etat"])
+            lignes.append(f"  - `{r['hypothese']}` → {etat}")
     return "\n".join(lignes)
 
 
@@ -130,6 +224,7 @@ def main() -> int:
         print("VELOCITÉ: ledger absent ou vide — aucune productivité mesurable.")
         return 0
     m = metriques(entrees)
+    m["retard"] = hypotheses_en_retard(entrees)
     if "--state" in sys.argv:
         print(bloc_state(m))
         return 0
@@ -147,6 +242,22 @@ def main() -> int:
     if cs["lots"] == 0:
         print("\n  ⚠️  0 lot cette semaine — la machine n'a pas produit de "
               "résultat cette semaine.")
+    # P5 : les hypothèses pré-enregistrées sans verdict vivant (le retard
+    # invisible que la revue a demandé de mesurer)
+    ret = m["retard"]
+    print(f"\n  ÉCHÉANCES : {ret['n_en_retard']} hypothèse(s) "
+          f"pré-enregistrée(s) sans verdict vivant "
+          f"(+ {ret['n_non_joignable']} non joignable(s)).")
+    for r in ret["rapport"]:
+        marque = {"tranchee": "  OK ", "jamais": "  ⏳ ",
+                  "superseded_only": "  ⏳ ",
+                  "non_joignable": "  ❓ "}.get(r["etat"], "    ")
+        detail = (f"{r['verdicts_vifs']}" if r["verdicts_vifs"]
+                  else r["etat"])
+        print(f"    {marque} {r['hypothese']:35} -> {detail}")
+    if ret["n_en_retard"] > 0:
+        print("    (⏳ = en retard : pré-enregistrée, jamais tranchée ou "
+              "verdict superseded · ❓ = sans `stratégie :`, non joignable)")
     return 0
 
 
