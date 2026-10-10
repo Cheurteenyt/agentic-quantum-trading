@@ -144,6 +144,15 @@ def liq_move_for(symbol: str, lev: float) -> float:
     modèle flatteur ; cf. le commentaire de `LIQ_FALLBACK_COUNT`.
     """
     global LIQ_FALLBACK_COUNT, LIQ_NON_VIABLE
+    # lev <= 0 : un spec/event mal formé (lev: 0 ou négatif — écrit à la main
+    # ou généré) ferait 100.0/lev -> ZeroDivisionError, tuant le run au lieu
+    # de le compter. Un levier nul/négatif n'a aucun sens physique : la
+    # position est « non exécutable ». On borne à 0 (« liquidé à l'entrée »,
+    # même sémantique que le cas distance <= 0) et on compte, comme #202.
+    # Bug trouvé par fuzz 2026-10-10 (liq_move_for("BTC", 0) -> ZeroDivision).
+    if not lev or lev <= 0:
+        LIQ_NON_VIABLE += 1
+        return 0.0
     entree = liq_params().get(symbol)
     if entree is None:
         LIQ_FALLBACK_COUNT += 1

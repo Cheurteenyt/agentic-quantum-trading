@@ -716,6 +716,23 @@ def run_wallet(events: list[dict], capital: float = 100.0,
         if ev["t_ms"] < busy.get(ev["sym"], -1):
             skipped += 1
             continue
+        # DÉFENSE (bug trouvé par fuzz 2026-10-10) : un event rechargé d'un
+        # fichier JSON (écrit à la main, ou corrompu par une division amont)
+        # peut porter un ret_pct/fund_pct/cost_pct = NaN ou inf. Sans garde,
+        # il entre dans `gross` puis `eq` (solde) et CORROMPT EN SILENCE tout
+        # ce qui suit : la courbe, les mois, le DD, le ROI final — un chiffre
+        # faux qui a l'air d'un chiffre. La garde isfinite existe EN AMONT
+        # (génération d'events) mais pas ici : un event qui bypass cette
+        # étape n'est plus protégé. Fail-closed : on skppe l'event pourri et
+        # on le COMPTE (skipped) pour qu'il se voie.
+        _pourri = any(
+            not isinstance(ev.get(k), (int, float))
+            or not np.isfinite(ev[k])
+            for k in ("ret_pct", "fund_pct", "cost_pct")
+        )
+        if _pourri:
+            skipped += 1
+            continue
         # les positions ouvertes dont la sortie est passée libèrent leur marge
         open_exits = [x for x in open_exits if x > ev["t_ms"]]
         margin = eq * cap_pct / 100.0
