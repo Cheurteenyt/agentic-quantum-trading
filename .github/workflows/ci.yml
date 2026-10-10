@@ -22,9 +22,18 @@ concurrency:
 # un audit de dépendances n'aient plus le même statut, et qu'une PR docs-only
 # ne relance pas la suite Python.
 #
-#   T1  PR / push de branche   ≤ 6 min   noyau + oracles rapides (filtré par chemins)
-#   T2  merge_group (avant main) ≤ 20 min  suite complète + frontend + pip-audit + ratchets
-#   T3  nuit (schedule)         libre     suite lente, bandit complet, calibration pleine
+#   T1  PR / push de branche   ≤ 10 min  noyau + oracles + rochets + CVE (filtré par chemins)
+#   T2  merge_group / dispatch ≤ 25 min  suite COMPLÈTE (SLOW_FILES) + frontend complet
+#   T3  nuit (schedule)        libre     suite complète, gitleaks historique, calibration
+#
+# ⚠️ E2 (audit 10/10) — CE QUE T2 N'EST PAS. T2 est conditionné à
+# `merge_group || workflow_dispatch`. Or la merge queue n'est PAS activée sur
+# ce dépôt (0 run `merge_group` dans tout l'historique, vérifié via l'API
+# Actions) : T2 ne se déclenche donc jamais en pratique. Tout ce qui n'existe
+# QUE dans T2 n'est jamais exécuté. C'est ce qui a laissé `main` rouge sur
+# audit_check C4 (STATE.md 3701 o > 3000 o) avec tous les runs au vert.
+# Règle : un oracle ou un rochet BLOQUANT va en T1. T2 ne garde que le LENT
+# (suite complète), et le LENT est couvert la nuit par T3.
 #
 # Le job `gate` agrège les paliers pertinents selon l'événement et reste le
 # SEUL required status check. Il est TOUJOURS défini (jamais `skipped`) —
@@ -109,6 +118,24 @@ jobs:
           python scripts/ledger_provenance.py
           python scripts/ledger_puissance.py
           python scripts/audit_path_root.py
+      # E2 (audit 10/10) : ces trois étapes vivaient en T2, lui-même conditionné
+      # à merge_group|workflow_dispatch. Or la merge queue n'est PAS activée sur
+      # ce dépôt (0 run merge_group dans tout l'historique) : audit_check et le
+      # rochet deep-audit ne tournaient donc JAMAIS. C'est exactement ce qui a
+      # laissé passer C4 (STATE.md à 3701 o > 3000 o) sur main sans qu'aucun run
+      # ne rougisse. Ils coûtent quelques secondes — leur place est ici, avec les
+      # autres oracles déterministes du noyau, pas dans un palier qui n'existe pas.
+      - name: Audit check (bloquant sur --fail-on)
+        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
+      - name: Rochet deep-audit (BLOQUANT)
+        run: python scripts/deep_audit.py --check
+      - name: Rochet dette_PR <= dette_main (deep-audit)
+        run: |
+          if git show origin/main:.github/deep-audit-baseline.json > /tmp/main_deep_audit.json 2>/dev/null; then
+            python scripts/deep_audit.py --check --baseline /tmp/main_deep_audit.json
+          else
+            echo "::notice::baseline deep-audit absente sur origin/main — comparaison sautée"
+          fi
       - name: Visibilité R1 — exécutés vs découverts
         if: always()
         run: |
@@ -139,17 +166,18 @@ jobs:
       - name: Tests (vitest)
         run: npm test
 
-  # ═══ PALIER T1 — sécurité rapide (secrets sur le diff) ═══
-  # Le scan bandit/pip-audit COMPLET est déplacé en T2/T3 : une PR de code
-  # n'a pas besoin d'attendre 500+ avis bandit pour avoir un verdict. Ici on
-  # garde le bloquant à 0 (bind/shell/eval) + gitleaks, rapides.
+  # ═══ PALIER T1 — sécurité rapide (secrets + CVE + rochets) ═══
+  # E2 (audit 10/10) : pip-audit et le rochet bandit COMPLET vivaient en T2,
+  # donc jamais exécutés (cf. T1-core : la merge queue n'est pas activée).
+  # Une CVE dans les dépendances ne doit pas attendre un palier qui ne tourne
+  # pas. bandit complet = 519 avis au 10/10, ~1 min : il a sa place ici.
   t1-security:
     if: >-
       github.event_name != 'schedule' &&
       (github.event_name == 'merge_group' || needs.changes.outputs.core == 'true')
     needs: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -183,10 +211,38 @@ jobs:
           else
             echo "::notice::baseline absent sur origin/main — comparaison sautée"
           fi
+      - name: Pip-audit — CVE (BLOQUANT)
+        run: |
+          pip install pip-audit --quiet
+          python -m pip_audit --no-deps --disable-pip -r requirements.lock
+      # Les deux rochets bandit (stock + dette PR vs main) sont fusionnés : le
+      # scan ne tourne qu'UNE fois, les deux verdicts sont rendus dessus.
+      - name: Bandit complet — rochets stock + dette PR vs main
+        run: |
+          pip install bandit --quiet
+          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null | grep -c "^>> Issue:" || true)
+          ref=$(cat .github/bandit-baseline.txt)
+          echo "bandit complet : $total (référence $ref)"
+          if [ "$total" -gt "$ref" ]; then
+            echo "::error::le stock d'avis bandit a AUGMENTÉ ($total > $ref)"
+            exit 1
+          fi
+          if ref_main=$(git show origin/main:.github/bandit-baseline.txt 2>/dev/null); then
+            if [ "$total" -gt "$ref_main" ]; then
+              echo "::error::la dette bandit de la PR ($total) dépasse celle de main ($ref_main)"
+              exit 1
+            fi
+          else
+            echo "::notice::baseline bandit absent sur origin/main — comparaison sautée"
+          fi
 
   # ═══ PALIER T2 — merge queue (avant main, ≤ 20 min) ═══
-  # La suite COMPLÈTE + les rochets lourds (deep-audit, bandit complet,
-  # pip-audit) + frontend complet. C'est l'état fusionné réel qui est jugé.
+  # La suite COMPLÈTE (SLOW_FILES inclus) + le frontend complet : c'est l'état
+  # fusionné réel qui est jugé. Les oracles et rochets (audit_check, deep-audit,
+  # pip-audit, bandit) sont désormais en T1 : ils doivent tourner sur CHAQUE PR,
+  # pas seulement ici — la merge queue n'est pas activée sur ce dépôt, donc ce
+  # palier ne se déclenche qu'en workflow_dispatch. Ce qui reste ici est ce qui
+  # est réellement trop lent pour T1.
   t2-full:
     if: github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -203,40 +259,6 @@ jobs:
         run: pip install --no-deps -r requirements.lock --quiet
       - name: Suite COMPLÈTE (SLOW_FILES inclus) — BLOQUANT
         run: python scripts/run_tests.py
-      - name: Audit check (bloquant sur --fail-on)
-        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
-      - name: Rochet deep-audit (BLOQUANT)
-        run: python scripts/deep_audit.py --check
-      - name: Rochet dette_PR <= dette_main (deep-audit)
-        run: |
-          if git show origin/main:.github/deep-audit-baseline.json > /tmp/main_deep_audit.json 2>/dev/null; then
-            python scripts/deep_audit.py --check --baseline /tmp/main_deep_audit.json
-          else
-            echo "::notice::baseline deep-audit absente sur origin/main — comparaison sautée"
-          fi
-      - name: Pip-audit — CVE (BLOQUANT)
-        run: |
-          pip install pip-audit --quiet
-          python -m pip_audit --no-deps --disable-pip -r requirements.lock
-      - name: Bandit complet — ratchet
-        run: |
-          pip install bandit --quiet
-          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null | grep -c "^>> Issue:" || true)
-          ref=$(cat .github/bandit-baseline.txt)
-          echo "bandit complet : $total (référence $ref)"
-          if [ "$total" -gt "$ref" ]; then
-            echo "::error::le stock d'avis bandit a AUGMENTÉ ($total > $ref)"
-            exit 1
-          fi
-      - name: Rochet dette_PR <= dette_main (bandit)
-        run: |
-          total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null | grep -c "^>> Issue:" || true)
-          if ! ref_main=$(git show origin/main:.github/bandit-baseline.txt 2>/dev/null); then
-            echo "::notice::baseline bandit absent sur origin/main — comparaison sautée"; exit 0
-          fi
-          if [ "$total" -gt "$ref_main" ]; then
-            echo "::error::la dette bandit de la PR ($total) dépasse celle de main ($ref_main)"; exit 1
-          fi
 
   # ═══ PALIER T3 — nuit (schedule, libre) ═══
   # Le lent doit tourner, pas être ignoré (R1, issue #235 constat 2 :

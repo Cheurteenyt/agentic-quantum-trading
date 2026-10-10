@@ -43,10 +43,18 @@ Projet UNIQUE (machine omarchy, SSD monté) :
 > racine** (chemin quoté). Elles sont le contrat : la CI les rejoue à chaque
 > push, un PR rouge est refusé. Ne PAS les contourner, ne PAS les « corriger »
 > en baissant un baseline sans PR dédiée.
+>
+> ⚠️ **Correction du 10/10 (E2).** Jusqu'ici cette phrase était FAUSSE pour la
+> moitié de la liste : `deep_audit` et `claim_verify` vivaient dans le palier
+> T2, conditionné à `merge_group | workflow_dispatch` — or la merge queue n'est
+> pas activée (0 run `merge_group` dans tout l'historique). Ces oracles ne
+> tournaient JAMAIS en CI ; c'est ce qui a laissé `main` rouge sur `audit_check`
+> C4 sans qu'aucun run ne rougisse. Ils sont désormais en T1 (PR #276).
+> `claim_verify.py` reste à câbler dans le workflow.
 
 ```bash
 cd "/run/media/cheurteen/Jeux SSD/trading-agent"
-.venv/bin/python scripts/run_tests.py --fast          # suite (2162 tests, 2 échecs connus/pré-existants)
+.venv/bin/python scripts/run_tests.py --fast          # suite (2189 tests, 0 échec)
 .venv/bin/python scripts/deep_audit.py --check         # rochet classes G1-G10 (bloquant)
 .venv/bin/python scripts/claim_verify.py --all         # preuves F-XXX (42/42 attendu)
 .venv/bin/python scripts/research_integrity.py         # invariants I001-I009
@@ -54,7 +62,13 @@ cd "/run/media/cheurteen/Jeux SSD/trading-agent"
 .venv/bin/python scripts/ledger_puissance.py           # N6 : chaque verdict vivant porte son n ≥ 10
 .venv/bin/python scripts/audit_path_root.py            # G10 : parents[N] résout à la racine
 .venv/bin/python -m pyflakes backend scripts tests     # noms indéfinis (bloquant)
+.venv/bin/python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
 ```
+
+> Les 2 « échecs connus/pré-existants » ont été corrigés le 10/10 (PR #275) :
+> c'était UN seul défaut — des tests non hermétiques qui lisaient le `data/`
+> de la machine (vert en CI sur clone propre, rouge en local). La suite est
+> verte des deux côtés.
 
 **Si l'un de ces oracles rougit : c'est un VRAI défaut, pas un obstacle.** Le
 corriger, ou documenter une dérogation explicite (`n_degression` dans le

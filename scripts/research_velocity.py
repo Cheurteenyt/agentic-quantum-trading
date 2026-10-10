@@ -115,6 +115,16 @@ def metriques(entrees: list[dict]) -> dict:
 # verdict vivant. C'est un fait (pas une estimation), la donnée existe déjà.
 _STRAT_RE = re.compile(r"strat[ée]gie\s*:\s*`?([A-Za-z0-9_\-\.]+)`?")
 
+APERCU_ECHEANCES = 3
+"""Nombre d'échéances nommées inline dans le bloc STATE.md (cf. bloc_state).
+Le compte total reste affiché ; seul l'aperçu est borné, pour tenir le budget
+de 3 Ko de `research/STATE.md` (audit_check C4)."""
+
+HISTO_SEMAINES = 3
+"""Nombre de semaines d'historique affichées inline (les plus récentes).
+Même raison : sans plafond, le bloc grossit d'une ligne par semaine et
+repousse STATE.md au-delà de sa borne."""
+
 
 def _declarer_strategie(md_path: Path) -> str | None:
     """L'identifiant de stratégie déclaré dans un .md d'hypothèse, ou None.
@@ -184,37 +194,45 @@ def hypotheses_en_retard(entrees: list[dict]) -> dict:
 
 
 def bloc_state(m: dict) -> str:
-    """Le bloc à afficher dans STATE.md (hors marqueurs générés)."""
+    """Le bloc à afficher dans STATE.md (hors marqueurs générés).
+
+    COMPACT par contrat (audit 10/10) : `research/STATE.md` a un budget de
+    3 Ko (audit_check C4) et c'est le fichier à lire EN PREMIER. La liste
+    nominative des échéances vit dans la sortie CLI de ce script ; on n'en
+    garde ici qu'un aperçu borné. Sans ce plafond, chaque vague de retard
+    repousse le fichier au-delà de sa borne (9 échéances inline = +450 o,
+    c'est ce qui a fait passer STATE.md à 3701 o le 10/10).
+    """
     cs = m["cette_semaine"]
     s = m["semaine_courante"] or "—"
     lignes = [
         "## Productivité (généré : `python scripts/research_velocity.py`)",
-        f"- Semaine courante **{s}** : **{cs['lots']}** lot(s) exécuté(s), "
-        f"**{cs['tranchees']}** hypothèse(s) tranchée(s), "
-        f"**{cs['candidats']}** candidat(s).",
+        f"- Semaine **{s}** : **{cs['lots']}** lots · "
+        f"**{cs['tranchees']}** tranchées · **{cs['candidats']}** candidats.",
     ]
     if m["toutes_semaines"]:
-        lignes.append("- Historique vivant (par semaine) :")
-        for sem, r in m["toutes_semaines"].items():
-            lignes.append(
-                f"  - {sem} : {r['lots']} lots · {r['tranchees']} tranchées · "
-                f"{r['candidats']} candidats · {r['verdicts']}")
+        items = list(m["toutes_semaines"].items())
+        vues = items[-HISTO_SEMAINES:]
+        hist = " | ".join(
+            f"{sem} : {r['lots']}·{r['tranchees']}·{r['candidats']} {r['verdicts']}"
+            for sem, r in vues)
+        reste = len(items) - len(vues)
+        suite = f" (+{reste} sem.)" if reste > 0 else ""
+        lignes.append(f"- Historique : {hist}{suite}")
     lignes.append(
-        "- Définition de « fini » hebdo : ≥ 1 lot exécuté ET journalisé, "
-        "≥ 1 hypothèse tranchée. Un FAIL est un résultat (fausse piste fermée).")
+        "- « Fini » hebdo = ≥ 1 lot journalisé ET ≥ 1 hypothèse tranchée.")
     # échéances : hypothèses pré-enregistrées sans verdict vivant (P5)
     ret = m.get("retard", {})
     if ret:
+        # APERÇU BORNÉ : le compte est le signal, la liste est le détail.
+        apercu = ", ".join(
+            f"`{r['hypothese']}`" for r in ret["en_retard"][:APERCU_ECHEANCES])
+        reste = ret["n_en_retard"] - len(ret["en_retard"][:APERCU_ECHEANCES])
+        suite = f" (+{reste})" if reste > 0 else ""
         lignes.append(
-            f"- **Échéances dépassées : {ret['n_en_retard']}** hypothèse(s) "
-            f"pré-enregistrée(s) sans verdict vivant "
-            f"(+ {ret['n_non_joignable']} non joignable(s), sans "
-            f"`stratégie :`).")
-        for r in ret["en_retard"]:
-            etat = {"jamais": "jamais tranchée",
-                    "superseded_only": "verdict(s) superseded"}.get(
-                        r["etat"], r["etat"])
-            lignes.append(f"  - `{r['hypothese']}` → {etat}")
+            f"- **Échéances dépassées : {ret['n_en_retard']}** sans verdict "
+            f"vivant (+{ret['n_non_joignable']} non joignables) : "
+            f"{apercu}{suite} — détail : `python scripts/research_velocity.py`.")
     return "\n".join(lignes)
 
 
