@@ -128,6 +128,7 @@ class CandleRollTests(unittest.TestCase):
             w.last_flush = 0
             w.n_ticks = w.n_swaps = w.n_top = w.n_sells_top = 0
             w.n_candles = w.n_theses = w.n_events = w.n_dedup = w.n_errors = 0
+            w.n_bad_px = 0
             w.unknown_types = set()
             w.con_ticks = MagicMock()
             w.con_swaps = MagicMock()
@@ -161,6 +162,51 @@ class CandleRollTests(unittest.TestCase):
         # sans roll, le buffer = la nouvelle minute
         c = list(w.candles.values())[0]
         self.assertEqual(c[0], 1790640060 * 1000)
+
+    # ── Fuzz 2026-10-10 : le garde sur priceUsd ──────────────────────────
+    # `float()` accepte "nan"/"inf"/"1e400" SANS lever d'erreur, et en Python
+    # max(nan, x) = nan : un seul prix non fini rendait high/low nan À VIE,
+    # puis la bougie corrompue partait en DB (toutes les stats en aval
+    # faussées, en silence). Un prix doit être FINI et > 0.
+
+    _PRIX_INVALIDES = [
+        float("nan"), float("inf"), float("-inf"),   # les non-finis
+        "nan", "1e400",                              # les chaînes pièges
+        "abc",                                       # la chaîne non numérique
+        0, -5, -0.0,                                 # le zéro et les négatifs
+    ]
+
+    def test_prix_non_fini_ou_negatif_rejete(self):
+        w = self._writer()
+        for bad in self._PRIX_INVALIDES:
+            w.add_price("mintA:1399811149", {"timestamp": 1790640000, "priceUsd": bad})
+        self.assertEqual(len(w.tick_q), 0,
+                         "aucun tick non fini/<=0 ne doit être écrit")
+        self.assertNotIn("mintA", w.candles,
+                         "aucune bougie ne doit naître d'un prix invalide")
+        self.assertEqual(w.n_bad_px, len(self._PRIX_INVALIDES),
+                         "chaque rejet doit être COMPTÉ (fail-closed visible)")
+
+    def test_prix_nan_n_empoisonne_pas_la_bougie(self):
+        """Le cœur du bug : après un tick sain, un nan ne doit pas figer
+        high/low — c'est là que max(nan, x) = nan faisait le dégât."""
+        w = self._writer()
+        w.add_price("mintA:1399811149", {"timestamp": 1790640000, "priceUsd": 1.0})
+        w.add_price("mintA:1399811149", {"timestamp": 1790640010, "priceUsd": float("nan")})
+        w.add_price("mintA:1399811149", {"timestamp": 1790640020, "priceUsd": 2.0})
+        c = w.candles["mintA"]
+        self.assertTrue(all(x == x for x in c[1:]),
+                        f"bougie empoisonnée par un nan : {c}")
+        self.assertEqual(c, [1790640000 * 1000, 1.0, 2.0, 1.0, 2.0])
+
+    def test_prix_valide_passe_toujours(self):
+        """Le garde ne doit pas être un refus en bloc : un prix fini > 0
+        passe, et le compteur de rejets reste à zéro."""
+        w = self._writer()
+        w.add_price("mintA:1399811149", {"timestamp": 1790640000, "priceUsd": 1.0})
+        w.add_price("mintA:1399811149", {"timestamp": 1790640010, "priceUsd": "2.5"})
+        self.assertEqual(len(w.tick_q), 2)
+        self.assertEqual(w.n_bad_px, 0)
 
 
 if __name__ == "__main__":
