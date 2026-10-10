@@ -240,5 +240,49 @@ class TestCollectEvents(unittest.TestCase):
         self.assertGreater(r["solde"], 100.0)
 
 
+    def test_metrics_inf_nan_rejetes_pas_de_chiffre_faux(self):
+        """BUG fuzz 2026-10-10 : une courbe de solde portant un inf (bug
+        amont, p.ex. ret_pct=inf non filtré) passait `prev > 0` (inf>0==True)
+        puis `sd <= 0` (nan<=0==False) et sortait Sharpe=nan — un chiffre
+        FAUX qui a l'air d'un chiffre, silencieux. Même faille que #268 :
+        un garde `<=0`/`>0` n'attrape NI nan NI inf. isfinite ferme les deux."""
+        from scripts.portfolio_runner import _portfolio_time_metrics
+        for pourri in (float("nan"), float("inf"), float("-inf")):
+            eq = [(0, 100.0), (3600000, pourri), (7200000, 150.0), (10800000, 120.0)]
+            r = _portfolio_time_metrics(eq)
+            self.assertTrue(
+                all(v is None or math.isfinite(v) for v in r),
+                f"courbe avec {pourri} a sorti un Sharpe/Sortino non fini: {r}")
+
+    def test_metrics_courbe_valide_inchangee(self):
+        """Le garde isfinite ne doit PAS altérer une courbe saine."""
+        from scripts.portfolio_runner import _portfolio_time_metrics
+        eq = [(i * 3600000, 100.0 * (1.001 ** i)) for i in range(100)]
+        r = _portfolio_time_metrics(eq)
+        self.assertIsNotNone(r[0], "courbe haussière saine doit garder son Sharpe")
+        self.assertTrue(math.isfinite(r[0]))
+
+    def test_bootstrap_non_finis_ecartes_et_comptes(self):
+        """BUG fuzz 2026-10-10 : un retour horaire NaN/inf passait le
+        bootstrap ; `if sd > 0` (nan>0==False) forçait Sharpe=0 pour cet
+        échantillon — un 0 FAUX qui biaise l'IC95 vers le bas, silencieux.
+        Fix : filtrer les non-finis en amont ET les compter (transparence)."""
+        from scripts.portfolio_runner import block_bootstrap_hourly
+        import numpy as np
+        rng = np.random.default_rng(3)
+        sains = rng.normal(0.0002, 0.001, 200)
+        pourri = np.concatenate([sains[:100], [np.nan, np.inf, -np.inf], sains[100:]])
+        r = block_bootstrap_hourly(pourri, block_hours=24, iters=100)
+        self.assertEqual(r["n_non_finis_ecartes"], 3,
+                         "les 3 non-finis doivent être écartés ET comptés")
+        lo, hi = r["sharpe_ci95"]
+        self.assertTrue(math.isfinite(lo) and math.isfinite(hi),
+                        "l'IC95 doit rester fini")
+        # régression : données 100% saines -> 0 écarté
+        r2 = block_bootstrap_hourly(sains, block_hours=24, iters=100)
+        self.assertEqual(r2["n_non_finis_ecartes"], 0,
+                         "pas de faux positif sur données propres")
+
+
 if __name__ == "__main__":
     unittest.main()
