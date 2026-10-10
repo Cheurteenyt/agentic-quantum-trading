@@ -132,7 +132,7 @@ est contredit) · `context_manifest.py` (LE brief d'entrée de session) ·
 | Fichier | Une ligne |
 |---|---|
 | `qubo_sizing.py` | QUBO discrétisé des poids (annealing, Q = cov TRAIN) — CANDIDAT +4 539 % @ 23,4 % |
-| `qubo_joint_lev.py` | QUBO joint poids×levier (plafonds MAE par flux) — CANDIDAT **+5 082 % @ 23,3 %**, record +83,7 % |
+| `qubo_joint_lev.py` | QUBO joint poids×levier (plafonds MAE par flux) — ⛔ **REFUTÉ (F-033)** : re-mesuré sur données fixées = 20 liqs, DD 99,2 %, final $1. Le +5 082 % @ 23,3 % et le record +83,7 % sont MORTS. |
 | `qubo_per_symbol.py` | QUBO par symbole dans le flux majors (granularité 6 majeures) |
 | `conditional_sizing.py` | sizing conditionnel par régime (jamais gate sec) — NUL (contrôle inverse ambigu) |
 | `funding_dimension_study.py` | structure funding (velocity/dispersion/level) — NUL |
