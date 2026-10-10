@@ -21,6 +21,7 @@ import contextlib
 import base64
 import fcntl
 import json
+import math
 import os
 import signal
 import sqlite3
@@ -267,6 +268,7 @@ class Writer:
         self.n_candles, self.n_theses, self.n_events = 0, 0, 0
         self.n_tdetail, self.n_ohlcv, self.n_mc = 0, 0, 0
         self.n_dedup, self.n_errors = 0, 0
+        self.n_bad_px = 0   # prix rejetés (nan/inf/<=0) — fail-closed compté
         self.unknown_types = set()
         self.con_ticks = sqlite3.connect(DB_TICKS, timeout=30)
         self.con_swaps = sqlite3.connect(DB_SWAPS, timeout=30)
@@ -290,7 +292,20 @@ class Writer:
         ts = payload.get("timestamp") or int(time.time())
         px = payload.get("priceUsd")
         if mint and px is not None:
-            px = float(px)
+            try:
+                px = float(px)
+            except (TypeError, ValueError):
+                self.n_bad_px += 1
+                return
+            # Fuzz 2026-10-10 : un priceUsd = NaN/inf/négatif (API dégradée,
+            # ou "1e400" -> inf) passait float() SANS erreur puis empoisonnait
+            # la bougie 1m — max(nan, x) = nan en Python, donc high/low
+            # restaient nan À VIE, et partaient en DB (toutes les stats en
+            # aval faussées, en silence). Un prix doit être FINI et > 0.
+            # On compte les rejets pour qu'ils se voient (fail-closed).
+            if not math.isfinite(px) or px <= 0:
+                self.n_bad_px += 1
+                return
             if self.last_px.get(topic_id) == px:
                 self.n_dedup += 1
                 return
@@ -831,6 +846,7 @@ async def session(user_uuid, seed_mints, writer, run_until_ts=None):
                 writer.flush()
                 log(f"résumé 10 min : {n_recv} msgs | ticks={writer.n_ticks} "
                     f"(dédup={writer.n_dedup}) bougies1m={writer.n_candles} "
+                    f"px_rejetés={writer.n_bad_px} "
                     f"swaps={writer.n_swaps} (top={writer.n_top}, "
                     f"sorties_top={writer.n_sells_top}) "
                     f"mc_samples={writer.n_mc} "
