@@ -82,9 +82,16 @@ jobs:
   # Les oracles déterministes du noyau sont quasi instantanés (0.05–8 s) ;
   # le coût est la suite --fast.
   t1-core:
+    # E2-ter : `ci` (`.github/**`) doit AUSSI déclencher ce palier. Sans ça, une
+    # PR qui ne touche QUE le workflow était classée core=false → t1-core
+    # SKIPPED → la modification du pipeline n'était jamais validée par le
+    # pipeline lui-même. C'est un fail-open de la porte sur elle-même : mesuré
+    # sur la PR #277 (t1-core `skipping` alors que le diff modifiait ci.yml).
     if: >-
       github.event_name != 'schedule' &&
-      (github.event_name == 'merge_group' || needs.changes.outputs.core == 'true')
+      (github.event_name == 'merge_group' ||
+       needs.changes.outputs.core == 'true' ||
+       needs.changes.outputs.ci == 'true')
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -86,17 +86,43 @@ def _is_plausible_token_price(price_usd: Any) -> bool:
     return 0 < price <= _MAX_TOKEN_PRICE_USD
 
 
-def _is_plausible_wallet_value(value_usd: Any, liquidity_usd: Any) -> bool:
+def _is_plausible_wallet_value(value_usd: Any, liquidity_usd: Any) -> bool | None:
+    """Le plafond de valeur est-il tenable compte tenu de la liquidité ?
+
+    Trois verdicts, et c'est tout l'intérêt (issue #271) :
+      True  plausible — la liquidité est connue et la valeur tient dessous
+      False non plausible — la valeur dépasse la liquidité (ou est absurde)
+      None  INDÉCIDABLE — la liquidité est INCONNUE
+
+    Avant, `float(liquidity_usd or 0)` faisait `None -> 0.0`, et le `return
+    True` final était atteint que la liquidité soit 0 parce que le token est
+    réellement illiquide OU parce que l'API est tombée. Les deux états étaient
+    écrasés en un seul, et l'appelant lisait « plausible ». Un million de
+    dollars de valeur sans liquidité connue passait donc le contrôle. Le
+    troisième verdict force l'appelant à TRAITER le cas inconnu au lieu de le
+    confondre avec le cas sain.
+    """
     try:
         value = float(value_usd or 0)
-        liquidity = float(liquidity_usd or 0)
     except (TypeError, ValueError):
         return False
     if value <= 0:
         return False
+    if value >= 1_000_000_000_000:
+        return False
+    # Liquidité inconnue : on ne peut pas conclure, on ne décide pas à la place
+    # de la donnée (fail-closed côté confiance, cf. appelant).
+    if liquidity_usd is None:
+        return None
+    try:
+        liquidity = float(liquidity_usd)
+    except (TypeError, ValueError):
+        return None
+    if liquidity < 0:
+        return None
     if liquidity > 0 and value > liquidity * _MAX_VALUE_TO_LIQUIDITY_RATIO:
         return False
-    return value < 1_000_000_000_000
+    return True
 
 
 def _normalize_dex_chain(chain: Any) -> str:
@@ -429,7 +455,27 @@ def _get_dexscreener_data(token_address: str, chain: str = "eth") -> dict[str, A
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read().decode())
     except Exception:
-        return {}
+        # Issue #271 : « API muette » n'est PAS « pas de pair ». Avant, on
+        # renvoyait {} — indistinguable d'une réponse vide, donc `liquidity_usd`
+        # disparaissait (le `.get()` de l'appelant rendait None) et le contrôle
+        # de plausibilité lisait None comme 0 donc « plausible ». On renvoie
+        # désormais un bloc explicite : liquidité None (inconnue, pas nulle),
+        # marqueur `api_error`, confiance low. L'appelant distingue enfin les
+        # deux causes.
+        result = {
+            "dex_chain": requested_chain,
+            "api_error": True,
+            "price_usd": None,
+            "liquidity_usd": None,
+            "volume_24h": 0,
+            "market_cap": 0,
+            "confidence": "low",
+            "pair_validated": False,
+            "top_holder_pct": 0,
+            "checks": ["api_error"],
+        }
+        _DEX_CACHE[cache_key] = (result, now)
+        return result
 
     pairs = data if isinstance(data, list) else (data.get("pairs") or [])
     if not pairs:
@@ -963,8 +1009,19 @@ def get_token_balances(address: str, tokens: list[str], chain: str) -> list[dict
             value_usd = None
             if price_usd and price_usd > 0:
                 value_usd = round(balance * price_usd, 2)
-            if value_usd and not _is_plausible_wallet_value(value_usd, liquidity_usd):
-                confidence = "low"
+            if value_usd:
+                plausible = _is_plausible_wallet_value(value_usd, liquidity_usd)
+                if plausible is False:
+                    confidence = "low"
+                elif plausible is None:
+                    # Issue #271 : liquidité inconnue (API DexScreener en échec
+                    # OU aucun pair) — on ne SAIT pas si la valeur est tenable.
+                    # Avant, ce cas retournait True (plausible) et la valeur
+                    # passait telle quelle. On dégrade à "low" : l'appelant
+                    # filtre les "low" (étape 9), donc un token dont on ignore
+                    # la liquidité ne peut plus s'afficher comme une position
+                    # fiable. Fail-closed : l'ignorance ne vaut pas validation.
+                    confidence = "low"
 
             # 9. Filter: ignore low confidence tokens entirely
             if confidence == "low":
