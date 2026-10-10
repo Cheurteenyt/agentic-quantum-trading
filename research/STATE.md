@@ -12,6 +12,13 @@ MAJ manuelle : 2026-10-06. Le bloc ci-dessous est GÉNÉRÉ : `python3 scripts/l
 - Seuil de preuve du prochain essai : |t| ≥ 3.80 (Bonferroni, N=342 dont 341 pré-ledger)
 <!-- LEDGER:END -->
 
+## Productivité (généré : `python scripts/research_velocity.py`)
+- Semaine courante **2026-W41** : **16** lot(s) exécuté(s), **16** hypothèse(s) tranchée(s), **0** candidat(s).
+- Historique vivant (par semaine) :
+  - 2026-W41 : 16 lots · 16 tranchées · 0 candidats · {'DISCOVERY_FAIL': 16}
+- Définition de « fini » hebdo : ≥ 1 lot exécuté ET journalisé, ≥ 1 hypothèse tranchée. Un FAIL est un résultat (fausse piste fermée).
+
+
 ## Verdicts qui comptent
 - Pool OpenMarket v8 : E[R] +0,093 R, IC95 [−0,027 ; +0,223] ; rien ne survit à Bonferroni (N=362) → edge NON établi.
   Repro : `python3 scripts/studies/x501_openmarket/x501_multiplicity_adapter.py`
