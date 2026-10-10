@@ -190,7 +190,8 @@ jobs:
   t1-security:
     if: >-
       github.event_name != 'schedule' &&
-      (github.event_name == 'merge_group' || needs.changes.outputs.core == 'true')
+      (github.event_name == 'merge_group' || needs.changes.outputs.core == 'true'
+       || needs.changes.outputs.ci == 'true')
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
