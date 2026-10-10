@@ -1,0 +1,6 @@
+{
+  "run_id": "EXP-al-gradient-reproof-2026-10-07",
+  "git_sha": "bdd48fa",
+  "source": "report manuel reports/al-gradient-reproof-2026-10-07.md",
+  "note": "run rétro-créé 2026-10-10 par l'oracle N6 pour rendre le n=1105 traçable (le ledger pointait vers le rapport, pas un run)."
+}

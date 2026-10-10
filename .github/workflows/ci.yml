@@ -60,6 +60,20 @@ jobs:
       # ledger doit corroborer chacun de ses verdicts par son run.
       - name: Provenance du ledger (le ledger doit corroborer ses runs)
         run: python scripts/ledger_provenance.py
+      # N6 : un verdict énoncé SANS taille d'échantillon lisible dans son
+      # run ne peut pas être cru — la règle du dépôt est N ≥ 10. Le N de
+      # multiplicité de lab_ledger compte des lignes, pas des observations
+      # (mesuré : 0/16 entrées vivantes portaient un n ; 2 pointaient vers
+      # reports/ ou scripts/ au lieu d'un run).
+      - name: Puissance du ledger (chaque verdict vivant porte son n)
+        run: python scripts/ledger_puissance.py
+      # G10 : un `Path(__file__).resolve().parents[N]` copié d'un en-tête
+      # racine dans un sous-dossier résout vers scripts/ au lieu de la
+      # racine — le script plante au LANCEMENT, jamais à l'import, donc
+      # invisible. Le filet distingue le vrai bug de l'import frère
+      # légitime et du STUDIES_DIR.parents[1] correct.
+      - name: G10 path ROOT (parents[N] doit résoudre à la racine)
+        run: python scripts/audit_path_root.py
       - name: Audit check (bloquant sur --fail-on)
         run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
 
