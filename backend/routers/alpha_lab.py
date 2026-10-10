@@ -1,4 +1,4 @@
-﻿"""Alpha Lab Router — Unified On-Chain + Alpha"""
+"""Alpha Lab Router — Unified On-Chain + Alpha"""
 from __future__ import annotations
 
 import asyncio
@@ -6,12 +6,15 @@ import base64
 import hmac
 import hashlib
 import json
+import logging
 import re
 import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger("alpha_lab")
 
 import os
 
@@ -628,7 +631,7 @@ def _local_exact_swap_context(tx_hash: Any, chain: Any = None) -> dict[str, Any]
             try:
                 conn.close()
             except Exception:
-                pass
+                logger.debug("[ALPHA_LAB] fermeture connexion ignore", exc_info=True)
     if not row:
         return None
 
@@ -697,7 +700,7 @@ def _local_exact_swap_context(tx_hash: Any, chain: Any = None) -> dict[str, Any]
                 and pool_snapshot.get("pool_snapshot_provider")
             )
         except Exception:
-            pass
+            logger.debug("[ALPHA_LAB] pool_snapshot enrichment ignore", exc_info=True)
 
     return {
         "market_provider": "local_exact_swap_cache",

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Arkham Intelligence Scraper — Stratégie de Crédits Intelligent
 ================================================================
 
@@ -97,12 +97,23 @@ ETHERSCAN_API_URLS = {
 
 ETHERSCAN_CHAIN_IDS = {
     'ethereum': '1',
+    'eth':      '1',        # alias de ethereum — sans cette clé, un appel
+                            # chain='eth' retombait sur le défaut "1" par chance
     'bsc':      '56',
     'arbitrum': '42161',
     'polygon':  '137',
+    'base':     '8453',     # AJOUTÉ (bug silencieux fondateur) : sans cette clé,
+                            # un appel chain='base' envoyait chainid=1 = la
+                            # MAINNET ETHEREUM, et renvoyait un solde plausible
+                            # mais FAUX tagué chain='base' (vérifié à l'exécution).
     'optimism': '10',
     'avalanche':'43114',
 }
+
+# Sentinelle « chaîne hors map » : on REFUSE d'interroger plutôt que de
+# retomber sur un défaut muet. Un `.get(chain, "1")` interrogeait la
+# mauvaise blockchain en silence — le pire défaut (indétectable en aval).
+_CHAIN_NON_SUPPORTEE = object()
 
 # NATIVE COINS — blockchains natives (pas de contrat ERC-20)
 NATIVE_COINS = {
@@ -1744,7 +1755,7 @@ class ArkhamScraper:
             try:
                 self._save_cache()
             except Exception:
-                pass
+                logger.warning("[ARKHAM] cache token_detail non sauvegarde", exc_info=True)
 
         return result
 
@@ -1941,12 +1952,22 @@ class ArkhamScraper:
 
         # Choisir l'API selon la chain
         api_url = ETHERSCAN_API_URLS.get(chain, ETHERSCAN_API_URLS["ethereum"])
-        chain_id = ETHERSCAN_CHAIN_IDS.get(chain, "1")
+        chain_id = ETHERSCAN_CHAIN_IDS.get(chain, _CHAIN_NON_SUPPORTEE)
         api_key = self._get_api_key_for_chain(chain)
 
         # BSC: utiliser le RPC officiel Binance (gratuit, illimite)
         if chain == "bsc":
             return self._fetch_bsc_via_rpc(address)
+
+        # FAIL-CLOSED : une chaîne hors map ne retombe PLUS sur "1"
+        # (Ethereum mainnet). Le défaut muet interrogeait la MAUVAISE
+        # blockchain et renvoyait un solde plausible mais FAUX tagué
+        # `chain`. Une chaîne inconnue sort maintenant une erreur.
+        if chain_id is _CHAIN_NON_SUPPORTEE:
+            logger.warning(f"[ARKHAM] chain non supportee pour Etherscan V2: "
+                           f"{chain!r} — refus (pas de defaut silencieux)")
+            return {"error": f"etherscan_chain_not_supported:{chain}",
+                    "address": address, "chain": chain}
 
         if not api_key:
             logger.warning(f"[ARKHAM] Pas de clé API pour {chain} — données blockchain limitées")
@@ -2016,7 +2037,7 @@ class ArkhamScraper:
                 try:
                     result["transaction_count"] = int(tx_data["result"], 16)
                 except (ValueError, TypeError):
-                    pass
+                    logger.debug("[ARKHAM] transaction_count illisible (hex invalide)", exc_info=True)
 
         except Exception as e:
             logger.error(f"[ARKHAM] Erreur blockchain data pour {address}: {e}")
@@ -2113,7 +2134,7 @@ class ArkhamScraper:
                     seen.add(addr)
                     result['tokens'].append({'contract': addr, 'symbol': '', 'name': ''})
         except Exception:
-            pass
+            logger.debug("[ARKHAM] token parsing ignore (adresse illisible)", exc_info=True)
         
         # Cache result
         self._cache.setdefault('addresses', {})[address.lower()] = result
@@ -2277,7 +2298,7 @@ class ArkhamScraper:
                     if holders:
                         logger.info(f"[ARKHAM] {len(holders)} holders via Etherscan pour {token_address[:10]}...")
             except Exception:
-                pass
+                logger.warning("[ARKHAM] holders via Etherscan ignore", exc_info=True)
 
         # ── Tiers 4: Fallback Transfer events ──
         if not holders and api_key:
