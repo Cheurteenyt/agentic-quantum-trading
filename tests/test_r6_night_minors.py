@@ -28,8 +28,10 @@ from __future__ import annotations
 import ast
 import io
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 import urllib.error
 from unittest import mock
@@ -201,13 +203,30 @@ class TestD10DailyBriefConnectDansTry(unittest.TestCase):
 
     def test_repertoire_fomo_absent_le_brief_survit(self):
         """Le test D-10 bout-en-bout : le script complet s'exécute dans le
-        clone (data/ absente) — AVANT le fix il crashait au connect."""
-        r = subprocess.run(
-            [sys.executable, str(ROOT / "scripts" / "daily_brief.py")],
-            capture_output=True, text=True, timeout=60,
-            env={"PATH": "/usr/bin:/bin", "HOME": str(ROOT)})
-        self.assertEqual(r.returncode, 0, r.stderr[-500:])
-        self.assertIn("GRADUATIONS : indispo", r.stdout)
+        clone (data/ absente) — AVANT le fix il crashait au connect.
+
+        HERMÉTIQUE (10/10) : `daily_brief.py` résout son ROOT par
+        `Path(__file__).resolve().parents[1]`. On le rejoue donc depuis un
+        ROOT TEMPORAIRE, où `data/` n'existe pas par construction. L'ancienne
+        version le lançait depuis le vrai dépôt : elle n'était verte que sur
+        une machine où `data/fomo/` manquait — donc en CI (data/ gitignoré)
+        et jamais chez le dev, où le brief lisait les vraies DB.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            (t / "scripts").mkdir()
+            (t / "reports").mkdir()   # daily_brief écrit son log ici
+            shutil.copy2(ROOT / "scripts" / "daily_brief.py",
+                         t / "scripts" / "daily_brief.py")
+            r = subprocess.run(
+                [sys.executable, str(t / "scripts" / "daily_brief.py")],
+                capture_output=True, text=True, timeout=60,
+                env={"PATH": "/usr/bin:/bin", "HOME": tmp})
+            self.assertEqual(r.returncode, 0, r.stderr[-500:])
+            self.assertIn("GRADUATIONS : indispo", r.stdout)
+            # …et le brief va jusqu'au BOUT (les sections 5-6 ne sont pas
+            # perdues en route, c'est tout l'objet du fix D-10)
+            self.assertIn("ACTIONS du jour", r.stdout)
 
 
 if __name__ == "__main__":

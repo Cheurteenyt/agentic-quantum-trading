@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -157,16 +158,28 @@ class ClampTests(unittest.TestCase):
         return len(r)
 
     def _run_dir_case(self, dirpath: Path, glob: str, maker, fetcher, names):
-        dirpath.mkdir(parents=True, exist_ok=True)
-        created = [maker(dirpath, n) for n in names]
+        """HERMÉTIQUE (10/10) : les routers résolvent `data/signals` et
+        `data/chat` RELATIVEMENT au cwd (`Path("data/signals")`). Sans ce
+        chdir, le test écrivait ses 3 fixtures dans le VRAI `data/` du dépôt
+        et lisait en plus les fichiers qui s'y trouvaient déjà — vert en CI
+        (clone propre, `data/*` gitignoré) et rouge en local dès qu'un seul
+        `signal_*.json` traînait : 3 fixtures + 4 vrais = 7 au lieu de 3.
+        On s'exécute donc dans un ROOT temporaire, où l'ambiant est vide par
+        construction. Le cwd est restauré même en cas d'échec.
+        """
+        cwd0 = os.getcwd()
         try:
-            r0 = asyncio.run(fetcher(limit=0))
-            rn = asyncio.run(fetcher(limit=-1))
-            r2 = asyncio.run(fetcher(limit=2))
-            rb = asyncio.run(fetcher(limit=1000))
+            with tempfile.TemporaryDirectory() as tmp:
+                os.chdir(tmp)
+                dirpath.mkdir(parents=True, exist_ok=True)
+                for n in names:
+                    maker(dirpath, n)
+                r0 = asyncio.run(fetcher(limit=0))
+                rn = asyncio.run(fetcher(limit=-1))
+                r2 = asyncio.run(fetcher(limit=2))
+                rb = asyncio.run(fetcher(limit=1000))
         finally:
-            for f in created:
-                f.unlink(missing_ok=True)
+            os.chdir(cwd0)
         return self._count(r0), self._count(rn), self._count(r2), self._count(rb)
 
     def test_market_signals_clamped(self):
