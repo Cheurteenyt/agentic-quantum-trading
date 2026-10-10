@@ -207,6 +207,9 @@ jobs:
       - name: Bandit ciblé (bind/shell/eval, 0 attendu — BLOQUANT)
         run: |
           pip install bandit --quiet
+          # Garde fail-CLOSED : sans elle, un bandit absent/cassé rend un grep
+          # vide, donc « 0 finding », donc un gate VERT qui n'a rien mesuré.
+          python -c "import bandit" 2>/dev/null || { echo "::error::bandit indisponible — le gate ne peut pas mesurer"; exit 1; }
           for t in B104 B602 B603 B605 B607; do
             if python -m bandit -q -ll -r backend discord_bot scripts -t "$t" | grep -q "^>> Issue:"; then
               echo "::error::bandit $t détecté (bind large / shell / eval)"
@@ -236,7 +239,22 @@ jobs:
       - name: Bandit complet — rochets stock + dette PR vs main
         run: |
           pip install bandit --quiet
+          # Garde fail-CLOSED (E2-ter, 10/10). Avant : si bandit était absent ou
+          # cassé, `total` valait 0, et `0 > 519` est faux → la marche PASSAIT en
+          # annonçant « bandit complet : 0 (référence 519) ». Un outil absent
+          # rendait un gate VERT sur 519 avis non mesurés — la même famille que
+          # les autres fail-open du dépôt. Reproduit en local le 10/10.
+          python -c "import bandit" 2>/dev/null || { echo "::error::bandit indisponible — le gate ne peut pas mesurer"; exit 1; }
           total=$(python -m bandit -q -ll -r backend discord_bot scripts 2>/dev/null | grep -c "^>> Issue:" || true)
+          # Un scan qui rend 0 alors que la référence n'est pas 0 est SUSPECT :
+          # soit l'outil n'a pas tourné, soit il a été neutralisé. On refuse.
+          if [ "$total" -eq 0 ]; then
+            ref0=$(cat .github/bandit-baseline.txt)
+            if [ "$ref0" -ne 0 ]; then
+              echo "::error::scan bandit vide (0 avis) alors que la référence est $ref0 — le scan n'a PAS mesuré"
+              exit 1
+            fi
+          fi
           ref=$(cat .github/bandit-baseline.txt)
           echo "bandit complet : $total (référence $ref)"
           if [ "$total" -gt "$ref" ]; then
