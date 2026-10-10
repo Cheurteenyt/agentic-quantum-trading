@@ -1,4 +1,4 @@
-﻿"""
+"""
 Alpha wallet intelligence adapters.
 
 These adapters are deliberately conservative: if an API key is missing or an

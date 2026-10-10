@@ -1,0 +1,17 @@
+# Normalisation des fins de ligne : LF partout, sur tous les OS.
+# Sans ça, des éditeurs Windows réintroduisent CRLF silencieusement et
+# git stocke le mélange — mesure au 2026-10-10 : 11 fichiers backend
+# étaient en CRLF (dont onchain_engine.py à ~99.7%), 4 avec un BOM UTF-8.
+# `text=auto` laisse git décider, `eol=lf` force LF au checkout.
+* text=auto eol=lf
+
+# Python : LF strict, et le BOM UTF-8 (U+FEFF) casse le parse strict des
+# outils (ruff, certains linters) même si Python l'importe. On le refuse.
+*.py text eol=lf
+
+# Données : jamais de conversion de fin de ligne (elles sont lues telles
+# quelles par les collecteurs).
+*.json text eol=lf
+*.jsonl text eol=lf
+*.md text eol=lf
+*.db binary

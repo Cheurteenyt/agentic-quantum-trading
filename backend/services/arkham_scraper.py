@@ -1,4 +1,4 @@
-﻿"""
+"""
 Arkham Intelligence Scraper — Stratégie de Crédits Intelligent
 ================================================================
 

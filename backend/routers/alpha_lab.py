@@ -1,4 +1,4 @@
-﻿"""Alpha Lab Router — Unified On-Chain + Alpha"""
+"""Alpha Lab Router — Unified On-Chain + Alpha"""
 from __future__ import annotations
 
 import asyncio
