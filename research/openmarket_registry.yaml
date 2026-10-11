@@ -5,7 +5,22 @@ pool_v8:
   E_R: 0.093
   IC95_blocks: [-0.027, 0.223]
   edge_established: false
-  note: "Sans top 5% : E[R] = -0,065. Holdout propre = HOLDOUT-X."
+  note: "Sans top 5% : E[R] = -0,065. Holdout propre = HOLDOUT-X — RÉPONDU (11/10, FAIL)."
+holdout_x:
+  verdict: FAIL
+  date: "2026-10-11"
+  gel: "745e02d"
+  univers: "48 plus anciennes perps USDT-M (onboardDate < 2024-01-01, status=TRADING) hors SYMS_40 — fapi exchangeInfo 11/10, figé AVANT toute collecte"
+  moteur: "x501_engine_deep_v30.py (auto-contenu, versionné — fait foi)"
+  trades: 950
+  E_R: 0.0642
+  IC95_blocks_seed7: [-0.0376, 0.1793]
+  fenetres_protocol_v2: "3/6 PASS (W1 -0.374)"
+  stress_x1_5_E_R: 0.0513
+  hors_top5_E_R: -0.1050
+  champion_pare_meme_moteur: "E[R] +0.0731, IC95 [-0.0255 ; +0.1762], 4/6 — même profil statistique que le holdout"
+  reponse: "À la barre pré-enregistrée, l'edge v8 ne sépare PAS du bruit sur des symboles jamais vus — ET le champion apparié montre le même profil : la lecture « sur-apprentissage de symbole » n'est pas la bonne ; la lecture « edge réel mais au-dessous de la barre de preuve protocol_v2 (borne basse > 0, 5/6 fenêtres) » est celle que les données supportent. Le +0,093 du pool v8 restait à la limite du bruit (IC95 [-0.027 ; +0.223]) — le holdout le confirme : PAS D'EDGE ÉTABLI."
+  harnais: "scripts/studies/x501_openmarket/holdout_x_harness.py"
 mc_versions:
   v20: {status: "OFFICIEL archive", trades: 31, median: "642$", kernel: "NON_REPRODUCTIBLE"}
   v30: {status: "deep re-chiffrement", trades: 570, median: "117$", kernel: "NON_REPRODUCTIBLE"}

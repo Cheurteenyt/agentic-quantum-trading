@@ -1,0 +1,7 @@
+{
+  "verdict": "FAIL",
+  "n": 950,
+  "source_n": "scripts/studies/x501_openmarket/research_holdout_x.json — holdout.n (950 trades holdout sur 1170 bruts ; BTC exclus du verdict)",
+  "note": "E[R] +0.0642, IC95 blocs-mois [-0.0376 ; +0.1793] (4000 tirages seed 7) : borne basse < 0. 3/6 fenetres protocol_v2 (W1 -0.374). Stress x1.5 : +0.0513 tient. Hors top 5% : -0.1050 (porte par les outliers). Champion apparié MÊME moteur : +0.0731, IC95 [-0.0255 ; +0.1762], 4/6 — même profil. FAIL aux critères pre-enregistrés de la spec.",
+  "run_id": "EXP-holdout-x-2026-10-11"
+}

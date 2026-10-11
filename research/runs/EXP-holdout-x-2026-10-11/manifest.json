@@ -1,0 +1,6 @@
+{
+  "run_id": "EXP-holdout-x-2026-10-11",
+  "git_sha": "745e02d",
+  "source": "scripts/studies/x501_openmarket/holdout_x_harness.py --run (gel 745e02d ; harnais + univers figés AVANT toute collecte)",
+  "note": "Run HOLDOUT-X du 11/10 : 48 plus anciennes perps USDT-M hors SYMS_40 (fapi exchangeInfo 11/10, figées au commit de gel), moteur x501_engine_deep_v30 (auto-contenu, fait foi), 3 runs (holdout nominal, champion apparié SYMS_40, stress x1.5). Données : collecte Vision 88 symboles -> 4 388 428 klines + 572 224 funding (QA : seule anomalie = trou ICPUSDT 627 h, documente docs/40). Le ref du ledger L98 a ete corrige le jour meme (prose -> run dir) pour rendre le n traçable (contracte N5)."
+}
