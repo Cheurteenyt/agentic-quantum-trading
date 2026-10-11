@@ -1,134 +1,146 @@
-generated: '2026-10-07'
-source_snapshot: k1h-f163ffb4f65aecf6
+deliste_source_snapshot: 2026-10-11 01:59 UTC
+generated: '2026-10-11'
+point_in_time: true
+source_snapshot: k1h-d1b10b4d2be586f6
 symbols:
   ADAUSDT:
-    bars: 43948
-    coverage_pct: 99.99
+    bars: 44055
+    coverage_pct: 99.97
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1631116800000
-    funding_coverage_pct: 101.25
-    funding_prints: 5563
+    funding_coverage_pct: 101.21
+    funding_prints: 5575
     funding_start: '2021-09-08'
-    gaps: 6
-    last_bar_ms: 1791331200000
-    observed_end: '2026-10-07'
+    gaps: 2
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2021-10-01'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   AVAXUSDT:
-    bars: 42855
-    coverage_pct: 99.98
+    bars: 42963
+    coverage_pct: 99.97
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1637031600000
-    funding_coverage_pct: 99.99
-    funding_prints: 5357
+    funding_coverage_pct: 99.95
+    funding_prints: 5369
     funding_start: '2021-11-16'
-    gaps: 7
-    last_bar_ms: 1791331200000
-    observed_end: '2026-10-07'
+    gaps: 2
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2021-11-16'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   BNBUSDT:
-    bars: 41680
-    coverage_pct: 99.99
+    bars: 41787
+    coverage_pct: 99.97
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1641265200000
-    funding_coverage_pct: 99.99
-    funding_prints: 5210
+    funding_coverage_pct: 99.94
+    funding_prints: 5222
     funding_start: '2022-01-04'
-    gaps: 6
-    last_bar_ms: 1791331200000
-    observed_end: '2026-10-07'
+    gaps: 2
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2022-01-04'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   BTCUSDT:
-    bars: 44681
-    coverage_pct: 100.0
+    bars: 44793
+    coverage_pct: 99.99
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1630051200000
-    funding_coverage_pct: 100.26
-    funding_prints: 5600
+    funding_coverage_pct: 100.22
+    funding_prints: 5612
     funding_start: '2021-08-27'
-    gaps: 2
-    last_bar_ms: 1791331200000
-    observed_end: '2026-10-07'
+    gaps: 1
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2021-09-01'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   DOGEUSDT:
-    bars: 43956
-    coverage_pct: 99.99
+    bars: 44055
+    coverage_pct: 99.97
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1631116800000
-    funding_coverage_pct: 101.24
-    funding_prints: 5563
+    funding_coverage_pct: 101.21
+    funding_prints: 5575
     funding_start: '2021-09-08'
-    gaps: 4
-    last_bar_ms: 1791352800000
-    observed_end: '2026-10-07'
+    gaps: 2
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2021-10-01'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   ETHUSDT:
-    bars: 44547
-    coverage_pct: 100.0
+    bars: 44652
+    coverage_pct: 99.99
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1630983600000
-    funding_coverage_pct: 99.97
-    funding_prints: 5567
+    funding_coverage_pct: 99.95
+    funding_prints: 5579
     funding_start: '2021-09-07'
     gaps: 1
-    last_bar_ms: 1791352800000
-    observed_end: '2026-10-07'
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2021-09-07'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   LINKUSDT:
-    bars: 39280
-    coverage_pct: 99.98
+    bars: 39388
+    coverage_pct: 99.97
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1649901600000
-    funding_coverage_pct: 99.98
-    funding_prints: 4910
+    funding_coverage_pct: 99.94
+    funding_prints: 4922
     funding_start: '2022-04-14'
-    gaps: 7
-    last_bar_ms: 1791331200000
-    observed_end: '2026-10-07'
+    gaps: 2
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2022-04-14'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   LTCUSDT:
-    bars: 42855
-    coverage_pct: 99.98
+    bars: 42963
+    coverage_pct: 99.97
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1637031600000
-    funding_coverage_pct: 99.99
-    funding_prints: 5357
+    funding_coverage_pct: 99.95
+    funding_prints: 5369
     funding_start: '2021-11-16'
-    gaps: 7
-    last_bar_ms: 1791331200000
-    observed_end: '2026-10-07'
+    gaps: 2
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2021-11-16'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   SOLUSDT:
-    bars: 44499
-    coverage_pct: 100.0
+    bars: 44604
+    coverage_pct: 99.99
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1631116800000
-    funding_coverage_pct: 103.8
-    funding_prints: 5774
+    funding_coverage_pct: 103.77
+    funding_prints: 5786
     funding_start: '2021-09-08'
     gaps: 1
-    last_bar_ms: 1791352800000
-    observed_end: '2026-10-07'
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2021-09-09'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
   XRPUSDT:
-    bars: 43952
-    coverage_pct: 100.0
+    bars: 44055
+    coverage_pct: 99.97
+    deliste_source: null
     delisted_at: null
     first_bar_ms: 1631116800000
-    funding_coverage_pct: 101.25
-    funding_prints: 5563
+    funding_coverage_pct: 101.21
+    funding_prints: 5575
     funding_start: '2021-09-08'
     gaps: 2
-    last_bar_ms: 1791331200000
-    observed_end: '2026-10-07'
+    last_bar_ms: 1791738000000
+    observed_end: '2026-10-11'
     observed_start: '2021-10-01'
-    source: k1h-f163ffb4f65aecf6
+    source: k1h-d1b10b4d2be586f6
 universe: univ10
