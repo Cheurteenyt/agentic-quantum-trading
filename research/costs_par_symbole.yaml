@@ -1,0 +1,20 @@
+# P2 (audit Sonnet 5.5, R4) — la table des coûts de round-trip par symbole.
+#
+# ⚠️ HONNÊTETÉ : cette table est VIDE aujourd'hui (11/10). Aucune mesure de
+# coût par symbole post-correctif n'existe — la seule mesure datée est la
+# classe meme entière (TAKER_RT 28 bps, 04/10, doc #20), qui EST le défaut.
+# La table existe pour que la prochaine mesure atterrisse ICI au lieu de
+# rester un magic number dans les specs. Une entrée sans `source` datée est
+# refusée par `scripts/costs.py::verifier_table` : on n'invente pas un coût.
+#
+# Priorité d'application (scripts/costs.py) :
+#   spec.cost_pct explicite  >  par_symbole[sym].rt_pct  >  defaut_rt_pct
+schemaVersion: 1
+defaut_rt_pct: 0.28
+defaut_source: "mesure meme TAKER_RT 28 bps RT (04/10, docs/20) — s'applique aux symboles sans override"
+par_symbole: {}
+# Exemple d'override (une fois mesuré) :
+# par_symbole:
+#   ARBUSDT:
+#     rt_pct: 0.19
+#     source: "mesure spread+fees 12/10, scripts/studies/x/… (datée, reproductible)"

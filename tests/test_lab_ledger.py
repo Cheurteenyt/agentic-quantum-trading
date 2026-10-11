@@ -178,13 +178,16 @@ class DiscoveryVerdictExigeSaGrandeur(unittest.TestCase):
                            "--now", NOW, *argv])
         return code, buf.getvalue()
 
-    def disc(self, hyp, verdict="DISCOVERY_FAIL", *, n=None, er=None, backfill=False, st="s"):
+    def disc(self, hyp, verdict="DISCOVERY_FAIL", *, n=None, er=None,
+             breakeven=None, backfill=False, st="s"):
         argv = ["log", "--family", "f", "--strategy", st, "--hypothesis", hyp,
                 "--verdict", verdict, "--mode", "discovery"]
         if n is not None:
             argv += ["--n", str(n)]
         if er is not None:
             argv += ["--er", str(er)]
+        if breakeven is not None:
+            argv += ["--breakeven-bps", str(breakeven)]
         if backfill:
             argv.append("--backfill")
         return self.run_cli(*argv)
@@ -195,13 +198,23 @@ class DiscoveryVerdictExigeSaGrandeur(unittest.TestCase):
         self.assertIn("REFUS", out)
         self.assertEqual(len(L.load(self.led, None)), 0, "rien ne doit être écrit")
 
-    def test_discovery_fail_avec_n_et_er_est_accepte(self):
-        code, _ = self.disc("h", n=400, er=-0.02)
+    def test_discovery_fail_avec_n_et_er_seuls_est_refuse(self):
+        """P2 (R4) : le breakeven fait partie de la grandeur obligatoire.
+        Mutation du garde R2 (#287) : n+er seuls ne suffisent plus — sans le
+        coût d'équilibre, on ne sait pas « à quel coût ça aurait passé »."""
+        code, out = self.disc("h", n=400, er=-0.02)
+        self.assertEqual(code, L.EXIT_ERR)
+        self.assertIn("--breakeven-bps", out)
+        self.assertEqual(len(L.load(self.led, None)), 0, "rien ne doit être écrit")
+
+    def test_discovery_fail_avec_toutes_les_grandeurs_est_accepte(self):
+        code, _ = self.disc("h", n=400, er=-0.02, breakeven=18.0)
         self.assertEqual(code, L.EXIT_OK)
         entries = L.load(self.led, None)
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["n"], 400)
         self.assertEqual(entries[0]["er"], -0.02)
+        self.assertEqual(entries[0]["breakeven_cost_bps"], 18.0)
 
     def test_discovery_pass_sans_chiffres_est_refuse(self):
         # les DEUX verdicts DISCOVERY_* sont couverts, pas seulement FAIL

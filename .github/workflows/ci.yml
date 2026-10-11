@@ -171,7 +171,7 @@ jobs:
       # .service…) — c'est précisément ce que le filtre `core` devait énumérer.
       # Non filtré = plus rien à énumérer, le trou est fermé par construction.
       - name: Audit check (BLOQUANT, non filtré)
-        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
+        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5,F7
       - name: Vérificateur de preuves (F-XXX — BLOQUANT, non filtré)
         run: python scripts/claim_verify.py --all
       # Gel de la CI (docs/38 — audit Sonnet 5.5 §R3). Pendant les 2 semaines du
@@ -274,7 +274,7 @@ jobs:
       # ne rougisse. Ils coûtent quelques secondes — leur place est ici, avec les
       # autres oracles déterministes du noyau, pas dans un palier qui n'existe pas.
       - name: Audit check (bloquant sur --fail-on)
-        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
+        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5,F7
       - name: Rochet deep-audit (BLOQUANT)
         run: python scripts/deep_audit.py --check
       - name: Rochet dette_PR <= dette_main (deep-audit)

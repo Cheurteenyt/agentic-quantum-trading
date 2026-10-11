@@ -202,6 +202,18 @@ bz = grep(".zcode/agents/bonsai.md", r"^injectAgentsMd:\s*true")
 az = (ROOT / "AGENTS.md").stat().st_size if (ROOT / "AGENTS.md").exists() else 0
 info("F6", "Agent local Bonsai : AGENTS.md injecté dans son contexte" if bz else "Agent local Bonsai : AGENTS.md non injecté",
      f"AGENTS.md = {az} octets ≈ {int(az / 3.6)} jetons rajoutés à CHAQUE appel du modèle local" if bz else "contexte minimal")
+# ---- F7 (P2, audit Sonnet 5.5 R4) : la table de coûts ne fabrique rien ----
+try:
+    sys.path.insert(0, str(ROOT))
+    from scripts.costs import verifier_table as _vt_couts  # noqa: E402
+    _couts_bad = _vt_couts()
+    add(not _couts_bad, "F7",
+        "Table de coûts par symbole : chaque override porte sa source datée "
+        "(un coût sans provenance est une invention — scripts/costs.py)",
+        "; ".join(_couts_bad[:4]) or "saine (défaut 0,28 %, overrides sourcés)")
+except Exception as _e:
+    add(False, "F7", "Table de coûts par symbole lisible (scripts/costs.py)",
+        f"erreur de lecture : {_e}")
 
 # ---- D. Statistique (le tableau de bord) ------------------------------------------------
 tp = ROOT / args.trades

@@ -322,6 +322,11 @@ def event_study(cols: dict[str, np.ndarray], mask: np.ndarray, horizon: int,
     q = np.percentile(pos_ret, [10, 50, 90])
     return {"n": n,
             "mean": float(pos_ret.mean()), "median": float(q[1]),
+            # P2 (R4) : la moyenne BRUTE (avant coût) et le coût appliqué
+            # voyagent — l'agrégat peut ainsi calculer un breakeven EXACT
+            # même quand les symboles portent des coûts différents.
+            "mean_gross": float(pos_ret.mean() + cost_pct),
+            "cost_pct": float(cost_pct),
             "p10": float(q[0]), "p90": float(q[2]),
             "wr": float((pos_ret > 0).mean() * 100),
             "mae_mean": float(np.mean(mae)) if len(mae) else None,

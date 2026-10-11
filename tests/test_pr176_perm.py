@@ -43,7 +43,7 @@ class TestPermGate(unittest.TestCase):
         cols = _cols(rng)
         # pos_ret du short = -ret - coût
         mean_obs = float((-cols["ret_6"][mask] - 0.28).mean())
-        p = _perm_loop([(cols, mask)], H, -1, 0.28,
+        p = _perm_loop([(cols, mask, 0.28)], H, -1,
                        mean_obs=mean_obs, n_perm=99, seed=1)
         self.assertGreater(p, 0.10, "un bruit pur ne doit pas passer BH")
 
@@ -53,7 +53,7 @@ class TestPermGate(unittest.TestCase):
         mask[rng.choice(N, 300, replace=False)] = True
         cols = _cols(rng, edge=-0.9, mask=mask)   # crash sur les events
         mean_obs = float((-cols["ret_6"][mask] - 0.28).mean())
-        p = _perm_loop([(cols, mask)], H, -1, 0.28,
+        p = _perm_loop([(cols, mask, 0.28)], H, -1,
                        mean_obs=mean_obs, n_perm=99, seed=1)
         self.assertLess(p, 0.05, "un edge de -0,9 % doit passer la permutation")
 
@@ -67,7 +67,7 @@ class TestPermGate(unittest.TestCase):
         mean_obs = float((-cols["ret_6"][mask] - 0.28).mean())
         # mean_obs fort, mais le mean PERMUTÉ (masque roulé) ≈ -coût :
         # la p doit être petite, pas 1.0
-        p = _perm_loop([(cols, mask)], H, -1, 0.28,
+        p = _perm_loop([(cols, mask, 0.28)], H, -1,
                        mean_obs=mean_obs, n_perm=99, seed=2)
         self.assertLessEqual(p, 0.5)
 

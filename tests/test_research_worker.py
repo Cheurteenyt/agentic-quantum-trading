@@ -776,7 +776,7 @@ class TestLedgerDedup(unittest.TestCase):
              "--family", "testfam", "--strategy", "teststr",
              "--hypothesis", "h1", "--verdict", "DISCOVERY_FAIL",
              "--mode", "discovery", "--snapshot", snapshot,
-             "--n", "5", "--er", "0.1"],
+             "--n", "5", "--er", "0.1", "--breakeven-bps", "10.0"],
             capture_output=True, text=True, cwd=ROOT)
 
     def test_meme_mesure_noop(self):

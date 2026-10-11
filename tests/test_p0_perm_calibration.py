@@ -78,7 +78,9 @@ def _une_marche(seed: int, edge: float = 0.0, n_perm: int = 429):
     mask[rng.choice(N, EV, replace=False)] = True
     cols = _cols(rng, mask, edge=edge)
     mean_obs = float((-cols["ret_6"][mask] - COST).mean())
-    p = _perm_loop([(cols, mask)], H, -1, COST, mean_obs=mean_obs,
+    # P2 (R4) : chaque paire porte son coût (cols, m, cost_sym) — le null
+    # applique le même coût que l'observation.
+    p = _perm_loop([(cols, mask, COST)], H, -1, mean_obs=mean_obs,
                    n_perm=n_perm, seed=seed)
     return p
 
@@ -286,7 +288,7 @@ class TestArretPrecoce(unittest.TestCase):
             mask[rng.choice(N, EV, replace=False)] = True
             cols = _cols(rng, mask)
             mo = float((-cols["ret_6"][mask] - COST).mean())
-            args = ([(cols, mask)], H, -1, COST)
+            args = ([(cols, mask, COST)], H, -1)   # P2 : (cols, m, cost_sym)
             arret = _perm_loop(*args, mean_obs=mo, n_perm=99, seed=s,
                                h_stop=10)
             complet = _perm_loop(*args, mean_obs=mo, n_perm=99, seed=s,
@@ -363,7 +365,7 @@ class TestCoutMesure(unittest.TestCase):
         mask[rng.choice(N, EV, replace=False)] = True
         cols = _cols(rng, mask)
         mo = float((-cols["ret_6"][mask] - COST).mean())
-        args = ([(cols, mask)], H, -1, COST)
+        args = ([(cols, mask, COST)], H, -1)   # P2 : (cols, m, cost_sym)
         t0 = time.perf_counter()
         for _ in range(5):
             _perm_loop(*args, mean_obs=mo, n_perm=429, seed=1, h_stop=0)

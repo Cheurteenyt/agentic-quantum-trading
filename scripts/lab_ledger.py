@@ -371,12 +371,14 @@ def cmd_log(a) -> int:
             manque.append("--n (> 0)")
         if a.er is None:
             manque.append("--er")
+        if a.breakeven_bps is None:
+            manque.append("--breakeven-bps")
         if manque:
             print(f"REFUS : un verdict {verdict} doit porter sa grandeur "
                   f"(manque : {', '.join(manque)}). Un verdict sans n ni moyenne "
                   f"est de l'information nulle — il ne dit ni la distance au seuil "
-                  f"ni le coût d'équilibre. Relance avec --n N --er E (et --se SE en "
-                  f"bonus), ou --backfill si c'est une entrée historique.")
+                  f"ni le coût d'équilibre. Relance avec --n N --er E --breakeven-bps B "
+                  f"(et --se SE en bonus), ou --backfill si c'est une entrée historique.")
             return EXIT_ERR
     pol, entries, now = ctx(a)
     ts = parse_dt(a.date) if a.date else now
@@ -400,7 +402,9 @@ def cmd_log(a) -> int:
              "mode": a.mode, "snapshot": a.snapshot,
              "family": family, "strategy": strategy, "hypothesis": a.hypothesis.strip(),
              "hypothesis_hash": sha(norm_text(a.hypothesis)), "parameter_hash": sha(json.dumps(params, sort_keys=True)),
-             "verdict": verdict, "n": a.n, "er": a.er, "se": a.se, "ref": a.ref, "notes": a.notes, "git": git_short()}
+             "verdict": verdict, "n": a.n, "er": a.er, "se": a.se,
+             "breakeven_cost_bps": a.breakeven_bps,
+             "ref": a.ref, "notes": a.notes, "git": git_short()}
     if params:
         entry["params"] = params
     if a.backfill:
@@ -709,6 +713,9 @@ def build_parser() -> argparse.ArgumentParser:
             s.add_argument("--n", type=int)
             s.add_argument("--er", type=float)
             s.add_argument("--se", type=float)
+            s.add_argument("--breakeven-bps", type=float, dest="breakeven_bps",
+                           help="P2 (R4) : le RT cost (bps) auquel la moyenne "
+                                "nette devient 0 — obligatoire pour DISCOVERY_*")
             s.add_argument("--ref")
             s.add_argument("--notes")
             s.add_argument("--backfill", action="store_true")
