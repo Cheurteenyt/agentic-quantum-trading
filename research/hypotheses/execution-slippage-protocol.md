@@ -1,5 +1,6 @@
 # PROTOCOLE PRÉ-ENREGISTRÉ — le coût d'exécution humaine (scellé le 03/10, AVANT toute mesure de kill)
 
+Mécanisme : protocole de MESURE, pas un edge — sans slippage réellement mesuré par symbole, aucun backtest n'est valide (le coût plat décide seul de certains verdicts, cf. P2) ; le sondage scripts/studies/execution_slippage_probe.py mesure le coût d'exécution réel AVANT toute mesure de kill.
 Origine : le flag du tournoi Bonsai du 03/10 (« sans mesure réelle du coût d'exécution,
 aucun backtest n'est valide ») — vérifié exact : `slippage_measured` = 6 lignes orphelines.
 Conception : Bonsai (métriques + seuils, dérivés de la théorie, PAS de nos données) ;

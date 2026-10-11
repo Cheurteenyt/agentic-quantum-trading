@@ -12,12 +12,14 @@ Invariants :
   I006  les confirmations scellées portent le protocole actif
   I007  par run confirmé : manifest/summary/spec.json mêmes spec_sha
   I008  les journaux forward n'existent que pour des runs confirmés
+  I010  toute hypothèse pré-enregistrée porte un Mécanisme non trivial (P4)
 
     python3 scripts/research_integrity.py     # exit 0 = PASS, 1 = FAIL
 """
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -29,6 +31,19 @@ if str(ROOT) not in sys.path:
 
 RUNS = ROOT / "research" / "runs"
 FAILURES: list[str] = []
+
+
+def _contenu_mecanisme(lines: list[str], idx: int) -> str:
+    """Le contenu du mécanisme (I010) : après le premier ':' de la ligne
+    d'en-tête, plus les lignes indentées qui suivent (le paragraphe).
+    Le format template est `Mécanisme (pourquoi…) :` + paragraphe indenté ;
+    un fichier copié du template sans mécanisme écrit tombe à contenu vide."""
+    parties = [lines[idx].split(":", 1)[1] if ":" in lines[idx] else ""]
+    for l in lines[idx + 1:]:
+        if not l.strip() or l[:1] not in (" ", "\t"):
+            break
+        parties.append(l)
+    return " ".join(parties).strip()
 
 
 def check(inv: str, ok: bool, detail: str = "") -> None:
@@ -230,6 +245,44 @@ def main() -> int:
                 pass
     check("I009", ok9, "; ".join(det9) or
           f"{len(confirmed)} CONFIRMED(s) ↔ {len(ledger_conf)} ligne(s) ledger")
+
+    # I010 (P4, audit Sonnet 5.5 R4) : toute hypothèse pré-enregistrée porte
+    # un Mécanisme NON TRIVIAL. Le constat du rapport : « personne ne fait
+    # tourner les hypothèses qui ont un mécanisme » — sans champ obligatoire,
+    # on ne peut même pas MESURER lesquelles en ont un. Le format template est
+    # `Mécanisme (pourquoi…) :` avec le contenu sur la même ligne et/ou en
+    # lignes indentées qui suivent — un fichier copié du template SANS
+    # mécanisme écrit tombe à contenu vide → refusé. Les non-hypothèses
+    # (gabarit _, README, journaux d'amendements) sont hors champ ; les specs
+    # scellées (crowding-composite) ne sont PAS modifiées — elles portent déjà
+    # leur mécanisme et restent vérifiables par leur sha256 (SealTests).
+    placeholder_re = re.compile(r"<[^>\n]*>")
+    ok10, det10 = True, []
+    for hdir in (ROOT / "research" / "hypotheses",
+                 ROOT / "docs" / "lab" / "hypotheses"):
+        if not hdir.is_dir():
+            continue
+        for f in sorted(hdir.glob("*.md")):
+            if (f.stem.startswith("_") or f.name == "README.md"
+                    or f.name.endswith(".amendments.md")):
+                continue
+            lines = f.read_text(encoding="utf-8",
+                                errors="ignore").splitlines()
+            idx = next((i for i, l in enumerate(lines)
+                        if l.lstrip().startswith("Mécanisme")), None)
+            if idx is None:
+                ok10 = False
+                det10.append(f"{f.name} : pas de ligne « Mécanisme »")
+                continue
+            contenu = _contenu_mecanisme(lines, idx)
+            if len(contenu) < 40:
+                ok10 = False
+                det10.append(f"{f.name} : mécanisme vide/trivial")
+            elif placeholder_re.search(contenu):
+                ok10 = False
+                det10.append(f"{f.name} : mécanisme placeholder")
+    check("I010", ok10, "; ".join(det10) or
+          "toute hypothèse pré-enregistrée porte son mécanisme")
 
     return finish()
 
