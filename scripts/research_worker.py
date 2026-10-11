@@ -1019,10 +1019,15 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     write_artifacts(spec_id, spec, res, "discovery",
                                     db_path=db_path)
                     # la dédup du ledger est dans lab_ledger.cmd_log (PR-161)
+                    # N6 (R2) : les grandeurs mesurées descendent au ledger —
+                    # sans elles, un DISCOVERY_* est une ligne muette.
                     _log_ledger(spec, verdict, "discovery",
                                 str(ROOT / "research" / "runs" / spec_id /
                                     "report.md"),
-                                snapshot=res.get("snapshot"))
+                                snapshot=res.get("snapshot"),
+                                n=res.get("n"),
+                                er=res.get("mean"),
+                                se=res.get("se"))
                     if spec_id not in candidates:
                         candidates.append(spec_id)
                     print(f"[worker]   → CANDIDATE", flush=True)

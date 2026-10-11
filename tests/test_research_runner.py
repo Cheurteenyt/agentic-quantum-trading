@@ -255,5 +255,53 @@ class TestRunner(unittest.TestCase):
                         "une barre saine doit garder un range_pct fini")
 
 
+class LesGrandeursVontAuLedger(unittest.TestCase):
+    """N6 (audit Sonnet 5.5, R2) — le défaut RACINE : `_log_ledger` JETAIT les
+    grandeurs.
+
+    Mesure qui a motivé le test : au 11/10 le worker calculait `n` et `mean`,
+    les AFFICHAIT (« n 5 · mean 0.100 »), puis `_log_ledger` construisait sa
+    commande sans jamais passer --n ni --er. D'où 16 lignes DISCOVERY_* muettes.
+    Ce test capture la commande réellement construite et exige que les trois
+    grandeurs y soient — il rougit si on les retire.
+    """
+
+    def _commande(self, **kw):
+        captured = {}
+
+        class _Faux:
+            returncode = 0
+            stdout = stderr = ""
+
+        def _fake_run(argv, *a, **k):
+            captured["argv"] = argv
+            return _Faux()
+
+        orig = rr.subprocess.run
+        rr.subprocess.run = _fake_run
+        try:
+            rr._log_ledger({"family": "f", "strategy": "s", "hypothesis": "h"},
+                           "DISCOVERY_FAIL", "discovery", "ref",
+                           snapshot="snap", fail_closed=True, **kw)
+        finally:
+            rr.subprocess.run = orig
+        return captured["argv"]
+
+    def test_n_er_se_sont_transmis_au_cli(self):
+        argv = self._commande(n=400, er=-0.02, se=0.01)
+        self.assertIn("--n", argv)
+        self.assertEqual(argv[argv.index("--n") + 1], "400")
+        self.assertIn("--er", argv)
+        self.assertEqual(argv[argv.index("--er") + 1], "-0.02")
+        self.assertIn("--se", argv)
+        self.assertEqual(argv[argv.index("--se") + 1], "0.01")
+
+    def test_sans_grandeur_aucun_flag_n_est_ajoute(self):
+        # ne pas passer de valeur ne doit PAS fabriquer un --n orphelin
+        argv = self._commande()
+        self.assertNotIn("--n", argv)
+        self.assertNotIn("--er", argv)
+
+
 if __name__ == "__main__":
     unittest.main()

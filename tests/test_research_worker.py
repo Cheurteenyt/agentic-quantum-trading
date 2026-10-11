@@ -766,13 +766,17 @@ class TestRunWorker(unittest.TestCase):
 
 class TestLedgerDedup(unittest.TestCase):
     def _log(self, ledger: Path, snapshot: str = "snap1"):
+        # N6 (R2) : un DISCOVERY_* doit porter sa grandeur — le ledger refuse
+        # désormais une ligne muette. Ce test porte sur la DÉDUP, pas sur les
+        # chiffres : on passe des valeurs neutres mais présentes.
         return subprocess.run(
             [sys.executable, str(ROOT / "scripts" / "lab_ledger.py"),
              "--ledger", str(ledger), "log",
              "--date", "2026-10-07",
              "--family", "testfam", "--strategy", "teststr",
              "--hypothesis", "h1", "--verdict", "DISCOVERY_FAIL",
-             "--mode", "discovery", "--snapshot", snapshot],
+             "--mode", "discovery", "--snapshot", snapshot,
+             "--n", "5", "--er", "0.1"],
             capture_output=True, text=True, cwd=ROOT)
 
     def test_meme_mesure_noop(self):
