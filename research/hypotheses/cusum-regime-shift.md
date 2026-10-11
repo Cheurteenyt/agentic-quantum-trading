@@ -8,4 +8,4 @@ PASS si : le drift post-saut est systématique (même signe en train et val) ET 
 FAIL si : le drift post-saut n'est pas systématique OU la différence n'est pas significative.
 SOUS_PUISSANT si n_sauts < 20 en train.
 Contrôles : inverse (le drift devrait être nul si le CUSUM ne capte rien) · le base-rate par direction du saut.
-Hash du gel : <commit> · Jugé sous : protocol_v1 · Le seuil CUSUM = 3× σ des retours de référence (pré-déclaré, pas tuné).
+Hash du gel : non gelée — aucun harnais exécutable, statut `superseded_only` au registre (research_velocity 2026-W41). Le gel se pose au commit du harnais, pas avant. · Jugé sous : protocol_v1 · Le seuil CUSUM = 3× σ des retours de référence (pré-déclaré, pas tuné).
