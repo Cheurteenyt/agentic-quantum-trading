@@ -235,7 +235,7 @@ except Exception as _e:
 # recherche (scripts/ racine). Les études one-shot vivent dans scripts/
 # studies/ et scripts/archive_studies/ ; une app interactive (streamlit,
 # dash, gradio, flask) doit vivre dans un dossier dédié, pas noyer le lab.
-_app_hits = [l for l in sh("grep", "-rln",
+_app_hits = [l for l in sh("grep", "-rln", "--include=*.py",
                            r"import streamlit\|from streamlit\|import dash\|"
                            r"from dash\|import gradio\|import flask",
                            "scripts/").splitlines()
