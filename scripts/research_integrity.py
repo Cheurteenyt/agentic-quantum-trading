@@ -13,6 +13,7 @@ Invariants :
   I007  par run confirmé : manifest/summary/spec.json mêmes spec_sha
   I008  les journaux forward n'existent que pour des runs confirmés
   I010  toute hypothèse pré-enregistrée porte un Mécanisme non trivial (P4)
+  I011  les manifests d'univers sont point-in-time cohérents (P3)
 
     python3 scripts/research_integrity.py     # exit 0 = PASS, 1 = FAIL
 """
@@ -21,6 +22,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -31,6 +33,39 @@ if str(ROOT) not in sys.path:
 
 RUNS = ROOT / "research" / "runs"
 FAILURES: list[str] = []
+
+
+def _coherence_point_in_time(nom: str, m: dict) -> list[str]:
+    """I011 (P3, audit Sonnet 5.5 R4) : la cohérence POINT-IN-TIME d'un
+    manifest d'univers. L'anti-survivorship ne vaut que si le delisting est
+    PROUVÉ : un `delisted_at` sans `deliste_source` est une invention (leçon
+    F7 — un chiffre sans provenance), et il doit être un ISO date cohérent
+    avec l'observation (≥ observed_start, ≤ observed_end + 2 j pour
+    l'arrondi). Un symbole sans données est toléré (il ne tradera jamais).
+    """
+    problemes: list[str] = []
+    for sym, e in (m.get("symbols") or {}).items():
+        d = e.get("delisted_at")
+        if not d:
+            continue
+        if not (e.get("deliste_source") or "").strip():
+            problemes.append(f"{nom}:{sym} delisted_at sans deliste_source")
+        try:
+            dt = datetime.strptime(str(d), "%Y-%m-%d")
+        except ValueError:
+            problemes.append(f"{nom}:{sym} delisted_at illisible : {d}")
+            continue
+        os_ = e.get("observed_start")
+        oe = e.get("observed_end")
+        if os_ and dt < datetime.strptime(os_, "%Y-%m-%d"):
+            problemes.append(f"{nom}:{sym} delisted_at < observed_start")
+        if oe:
+            oe_dt = datetime.strptime(oe, "%Y-%m-%d")
+            if not (oe_dt - timedelta(days=2) <= dt <= oe_dt + timedelta(days=2)):
+                problemes.append(
+                    f"{nom}:{sym} delisted_at incohérent avec "
+                    f"observed_end ({oe})")
+    return problemes
 
 
 def _contenu_mecanisme(lines: list[str], idx: int) -> str:
@@ -100,6 +135,23 @@ def main() -> int:
                 detail4.append(f"{f.name} illisible : {exc}")
     check("I004", ok4, "; ".join(detail4) or
           f"{len(list(udir.glob('*.yaml')))} manifest(s) valides")
+
+    # I011 — la cohérence POINT-IN-TIME des manifests (P3, R4) : un
+    # delisting sans provenance est une invention ; la machine à
+    # survivorship invisible est le défaut que P3 ferme.
+    ok11, detail11 = True, []
+    if udir.exists():
+        for f in sorted(udir.glob("*.yaml")):
+            try:
+                m = yaml.safe_load(f.read_text(encoding="utf-8"))
+                detail11.extend(_coherence_point_in_time(f.stem, m or {}))
+            except Exception as exc:
+                ok11 = False
+                detail11.append(f"{f.name} illisible : {exc}")
+    if detail11:
+        ok11 = False
+    check("I011", ok11, "; ".join(detail11) or
+          f"{len(list(udir.glob('*.yaml')))} manifest(s) point-in-time cohérents")
 
     # I005 — les specs qui déclarent un univers le résolvent
     ok5, detail5 = True, []
