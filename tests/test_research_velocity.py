@@ -183,5 +183,88 @@ class TestHypothesesEnRetard(unittest.TestCase):
                 self.assertIsNotNone(x["strategie"])
 
 
+class TestPartRecherche(unittest.TestCase):
+    """R3-5 (audit Sonnet 5.5) : % des livraisons de la semaine qui
+    exécutent ou pré-enregistrent une hypothèse — objectif ≥ 50 %.
+    C'est la métrique qui JUGE le gel de la CI (docs/38, #290). Pièges
+    refusés ici : un dénominateur vide qui lirait 0 % ou 100 % (fail-open
+    classique), un périmètre qui déborde (toute la doc = bruit, et une
+    métrique toujours verte apprend à l'ignorer — F2)."""
+
+    def test_pre_enregistrement_compte(self):
+        self.assertTrue(RV.est_recherche(["research/hypotheses/holdout-x.md"]))
+
+    def test_execution_compte(self):
+        for c in (["research/ledger/trials.jsonl"],
+                  ["research/runs/x/essai.json"],
+                  ["scripts/studies/mon_etude/run.py"]):
+            self.assertTrue(RV.est_recherche(c), c)
+
+    def test_registre_machine_compte(self):
+        """La vérification du registre AVANT de partir fait partie du
+        pré-enregistrement (docs/38 §2)."""
+        self.assertTrue(RV.est_recherche(["research/registry.yaml"]))
+        self.assertTrue(RV.est_recherche(["research/openmarket_registry.yaml"]))
+
+    def test_hors_perimetre_ne_compte_pas(self):
+        """ÉTROIT par choix : la CI, un fix noyau, la doc générale, un
+        script hors études, l'état affiché — aucun n'est la recherche."""
+        for c in ([".github/workflows/ci.yml"],
+                  ["backend/services/x.py"],
+                  ["docs/38-gouvernance-recherche.md"],
+                  ["scripts/research_velocity.py"],
+                  ["research/STATE.md"]):
+            self.assertFalse(RV.est_recherche(c), c)
+
+    def test_zero_livraison_n_est_ni_zero_ni_cent(self):
+        """Le piège fail-open : dénominateur vide → pct=None (« — »), jamais
+        un score fabriqué à partir d'une mesure vide."""
+        r = RV.part_recherche([])
+        self.assertIsNone(r["pct"])
+        self.assertEqual(r["total"], 0)
+
+    def test_le_pourcentage_est_le_bon(self):
+        liv = [("a", ["scripts/studies/s.py"]),
+               ("b", [".github/workflows/ci.yml"]),
+               ("c", ["backend/x.py"]),
+               ("d", ["research/hypotheses/h.md"])]
+        r = RV.part_recherche(liv)
+        self.assertEqual((r["total"], r["recherche"], r["pct"]), (4, 2, 50))
+
+    def test_push_direct_ne_sort_pas_du_denominateur(self):
+        """Un commit SANS `(#NNN)` reste au dénominateur — sinon un push
+        direct gonflerait la part en disparaissant du compte."""
+        liv = [("push direct sans PR", ["backend/x.py"]),
+               ("fix (#12)", ["research/hypotheses/h.md"])]
+        r = RV.part_recherche(liv)
+        self.assertEqual(r["total"], 2)
+        self.assertEqual(r["pct"], 50)
+
+    def test_le_parseur_lit_le_format_git_exact(self):
+        """Verrou dérivé : le format est celui de
+        `git log --name-only --pretty=format:%x00LIV%x00%s`."""
+        txt = ("\x00LIV\x00docs(hyp): jointure (#270)\n"
+               "research/hypotheses/premium-fade-listing.md\n"
+               "\x00LIV\x00ci(gate) muet (#285)\n"
+               ".github/workflows/ci.yml\n"
+               "\n")
+        liv = RV._parse_livraisons(txt)
+        self.assertEqual(len(liv), 2)
+        self.assertEqual(liv[0][0], "docs(hyp): jointure (#270)")
+        self.assertEqual(liv[0][1], ["research/hypotheses/premium-fade-listing.md"])
+        self.assertEqual(liv[1][1], [".github/workflows/ci.yml"])
+
+    def test_historique_reel_mesure_sans_inventer(self):
+        """Ancrage réel (tolérant) : la lecture git tourne depuis la racine
+        et produit un score dans [0, 100]. Si la semaine est calme, la
+        métrique affiche « — » (pct None) — c'est honnête, pas un échec."""
+        liv = RV.lire_livraisons(7)
+        self.assertIsNotNone(liv, "git doit être lisible depuis la racine")
+        r = RV.part_recherche(liv)
+        if r["pct"] is not None:
+            self.assertTrue(0 <= r["pct"] <= 100)
+            self.assertLessEqual(r["recherche"], r["total"])
+
+
 if __name__ == "__main__":
     unittest.main()
