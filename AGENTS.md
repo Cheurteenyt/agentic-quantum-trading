@@ -58,7 +58,7 @@ cd "/run/media/cheurteen/Jeux SSD/trading-agent"
 .venv/bin/python scripts/run_tests.py --fast          # suite (2189 tests, 0 échec)
 .venv/bin/python scripts/deep_audit.py --check         # rochet classes G1-G10 (bloquant)
 .venv/bin/python scripts/claim_verify.py --all         # preuves F-XXX (42/42 attendu)
-.venv/bin/python scripts/research_integrity.py         # invariants I001-I009
+.venv/bin/python scripts/research_integrity.py         # invariants I001-I010 (I010 : le Mécanisme obligatoire, P4)
 .venv/bin/python scripts/ledger_provenance.py          # N5 : ledger ↔ runs (verdict du DERNIER attempt)
 .venv/bin/python scripts/ledger_puissance.py           # N6 : chaque verdict vivant porte son n ≥ 10
 .venv/bin/python scripts/audit_path_root.py            # G10 : parents[N] résout à la racine

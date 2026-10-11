@@ -1,5 +1,6 @@
 # W41 — LES TROIS CHANTIERS QUBO (pré-enregistrés le 05/10, avant tout run)
 
+Mécanisme : les trois chantiers CONDITIONNENT le risque au lieu de prédire la direction — (1) marge plafonnée k% du wallet : quelques liquidations absorbables ≠ mort si la marge par trade est plafonnée ; (2) le coût funding des majors (+2,0 % cumulé, ×8 = +15,6 %) est structurel : plafond ou hold raccourci ; (3) le tilt par-symbole (funding du symbole de l'event, T > 1,5 → levier ÷2) remplace la médiane marché. Design figé avant tout run.
 Le contexte : la famille premium-tilt est FERMÉE (v1 FAIL, v2-A FAIL, v2-B FAIL
 pire — PR #87-88). La cellule 11x codifiée est MORTE sur la fenêtre récente
 (1 liq VAL, SOL MAE 13,08 %, wallet -21,2 % AVANT la liq — la run saignait déjà).

@@ -1,5 +1,6 @@
 # HYPOTHÈSE PRÉ-ENREGISTRÉE — premium-fade-listing (armée lun 05/10, budget réouvert)
 
+Mécanisme (historique — écrit ici le 11/10, le mécanisme est celui de l'armement du 05/10, AVANT le verdict ex ante du 04/10 : les critères discriminateurs venaient de la simulation adversariale Bonsai du 03/10, jamais de nos données) : l'ouverture d'un listing crée un premium que l'arbitrage de listing cherche à capter — le fade parie sur sa résorption mesurée. KILL ex ante 04/10 : 22,2 % de 80 770 trades toxiques > seuil 15 %.
 domaine : aster · famille : institutions · stratégie : premium_fade_listing
 
 **Pré-enregistrée le 03/10** (budget épuisé 24/20 — ce fichier ne consomme RIEN, il fige
