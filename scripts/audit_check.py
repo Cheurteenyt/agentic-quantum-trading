@@ -215,6 +215,80 @@ except Exception as _e:
     add(False, "F7", "Table de coûts par symbole lisible (scripts/costs.py)",
         f"erreur de lecture : {_e}")
 
+# ---- E. Le lab comme package, la quarantaine des apps, le ratchet d'artefacts
+#      (E2-E4 de l'audit Sonnet 5.5 — les ID E1-E3 sont pris par le audit
+#      GLM précédent, la lettre continue à E4)
+# E4 — le lab est UN package importable (scripts/lab, surface déclarée)
+try:
+    sys.path.insert(0, str(ROOT))
+    import scripts.lab as _lab  # noqa: E402
+    _lab_manquants = _lab.membres_importables()
+    add(not _lab_manquants, "E4",
+        "Le lab de recherche est UN package importable (scripts/lab — "
+        "surface déclarée : " + ", ".join(_lab.SURFACE) + ")",
+        f"membres non importables : {', '.join(_lab_manquants)}"
+        if _lab_manquants else "toute la surface importe")
+except Exception as _e:
+    add(False, "E4", "Package scripts/lab importable", f"erreur : {_e}")
+
+# E5 — quarantaine des apps : aucun point d'entrée app dans le chemin de
+# recherche (scripts/ racine). Les études one-shot vivent dans scripts/
+# studies/ et scripts/archive_studies/ ; une app interactive (streamlit,
+# dash, gradio, flask) doit vivre dans un dossier dédié, pas noyer le lab.
+_app_hits = [l for l in sh("grep", "-rln",
+                           r"import streamlit\|from streamlit\|import dash\|"
+                           r"from dash\|import gradio\|import flask",
+                           "scripts/").splitlines()
+             if "/studies/" not in l and "/archive_studies/" not in l
+             and "audit_check.py" not in l   # le motif du grep vit ICI
+             and l.strip()]
+add(not _app_hits, "E5",
+    "Quarantaine des apps : aucun framework d'app interactive dans le "
+    "chemin de recherche (scripts/ racine — les études restent dans "
+    "studies/archive_studies)",
+    "; ".join(_app_hits[:4]) or "aucun")
+
+# E6 — artefacts dérivés hors git : RATCHET (le pattern test-count-baseline).
+# 1) les extensions d'artefact compilés sont INTERDITES (0 aujourd'hui) ;
+# 2) les artefacts texte lourds (csv/json) trackés sont PLAFONNÉS par la
+#    baseline : tout nouveau fichier > 500 Ko hors baseline rougit, toute
+#    croissance > 50 % rougit. La machine LIVE réécrit ses _latest chaque
+#    nuit : leur SORTIE de git est une migration machine séparée (risque —
+#    les lecteurs doivent tolérer l'absence), documentée mais PAS faite ici.
+_art = [l for l in sh("git", "ls-files").splitlines() if l.strip()]
+_art_pkl = [p for p in _art if p.endswith((".pkl", ".parquet", ".npz",
+                                           ".db", ".sqlite", ".ckpt"))]
+add(not _art_pkl, "E6",
+    "Artefacts dérivés hors git : aucun binaire de run tracké (pkl/parquet/"
+    "npz/db/sqlite/ckpt)",
+    "; ".join(_art_pkl[:4]) or "aucun")
+_ART_BASELINE = ROOT / ".github" / "artifact-baseline.txt"
+_big = {}
+for p in _art:
+    if p.endswith((".csv", ".json", ".jsonl")):
+        try:
+            sz = os.path.getsize(ROOT / p)
+        except OSError:
+            continue
+        if sz > 500_000:
+            _big[p] = sz
+_base_art = {}
+if _ART_BASELINE.exists():
+    for l in _ART_BASELINE.read_text(encoding="utf-8").splitlines():
+        if l.strip():
+            _p, _s = l.rsplit(":", 1)
+            _base_art[_p] = int(_s)
+_art_fails = ([f"NOUVEAU : {p} ({_big[p] // 1000} Ko)"
+               for p in sorted(set(_big) - set(_base_art))] +
+              [f"×{(1.0 * _big[p] / _base_art[p]):.1f} : {p}"
+               for p in sorted(set(_big) & set(_base_art))
+               if _big[p] > _base_art[p] * 1.5])
+add(not _art_fails, "E6",
+    "Artefacts dérivés hors git : ratchet des csv/json lourds trackés "
+    "(baseline .github/artifact-baseline.txt — nouveau > 500 Ko ou "
+    "croissance > 50 % = sortie de git obligatoire)",
+    "; ".join(_art_fails[:4]) or f"{len(_big)} fichier(s) à la baseline")
+
 # ---- D. Statistique (le tableau de bord) ------------------------------------------------
 tp = ROOT / args.trades
 if tp.exists():

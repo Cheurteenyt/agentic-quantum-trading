@@ -63,7 +63,7 @@ cd "/run/media/cheurteen/Jeux SSD/trading-agent"
 .venv/bin/python scripts/ledger_puissance.py           # N6 : chaque verdict vivant porte son n ≥ 10
 .venv/bin/python scripts/audit_path_root.py            # G10 : parents[N] résout à la racine
 .venv/bin/python -m pyflakes backend scripts tests     # noms indéfinis (bloquant)
-.venv/bin/python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5,F7
+.venv/bin/python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5,F7,E4,E5,E6
 ```
 
 > Les 2 « échecs connus/pré-existants » ont été corrigés le 10/10 (PR #275) :
