@@ -499,6 +499,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Le gate n'avait besoin d'AUCUN checkout : il ne lisait que les
+      # `needs.*.result`. Le test de méta-CI ci-dessous lit
+      # `scripts/meta_ci.py` — donc il en faut un. Coût : ~3 s.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Agréger le verdict des paliers
         run: |
           # Sur un schedule, seuls T3 tourne ; sinon T1 (+T2 en merge_group).
@@ -520,3 +524,23 @@ jobs:
           fi
           echo "::notice::gate VERT — paliers pertinents OK (skipped = filtré, neutre)"
           echo "Seul check requis par le branch protection : ce job 'gate'."
+
+      # ── MÉTA-CI (R3-bis, audit Sonnet 5.5) ─────────────────────────────────
+      # L'agrégation ci-dessus traite `skipped` comme NEUTRE, sans distinction.
+      # C'est voulu pour les paliers FILTRÉS — mais ça veut dire qu'un palier
+      # qui ne devait PAS sauter et qui saute (parce qu'on lui a ajouté un
+      # filtre de chemins, le défaut même que le rapport §R3 décrit) disparaît
+      # en silence : le gate se croit vert sans avoir mesuré.
+      #
+      # Ce test dit, en une fois, ce que quatre correctifs successifs
+      # (#281→#288) ont dû apprendre un par un : un palier OBLIGATOIRE
+      # (sans filtre de chemins, tournant sur PR/push) qui sort `skipped` est
+      # un TROU, pas une neutralité. La liste des obligatoires est dérivée du
+      # workflow par `tests/test_meta_ci.py` — ajouter un palier non filtré le
+      # rend obligatoire par construction, sans que personne ait à y penser.
+      - name: Méta-CI — un palier obligatoire n'a pas le droit de disparaître
+        env:
+          META_CI_EVENT: ${{ github.event_name }}
+          META_CI_JOBS: >-
+            changes=${{ needs.changes.result }},t1-cheap=${{ needs.t1-cheap.result }},gate=success
+        run: python3 scripts/meta_ci.py
