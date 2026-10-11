@@ -18,6 +18,7 @@ Généré : LEDGER par `lab_ledger.py sync-state`, Productivité par
 - Historique : 2026-W41 : 16·16·0 {'DISCOVERY_FAIL': 16}
 - « Fini » hebdo = ≥ 1 lot journalisé ET ≥ 1 hypothèse tranchée.
 - **Échéances dépassées : 9** sans verdict vivant (+2 non joignables) : `cusum-regime-shift`, `depth-imbalance`, `holdout-x` (+6) — détail : `python scripts/research_velocity.py`.
+- Part recherche (7 j) : **39/208** (19 %) — objectif ≥ 50 % (R3-5).
 
 ## Verdicts qui comptent
 - Pool OpenMarket v8 : E[R] +0,093 R, IC95 [−0,027 ; +0,223] ; rien ne survit à Bonferroni (N=362) → edge NON établi. Repro : `scripts/studies/x501_openmarket/`

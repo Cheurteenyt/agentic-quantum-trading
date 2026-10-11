@@ -19,6 +19,10 @@ produit ? » dans STATE.md.
    nature. Un FAIL est un RÉSULTAT (une fausse piste fermée), pas un échec.
 3. **Candidats** — verdicts positifs vivants (PASS/DISCOVERY_PASS). C'est le
    seul vrai « produit ». Aujourd'hui : 0, et c'est honnête de le voir.
+4. **Part de recherche** (audit Sonnet 5.5, §R3-5) — % des livraisons des
+   7 derniers jours qui exécutent ou pré-enregistrent une hypothèse,
+   objectif ≥ 50 %. C'est la métrique qui JUGE le gel de la CI (docs/38) :
+   pas « la CI est immobile » mais « la part de recherche remonte ».
 
 La doctrine du dépôt : un chiffre sans commande de reproduction est présumé
 halluciné. Ce script imprime SA commande en tête.
@@ -31,6 +35,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -193,6 +198,98 @@ def hypotheses_en_retard(entrees: list[dict]) -> dict:
                                    if r["etat"] == "non_joignable")}
 
 
+# --- Part de recherche (audit Sonnet 5.5, §R3-5, 2026-10-11) ---
+#
+# Le rapport demande : « % de PR de la semaine qui exécutent ou
+# pré-enregistrent une hypothèse », objectif ≥ 50 %, affiché chaque
+# semaine. C'est la métrique qui JUGE le gel de la CI (docs/38, #290) :
+# pas « la CI est immobile » mais « la part de recherche remonte ».
+#
+# Définition mesurable, ÉTROITE, hors ligne (git — pas d'API, pas de token) :
+#   - Livraisons : les commits entrés dans main pendant la fenêtre de 7 j.
+#     Convention mesurée le 11/10 : 208/208 commits des 7 derniers jours
+#     sont des squash-merges `(#NNN)`. On compte TOUTES les livraisons au
+#     dénominateur — un push direct (sans PR) ne doit pas gonfler la part
+#     en disparaissant du compte.
+#   - Recherche : une livraison qui touche au moins un chemin de
+#     pré-enregistrement ou d'exécution (listes ci-dessous). ÉTROIT par
+#     choix (même leçon que l'oracle `ci(...)` de #290) : un périmètre qui
+#     déborde (toute la doc, tout fix) mesurerait le bruit, pas la
+#     recherche — et une métrique toujours verte apprend à l'ignorer (F2).
+PRE_ENREGISTREMENT = ("research/hypotheses/",)
+EXECUTION = ("research/ledger/", "research/runs/", "scripts/studies/")
+
+
+def _est_registre(chemin: str) -> bool:
+    """Les registres machine (`research/registry.yaml`,
+    `research/openmarket_registry.yaml`, …) — la vérification du registre
+    AVANT de partir fait partie du pré-enregistrement (docs/38 §2)."""
+    nom = chemin.rsplit("/", 1)[-1]
+    return (chemin.startswith("research/") and "registry" in nom
+            and nom.endswith((".yaml", ".yml")))
+
+
+def est_recherche(chemins: list[str]) -> bool:
+    """Une livraison touchant ≥ 1 chemin de recherche est UNE livraison
+    de recherche (le reste de son diff n'est pas jugé : on mesure si la
+    semaine a porté de la recherche, pas la pureté de chaque PR)."""
+    for c in chemins:
+        c = c.replace("\\", "/").strip()
+        if (c.startswith(PRE_ENREGISTREMENT) or c.startswith(EXECUTION)
+                or _est_registre(c)):
+            return True
+    return False
+
+
+def part_recherche(livraisons: list[tuple[str, list[str]]]) -> dict:
+    """Le % R3-5. ⚠️ Dénominateur vide → pct=None (« — » à l'affichage) :
+    ni 0 % ni 100 % — un dénominateur vide qui lirait bon ou mauvais est
+    le fail-open classique (on ne sait pas, on le DIT)."""
+    total = len(livraisons)
+    n = sum(1 for _, fichiers in livraisons if est_recherche(fichiers))
+    pct = round(100 * n / total) if total else None
+    return {"total": total, "recherche": n, "pct": pct, "objectif": 50}
+
+
+def _parse_livraisons(texte: str) -> list[tuple[str, list[str]]]:
+    """Le format exact de `git log --name-only
+    --pretty=format:%x00LIV%x00%s` : une ligne `\0LIV\0<sujet>` ouvre un
+    commit, les lignes non vides suivantes sont ses fichiers."""
+    livraisons: list[tuple[str, list[str]]] = []
+    sujet: str | None = None
+    fichiers: list[str] = []
+    for ligne in texte.splitlines():
+        if ligne.startswith("\x00LIV\x00"):
+            if sujet is not None:
+                livraisons.append((sujet, fichiers))
+            sujet = ligne[len("\x00LIV\x00"):]
+            fichiers = []
+        elif ligne.strip() and sujet is not None:
+            fichiers.append(ligne.strip())
+    if sujet is not None:
+        livraisons.append((sujet, fichiers))
+    return livraisons
+
+
+def lire_livraisons(fenetre_jours: int = 7) -> list[tuple[str, list[str]]] | None:
+    """Les livraisons de la fenêtre, lues depuis git. None si git est
+    indisponible — on ne fabrique PAS un score à partir d'un échec de
+    mesure (leçon oracle-grep : une sortie vide n'est pas un zéro)."""
+    try:
+        out = subprocess.run(
+            ["git", "log", f"--since={fenetre_jours} days", "--name-only",
+             # %x00 est interprété PAR GIT (on passe le texte littéral, pas
+             # un octet NUL — exec refuse un argv contenant \x00) ; la sortie
+             # contient elle un vrai NUL, que _parse_livraisons lit.
+             "--pretty=format:%x00LIV%x00%s"],
+            capture_output=True, text=True, cwd=ROOT, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if out.returncode != 0:
+        return None
+    return _parse_livraisons(out.stdout)
+
+
 def bloc_state(m: dict) -> str:
     """Le bloc à afficher dans STATE.md (hors marqueurs générés).
 
@@ -233,6 +330,16 @@ def bloc_state(m: dict) -> str:
             f"- **Échéances dépassées : {ret['n_en_retard']}** sans verdict "
             f"vivant (+{ret['n_non_joignable']} non joignables) : "
             f"{apercu}{suite} — détail : `python scripts/research_velocity.py`.")
+    # part de recherche (R3-5) : la métrique qui juge le gel de la CI
+    part = m.get("part_recherche")
+    if part is not None:
+        if part["pct"] is None:
+            lignes.append(
+                "- Part recherche (7 j) : aucune livraison — rien à juger.")
+        else:
+            lignes.append(
+                f"- Part recherche (7 j) : **{part['recherche']}/"
+                f"{part['total']}** ({part['pct']} %) — objectif ≥ 50 %.")
     return "\n".join(lignes)
 
 
@@ -243,6 +350,8 @@ def main() -> int:
         return 0
     m = metriques(entrees)
     m["retard"] = hypotheses_en_retard(entrees)
+    liv = lire_livraisons()
+    m["part_recherche"] = part_recherche(liv) if liv is not None else None
     if "--state" in sys.argv:
         print(bloc_state(m))
         return 0
@@ -270,12 +379,28 @@ def main() -> int:
         marque = {"tranchee": "  OK ", "jamais": "  ⏳ ",
                   "superseded_only": "  ⏳ ",
                   "non_joignable": "  ❓ "}.get(r["etat"], "    ")
-        detail = (f"{r['verdicts_vifs']}" if r["verdicts_vifs"]
+        detail = (f"{r['verdicts_vifs']}" if r['verdicts_vifs']
                   else r["etat"])
         print(f"    {marque} {r['hypothese']:35} -> {detail}")
     if ret["n_en_retard"] > 0:
         print("    (⏳ = en retard : pré-enregistrée, jamais tranchée ou "
               "verdict superseded · ❓ = sans `stratégie :`, non joignable)")
+    # R3-5 : la part de recherche — la métrique qui juge le gel de la CI
+    part = m["part_recherche"]
+    print("")
+    if part is None:
+        print("  PART DE RECHERCHE : non mesurable (git indisponible) — "
+              "aucun score affiché.")
+    elif part["pct"] is None:
+        print("  PART DE RECHERCHE (7 j) : aucune livraison — rien à juger.")
+    else:
+        print(f"  PART DE RECHERCHE (7 j) : {part['recherche']}/"
+              f"{part['total']} livraisons = {part['pct']} % "
+              f"(objectif ≥ {part['objectif']} %)")
+        if part["pct"] < part["objectif"]:
+            print("    ⚠️ sous l'objectif — la semaine a porté la porte "
+                  "(CI/fix/docs) plus que la recherche. Le gel de la CI "
+                  "existe pour ça (docs/38).")
     return 0
 
 
