@@ -23,6 +23,8 @@ concurrency:
 # ne relance pas la suite Python.
 #
 #   T1  PR / push de branche   ≤ 10 min  noyau + oracles + rochets + CVE (filtré par chemins)
+#   T1-cheap  PR / push        ≤ 8 min   oracles BON MARCHÉ, NON filtrés (pyflakes,
+#                                        syntaxe, audit_check, claim_verify) — R3
 #   T2  merge_group / dispatch ≤ 25 min  suite COMPLÈTE (SLOW_FILES) + frontend complet
 #   T3  nuit (schedule)        libre     suite complète, gitleaks historique, calibration
 #
@@ -122,6 +124,56 @@ jobs:
               # filtre : lancer le workflow sans les avoir relus serait un trou.
               - '.gitleaks.toml'
               - 'start_all.sh'
+
+  # ═══ PALIER T1-CHEAP — les oracles BON MARCHÉ, SANS filtre de chemins ═══
+  # R3 (audit Sonnet 5.5) : le défaut structurel. Un filtre `core` qui doit
+  # ÉNUMÉRER toutes les entrées de tous les oracles est fragile : chaque oubli
+  # est un faux vert (c'est ce qui a coûté #281→#286, un correctif par trou).
+  # On coupe la fragilité à la racine : les oracles qui coûtent QUELQUES
+  # SECONDES ne sont plus filtrés du tout — ils tournent sur CHAQUE PR/push.
+  # Un oracle non filtré ne peut pas être « oublié » : il n'y a rien à énumérer.
+  # Ce qui reste filtré est le LOURD (la suite --fast), pour qu'une PR docs-only
+  # ne paie pas 2 min de pytest.
+  t1-cheap:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dependencies
+        run: pip install --no-deps -r requirements.lock --quiet
+      # pyflakes + compileall : les DEUX gardes de syntaxe/noms. Elles ne
+      # dépendent d'AUCUN chemin — elles lisent tout le code, toujours.
+      - name: Oracle pyflakes + syntaxe (BLOQUANT, non filtré)
+        run: |
+          pip install pyflakes --quiet
+          printf 'x = 1\n' > /tmp/pf_probe.py
+          if ! python -m pyflakes /tmp/pf_probe.py; then
+            echo "::error::pyflakes ne tourne pas (ou signale un fichier sain) — le gate ne peut pas mesurer"
+            exit 1
+          fi
+          if python -m pyflakes scripts backend discord_bot agent tests | grep "undefined name '"; then
+            echo "::error::undefined name détecté — corrige ou importe"
+            exit 1
+          fi
+          python -m compileall -q -f scripts backend discord_bot agent tests || {
+            echo "::error::syntaxe Python invalide — un fichier ne compile pas (voir ci-dessus)"
+            exit 1
+          }
+      # audit_check : contrôles BLOQUANTS A1/A2/A4/B2-B4/C1-C5/E1/E2/F1-F5.
+      # Il lit des fichiers de config/docs (`.zcode/**`, `docs/lab/**`, le
+      # .service…) — c'est précisément ce que le filtre `core` devait énumérer.
+      # Non filtré = plus rien à énumérer, le trou est fermé par construction.
+      - name: Audit check (BLOQUANT, non filtré)
+        run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
+      - name: Vérificateur de preuves (F-XXX — BLOQUANT, non filtré)
+        run: python scripts/claim_verify.py --all
 
   # ═══ PALIER T1 — PR rapide (≤ 6 min), filtré par chemins ═══
   # Ne tourne QUE si du code noyau change (pas pour une PR docs-only) — SAUF
@@ -443,7 +495,7 @@ jobs:
   # Le gate échoue si UN palier pertinent échoue, passe sinon.
   gate:
     if: always() && !cancelled()
-    needs: [changes, t1-core, t1-frontend, t1-security, t2-full, t3-night]
+    needs: [changes, t1-cheap, t1-core, t1-frontend, t1-security, t2-full, t3-night]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -454,7 +506,8 @@ jobs:
           # 'failure'/'cancelled' font échouer le gate. 'success' ou 'skipped'
           # partout = gate VERT.
           failed=""
-          for r in "${{ needs.t1-core.result }}" "${{ needs.t1-frontend.result }}" \
+          for r in "${{ needs.t1-cheap.result }}" "${{ needs.t1-core.result }}" \
+                   "${{ needs.t1-frontend.result }}" \
                    "${{ needs.t1-security.result }}" "${{ needs.t2-full.result }}" \
                    "${{ needs.t3-night.result }}"; do
             if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
