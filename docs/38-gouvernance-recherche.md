@@ -4,6 +4,8 @@
 02/10/2026. **Verdict adopté** : FREEZE → CENTRALISER → REFACTOR → ISOLER →
 VALIDATE → RESEARCH AGAIN. Le projet ne grossit plus ; il devient plus strict.
 
+**Amendements** : §« Gel de la CI » (11/10, audit Sonnet 5.5 §R3) — cf. plus bas.
+
 ## Ce qui est RATIFIÉ et en place dès aujourd'hui (P0)
 
 1. **Le gel** : tag `freeze-2026-10-02`. Pendant la restructuration : pas de
@@ -65,3 +67,50 @@ l'audit : la classification JOinte continuation/absorption/exhaustion (price sho
 + OI shock + liq burst + flow — les tirs OI H4/H5 du 06-07/10 sont la première
 tranche), et le composite crowding (fresh/crowded/late) — pré-enregistré AVANT
 tout test, budget consommé, une variable à la fois.
+
+## Gel de la CI (audit Sonnet 5.5, §R3 — 11/10)
+
+**Le constat.** Sept commits consécutifs portent sur le même gate (`le filtre
+core couvre enfin…` ×3, `ne peut plus se désactiver en silence`, `l'oracle était
+fail-open`, `bandit fail-closed`). Ils réparent des défauts **de ma propre
+conception en paliers** : un filtre de chemins qui doit énumérer *toutes* les
+entrées de *tous* les oracles est fragile par nature, et chaque oubli est un faux
+vert. La CI a absorbé la semaine au détriment de la recherche.
+
+**Le gel.** À compter du **11/10/2026**, la CI est déclarée **terminée**. Tag
+`freeze-ci-2026-10-11`. Pendant **2 semaines** (jusqu'au **25/10/2026**) :
+
+- **tout commit `ci(...)` doit citer un incident RÉEL** — le `#NNN` qui le
+  documente — et non décrire le correctif (« je répare la CI » n'est pas un
+  incident). Un `ci(fix)` nu est précisément la signature d'un gate qu'on
+  rafistole sans avoir nommé le trou ;
+- les **seuls** correctifs CI admis sont ceux d'un incident **daté et nommé**
+  (une étape qui n'a pas tourné, un oracle fail-open mesuré, un filtre qui
+  laissait passer). Le filtre `core` n'est **plus** une raison suffisante : depuis
+  #281→#289, plus rien d'obligatoire n'est filtré (`t1-cheap` porte les oracles
+  bon marché **sans filtre**, `meta_ci.py` refuse un palier obligatoire `skipped`).
+
+**Pourquoi une règle de revue et pas un gate bloquant de plus.** Un hook
+`commit-msg` qui refuse un `ci(...)` mal formé finirait en `--no-verify` — c'est
+la leçon F2 sous une autre forme (« un gate toujours rouge apprend à l'agent à
+l'ignorer »). La règle est donc **vérifiable, pas contraignante** :
+`scripts/audit_ci_commits.py` mesure la plage `freeze-ci-2026-10-11..HEAD` et
+nomme le fautif s'il y en a un. **Mesuré le 11/10 : 15/15** commits `ci(...)` de
+l'historique citent déjà un incident — la convention était *observée mais jamais
+déclarée*. On la déclare et on la rend visible, on n'invente rien.
+
+**Fin du gel.** Au **25/10/2026**, deux issues possibles, tranchées par la
+mesure et non par l'habitude :
+
+1. la CI n'a pas bougé pendant 2 semaines → le gel a tenu, on lève la règle (elle
+   a rempli son rôle : rendre visible ce qui ne l'était pas) ;
+2. un `ci(...)` sans incident est apparu → il est **examiné**, pas puni :
+   soit le trou était réel et la règle a bien joué (il faut citer l'incident
+   *a posteriori*), soit la règle est trop large et on la corrige.
+
+⚠️ **Ce qui n'est PAS gelé** : la recherche (R1, holdout-x), les verdicts en
+cours, la Phase 1 de restitution. Le gel porte sur **la porte**, pas sur ce
+qu'elle laisse passer. La métrique qui juge le gel n'est pas « la CI est
+immobile » mais **« la part de recherche remonte »** (§R3-5 : `% de PR de la
+semaine qui exécutent ou pré-enregistrent une hypothèse`, objectif ≥ 50 %, à
+afficher dans `research_velocity.py`).

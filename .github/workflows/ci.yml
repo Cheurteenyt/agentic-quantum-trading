@@ -174,6 +174,14 @@ jobs:
         run: python scripts/audit_check.py --fail-on A1,A2,A4,B2,B3,B4,C1,C2,C3,C4,C5,E1,E2,F1,F2,F3,F4,F5
       - name: Vérificateur de preuves (F-XXX — BLOQUANT, non filtré)
         run: python scripts/claim_verify.py --all
+      # Gel de la CI (docs/38 — audit Sonnet 5.5 §R3). Pendant les 2 semaines du
+      # gel, un commit `ci(...)` qui ne cite pas d'incident (#NNN) est BLOQUANT.
+      # Hors fenêtre, l'oracle même émet une notice et reste VERT (jamais rouge
+      # pour rien — F2 : un gate toujours rouge apprend à l'ignorer, #288).
+      # Non filtré : il mesure les commits, pas un chemin — `origin/main..HEAD`
+      # est vide sur un push vers main, ce qui est correct (rien à vérifier).
+      - name: Gel de la CI — un `ci(...)` doit citer un incident (fenêtré)
+        run: python scripts/audit_ci_commits.py origin/main..HEAD
 
   # ═══ PALIER T1 — PR rapide (≤ 6 min), filtré par chemins ═══
   # Ne tourne QUE si du code noyau change (pas pour une PR docs-only) — SAUF
