@@ -1246,7 +1246,9 @@ def _ledger_params(spec: dict) -> list[str]:
 
 def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
                 snapshot: str | None = None,
-                fail_closed: bool = True) -> None:
+                fail_closed: bool = True,
+                n: int | None = None, er: float | None = None,
+                se: float | None = None) -> None:
     """FIX v8 (№21) : le snapshot du ledger est CELUI DU RUN — jamais
     recalculé implicitement sur une autre DB.
     FIX v16 (PR-149 Bloc B6) : au CONFIRM, l'écriture au ledger est
@@ -1262,6 +1264,18 @@ def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
             snapshot = str(snapshot_id())
         except sqlite3.Error:
             snapshot = "unknown"
+    # N6 (audit Sonnet 5.5, R2) : les GRANDEURS mesurées voyagent jusqu'au
+    # ledger. Avant ce fix, `n`/`mean` étaient calculés et affichés par le
+    # worker puis JETÉS ici — d'où 16 lignes DISCOVERY_* sans n ni er. Le
+    # ledger refuse désormais un DISCOVERY_* sans grandeur : ne pas les
+    # passer ferait échouer la mesure (fail-closed), ce qui est voulu.
+    mesures = []
+    if n is not None:
+        mesures += ["--n", str(int(n))]
+    if er is not None:
+        mesures += ["--er", str(float(er))]
+    if se is not None:
+        mesures += ["--se", str(float(se))]
     result = subprocess.run([
         sys.executable, "scripts/lab_ledger.py", "log",
         "--family", str(spec.get("family", "research")),
@@ -1269,6 +1283,7 @@ def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
         "--hypothesis", str(spec.get("hypothesis", ""))[:300],
         "--verdict", verdict, "--mode", mode,
         "--snapshot", snapshot, "--ref", ref,
+        *mesures,
         "--params", *_ledger_params(spec)],   # F-045
         capture_output=fail_closed, text=fail_closed, cwd=ROOT)
     if fail_closed and result.returncode != 0:

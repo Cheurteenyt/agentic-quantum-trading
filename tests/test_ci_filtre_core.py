@@ -468,6 +468,97 @@ class TestToutPalierFiltreConsulteCi(unittest.TestCase):
             "\n→ ajoute `|| needs.changes.outputs.ci == 'true'` à leur condition")
 
 
+#: Les oracles assez BON MARCHÉ (quelques secondes) pour tourner sans filtre.
+#: Doit rester synchronisé avec le job `t1-cheap` : chaque commande y figurant
+#: est un oracle coûteux en risque et bon marché en temps.
+ORACLES_BON_MARCHE = (
+    "pyflakes",
+    "compileall",
+    "audit_check.py",
+    "claim_verify.py",
+)
+
+
+class TestLesOraclesBonMarcheNeSontPasFiltres(unittest.TestCase):
+    """R3 (audit Sonnet 5.5) — la fragilité structurelle, coupée à la racine.
+
+    Le défaut : un filtre `core` qui doit ÉNUMÉRER toutes les entrées de tous
+    les oracles est fragile — chaque oubli est un faux vert. Ça a coûté six PR
+    (#281→#286), un correctif par trou découvert, chacun après coup.
+
+    Le remède n'est pas un septième correctif : c'est de retirer du filtre les
+    oracles qui coûtent QUELQUES SECONDES. Un oracle non filtré ne peut pas
+    être « oublié » — il n'y a plus rien à énumérer.
+
+    Ce test DÉRIVE l'invariant du workflow : tout oracle bon marché doit vivre
+    dans un job dont la condition ne consulte AUCUN filtre de chemins. Ajouter
+    demain un `needs.changes.outputs.` à `t1-cheap`, ou déplacer un de ces
+    oracles dans un palier filtré, fait rougir ici.
+    """
+
+    def _jobs(self) -> dict:
+        import yaml
+        return yaml.safe_load(CI.read_text(encoding="utf-8"))["jobs"]
+
+    def _job_portant(self, oracle: str) -> str | None:
+        """Le job dont une commande cite CET oracle."""
+        for nom, job in self._jobs().items():
+            for step in job.get("steps", []):
+                if oracle in (step.get("run") or ""):
+                    return nom
+        return None
+
+    def test_chaque_oracle_bon_marche_est_present(self):
+        """Garde-fou : si un oracle disparaît du workflow, la dérive casse ici."""
+        absents = [o for o in ORACLES_BON_MARCHE
+                   if self._job_portant(o) is None]
+        self.assertEqual(
+            absents, [],
+            f"ces oracles bon marché ne sont plus nulle part dans le workflow : "
+            f"{absents} — les a-t-on supprimés, ou renommés ?")
+
+    def test_les_oracles_bon_marche_vivent_dans_t1_cheap(self):
+        """Ils doivent être dans `t1-cheap`, pas éparpillés."""
+        for o in ORACLES_BON_MARCHE:
+            self.assertEqual(
+                self._job_portant(o), "t1-cheap",
+                f"`{o}` (oracle bon marché) doit vivre dans le job `t1-cheap`")
+
+    def test_t1_cheap_ne_consulte_aucun_filtre_de_chemins(self):
+        """LA propriété qui ferme le défaut : `t1-cheap` n'est pas filtré.
+
+        Si sa condition contient `needs.changes.outputs.`, il redevient
+        « skippable » — donc neutralisable, et tout le travail de R3 est perdu.
+        """
+        cond = self._jobs()["t1-cheap"].get("if") or ""
+        self.assertNotIn(
+            "needs.changes.outputs.", cond,
+            "`t1-cheap` est redevenu filtré par chemins : les oracles bon marché "
+            "redeviennent skippables (= neutralisables par le gate). C'est "
+            "exactement le défaut que R3 ferme.\n"
+            f"condition actuelle : {cond!r}")
+
+    def test_t1_cheap_tourne_sur_pr_et_push(self):
+        """Il doit tourner sur les DEUX événements de PR (pas un seul)."""
+        cond = self._jobs()["t1-cheap"].get("if") or ""
+        self.assertIn("pull_request", cond)
+        self.assertIn("push", cond)
+
+    def test_le_gate_agrege_t1_cheap(self):
+        """Le gate doit compter `t1-cheap` : sinon son échec est invisible."""
+        needs = self._jobs()["gate"]["needs"]
+        self.assertIn(
+            "t1-cheap", needs,
+            "`gate` n'agrège pas `t1-cheap` : un échec d'oracle bon marché ne "
+            "ferait pas rougir le seul check requis")
+        # et le verdict doit être LU dans la boucle d'agrégation
+        corps = "\n".join(s.get("run", "") for s in self._jobs()["gate"]["steps"])
+        self.assertIn(
+            "needs.t1-cheap.result", corps,
+            "`t1-cheap` est dans `needs` mais son résultat n'est pas agrégé : "
+            "un échec passerait pour neutre")
+
+
 class TestRochetDeDetteFailClosed(unittest.TestCase):
     """Tout rochet `git show origin/main:` doit d'abord vérifier sa REF.
 

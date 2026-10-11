@@ -56,6 +56,17 @@ DEFAULT_STATE = ROOT / "research" / "STATE.md"
 
 CONSUMING = {"PASS", "FAIL", "NUL", "SOUS_PUISSANT", "INCONCLU"}
 VERDICTS = CONSUMING | {"PREREG", "DISCOVERY_PASS", "DISCOVERY_FAIL"}
+# N6 (audit Sonnet 5.5, R2) : un verdict de DÉCOUVERTE doit porter sa grandeur.
+# Mesuré le 11/10 : les 16 lignes vivantes sont TOUTES DISCOVERY_FAIL et AUCUNE
+# ne porte `n` ni `er` — un DISCOVERY_FAIL sans n ni moyenne ne dit ni s'il était
+# proche du seuil, ni à quel coût il aurait passé. C'est de l'information nulle :
+# le grind produit du bruit non réutilisable. On exige donc n>0 ET er pour tout
+# verdict DISCOVERY_*. ⚠️ Le périmètre est VOLONTAIREMENT limité à DISCOVERY_* :
+# les verdicts de confirmation (PASS/FAIL/NUL…) ont leur propre contrat (le run
+# scellé porte les chiffres, cf. research_integrity I007) — les inclure casserait
+# des dizaines de tests et l'usage établi. `--backfill` reste la porte de sortie
+# pour les entrées historiques, jamais pour une mesure neuve.
+DISCOVERY_VERDICTS = {"DISCOVERY_PASS", "DISCOVERY_FAIL"}
 # v3 : les verdicts DISCOVERY_* sont loggés en mode discovery (hors budget
 # scientifique, jamais promote) — ils TRACENT la pression de sélection
 # (N_discovery, brief V3 §75) sans toucher le budget de confirmation.
@@ -350,6 +361,23 @@ def cmd_log(a) -> int:
     if verdict not in VERDICTS:
         print(f"verdict invalide : {a.verdict} (attendu : {', '.join(sorted(VERDICTS))})")
         return EXIT_ERR
+    # N6 (audit Sonnet 5.5, R2) : refus AVANT écriture — un verdict qui tranche
+    # sans sa grandeur ne mesurerait rien. Le --backfill reste la porte de sortie
+    # pour les entrées historiques (antérieures à la règle), jamais pour une
+    # mesure neuve. Le refus est FAIL-CLOSED : il sort en erreur, il n'avertit pas.
+    if verdict in DISCOVERY_VERDICTS and not a.backfill:
+        manque = []
+        if a.n is None or a.n <= 0:
+            manque.append("--n (> 0)")
+        if a.er is None:
+            manque.append("--er")
+        if manque:
+            print(f"REFUS : un verdict {verdict} doit porter sa grandeur "
+                  f"(manque : {', '.join(manque)}). Un verdict sans n ni moyenne "
+                  f"est de l'information nulle — il ne dit ni la distance au seuil "
+                  f"ni le coût d'équilibre. Relance avec --n N --er E (et --se SE en "
+                  f"bonus), ou --backfill si c'est une entrée historique.")
+            return EXIT_ERR
     pol, entries, now = ctx(a)
     ts = parse_dt(a.date) if a.date else now
     family, strategy, params = slug(a.family), slug(a.strategy), parse_params(a.params)
