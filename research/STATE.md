@@ -6,22 +6,22 @@ Généré : LEDGER par `lab_ledger.py sync-state`, Productivité par
 
 ## Ledger & budget
 <!-- LEDGER:BEGIN (généré par lab_ledger.py sync-state — ne pas éditer à la main) -->
-- Ledger : **97** entrées (0 essais, dont 12 backfill hors budget, 81 superseded hors preuve) —  · superseded : PR-143
-- Budget semaine 2026-W41 (effet policy : 2026-10-02) : **0/20** consommés (hors re-vérifications exemptées), reste 20
+- Ledger : **98** entrées (1 essais, dont 12 backfill hors budget, 81 superseded hors preuve) — FAIL 1 · superseded : PR-143
+- Budget semaine 2026-W41 (effet policy : 2026-10-02) : **1/20** consommés (hors re-vérifications exemptées), reste 19
 - Familles bloquantes hors reverify : aucune
 - Familles raw historiques (re-verifies incluses) : aucune
-- Seuil de preuve du prochain essai : |t| ≥ 3.80 (Bonferroni, N=342 dont 341 pré-ledger)
+- Seuil de preuve du prochain essai : |t| ≥ 3.80 (Bonferroni, N=343 dont 341 pré-ledger)
 <!-- LEDGER:END -->
 
 ## Productivité (généré : `python scripts/research_velocity.py`)
-- Semaine **2026-W41** : **16** lots · **16** tranchées · **0** candidats.
-- Historique : 2026-W41 : 16·16·0 {'DISCOVERY_FAIL': 16}
+- Semaine **2026-W41** : **17** lots · **17** tranchées · **0** candidats.
+- Historique : 2026-W41 : 17·17·0 {'DISCOVERY_FAIL': 16, 'FAIL': 1}
 - « Fini » hebdo = ≥ 1 lot journalisé ET ≥ 1 hypothèse tranchée.
-- **Échéances dépassées : 9** sans verdict vivant (+2 non joignables) : `cusum-regime-shift`, `depth-imbalance`, `holdout-x` (+6) — détail : `python scripts/research_velocity.py`.
-- Part recherche (7 j) : **39/208** (19 %) — objectif ≥ 50 % (R3-5).
+- **Échéances dépassées : 8** sans verdict vivant (+2 non joignables) : `cusum-regime-shift`, `depth-imbalance`, `liq-echo` (+5) — détail : `python scripts/research_velocity.py`.
+- Part recherche (7 j) : **41/211** (19 %) — objectif ≥ 50 % (R3-5).
 
 ## Verdicts qui comptent
-- Pool OpenMarket v8 : E[R] +0,093 R, IC95 [−0,027 ; +0,223] ; rien ne survit à Bonferroni (N=362) → edge NON établi. Repro : `scripts/studies/x501_openmarket/`
+- Pool OpenMarket v8 : edge NON établi — HOLDOUT-X **FAIL** 11/10 (48 symboles jamais vus, n=950, E[R] +0,064, IC95 [−0,038 ; +0,179], 3/6 fenêtres, champion apparié +0,073). Repro : `holdout_x_harness.py`
 - premium-fade directionnel : CLOS (naked −9,6 bps ; le « 87 % WR » = backtest à coûts 0 bps).
 - premium-fade-listing : KILL ex ante 04/10 (22,2 % de 80 770 trades toxiques > seuil 15 %) — mécanisme CONTEXTE (docs/20).
 - vol_spike_meme re-costé au spread réel : PASS 04/10 (+0,0161 $/trade, 0 liq) — coût machine = TAKER_RT 28 bps.

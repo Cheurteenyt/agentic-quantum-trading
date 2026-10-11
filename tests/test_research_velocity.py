@@ -86,9 +86,10 @@ class TestVelocityMetriques(unittest.TestCase):
 
     def test_ledger_reel_zero_lot_visible(self):
         """Le ledger RÉEL du dépôt : la métrique doit tourner sans planter et
-        refléter les 16 vivants (toutes DISCOVERY_FAIL)."""
+        refléter les vivants. 16 DISCOVERY_FAIL jusqu'au 11/10 ; le FAIL de
+        HOLDOUT-X (48 symboles jamais vus, #292) porte le total à 17."""
         m_ = RV.metriques(RV.charger())
-        self.assertEqual(m_["total_vivant"], 16)
+        self.assertEqual(m_["total_vivant"], 17)
         # toutes les vivantes sont des échecs -> 0 candidat, c'est le signal
         self.assertEqual(m_["cette_semaine"]["candidats"], 0)
 
