@@ -5,4 +5,4 @@ Prédiction : DepthImbalance > 0,25 → mouvement haussier ≥ 0,8 % en 15 min
 Données : depth.db (30 s, 15 symboles, maturité 14 j le 13/10), moyenne glissante 30 min
 PASS si WR ≥ 65 % ET ratio bénéfice/coût ≥ 1,8 sur n ≥ 100 · FAIL si WR < 55 %
 Contrôles : inverse (AskVolume > BidVolume → baissier) · hors liquidations · par symbole
-Hash du gel : <au commit> · Jugé sous : protocol_v1 · FORWARD-ONLY (depth 10 j — pas de rétrospectif)
+Hash du gel : non gelée — FORWARD-ONLY, la matière première (depth.db, 14 j) n'est pas encore mature ; gel au commit du harnais forward, avant le premier jour jugé. · Jugé sous : protocol_v1 · FORWARD-ONLY (depth 10 j — pas de rétrospectif)

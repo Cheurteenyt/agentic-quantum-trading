@@ -9,4 +9,4 @@ PASS si : E[ret] > 0 après coûts en TRAIN ET VAL, WR > 50 %, MAE max < 50 %.
 FAIL si : E[ret] ≤ 0 OU WR < 40 %.
 SOUS_PUISSANT si n < 10 en VAL (déclaré : le split VAL ne couvre que 3,3 jours).
 Contrôles : inverse (SHORT la capitulation → devrait perdre) · par symbole · hors petites liq (< p50).
-Hash du gel : <commit> · Jugé sous : protocol_v1 · FORWARD-ONLY pour le verdict définitif.
+Hash du gel : non gelée — FORWARD-ONLY pour le verdict définitif ; gel au commit du harnais forward, avant le premier jour jugé. · Jugé sous : protocol_v1 · FORWARD-ONLY pour le verdict définitif.
