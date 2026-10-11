@@ -54,6 +54,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.aster_indicators import volume_z  # noqa: E402
+from scripts.costs import breakeven_cost_bps, cout_rt_pct  # noqa: E402  (P2, R4)
 from scripts.label_matrix import (  # noqa: E402
     LABEL_VERSION, build_matrix, dataset_window_sha, snapshot_id)
 from scripts.research_os import (  # noqa: E402
@@ -497,8 +498,9 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
     from scripts.label_matrix import event_study
     sig = spec["signal"]
     side = int(sig.get("side", -1))
-    cost = float(cost_pct if cost_pct is not None
-                 else spec.get("cost_pct", 0.28))
+    spec_pct = spec.get("cost_pct")     # P2 (R4) : None = symbol-aware
+    cost = (float(cost_pct) if cost_pct is not None
+            else float(spec_pct if spec_pct is not None else 0.28))
     horizons = tuple(int(h) for h in spec.get("horizons", [24]))
     if feats_by_sym is None:
         feats_by_sym = _features_by_sym(spec, db_path)
@@ -506,6 +508,11 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
     for sym in spec["data"]["symbols"]:
         if sym not in matrix or sym not in feats_by_sym:
             continue
+        # P2 (audit Sonnet 5.5, R4) : le coût est SYMBOL-AWARE quand la spec
+        # ne pinne pas le sien (table research/costs_par_symbole.yaml,
+        # priorité spec > table > défaut — scripts/costs.py).
+        cost_sym = (cost if cost_pct is not None
+                    else cout_rt_pct(sym, spec_pct))
         feats = feats_by_sym[sym]
         fz = frozen.get(sym) if frozen is not None else None
         if frozen is not None and fz is None:
@@ -531,7 +538,7 @@ def _study(spec, matrix, view, side_mult: float, db_path: Path,
                             <= (view.end_ms - H * 3_600_000) * 10**6)
             out[f"{sym}@{H}h"] = event_study(matrix[sym], m_h, H,
                                              side=int(side * side_mult),
-                                             cost_pct=cost)
+                                             cost_pct=cost_sym)
     return out
 
 
@@ -609,8 +616,8 @@ def sequential_perm_pvalue(exceed, n_max: int,
     return (exc + 1) / (int(n_max) + 1), int(n_max)
 
 
-def _perm_loop(pairs: list[tuple[dict, np.ndarray]], h1: int, side: int,
-               cost: float, mean_obs: float, n_perm: int = 99,
+def _perm_loop(pairs: list[tuple[dict, np.ndarray, float]], h1: int,
+               side: int, mean_obs: float, n_perm: int = 99,
                seed: int = 0, h_stop: int = 10) -> float:
     """La boucle de permutation (pure, testable) : p one-sided supérieur.
 
@@ -622,20 +629,23 @@ def _perm_loop(pairs: list[tuple[dict, np.ndarray]], h1: int, side: int,
 
     `h_stop=0` désactive l'arrêt précoce (l'ancien comportement fixe),
     pour les tests qui veulent mesurer le nombre de tirages.
+
+    P2 (R4) : chaque paire porte SON coût `(cols, m, cost_sym)` — le null
+    applique le même coût par symbole que l'observation.
     """
     from scripts.label_matrix import event_study
     if not pairs:
         return float("nan")
-    n_min = min(len(m) for _, m in pairs)
+    n_min = min(len(m) for _, m, _ in pairs)
     lo_shift = max(1, min(168, n_min // 4))
     rng = np.random.default_rng(seed)
 
     def exceed(_i: int) -> bool:
         k = int(rng.integers(lo_shift, max(lo_shift + 1, n_min - lo_shift)))
         num = den = 0.0
-        for cols, m in pairs:
+        for cols, m, cost_sym in pairs:
             st = event_study(cols, np.roll(m, k), h1, side=side,
-                             cost_pct=cost)
+                             cost_pct=cost_sym)
             if st.get("n", 0):
                 num += st["mean"] * st["n"]
                 den += st["n"]
@@ -664,7 +674,6 @@ def _perm_pvalue(spec, matrix, view, db_path, feats_by_sym, frozen,
     puissance 100 % à +0,4 % d'edge (n≈490)."""
     sig = spec["signal"]
     side = int(sig.get("side", -1))
-    cost = float(spec.get("cost_pct", 0.28))
     h1 = int(spec.get("horizons", [24])[0])
     pairs = []
     for sym in kept_syms:
@@ -681,8 +690,11 @@ def _perm_pvalue(spec, matrix, view, db_path, feats_by_sym, frozen,
         m_h = mask_h & (feats["open_time_ns"]
                         <= (view.end_ms - h1 * 3_600_000) * 10**6)
         if m_h.any():
-            pairs.append((matrix[sym], m_h))
-    return _perm_loop(pairs, h1, side, cost, mean_obs, n_perm, seed)
+            # P2 (R4) : le null de permutation applique le MÊME coût par
+            # symbole que l'observation — sinon le test est biaisé.
+            pairs.append((matrix[sym], m_h,
+                          cout_rt_pct(sym, spec.get("cost_pct"))))
+    return _perm_loop(pairs, h1, side, mean_obs, n_perm, seed)
 
 
 def _aggregate(per_symbol: dict, min_n: int) -> tuple[int, float]:
@@ -697,6 +709,21 @@ def _aggregate(per_symbol: dict, min_n: int) -> tuple[int, float]:
     w = np.array([n for _, n in kept], dtype=float)
     m = np.array([mu for mu, _ in kept], dtype=float)
     return n_total, float((m * w).sum() / w.sum())
+
+
+def _aggregate_gross(per_symbol: dict, min_n: int) -> float:
+    """P2 (R4) : la moyenne BRUTE agrégée (avant coût, pondérée par n) —
+    le breakeven de l'agrégat est exact même à coûts par symbole."""
+    kept = [(float(s["mean_gross"]), int(s.get("n", 0)))
+            for s in per_symbol.values()
+            if s.get("n", 0) >= min_n
+            and s.get("mean_gross") is not None
+            and np.isfinite(s.get("mean_gross", float("nan")))]
+    if not kept:
+        return float("nan")
+    w = np.array([n for _, n in kept], dtype=float)
+    m = np.array([g for g, _ in kept], dtype=float)
+    return float((m * w).sum() / w.sum())
 
 
 # ------------------------------------------------------------------ runs
@@ -730,6 +757,12 @@ def run_discovery(spec: dict, db_path: Path = KDB,
     per_h1 = {k: v for k, v in per_symbol.items()
               if k.endswith(f"@{h1}h")}
     n_total, mean_all = _aggregate(per_h1, min_n)
+    # P2 (R4) : le breakeven de l'agrégat — le RT cost (bps) auquel la
+    # moyenne nette devient 0, calculé sur la moyenne BRUTE poolée (exact
+    # même à coûts par symbole). C'est la grandeur que R2 exige au ledger.
+    gross_all = _aggregate_gross(per_h1, min_n)
+    breakeven = (breakeven_cost_bps(gross_all, 0.0)
+                 if np.isfinite(gross_all) else None)
     # le contrôle inverse : le côté inversé doit être pire sur l'horizon 1
     inv = _study(spec, matrix, view, -1.0, db_path,
                  feats_by_sym=feats_by_sym)
@@ -771,6 +804,8 @@ def run_discovery(spec: dict, db_path: Path = KDB,
                      if s.get("n", 0) >= min_n and np.isfinite(s.get("mean", float("nan")))),
                     default=float("nan"))
     return {"verdict": verdict, "n": n_total, "mean": mean_all,
+            "mean_gross": gross_all,
+            "breakeven_cost_bps": breakeven,
             "inverse_mean": inv_mean, "edge_advantage": advantage,
             "p_perm": p_perm,
             "worst": worst_sym, "per_symbol": per_symbol,
@@ -1248,7 +1283,8 @@ def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
                 snapshot: str | None = None,
                 fail_closed: bool = True,
                 n: int | None = None, er: float | None = None,
-                se: float | None = None) -> None:
+                se: float | None = None,
+                breakeven_bps: float | None = None) -> None:
     """FIX v8 (№21) : le snapshot du ledger est CELUI DU RUN — jamais
     recalculé implicitement sur une autre DB.
     FIX v16 (PR-149 Bloc B6) : au CONFIRM, l'écriture au ledger est
@@ -1276,6 +1312,10 @@ def _log_ledger(spec: dict, verdict: str, mode: str, ref: str,
         mesures += ["--er", str(float(er))]
     if se is not None:
         mesures += ["--se", str(float(se))]
+    if breakeven_bps is not None:
+        # P2 (R4) : le coût d'équilibre voyage avec le verdict — le ledger
+        # REFUSE désormais un DISCOVERY_* sans lui (fail-closed, comme n/er).
+        mesures += ["--breakeven-bps", str(float(breakeven_bps))]
     result = subprocess.run([
         sys.executable, "scripts/lab_ledger.py", "log",
         "--family", str(spec.get("family", "research")),
@@ -1298,8 +1338,13 @@ def cmd_discovery(a) -> int:
     spec = load_spec(Path(a.spec))
     res = run_discovery(spec, db_path=Path(a.db))
     rdir = write_artifacts(spec["id"], spec, res, "discovery", db_path=Path(a.db))
+    # FIX P2 : n/er/breakeven VOYAGENT jusqu'au ledger (les 2 sites discovery
+    # ne les passaient pas depuis le garde R2 de #287 — toute exécution CLI
+    # ou grind aurait échoué fail-closed après avoir coûté le calcul).
     _log_ledger(spec, res["verdict"], Mode.DISCOVERY.value,
-                str(rdir / "report.md"), snapshot=res.get("snapshot"))
+                str(rdir / "report.md"), snapshot=res.get("snapshot"),
+                n=res.get("n"), er=res.get("mean"),
+                breakeven_bps=res.get("breakeven_cost_bps"))
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
           f"{res['mean']:.3f} · inverse {res['inverse_mean']:.3f} · "
           f"p_perm {res.get('p_perm', float('nan')):.3f}")
@@ -1383,7 +1428,9 @@ def _confirm_locked(spec: dict, a) -> int:
                 # NameError APRÈS le calcul : verdict jeté, ledger jamais
                 # écrit, budget jamais décompté
                 str(RUNS / spec["id"] / "report.md"),
-                snapshot=res.get("snapshot"), fail_closed=True)
+                snapshot=res.get("snapshot"), fail_closed=True,
+                n=res.get("n"), er=res.get("mean"),
+                breakeven_bps=res.get("breakeven_cost_bps"))
     pw = res.get("windows_pass")
     print(f"{spec['id']} : {res['verdict']} · n {res['n']} · mean "
           f"{res['mean']:.3f} · fenêtres {pw}/{res.get('windows_required')} "
@@ -1542,7 +1589,9 @@ def cmd_grind(a) -> int:
             write_artifacts(spec["id"], spec, r2, "discovery")
             _log_ledger(spec, r2["verdict"], Mode.DISCOVERY.value,
                         str(RUNS / spec["id"] / "report.md"),
-                        snapshot=r2.get("snapshot"))
+                        snapshot=r2.get("snapshot"),
+                        n=r2.get("n"), er=r2.get("mean"),
+                        breakeven_bps=r2.get("breakeven_cost_bps"))
             survivors.append(spec["id"])
             print(f"[grind]   CANDIDATE discovery : {r2['verdict']} "
                   f"(n {r2['n']}, mean {r2['mean']:.3f})")
