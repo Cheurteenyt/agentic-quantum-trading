@@ -30,6 +30,34 @@ au portage delta-neutre (funding couvert ~99,9 %).
 rapport §4) AVANT le premier jour du pilote — un barème maker ≥ 2 bps
 rendrait le critère inaccessible ex ante.
 
+**Prérequis VÉRIFIÉ le 12/10** — source officielle
+(`docs.asterdex.com/trading/perpetuals/fees-and-specs/fees`, relevée le
+12/10/2026 ; corroborée par `docs/reference/aster-official-docs-gap-audit.md`,
+qui citait déjà la même URL le 31/05) :
+
+| Catégorie | Maker | Taker |
+|---|---|---|
+| Crypto — General | **0 bps** | 4 bps (0,04 %, modulé VIP) |
+| Crypto — Group B | 0 bps | **10 bps** (0,1 %) |
+| RWA | 0 bps | 1,25 bps (depuis 07/09/2026) |
+| USD1 (BTC/ETH/SOL) | 0 bps | 4 bps |
+
+- **Conséquence 1 — le critère est accessible** : maker = **0 bps sur TOUTES
+  les catégories** (« All maker fees are 0 bps »). La crainte d'un barème
+  maker ≥ 2 bps qui aurait rendu « ≥ 2 bps net/fill » inatteignable ex ante
+  est **levée**. Le pilote peut démarrer sur ce plan.
+- **Conséquence 2 — le repli taker n'est pas uniforme** : les non-fills
+  paient 4 bps (General) à **10 bps** (Group B). Le pilote doit donc
+  (a) choisir ses ~10 memes dans un **groupe connu** et (b) modéliser le
+  **taux de fill**, sinon le coût du fallback est sous-estimé — c'est le
+  « fill_status » que `docs/reference/aster-official-docs-gap-audit.md`
+  (§1.a) déclare encore **non implémenté** (« les modes maker/BBO doivent
+  être lus comme proxies de coût, pas comme preuve de fill »).
+- ⚠️ `scripts/portfolio_sim.py` porte `MAKER_BPS = 2` (proxy conservateur
+  antérieur) alors que l'officiel est **0** : le simulateur est *pessimiste*
+  sur les frais maker, ce qui est du bon côté du biais (il ne fabrique pas
+  un edge). À ne pas « corriger » vers 0 sans revoir le modèle de fill.
+
 **Verdict du pilote** : ~19/10 (7 jours après le début effectif).
 
 ## D-2 · La règle de kill de la ligne directionnelle Aster (ARMÉE le 11/10)
