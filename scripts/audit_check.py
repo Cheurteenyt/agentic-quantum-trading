@@ -289,6 +289,37 @@ add(not _art_fails, "E6",
     "croissance > 50 % = sortie de git obligatoire)",
     "; ".join(_art_fails[:4]) or f"{len(_big)} fichier(s) à la baseline")
 
+# E7 — LA FRONTIÈRE APPLIQUÉE du lab (audit Sonnet 5.5 R4 §2.2).
+# E4 déclare la surface (les 9 membres) mais RIEN n'empêche un membre
+# d'importer le backend (211 k lignes) ou le bot Discord — le lab
+# redeviendrait couplé et l'audit ne le verrait pas. E7 FERME la frontière :
+# aucun fichier de la surface ne contient `from backend` / `import backend`
+# / `from discord_bot` / `import discord_bot`. Aujourd'hui 0/9 (vérifié) ;
+# ce contrôle empêche que ça change en silence. 5 autres scripts hors lab
+# importent backend — c'est LÉGITIME (apps, pas le noyau), le contrôle ne
+# s'applique QU'aux membres déclarés.
+_frontiere_interdits = ("from backend", "import backend",
+                        "from discord_bot", "import discord_bot")
+_frontiere_fails = []
+try:
+    import scripts.lab as _lab_frontiere  # noqa: E402
+    _surface_members = _lab_frontiere.SURFACE
+except Exception:
+    _surface_members = ()
+for _m in _surface_members:
+    _mf = ROOT / "scripts" / f"{_m}.py"
+    if not _mf.exists():
+        continue
+    for _i, _l in enumerate(lines(str(_mf.relative_to(ROOT)))):
+        if any(k in _l for k in _frontiere_interdits):
+            _frontiere_fails.append(f"{_m}.py:{_i + 1}")
+add(not _frontiere_fails, "E7",
+    "Frontière du lab appliquée : aucun des 9 membres de la surface "
+    "n'importe backend/discord_bot (le noyau de recherche reste "
+    "découplé du terminal on-chain)",
+    "; ".join(_frontiere_fails[:4]) or f"0/{len(_surface_members)} membres "
+    "importés (surface propre)")
+
 # ---- D. Statistique (le tableau de bord) ------------------------------------------------
 tp = ROOT / args.trades
 if tp.exists():
