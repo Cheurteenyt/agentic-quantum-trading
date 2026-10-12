@@ -6,7 +6,7 @@ Productivité : `research_velocity.py --state`. Tout chiffre = sa commande de re
 ## Ledger & budget
 <!-- LEDGER:BEGIN (généré par lab_ledger.py sync-state — ne pas éditer à la main) -->
 - Ledger : **98** entrées (1 essais, dont 12 backfill hors budget, 81 superseded hors preuve) — FAIL 1 · superseded : PR-143
-- Budget semaine 2026-W41 (effet policy : 2026-10-02) : **1/20** consommés (hors re-vérifications exemptées), reste 19
+- Budget semaine 2026-W42 (effet policy : 2026-10-02) : **0/20** consommés (hors re-vérifications exemptées), reste 20
 - Familles bloquantes hors reverify : aucune
 - Familles raw historiques (re-verifies incluses) : aucune
 - Seuil de preuve du prochain essai : |t| ≥ 3.80 (Bonferroni, N=343 dont 341 pré-ledger)
