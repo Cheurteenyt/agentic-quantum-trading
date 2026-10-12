@@ -48,11 +48,16 @@ from pathlib import Path
 
 import yaml
 
-from scripts.label_matrix import dataset_window_sha  # noqa: E402 (P0-③)
-
+# P1 (audit 2026-10-11) : la racine du dépôt DOIT être sur sys.path AVANT
+# l'import de `scripts.label_matrix`. Lançé par son chemin (`python
+# scripts/research_worker.py`), `sys.path[0]` = `scripts/`, donc `import
+# scripts` échoue. Les tests passaient parce qu'ils importent le module avec
+# la racine déjà sur le chemin — « les tests importent, personne ne lance ».
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from scripts.label_matrix import dataset_window_sha  # noqa: E402 (P0-③)
 
 RUNTIME = ROOT / "research" / "runtime"
 ARCHIVE = RUNTIME / "archive"
