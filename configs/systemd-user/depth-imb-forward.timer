@@ -1,0 +1,9 @@
+[Unit]
+Description=depth_imb_forward chaque jour 07:10 (après les forwards survivants 06:55, avant la journée)
+
+[Timer]
+OnCalendar=*-*-* 07:10:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

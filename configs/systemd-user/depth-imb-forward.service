@@ -1,0 +1,10 @@
+[Unit]
+Description=depth_imb_forward — le harnais FORWARD de DEPTH-IMB (spec pré-enregistrée, gel 1f25c0f)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/run/media/cheurteen/Jeux SSD/trading-agent
+ExecStart="/run/media/cheurteen/Jeux SSD/trading-agent/.venv/bin/python" scripts/depth_imbalance_forward.py
+TimeoutStartSec=1800
