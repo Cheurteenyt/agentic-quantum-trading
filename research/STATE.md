@@ -20,13 +20,12 @@ Productivité : `research_velocity.py --state`. Tout chiffre = sa commande de re
 - Part recherche (7 j) : **41/211** (19 %) — objectif ≥ 50 % (R3-5).
 
 ## Verdicts qui comptent
-- Pool v8 : edge NON établi — HOLDOUT-X **FAIL** 11/10 (48 jamais vus, n=950, E[R] +0,064, IC95 [−0,038 ; +0,179], 3/6 fenêtres, champion +0,073). Repro : `holdout_x_harness.py`
+- Pool v8 : edge NON établi — HOLDOUT-X **FAIL** 11/10 (n=950, E[R] +0,064, IC95 [−0,038 ; +0,179], 3/6 fenêtres, champion +0,073). **GELÉ** : aucun cycle sans mécanisme nouveau pré-enregistré. Repro : `holdout_x_harness.py`
 - premium-fade directionnel : CLOS (naked −9,6 bps ; « 87 % WR » = coûts 0 bps).
 - premium-fade-listing : KILL ex ante 04/10 (22,2 % de 80 770 trades toxiques > 15 %) — CONTEXTE (docs/20).
 - vol_spike_meme au spread réel : PASS 04/10 (+0,0161 $/trade, 0 liq ; TAKER_RT 28 bps).
 - corr_months corrigé 05/10 : les verdicts de décorrélation tiennent (−0,055 / −0,650).
 - Aster 13 mois : FORWARD-ONLY (« +24 %/26 j » = aucune info DD → verdict 90 j).
-- File bugs : reports/aster/bug-hunt-0510/SYNTHESE.md (10 mineurs + 3 suspects).
 
 ## En attente (pré-enregistré)
 Murs+depth 06-07/10 · OI quadrant 07-08/10 · whaleflow+P3 08/10 · INV-N ~28/10 · H-CROWD-1 30/10 ·
