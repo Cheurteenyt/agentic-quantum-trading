@@ -91,5 +91,35 @@ class LesFonctionsPures(unittest.TestCase):
         self.assertEqual(d._stats(np.array([]), 0.28), {"n": 0})
 
 
+class LeShaCiteEstCeluiQueLeHarnaisDerive(unittest.TestCase):
+    """La spec cite un sha de gel : il doit être CELUI que le harnais calcule.
+
+    Sans ce verrou, la ligne « Hash du gel » redevient une intention qu'on
+    recopie à la main — et un squash-merge la fait diverger en silence
+    (vécu : la spec citait le commit de branche, le harnais dérivait celui
+    de `main`).
+    """
+
+    def test_le_sha_cite_par_la_spec_est_le_gel_reel(self) -> None:
+        import re
+        import subprocess
+        txt = (ROOT / "research" / "hypotheses" / "depth-imbalance.md").read_text(
+            encoding="utf-8")
+        ligne = [ln for ln in txt.splitlines() if ln.startswith("Hash")][0]
+        m = re.search(r"\b([0-9a-f]{7,40})\b", ligne)
+        self.assertIsNotNone(m, "la ligne « Hash du gel » ne cite aucun sha")
+        sha = m.group(1)
+        out = subprocess.run(
+            ["git", "log", "--diff-filter=A", "--format=%H", "--", d.SELF_REL],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=30)
+        commits = out.stdout.split()
+        if not commits:  # arbre sans historique git : le verrou ne s'applique pas
+            self.skipTest("pas d'historique git pour ce fichier")
+        self.assertTrue(
+            commits[-1].startswith(sha),
+            f"la spec cite {sha} mais le harnais dérive {commits[-1][:12]} — "
+            "le gel est un état : recopier le sha réel.")
+
+
 if __name__ == "__main__":
     unittest.main()
