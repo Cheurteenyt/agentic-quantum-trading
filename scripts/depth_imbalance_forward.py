@@ -70,6 +70,26 @@ def gel_start_ms() -> int | None:
         return None
 
 
+def gel_en_secondes(gel_ms: int | None) -> int | None:
+    """Le gel est en MILLISECONDES (`git log %ct`), `depth_meta.ts` en SECONDES.
+
+    ⚠️ Bug vécu : comparer `ts` (s) à `gel_ms` (ms) est TOUJOURS faux — le
+    harnais renvoyait alors `n = 0` par construction, et le forward n'aurait
+    jamais rien jugé. La conversion est ici, testée.
+    """
+    return None if gel_ms is None else gel_ms // 1000
+
+
+def masque_forward(ts_s: np.ndarray, gel_ms: int | None) -> np.ndarray:
+    """Les snapshots postérieurs au gel. Sans gel (fichier non commité) : AUCUN.
+
+    Un harnais sans état est une intention, pas un gel — donc rien n'est jugé.
+    """
+    if gel_ms is None:
+        return np.zeros(len(ts_s), dtype=bool)
+    return ts_s >= gel_en_secondes(gel_ms)
+
+
 def load_imbalance(con: sqlite3.Connection, sym: str, mode: str) -> pd.DataFrame | None:
     """(ts, mid, imb) par snapshot. mode = 'band' (±0,5 %) ou 'top10' (spec)."""
     mids = pd.read_sql_query(
@@ -194,13 +214,10 @@ def run(mode: str, forward_only: bool, symbols: list[str] | None) -> dict:
             continue
         df = add_ma(df)
         drift = outcomes(df, HORIZON_MIN)
-        # FORWARD-ONLY : sans gel (fichier non commité), on ne juge RIEN —
-        # un harnais sans état est une intention, pas un gel.
-        if forward_only:
-            base = (np.zeros(len(df), dtype=bool) if gel is None
-                    else df.ts.values >= gel)
-        else:
-            base = np.ones(len(df), dtype=bool)
+        # FORWARD-ONLY : sans gel (fichier non commité), on ne juge RIEN.
+        # `--include-past` est une MESURE rétrospective, jamais un verdict.
+        base = (masque_forward(df.ts.values, gel) if forward_only
+                else np.ones(len(df), dtype=bool))
         liq = liq_times(sym)
         near_liq = (np.zeros(len(df), dtype=bool) if len(liq) == 0
                     else np.array([np.any(np.abs(liq - t) <= EXLIQ_MIN * 60)

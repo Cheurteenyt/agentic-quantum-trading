@@ -91,6 +91,27 @@ class LesFonctionsPures(unittest.TestCase):
         self.assertEqual(d._stats(np.array([]), 0.28), {"n": 0})
 
 
+class LeGelEtLesTimestampsPartagentLaMemeUnite(unittest.TestCase):
+    """Bug vécu (13/10) : `gel_start_ms()` rend des MILLISECONDES, `depth_meta.ts`
+    est en SECONDES. Comparer l'un à l'autre est toujours faux → le harnais
+    renvoyait `n = 0` par construction, et le forward n'aurait jamais rien jugé.
+    """
+
+    def test_gel_converti_en_secondes(self) -> None:
+        self.assertEqual(d.gel_en_secondes(1_791_925_118_000), 1_791_925_118)
+        self.assertIsNone(d.gel_en_secondes(None))
+
+    def test_le_masque_selectionne_bien_les_snapshots_post_gel(self) -> None:
+        ts = np.array([1000, 2000, 3000])           # SECONDES
+        gel_ms = 2000 * 1000                         # 2000 s exprimé en ms
+        self.assertEqual(list(d.masque_forward(ts, gel_ms)), [False, True, True])
+
+    def test_sans_gel_aucun_snapshot_n_est_juge(self) -> None:
+        """Un harnais sans état est une intention, pas un gel."""
+        ts = np.array([1000, 2000])
+        self.assertEqual(list(d.masque_forward(ts, None)), [False, False])
+
+
 class LeShaCiteEstCeluiQueLeHarnaisDerive(unittest.TestCase):
     """La spec cite un sha de gel : il doit être CELUI que le harnais calcule.
 
