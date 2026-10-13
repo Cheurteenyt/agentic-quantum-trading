@@ -50,6 +50,9 @@ POSITIFS = ("PASS", "DISCOVERY_PASS")
 # Verdicts qui sont des RÉSULTATS (une hypothèse tranchée), positifs ou non.
 TRANCHE = ("PASS", "DISCOVERY_PASS", "FAIL", "DISCOVERY_FAIL",
            "SOUS_PUISSANT", "NUL")
+# Verdicts de DÉCOUVERTE — les seuls qui DOIVENT porter un `n` (garde N6 de
+# lab_ledger). Une ligne DISCOVERY_* sans n est MUETTE (information nulle).
+DISCOVERY_VERDICTS = ("DISCOVERY_PASS", "DISCOVERY_FAIL")
 
 
 def _semaine(iso_date: str) -> str | None:
@@ -88,8 +91,21 @@ def metriques(entrees: list[dict]) -> dict:
 
     def resume(lst: list[dict]) -> dict:
         verd = Counter(e.get("verdict", "?") for e in lst)
+        # Une ligne MUETTE = un verdict DISCOVERY_* sans `n` (ni er). Le garde
+        # N6 de lab_ledger refuse désormais d'en créer (fail-closed), mais les
+        # 16 lignes historiques (écrites avant le garde) sont muettes et
+        # polluent la vélocité : « 17 lots » mélange 1 verdict chiffré et 16
+        # verdicts nus. On les COMPTE à part pour que la métrique soit honnête
+        # (un verdict sans n ni moyenne ne dit ni la distance au seuil ni le
+        # coût d'équilibre — de l'information nulle). Un PASS/FAIL classique
+        # n'est pas concerné (seuls les DISCOVERY_* doivent porter n).
+        muets = [e for e in lst
+                 if e.get("verdict") in DISCOVERY_VERDICTS
+                 and not e.get("n")]
         return {
             "lots": len(lst),
+            "lots_chiffres": len(lst) - len(muets),
+            "lots_muets": len(muets),
             "tranchees": sum(verd.get(v, 0) for v in TRANCHE),
             "candidats": sum(verd.get(v, 0) for v in POSITIFS),
             "verdicts": dict(verd),
@@ -307,6 +323,15 @@ def bloc_state(m: dict) -> str:
         f"- Semaine **{s}** : **{cs['lots']}** lots · "
         f"**{cs['tranchees']}** tranchées · **{cs['candidats']}** candidats.",
     ]
+    # distinction chiffré/muet (garde N6 lab_ledger) : un DISCOVERY_* sans n
+    # est une ligne muette (information nulle) — on le dit explicitement.
+    if cs.get("lots_muets"):
+        lignes.append(
+            f"- **Dont {cs['lots_muets']} lot(s) MUET(S)** "
+            f"(DISCOVERY_* sans `n` — écrits avant le garde N6 de lab_ledger, "
+            f"information nulle : ni distance au seuil ni coût d'équilibre) "
+            f"et {cs['lots_chiffres']} chiffré(s). Relancer avec chiffres ou "
+            f"marquer `sans_chiffres` ne change pas le verdict.")
     if m["toutes_semaines"]:
         items = list(m["toutes_semaines"].items())
         vues = items[-HISTO_SEMAINES:]
@@ -359,6 +384,11 @@ def main() -> int:
     print(f"VELOCITÉ RECHERCHE — semaine {m['semaine_courante']}")
     print(f"  cette semaine : {cs['lots']} lots · {cs['tranchees']} tranchées · "
           f"{cs['candidats']} candidats")
+    # la distinction chiffré/muet (garde N6) : un DISCOVERY_* sans n est muet
+    if cs.get("lots_muets"):
+        print(f"    dont {cs['lots_muets']} MUET(S) (DISCOVERY_* sans n — "
+              f"information nulle, écrits avant le garde N6) et "
+              f"{cs['lots_chiffres']} chiffré(s)")
     print(f"  total ledger  : {m['total_ledger']} entrées, "
           f"{m['total_vivant']} vivantes (non-superseded)")
     print("  historique vivant par semaine :")

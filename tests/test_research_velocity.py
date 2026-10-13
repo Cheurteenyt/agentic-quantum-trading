@@ -267,5 +267,42 @@ class TestPartRecherche(unittest.TestCase):
             self.assertLessEqual(r["recherche"], r["total"])
 
 
+    def test_lot_muet_distinct_du_lot_chiffre(self):
+        """Garde N6 (lab_ledger) : un DISCOVERY_* sans `n` est une ligne
+        MUETTE (information nulle). Le garde refuse d'en CRÉER désormais
+        (fail-closed) mais les 16 lignes historiques existent. La vélocité
+        doit les compter À PART pour ne plus mélanger « 17 lots » = 16 muets
+        + 1 chiffré. Un PASS/FAIL classique n'est PAS muet (seuls les
+        DISCOVERY_* doivent porter n)."""
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            entrees = [
+                {"date": "2026-10-06", "verdict": "DISCOVERY_FAIL"},      # muet
+                {"date": "2026-10-06", "verdict": "DISCOVERY_FAIL",
+                 "n": 950, "er": 0.064},                                   # chiffré
+                {"date": "2026-10-06", "verdict": "FAIL"},                 # classique, pas muet
+            ]
+            ledger = tmp / "trials.jsonl"
+            ledger.write_text("\n".join(json.dumps(e) for e in entrees) + "\n",
+                              encoding="utf-8")
+            import unittest.mock as m
+            with m.patch.object(RV, "LEDGER", ledger):
+                mm = RV.metriques(RV.charger())
+            cs = mm["cette_semaine"]
+            self.assertEqual(cs["lots"], 3)
+            self.assertEqual(cs["lots_muets"], 1, "seul le DISCOVERY sans n est muet")
+            self.assertEqual(cs["lots_chiffres"], 2, "chiffré + FAIL classique")
+
+    def test_ledger_reel_compte_les_muets(self):
+        """Le ledger RÉEL : les lignes DISCOVERY_FAIL historiques sans n sont
+        comptées muettes (le fait que le garde N6 a documenté)."""
+        m_ = RV.metriques(RV.charger())
+        cs = m_["cette_semaine"]
+        self.assertGreaterEqual(cs["lots_muets"], 1,
+                                "il reste des lignes muettes historiques")
+        # un lot chiffré existe aussi (HOLDOUT-X porte n)
+        self.assertGreaterEqual(cs["lots_chiffres"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
