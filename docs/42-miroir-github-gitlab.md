@@ -322,14 +322,32 @@ d'un refus `pre-receive`.
 
 ### 4.3 Le pin de confiance
 
-`TRUSTED_VERIFIER_SHA` vaut actuellement `0000…0000` (**amorçage**). Il doit
-être remplacé par le sha du commit de fusion de ce PR, dans un PR séparé.
+`TRUSTED_VERIFIER_SHA` vaut `5b79f6e7170f132f91e581a47d1378070c051eb2` :
+le commit de fusion (squash) du PR #308, celui qui a introduit
+`scripts/ci/` sur `main`. C'est lui, le juge — les scripts du miroir sont
+exécutés depuis **ce** commit, jamais depuis `main`, jamais depuis
+`TARGET_SHA`.
 
-Le workflow échoue tant qu'il vaut zéro — c'est correct (fail-closed) et
-sans effet tant que l'environnement n'existe pas. Aucun miroir ne peut
-réussir avant que les deux soient faits.
+Un PR ne peut pas citer son propre commit de fusion : il n'existe pas
+encore au moment où on l'écrit. D'où deux PR successifs — #308 pose les
+scripts, celui-ci pose le pin.
 
-Un contrôle automatique vérifie l'ensemble : `python scripts/ci/check_mirror_setup.py`.
+Entre les deux, le miroir échoue, et l'échec est instructif : l'étape 1
+**passe** (le pin est bien formé — c'est la forme qu'elle vérifie), c'est
+le *checkout du vérificateur* qui casse, sur
+`upload-pack: not our ref 0000…`. Tout ce qui suit est sauté, y compris
+la matérialisation de la clé GitLab : la panne survient **avant** qu'un
+identifiant n'existe. C'est le *fail-closed* attendu, et il a été constaté
+sur un vrai run — pas déduit.
+
+Le sha a été vérifié **signé** (`verified: true`, `reason: valid`) avant
+d'être écrit ici. La porte de signature refuse les commits non signés : un
+pin non signé aurait rendu le miroir mort-né, et le diagnostic n'aurait
+parlé que de signature.
+
+Contrôle : `python scripts/ci/check_mirror_setup.py` refuse le pin
+d'amorçage et vérifie la forme du sha. La signature du commit épinglé,
+elle, est vérifiée par le workflow lui-même, à chaque exécution.
 
 ## 5. Écarts assumés depuis Ariad
 

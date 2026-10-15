@@ -40,6 +40,12 @@ FP_HOTE = "SHA256:eUXGGm1YGsMAS7vkcx6JOJdOGHPem5gQp4taiCfCLB8"
 CLE_CLIENT_B64 = "AAAAC3NzaC1lZDI1NTE5AAAAIJKTdD3se4yH0BUPpZ1lnIwIpTZzD5UlD8gcjSP6/R9O"
 FP_CLIENT = "SHA256:p45GIFj/WYp6QAab9FgwbC0cgGv4EHPj94I8PKQBO5M"
 
+# Notre propre deploy key (github-actions-aqt-mirror), dediee a ce depot.
+# Le commentaire « Required environment » du workflow la cite : sans cette
+# ancre, une rotation laisserait le workflow annoncer une empreinte perimee
+# sans que rien ne le signale.
+FP_CLIENT_AQT = "SHA256:RE5SfICdM/KFkU6bm0PRNhaDounULNbd04zIwXPhjlA"
+
 KNOWN_HOSTS_OK = (
     "# gitlab.com host keys\n"
     f"gitlab.com ssh-ed25519 {CLE_HOTE_B64}\n"
@@ -354,17 +360,56 @@ class TestAccordAvecLeWorkflow(unittest.TestCase):
                          "l'URL du workflow doit viser le projet GitLab cible")
 
     def test_le_workflow_ne_vise_aucun_projet_ariad(self):
-        self.assertNotIn("codebase-memory-V2", self.wf)
-        self.assertNotIn("Cheurteenyt/Ariad", self.wf)
+        """Les restes d'Ariad sont des pieges, et pas seulement son nom.
+
+        Le port avait adapte l'URL du projet mais PAS l'empreinte de la
+        cle, une ligne plus bas : le workflow annoncait la deploy key
+        d'Ariad. Un operateur suivant la checklist aurait pose la
+        mauvaise — et le controle du nom ne voyait rien.
+
+        Les verifications portent sur des LIGNES, jamais sur le fichier
+        entier : comparer 750 lignes de YAML recrache tout le fichier a
+        l'echec et noie la raison.
+        """
+        lignes = self.wf.splitlines()
+
+        for motif, explication in (
+            ("codebase-memory-V2", "le projet GitLab d'Ariad"),
+            ("Cheurteenyt/Ariad", "le depot GitHub d'Ariad"),
+            ("github-actions-passive-mirror",
+             "le titre de la deploy key d'Ariad"),
+            ("p45GIFj",
+             "l'empreinte de la cle d'Ariad : une deploy key est "
+             "« project-scoped », la reutiliser donnerait a ce depot "
+             "un droit d'ECRITURE sur son projet"),
+        ):
+            for numero, ligne in enumerate(lignes, 1):
+                with self.subTest(motif=motif, ligne=numero):
+                    self.assertNotIn(motif, ligne,
+                                     f"ligne {numero} : {explication}")
+
+        self.assertTrue(
+            any(FP_CLIENT_AQT in ligne for ligne in lignes),
+            "le workflow ne cite nulle part notre empreinte "
+            f"({FP_CLIENT_AQT}). Si la cle a tourne, mettre a jour son "
+            "commentaire « Required environment », puis l'ancre "
+            "FP_CLIENT_AQT de ce fichier")
 
     def test_pin_lu_dans_le_workflow(self):
-        """Aujourd'hui l'amorcage : le contrôleur doit le DIRE, pas l'avaler."""
+        """Le pin du workflow REEL doit etre pose, et non l'amorcage.
+
+        Ce test a exige l'inverse tant que le pin valait zero : le
+        contrôleur devait le DIRE au lieu de l'avaler. Depuis que le PR
+        du pin est passe, il exige l'inverse — sinon un retour a
+        l'amorcage passerait inapercu, et le miroir mourrait au checkout
+        du verificateur sans que rien ne le signale avant le run.
+        """
         c = C.lire_constantes(self.wf)
         constat = C.controle_pin(c["pin"])
-        self.assertFalse(
+        self.assertTrue(
             constat.ok,
-            "tant que le pin vaut l'amorcage, le contrôle doit echouer. "
-            "S'il passait au vert ici, il ne detecterait jamais l'oubli")
+            "le pin du workflow est encore l'amorcage : poser le sha du "
+            "commit de fusion qui a introduit scripts/ci/ sur main")
 
     def test_le_workflow_ne_force_jamais_le_push(self):
         """L'invariant 5, verifie aussi sur le workflow (qui pourrait

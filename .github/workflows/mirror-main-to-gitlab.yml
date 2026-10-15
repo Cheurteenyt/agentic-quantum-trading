@@ -52,7 +52,7 @@ name: Mirror validated GitHub main to GitLab
 #   Secret:    GITLAB_MIRROR_SSH_PRIVATE_KEY  (OpenSSH ed25519, no passphrase)
 #   Variable:  GITLAB_REPOSITORY_SSH_URL      (git@gitlab.com:cheurteen1/agentic-quantum-trading.git)
 #   Variable:  GITLAB_KNOWN_HOSTS             (pinned GitLab.com host keys, full file content)
-#   Variable:  GITLAB_MIRROR_KEY_FINGERPRINT  (SHA256:p45GIFj/WYp6QAab9FgwbC0cgGv4EHPj94I8PKQBO5M)
+#   Variable:  GITLAB_MIRROR_KEY_FINGERPRINT  (SHA256:RE5SfICdM/KFkU6bm0PRNhaDounULNbd04zIwXPhjlA)
 #   Variable:  GITLAB_ED25519_HOST_FINGERPRINT (SHA256:eUXGGm1YGsMAS7vkcx6JOJdOGHPem5gQp4taiCfCLB8)
 
 on:
@@ -75,16 +75,18 @@ concurrency:
 # To rotate: publish a runtime update PR, squash-merge, verify CI + mirror,
 # then update this SHA in a separate PR.
 env:
-  # AMORCAGE : ce pin doit etre remplace par le sha du commit de fusion
-  # de CE PR. Tant qu'il est nul, le miroir echoue — ce qui est correct
-  # (fail-closed) et sans effet tant que l'environnement GitHub
-  # `gitlab-passive-mirror` n'existe pas. Voir la checklist du PR.
+  # Le sha du commit de fusion (squash) du PR qui a introduit
+  # `scripts/ci/` sur `main` : #308, fusionne le 15/10/2026. C'est LUI le
+  # juge — les scripts du miroir sont executes depuis ce commit, jamais
+  # depuis `main`. Verifie SIGNE (`verified: true`, `reason: valid`) avant
+  # d'etre ecrit ici : la porte de signature refuse les commits non signes,
+  # et un pin non signe aurait rendu le miroir mort-ne.
   #
-  # Les GUILLEMETS sont obligatoires : sans eux, YAML lit 40 zeros comme
-  # l'ENTIER 0, et l'etape 1 echoue sur « not a valid 40-char hex SHA: 0 ».
-  # Le message d'erreur parle alors de format et non de pin manquant —
-  # un diagnostic trompeur pour un probleme d'amorcage.
-  TRUSTED_VERIFIER_SHA: "0000000000000000000000000000000000000000"
+  # Les GUILLEMETS restent obligatoires : sans eux, YAML lit une suite de
+  # chiffres comme un ENTIER, et l'etape 1 echoue sur « not a valid
+  # 40-char hex SHA: 0 ». Le message parle alors de format et non de pin
+  # manquant — un diagnostic trompeur pour un probleme d'amorcage.
+  TRUSTED_VERIFIER_SHA: "5b79f6e7170f132f91e581a47d1378070c051eb2"
 
 jobs:
   mirror:

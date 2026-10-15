@@ -183,8 +183,9 @@ def controle_pin(pin: str | None) -> Constat:
         return Constat(
             "pin de confiance", False,
             "TRUSTED_VERIFIER_SHA vaut encore l'amorcage (40 zeros). Le "
-            "miroir echouera a l'etape 1. Le remplacer par le sha du "
-            "commit qui a introduit scripts/ci/ sur main")
+            "miroir echouera au checkout du verificateur : le pin est "
+            "bien forme, mais ne resout vers aucun commit. Le remplacer "
+            "par le sha du commit qui a introduit scripts/ci/ sur main")
     if not SHA40.match(pin):
         return Constat("pin de confiance", False,
                        f"TRUSTED_VERIFIER_SHA n'est pas un sha de 40 "
