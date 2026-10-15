@@ -76,6 +76,41 @@ selon leurs échéances forward. Le gel ne peut être déclenché qu'au 4e FAIL.
 pré-enregistré ; les specs déjà forward continuent leur course (un gel ne
 retire jamais un verdict daté).
 
+## D-3 · Gel du moteur 7 jours — un correctif ne passe que s'il vient d'un oracle rouge (décision du 16/10)
+
+**Contexte** : l'audit ad6e927 §N6 constate « les correctifs s'enchaînent
+(PR 174 → 214), le ledger reste à 97 lignes, 0 candidat » — on répare le
+moteur sans rien mesurer. Sa prescription : « geler le moteur 7 jours et
+lancer des lots de découverte ; un correctif ne passe que s'il vient d'un
+oracle rouge ».
+
+**Décision (16/10)** : gel des 21 modules de mesure (`ENGINE_FILES`,
+engine_sha scellé `2dbcfd50a8ec64e4`) du **16/10 au 23/10** ; pendant la
+fenêtre, une campagne de découverte tourne en continu sur la file bonsai
+(37 specs) ; un correctif MOTEUR ne passe QUE s'il vient d'un oracle rouge
+(un test qui échoue sur le code d'avant). Hors moteur (worker, docs, CI,
+tests) : libre — ces fichiers n'entrent pas dans l'engine_sha (règle
+testée par la matrice d'identité).
+
+**Critère de succès (écrit le 16/10, AVANT le verdict du 23/10)** — repris
+de la tâche 7 de l'audit :
+- ≥ **2 lots de découverte** chiffrés (n, moyenne) ;
+- **≥ 1 verdict de confirmation au ledger** — la lettre est déjà portée par
+  `holdout-x` (11/10, mode confirmation, FAIL) ; **la lecture retenue** est
+  un candidat issu de la file (un `DISCOVERY_PASS` complet au ledger) ;
+- le moteur n'a bougé que sur oracle rouge (zéro durcissement).
+
+**État daté (16/10)** : campagne `grind-bfd9aab-1792101711` lancée (37
+specs, n_perm 369, ~10 min/item) ; les cinq premiers items (h-21 → h-25)
+sont des `DISCOVERY_FAIL` (moyennes −0,29 à −0,54) — 0 candidat. Premier
+correctif sous gel : **#312** — le `DISCOVERY_PASS` du worker ne portait
+pas son breakeven au ledger (REFUS fail-closed posé par P2) : oracle rouge
+écrit d'abord, puis un argument corrigé dans `research_worker.py` — HORS
+`ENGINE_FILES`, engine_sha de la campagne inchangé. Le « 0 candidat »
+avait une cause mécanique, désormais fermée.
+
+**Verdict** : à poser le 23/10.
+
 ## Historique des décisions antérieures (référencées, pas re-décidées)
 
 - D3 protocol_v2 (docs/39) : PROPOSITION — ratification par tag
