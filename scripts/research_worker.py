@@ -1026,13 +1026,17 @@ def run_worker(queue_dir: Path, db_path: Path = None) -> int:
                     # la dédup du ledger est dans lab_ledger.cmd_log (PR-161)
                     # N6 (R2) : les grandeurs mesurées descendent au ledger —
                     # sans elles, un DISCOVERY_* est une ligne muette.
+                    # P2 (R4) : le breakeven VOYAGE AUSSI — sans lui, le
+                    # ledger refuse (fail-closed) et le PASS repartait en
+                    # FAILED_RETRYABLE, candidat perdu (ad6e927 §N6).
                     _log_ledger(spec, verdict, "discovery",
                                 str(ROOT / "research" / "runs" / spec_id /
                                     "report.md"),
                                 snapshot=res.get("snapshot"),
                                 n=res.get("n"),
                                 er=res.get("mean"),
-                                se=res.get("se"))
+                                se=res.get("se"),
+                                breakeven_bps=res.get("breakeven_cost_bps"))
                     if spec_id not in candidates:
                         candidates.append(spec_id)
                     print(f"[worker]   → CANDIDATE", flush=True)
