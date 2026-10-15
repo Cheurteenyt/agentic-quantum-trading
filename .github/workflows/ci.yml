@@ -166,6 +166,61 @@ jobs:
             echo "::error::syntaxe Python invalide — un fichier ne compile pas (voir ci-dessus)"
             exit 1
           }
+      # Analyse statique des artefacts du MIROIR. Les deux scripts de
+      # `scripts/ci/` détiennent le seul secret d'ÉCRITURE du dépôt (une
+      # deploy key GitLab) et sont les seuls composants que pyflakes et
+      # bandit ne lisent pas : ce sont des scripts shell. Ariad les passe à
+      # ShellCheck dans son job de tests (`severity: warning`, version
+      # épinglée) ; sans ça, le portage laisserait ~48 ko de shell — le
+      # composant le plus privilégié du dépôt — non analysés.
+      # Placés AVANT les oracles lourds : un échec d'audit_check plus loin ne
+      # doit pas sauter le lint (leçon SIG-R6 d'Ariad : un gate sauté n'a pas
+      # mesuré, il a disparu).
+      - name: ShellCheck — les scripts du miroir (BLOQUANT, non filtré)
+        run: |
+          set -euo pipefail
+          curl -sSL https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz | tar xJ
+          SC=./shellcheck-v0.10.0/shellcheck
+          # Sonde : un script volontairement cassé DOIT être refusé. Sans elle,
+          # un binaire cassé qui sort 0 rendrait le gate vert (motif pyflakes).
+          printf '#!/bin/bash\nif [ 1 -eq 1 ]; then\n  echo x\n' > /tmp/sc_probe.sh
+          if "$SC" --severity=warning /tmp/sc_probe.sh; then
+            echo "::error::ShellCheck ne signale pas un « fi » manquant — le gate ne peut pas mesurer"
+            exit 1
+          fi
+          mapfile -t scripts < <(find scripts/ci -type f -name '*.sh' | sort)
+          if [ "${#scripts[@]}" -eq 0 ]; then
+            echo "::error::aucun script .sh dans scripts/ci — le gate ne peut pas mesurer"
+            exit 1
+          fi
+          echo "ShellCheck ${#scripts[@]} script(s) : ${scripts[*]}"
+          "$SC" --severity=warning "${scripts[@]}"
+      # actionlint valide le workflow LUI-MÊME (syntaxe, expressions, `needs`,
+      # `runs-on`, `if:`). Ariad n'en a pas besoin : ses ~97 cas de contrat
+      # jouent ce rôle. Ici le workflow de miroir fait 753 lignes et docs/42 §9
+      # invoque actionlint comme preuve — l'automatiser rend la preuve
+      # permanente au lieu d'être un souvenir de rédaction.
+      #
+      # `-shellcheck=` : l'intégration ShellCheck d'actionlint est désactivée
+      # EXPLICITEMENT. Le runner GitHub préinstalle un shellcheck NON épinglé :
+      # constaté le 15/10, il a linte les blocs `run:` à la sévérité « style »
+      # et fait rougir ce gate sur des SC2129/SC2166 préexistants. Sans ce
+      # drapeau, la sévérité du gate dépendrait de l'image du runner — ce que
+      # l'épinglage combat. Conséquence assumée : les blocs `run:` des
+      # workflows ne sont PAS encore lintes. C'est un chantier à part : il
+      # demande d'épingler le binaire ET de prouver le verdict avant de le
+      # modifier (voir docs/42 §9).
+      - name: actionlint — les workflows (BLOQUANT, non filtré)
+        run: |
+          set -euo pipefail
+          curl -sSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz | tar xz
+          # Sonde : un workflow volontairement cassé DOIT être refusé.
+          printf 'on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    needs: [b]\n    steps:\n      - run: echo\n' > /tmp/al_probe.yml
+          if ./actionlint -shellcheck= /tmp/al_probe.yml; then
+            echo "::error::actionlint ne signale pas un needs vers un job inexistant — le gate ne peut pas mesurer"
+            exit 1
+          fi
+          ./actionlint -shellcheck=
       # audit_check : contrôles BLOQUANTS A1/A2/A4/B2-B4/C1-C5/E1/E2/F1-F5.
       # Il lit des fichiers de config/docs (`.zcode/**`, `docs/lab/**`, le
       # .service…) — c'est précisément ce que le filtre `core` devait énumérer.

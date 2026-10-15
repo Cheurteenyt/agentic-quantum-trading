@@ -196,8 +196,15 @@ class DepotNu:
         r = _run(["git", "ls-remote", str(self.gitlab), "refs/heads/main"])
         return r.stdout.split()[0] if r.stdout.strip() else ""
 
-    def divergence_gitlab(self) -> str:
-        """Un commit qui existe SUR GITLAB SEULEMENT — l'incident."""
+    def prepare_divergence(self) -> tuple[str, Path]:
+        """Cree, SANS le publier, un commit qui n'existe que pour GitLab.
+
+        Retourne `(sha, clone)`. Le clone permet a un hook de PUBLIER la
+        divergence a l'instant exact qu'un scenario veut tester : c'est ce
+        qui rend testable la fenetre entre la lecture initiale et le push,
+        celle que le hook `MIRROR_TEST_AFTER_INITIAL_READ` existe pour
+        couvrir.
+        """
         d = self.tmp / "diverge"
         _git("clone", "-b", "main", str(self.gitlab), str(d))
         _git("-C", str(d), "config", "user.email", "d@test")
@@ -205,8 +212,13 @@ class DepotNu:
         (d / "diverge.txt").write_text("divergence\n", encoding="utf-8")
         _git("-C", str(d), "add", "-A")
         _git("-C", str(d), "commit", "-m", "divergent commit")
+        return _git("-C", str(d), "rev-parse", "HEAD"), d
+
+    def divergence_gitlab(self) -> str:
+        """Un commit qui existe SUR GITLAB SEULEMENT — l'incident."""
+        sha, d = self.prepare_divergence()
         _git("-C", str(d), "push", "origin", "main")
-        return _git("-C", str(d), "rev-parse", "HEAD")
+        return sha
 
     def hook_pre_receive(self, message: str):
         h = self.gitlab / "hooks" / "pre-receive"
@@ -219,14 +231,20 @@ class DepotNu:
         env = {k: v for k, v in os.environ.items() if k not in A_PURGER}
         return env
 
-    def miroir(self, cible: str, *, mode_test=False, hooks=None) -> Resultat:
-        """Execute le script comme le ferait le workflow."""
+    def miroir(self, cible: str, *, mode_test=False, hooks=None,
+               github_remote: str | None = None) -> Resultat:
+        """Execute le script comme le ferait le workflow.
+
+        `github_remote` permet de pointer un GitHub qui n'existe pas : une
+        panne de LECTURE se teste comme le reste, sinon elle ne se teste
+        jamais (et sa classification derive sans que personne ne le voie).
+        """
         _git("-C", str(self.work), "checkout", cible)
         env = self._env_propre()
         env.update({
             "TARGET_SHA": cible,
             "GITLAB_URL": f"file://{self.gitlab}",
-            "GITHUB_REMOTE": f"file://{self.github}",
+            "GITHUB_REMOTE": github_remote or f"file://{self.github}",
             "SKIP_SSH_CONFIG": "yes",
             "SKIP_FP_CHECKS": "yes",
             "OUTPUT_FILE": str(self.output),
@@ -377,6 +395,64 @@ class TestEtatsDuMiroir(BaseMiroir):
                      "github_main_sha doit etre relu, pas recopie de "
                      "l'entree")
 
+    def test_une_erreur_github_est_classee(self):
+        """DIAG-R168.1-01 : une panne de LECTURE GitHub est NOMMEE.
+
+        Le script distingue quatre familles `GITHUB_*` (reseau, DNS,
+        authentification, ref absente) des familles locales `LOCAL_*`.
+        Aucune n'etait exercee : le cas le plus simple et deterministe est
+        un depot GitHub qui n'existe pas. La faute doit (a) sortir en
+        echec, (b) porter une categorie de la famille `GITHUB_*`, (c)
+        nommer la phase fautive, et (d) ne RIEN tenter sur GitLab — une
+        panne de lecture ne doit jamais ressembler a « rien a faire »
+        (fail-closed du MIRROR-R168.1-01).
+        """
+        self.d.fixe_gitlab(self.s1)
+        r = self.d.miroir(
+            self.s2, github_remote=f"file://{self.d.tmp / 'github-absent'}")
+        self.verifie(r.code == 1, r)
+        self.verifie(r.sorties.get("final_result") == "failed", r)
+        categorie = r.sorties.get("error_category", "")
+        self.verifie(
+            categorie.startswith("GITHUB_"), r,
+            f"une panne de lecture GitHub doit sortir de la famille "
+            f"GITHUB_*, pas d'une famille locale (recu : {categorie!r})")
+        self.verifie(r.sorties.get("error_phase") == "github-read", r,
+                     "la phase fautive doit etre nommee pour le diagnostic")
+        self.verifie(r.sorties.get("push_attempted") == "false", r,
+                     "GitHub illisible : rien ne doit partir vers GitLab")
+        self.assertEqual(self.d.sha_gitlab(), self.s1,
+                         "GitLab doit rester intact")
+
+    def test_un_github_sans_main_tombe_dans_le_repli(self):
+        """Le REPLI existe, et il reste dans la famille `GITHUB_*`.
+
+        GitHub repond, mais n'a pas de branche `main` : `git fetch` sort en
+        128 avec « couldn't find remote ref main ». Ce message ne matche
+        AUCUN motif du classificateur — il tombe donc dans le repli
+        `GITHUB_REMOTE_UNREACHABLE`, et non dans `GITHUB_REF_MISSING` (dont
+        les motifs attendent un message que git n'emet pas dans ce flux).
+
+        Ce test ne corrige pas l'imprecision : le script est byte-identique
+        au runtime audite d'Ariad, on ne le reecrit pas ici. Il la FIXE,
+        pour qu'un futur changement de categorie soit vu — et pour que le
+        repli ne devienne jamais une erreur LOCALE (une panne de lecture
+        classee « objet local » enverrait le diagnostic dans le mur).
+        """
+        self.d.fixe_gitlab(self.s1)
+        vide = self.d.tmp / "github-sans-main.git"
+        _git("init", "--bare", "-b", "main", str(vide))
+        r = self.d.miroir(self.s1, github_remote=f"file://{vide}")
+        self.verifie(r.code == 1, r)
+        self.verifie(r.sorties.get("error_phase") == "github-read", r)
+        self.verifie(
+            r.sorties.get("error_category") == "GITHUB_REMOTE_UNREACHABLE", r,
+            "le repli doit rester dans la famille GITHUB_* (et ce test fixe "
+            "qu'il ne dit PAS « ref absente »)")
+        self.verifie(r.sorties.get("push_attempted") == "false", r)
+        self.assertEqual(self.d.sha_gitlab(), self.s1,
+                         "GitLab doit rester intact")
+
 
 class TestCourses(BaseMiroir):
     """Le script doit resister a ce qui bouge PENDANT qu'il tourne.
@@ -418,6 +494,44 @@ class TestCourses(BaseMiroir):
         self.verifie(r.sorties.get("github_main_sha") == s3, r)
         self.assertEqual(self.d.sha_gitlab(), s3,
                          "le travail du run recent doit avoir survecu")
+
+    def test_course_apres_la_lecture_initiale_est_detectee(self):
+        """La fenetre que PERSONNE ne testait — ni ici, ni dans Ariad.
+
+        Le script lit GitLab (ici : s1, en retard, donc fast-forward
+        eligible), puis un AUTRE acteur avance GitLab vers un commit
+        divergent AVANT que le push ne parte. C'est exactement la fenetre
+        que le hook `MIRROR_TEST_AFTER_INITIAL_READ` existe pour couvrir —
+        et il etait branche des deux cotes sans qu'aucun test ne l'arme.
+        (Le cas homonyme d'Ariad, r168, avoue dans ses propres
+        commentaires tester « the simpler case » : la divergence AVANT le
+        run, deja couverte ici par `test_divergence_echoue_sans_pousser`.)
+
+        Ce que le scenario prouve, precisement : le VRAI push n'est jamais
+        tente — c'est le DRY-RUN qui refuse — et le refus est NOMME
+        `NON_FAST_FORWARD`, pas avale comme une panne inconnue. GitLab
+        garde le commit divergent : rien n'a ete ecrase.
+        """
+        self.d.fixe_gitlab(self.s1)
+        diverge, clone = self.d.prepare_divergence()
+        marqueur = self.d.tmp / "hook-a-tourne"
+        hook = f'git -C "{clone}" push origin main && touch "{marqueur}"'
+        r = self.d.miroir(self.s2, mode_test=True,
+                          hooks={"MIRROR_TEST_AFTER_INITIAL_READ": hook})
+        # Pas de `|| true` : un hook qui echoue doit faire echouer le test.
+        self.verifie(marqueur.exists(), r,
+                     "le hook n'a pas tourne : le scenario n'a rien teste")
+        self.verifie(r.code == 1, r)
+        self.verifie(r.sorties.get("final_result") == "failed", r)
+        self.verifie(r.sorties.get("error_category") == "NON_FAST_FORWARD", r)
+        self.verifie(r.sorties.get("error_phase") == "dry-run", r,
+                     "c'est le dry-run qui garde cette fenetre : le vrai "
+                     "push ne doit meme pas partir")
+        self.verifie(r.sorties.get("push_attempted") == "false", r)
+        self.verifie(r.sorties.get("push_completed") == "false", r)
+        self.assertEqual(self.d.sha_gitlab(), diverge,
+                         "le commit divergent doit survivre : aucune "
+                         "ecriture n'a eu lieu")
 
     def test_sans_mode_test_aucun_hook_ne_tourne(self):
         """La production ne doit pas pouvoir executer une commande."""
