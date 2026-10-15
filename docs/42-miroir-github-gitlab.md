@@ -149,9 +149,37 @@ attend un humain).
 |---|---|---|
 | `GITLAB_MIRROR_SSH_PRIVATE_KEY` | secret | la clé **privée** complète, format OpenSSH, sans phrase secrète |
 | `GITLAB_REPOSITORY_SSH_URL` | variable | `git@gitlab.com:cheurteen1/agentic-quantum-trading.git` |
-| `GITLAB_KNOWN_HOSTS` | variable | le **contenu** du fichier known_hosts GitLab.com, pas un chemin |
+| `GITLAB_KNOWN_HOSTS` | variable | la ligne ci-dessous, telle quelle |
 | `GITLAB_MIRROR_KEY_FINGERPRINT` | variable | `SHA256:...` de l'étape 4.1.4 |
 | `GITLAB_ED25519_HOST_FINGERPRINT` | variable | `SHA256:eUXGGm1YGsMAS7vkcx6JOJdOGHPem5gQp4taiCfCLB8` |
+
+**`GITLAB_KNOWN_HOSTS`** doit contenir le *contenu* de la ligne, jamais un
+chemin : la variable n'est lue qu'en CI, où aucun fichier local n'existe.
+
+```
+gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf
+```
+
+Le runtime force `StrictHostKeyChecking=yes` **et**
+`HostKeyAlgorithms=ssh-ed25519` : cette seule ligne suffit, inutile de
+coller les clés RSA ou ECDSA.
+
+La valeur se revérifie à tout moment, en une commande — et c'est la même
+source que celle utilisée pour la poser :
+
+```bash
+ssh-keyscan -t ed25519 gitlab.com
+```
+
+Vérifié le 15/10/2026 : la clé servie par GitLab.com est identique à celle
+ci-dessus, donc l'empreinte `SHA256:eUXGG…` de la ligne suivante est la
+bonne. Si GitLab fait tourner sa clé hôte, **c'est un diff visible** — et le
+miroir échoue avec `Host key verification failed`, pas en silence.
+
+`check_mirror_setup.py` **recalcule** l'empreinte depuis la clé au lieu de
+comparer les deux variables entre elles. La nuance compte : deux variables
+remplies de travers de la même façon se confirmeraient mutuellement, alors
+qu'un recalcul ne peut pas confirmer une clé fausse.
 
 ### 4.3 Le pin de confiance
 
