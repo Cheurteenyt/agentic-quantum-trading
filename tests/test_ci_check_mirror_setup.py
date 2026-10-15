@@ -293,6 +293,47 @@ class TestPermissionsEstManuel(unittest.TestCase):
         self.assertIn("main", c.detail)
 
 
+class TestAnalyseRemote(unittest.TestCase):
+    """`depot()` ne doit JAMAIS deviner le depot qu'il interroge.
+
+    Le controle interroge l'API GitHub. S'il se rabattait sur un nom en
+    dur quand `origin` est illisible, il interrogerait un depot qui n'est
+    pas celui de l'operateur — et rendrait un verdict sur une
+    configuration qui n'est pas celle qu'on croit examiner. Un repli
+    silencieux est ici un fail-open : il rend « OK » sur le mauvais objet.
+    """
+
+    def test_url_https(self):
+        self.assertEqual(
+            C.analyse_remote(
+                "https://github.com/Cheurteenyt/agentic-quantum-trading.git"),
+            "Cheurteenyt/agentic-quantum-trading")
+
+    def test_url_ssh(self):
+        self.assertEqual(
+            C.analyse_remote(
+                "git@github.com:Cheurteenyt/agentic-quantum-trading.git"),
+            "Cheurteenyt/agentic-quantum-trading")
+
+    def test_sans_suffixe_git(self):
+        self.assertEqual(C.analyse_remote("https://github.com/o/r"), "o/r")
+
+    def test_url_non_github_rend_None(self):
+        for mauvais in ("git@gitlab.com:cheurteen1/x.git",
+                        "https://gitlab.com/o/r.git",
+                        "n'importe quoi", ""):
+            with self.subTest(url=mauvais):
+                self.assertIsNone(C.analyse_remote(mauvais))
+
+    def test_aucun_repli_en_dur_dans_le_controleur(self):
+        source = (ROOT / "scripts" / "ci" /
+                  "check_mirror_setup.py").read_text(encoding="utf-8")
+        self.assertNotIn(
+            'return "Cheurteenyt', source,
+            "depot() a un repli en dur : le contrôle interrogerait un "
+            "dépôt choisi d'avance au lieu de celui de l'opérateur")
+
+
 class TestAccordAvecLeWorkflow(unittest.TestCase):
     """Le contrôleur lit ses constantes DANS le workflow.
 

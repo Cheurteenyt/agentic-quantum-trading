@@ -341,10 +341,10 @@ def _token() -> str | None:
     try:
         r = subprocess.run(["gh", "auth", "token"], capture_output=True,
                            text=True, timeout=20)
-        if r.returncode == 0 and r.stdout.strip():
-            return r.stdout.strip()
     except (OSError, subprocess.SubprocessError):
-        pass
+        return None
+    if r.returncode == 0 and r.stdout.strip():
+        return r.stdout.strip()
     return None
 
 
@@ -367,17 +367,31 @@ def _get(chemin: str, token: str) -> dict:
         raise Injoignable(f"{chemin} : {exc}") from exc
 
 
-def depot() -> str:
+def analyse_remote(url: str) -> str | None:
+    """`owner/repo` d'une URL de remote GitHub, ou None si ce n'en est pas une.
+
+    Pure, donc testable sans depot : une analyse qui depend de
+    l'environnement ne se teste que sur la machine ou elle tourne.
+    """
+    m = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", url.strip())
+    return m.group(1) if m else None
+
+
+def depot() -> str | None:
+    """Le depot GitHub vise, lu depuis `origin`.
+
+    Pas de repli sur une valeur en dur : si on ne peut pas lire le
+    remote, on ne sait pas QUEL depot on interroge. Un contrôle qui
+    interroge le mauvais depot rend un verdict qui ne veut rien dire —
+    il vaut mieux le dire que de deviner.
+    """
     try:
         r = subprocess.run(["git", "remote", "get-url", "origin"],
                            cwd=ROOT, capture_output=True, text=True,
                            timeout=20)
-        m = re.search(r"github\.com[:/]([^/]+/[^/.]+)", r.stdout.strip())
-        if m:
-            return m.group(1)
     except (OSError, subprocess.SubprocessError):
-        pass
-    return "Cheurteenyt/agentic-quantum-trading"
+        return None
+    return analyse_remote(r.stdout)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -399,13 +413,20 @@ def rassemble(hors_ligne: bool) -> tuple[list[Constat], str | None]:
             "verifies. Relancer sans ce drapeau"))
     else:
         token = _token()
+        nom_depot = depot()
         if token is None:
             constats.append(Constat(
                 "configuration GitHub", None,
                 "aucun token GitHub. Poser GH_TOKEN, ou s'authentifier "
                 "avec `gh auth login`"))
+        elif nom_depot is None:
+            constats.append(Constat(
+                "depot GitHub", False,
+                "impossible de lire `origin` : on ne sait pas QUEL depot "
+                "interroger. Lancer depuis le depot (et non depuis un "
+                "sous-dossier ou un export sans remote)"))
         else:
-            chemin = (f"/repos/{depot()}/environments/{ENVIRONNEMENT}")
+            chemin = f"/repos/{nom_depot}/environments/{ENVIRONNEMENT}"
             try:
                 env = _get(chemin, token)
                 protection = env.get("deployment_branch_policy") or {}
