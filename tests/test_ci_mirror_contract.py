@@ -351,9 +351,28 @@ class TestLaCIOutilleLeMiroir(unittest.TestCase):
         self.assertIn("v1.7.7", run)
         self.assertIn("al_probe.yml", run)
         self.assertIn(
-            "./actionlint\n", run + "\n",
+            "./actionlint -shellcheck=\n", run + "\n",
             "le lint doit aussi tourner sur les workflows reels, pas "
             "seulement sur la sonde")
+
+    def test_actionlint_n_utilise_pas_le_shellcheck_du_runner(self):
+        """L'integration ShellCheck d'actionlint est desactivee EXPLICITEMENT.
+
+        Sans ce drapeau, actionlint prend le `shellcheck` du PATH — sur un
+        runner GitHub, un binaire NON epingle. Constate le 15/10 : il a
+        linte les blocs `run:` a la severite « style » et fait rougir le
+        gate sur des SC2129/SC2166 preexistants du workflow de miroir. Le
+        drapeau vide rend le comportement deterministe quel que soit
+        l'image du runner — quitte a ne pas encore couvrir les blocs
+        `run:` (chantier a part, docs/42 §9).
+        """
+        run = self._run("actionlint")
+        lignes = [ligne.strip() for ligne in run.splitlines()]
+        self.assertIn("./actionlint -shellcheck=", lignes,
+                      "l'invocation finale doit porter le drapeau")
+        self.assertNotIn(
+            "./actionlint", lignes,
+            "une invocation nue reprendrait le shellcheck du runner")
 
     def test_les_linters_tournent_sur_chaque_PR_sans_filtre(self):
         """Le contrat d'un oracle bon marche : il ne depend d'AUCUN chemin.

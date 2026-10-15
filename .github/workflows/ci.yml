@@ -200,17 +200,27 @@ jobs:
       # jouent ce rôle. Ici le workflow de miroir fait 753 lignes et docs/42 §9
       # invoque actionlint comme preuve — l'automatiser rend la preuve
       # permanente au lieu d'être un souvenir de rédaction.
+      #
+      # `-shellcheck=` : l'intégration ShellCheck d'actionlint est désactivée
+      # EXPLICITEMENT. Le runner GitHub préinstalle un shellcheck NON épinglé :
+      # constaté le 15/10, il a linte les blocs `run:` à la sévérité « style »
+      # et fait rougir ce gate sur des SC2129/SC2166 préexistants. Sans ce
+      # drapeau, la sévérité du gate dépendrait de l'image du runner — ce que
+      # l'épinglage combat. Conséquence assumée : les blocs `run:` des
+      # workflows ne sont PAS encore lintes. C'est un chantier à part : il
+      # demande d'épingler le binaire ET de prouver le verdict avant de le
+      # modifier (voir docs/42 §9).
       - name: actionlint — les workflows (BLOQUANT, non filtré)
         run: |
           set -euo pipefail
           curl -sSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz | tar xz
           # Sonde : un workflow volontairement cassé DOIT être refusé.
           printf 'on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    needs: [b]\n    steps:\n      - run: echo\n' > /tmp/al_probe.yml
-          if ./actionlint /tmp/al_probe.yml; then
-            echo "::error::actionlint ne signale pas un `needs` vers un job inexistant — le gate ne peut pas mesurer"
+          if ./actionlint -shellcheck= /tmp/al_probe.yml; then
+            echo "::error::actionlint ne signale pas un needs vers un job inexistant — le gate ne peut pas mesurer"
             exit 1
           fi
-          ./actionlint
+          ./actionlint -shellcheck=
       # audit_check : contrôles BLOQUANTS A1/A2/A4/B2-B4/C1-C5/E1/E2/F1-F5.
       # Il lit des fichiers de config/docs (`.zcode/**`, `docs/lab/**`, le
       # .service…) — c'est précisément ce que le filtre `core` devait énumérer.
