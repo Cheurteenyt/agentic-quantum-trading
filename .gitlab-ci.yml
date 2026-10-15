@@ -1,0 +1,19 @@
+# GitLab is a passive mirror of the canonical GitHub repository.
+# CI, pull-request validation, and releases run on GitHub Actions.
+# No GitLab pipeline must be created for pushes, merge requests, schedules,
+# web/API triggers, or the GitHub-to-GitLab mirror.
+
+workflow:
+  rules:
+    - when: never
+
+stages:
+  - disabled
+
+passive-mirror-sentinel:
+  stage: disabled
+  script:
+    - |
+      echo "GitLab CI is intentionally disabled. GitHub is canonical."
+  rules:
+    - when: never
