@@ -126,18 +126,83 @@ sont manuelles parce qu'elles touchent à des identifiants.
 
 ### 4.1 Côté GitLab
 
-1. Créer le projet `cheurteen1/agentic-quantum-trading` (privé).
-2. Générer une paire de clés **dédiée** — jamais une clé existante :
-   ```bash
-   ssh-keygen -t ed25519 -f ~/.ssh/aqt-gitlab-mirror -C "github-actions-aqt-mirror"
-   ```
-3. Enregistrer la clé **publique** comme *deploy key* du projet, avec
-   **write access**, et l'autoriser explicitement à pousser sur `main`
-   protégé (GitLab : *Allowed to push and merge*). Une deploy key en
-   écriture n'est **pas** autorisée sur `main` par défaut — c'est l'erreur
-   la plus fréquente, et elle se manifeste par un refus `pre-receive`.
-4. Relever l'empreinte : `ssh-keygen -lf ~/.ssh/aqt-gitlab-mirror.pub`
-   → `SHA256:...`
+**Le projet doit être créé VIDE** — pas de README, pas de licence, pas de
+`.gitignore`. Ce n'est pas une préférence de style : la machine à états
+refuse un `main` GitLab qui n'est pas un ancêtre de `main` GitHub
+(`scripts/ci/mirror-main-to-gitlab.sh`, contrôle de divergence). Un commit
+initial créerait un historique sans aucun rapport avec celui de GitHub, et
+le tout premier miroir sortirait en `DIVERGENCE`. L'échec serait correct —
+mais il coûterait une reconstruction complète du projet pour rien.
+
+```bash
+# 0. Si le token glab est expiré (l'API rend alors 401 invalid_token)
+glab auth login --hostname gitlab.com
+
+PROJ="cheurteen1%2Fagentic-quantum-trading"   # le / doit être encodé
+
+# 1. Projet privé, SANS commit initial
+glab api projects -X POST \
+  -F name=agentic-quantum-trading \
+  -F path=agentic-quantum-trading \
+  -F visibility=private \
+  -F initialize_with_readme=false
+
+# 2. Paire de clés DÉDIÉE, sans phrase secrète (la CI ne peut pas en saisir)
+ssh-keygen -t ed25519 -f ~/.ssh/aqt-gitlab-mirror \
+  -C "github-actions-aqt-mirror" -N ""
+
+# 3. Deploy key avec droit d'écriture
+glab api "$PROJ/deploy_keys" -X POST \
+  -F title=github-actions-aqt-mirror \
+  -F can_push=true \
+  -F key="$(cat ~/.ssh/aqt-gitlab-mirror.pub)"
+
+# 4. Autoriser cette deploy key sur main protégé (l'étape qui échoue le plus)
+DID="$(glab api "$PROJ/deploy_keys" \
+  | jq -r '.[] | select(.title=="github-actions-aqt-mirror") | .id')"
+glab api "$PROJ/protected_branches" -X POST \
+  -F name=main \
+  -F "allowed_to_push=[{\"access_level\":40},{\"deploy_key_id\":$DID}]" \
+  -F 'allowed_to_merge=[{"access_level":40}]'
+
+# 5. L'empreinte de la clé CLIENT, pour l'environnement GitHub
+ssh-keygen -lf ~/.ssh/aqt-gitlab-mirror.pub
+```
+
+L'étape 4 est **gratuite**, et la nuance mérite d'être écrite parce que la
+documentation de l'API prête à confusion : la page *Protected branches* est
+donnée en `Free, Premium, Ultimate`, et la section « Enable deploy key
+access » n'y porte **aucun** badge payant — contrairement aux sections
+« groupes », « utilisateurs nommés » et « Code Owners », qui portent chacune
+le leur. Ce qui est payant, c'est d'autoriser des *groupes* ou des
+*utilisateurs nommés* ; une *deploy key* ne l'est pas.
+
+L'API, elle, annote `allowed_to_push` « Premium and Ultimate only » — cet
+avertissement vise les formes `user_id`/`group_id`. Si elle refuse malgré
+tout, faire l'étape 4 à la main : c'est le chemin qu'utilise le runbook
+d'Ariad, et il est éprouvé.
+
+```
+GitLab → agentic-quantum-trading → Settings → Repository → Branch rules
+       → main → Allowed to push and merge → Edit
+       → Maintainers + github-actions-aqt-mirror (deploy key) → Save changes
+```
+
+État attendu — celui d'Ariad en production :
+
+```
+Branch                    : main
+Allowed to merge          : Maintainers
+Allowed to push and merge : Maintainers + deploy key
+Allowed to force push     : NON   (doit rester désactivé)
+```
+
+Le projet étant vide, cette règle existe **avant** `main` : la toute
+première poussée du miroir est donc déjà autorisée, sans course entre la
+création de la branche et son autorisation.
+
+*Si l'étape 3 rend « key already exists »*, la clé est déjà enregistrée :
+passer à l'étape 4.
 
 ### 4.2 Côté GitHub
 
@@ -150,7 +215,7 @@ attend un humain).
 | `GITLAB_MIRROR_SSH_PRIVATE_KEY` | secret | la clé **privée** complète, format OpenSSH, sans phrase secrète |
 | `GITLAB_REPOSITORY_SSH_URL` | variable | `git@gitlab.com:cheurteen1/agentic-quantum-trading.git` |
 | `GITLAB_KNOWN_HOSTS` | variable | la ligne ci-dessous, telle quelle |
-| `GITLAB_MIRROR_KEY_FINGERPRINT` | variable | `SHA256:...` de l'étape 4.1.4 |
+| `GITLAB_MIRROR_KEY_FINGERPRINT` | variable | `SHA256:...` de l'étape 5 de §4.1 |
 | `GITLAB_ED25519_HOST_FINGERPRINT` | variable | `SHA256:eUXGGm1YGsMAS7vkcx6JOJdOGHPem5gQp4taiCfCLB8` |
 
 **`GITLAB_KNOWN_HOSTS`** doit contenir le *contenu* de la ligne, jamais un
@@ -180,6 +245,56 @@ miroir échoue avec `Host key verification failed`, pas en silence.
 comparer les deux variables entre elles. La nuance compte : deux variables
 remplies de travers de la même façon se confirmeraient mutuellement, alors
 qu'un recalcul ne peut pas confirmer une clé fausse.
+
+Les commandes correspondantes. **L'ordre compte** : l'environnement est créé
+d'abord *avec sa politique de branche*, parce que les appels suivants se
+contentent d'y déposer secret et variables.
+
+```bash
+REPO=Cheurteenyt/agentic-quantum-trading
+ENV=gitlab-passive-mirror
+
+# 1. L'environnement, restreint à `main` par une politique de branche
+#    explicite (et non « toutes les branches protégées »).
+#    Le corps JSON est écrit en clair : les crochets de `--field` et
+#    l'inférence de type sur les booléens prêtent à confusion, et une
+#    politique mal posée ne se voit qu'au premier run.
+gh api -X PUT "repos/$REPO/environments/$ENV" --input - <<'JSON'
+{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}
+JSON
+
+gh api -X POST "repos/$REPO/environments/$ENV/deployment-branch-policies" \
+  -F name=main --jq '.name'
+
+# 2. Le secret — la clé PRIVÉE, lue sur stdin. Jamais en argument : elle
+#    resterait dans l'historique du shell.
+gh secret set GITLAB_MIRROR_SSH_PRIVATE_KEY --env "$ENV" --repo "$REPO" \
+  < ~/.ssh/aqt-gitlab-mirror
+
+# 3. Les quatre variables
+gh variable set GITLAB_REPOSITORY_SSH_URL --env "$ENV" --repo "$REPO" \
+  --body "git@gitlab.com:cheurteen1/agentic-quantum-trading.git"
+
+gh variable set GITLAB_KNOWN_HOSTS --env "$ENV" --repo "$REPO" \
+  --body "gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf"
+
+gh variable set GITLAB_MIRROR_KEY_FINGERPRINT --env "$ENV" --repo "$REPO" \
+  --body "$(ssh-keygen -lf ~/.ssh/aqt-gitlab-mirror.pub | awk '{print $2}')"
+
+gh variable set GITLAB_ED25519_HOST_FINGERPRINT --env "$ENV" --repo "$REPO" \
+  --body "SHA256:eUXGGm1YGsMAS7vkcx6JOJdOGHPem5gQp4taiCfCLB8"
+```
+
+Puis vérifier l'ensemble d'un coup :
+
+```bash
+python scripts/ci/check_mirror_setup.py
+```
+
+Il contrôle l'existence et la restriction de branche de l'environnement, la
+présence du secret et des quatre variables, l'égalité **stricte** de l'URL
+avec celle du workflow, et surtout : il **recalcule** l'empreinte de la clé
+hôte épinglée au lieu de comparer les deux variables entre elles.
 
 ### 4.3 Le pin de confiance
 
