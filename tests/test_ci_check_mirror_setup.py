@@ -401,8 +401,8 @@ class TestAccordAvecLeWorkflow(unittest.TestCase):
         Ce test a exige l'inverse tant que le pin valait zero : le
         contrôleur devait le DIRE au lieu de l'avaler. Depuis que le PR
         du pin est passe, il exige l'inverse — sinon un retour a
-        l'amorcage passerait inapercu, et le miroir serait mort a
-        l'etape 1 sans que rien ne le signale avant le run.
+        l'amorcage passerait inapercu, et le miroir mourrait au checkout
+        du verificateur sans que rien ne le signale avant le run.
         """
         c = C.lire_constantes(self.wf)
         constat = C.controle_pin(c["pin"])

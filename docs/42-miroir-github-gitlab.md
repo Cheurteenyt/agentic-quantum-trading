@@ -330,9 +330,15 @@ exécutés depuis **ce** commit, jamais depuis `main`, jamais depuis
 
 Un PR ne peut pas citer son propre commit de fusion : il n'existe pas
 encore au moment où on l'écrit. D'où deux PR successifs — #308 pose les
-scripts, celui-ci pose le pin. Entre les deux, le workflow échoue à
-l'étape 1, et c'est correct (*fail-closed*) : l'échec ne portait que sur
-lui.
+scripts, celui-ci pose le pin.
+
+Entre les deux, le miroir échoue, et l'échec est instructif : l'étape 1
+**passe** (le pin est bien formé — c'est la forme qu'elle vérifie), c'est
+le *checkout du vérificateur* qui casse, sur
+`upload-pack: not our ref 0000…`. Tout ce qui suit est sauté, y compris
+la matérialisation de la clé GitLab : la panne survient **avant** qu'un
+identifiant n'existe. C'est le *fail-closed* attendu, et il a été constaté
+sur un vrai run — pas déduit.
 
 Le sha a été vérifié **signé** (`verified: true`, `reason: valid`) avant
 d'être écrit ici. La porte de signature refuse les commits non signés : un
