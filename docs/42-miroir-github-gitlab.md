@@ -322,14 +322,26 @@ d'un refus `pre-receive`.
 
 ### 4.3 Le pin de confiance
 
-`TRUSTED_VERIFIER_SHA` vaut actuellement `0000…0000` (**amorçage**). Il doit
-être remplacé par le sha du commit de fusion de ce PR, dans un PR séparé.
+`TRUSTED_VERIFIER_SHA` vaut `5b79f6e7170f132f91e581a47d1378070c051eb2` :
+le commit de fusion (squash) du PR #308, celui qui a introduit
+`scripts/ci/` sur `main`. C'est lui, le juge — les scripts du miroir sont
+exécutés depuis **ce** commit, jamais depuis `main`, jamais depuis
+`TARGET_SHA`.
 
-Le workflow échoue tant qu'il vaut zéro — c'est correct (fail-closed) et
-sans effet tant que l'environnement n'existe pas. Aucun miroir ne peut
-réussir avant que les deux soient faits.
+Un PR ne peut pas citer son propre commit de fusion : il n'existe pas
+encore au moment où on l'écrit. D'où deux PR successifs — #308 pose les
+scripts, celui-ci pose le pin. Entre les deux, le workflow échoue à
+l'étape 1, et c'est correct (*fail-closed*) : l'échec ne portait que sur
+lui.
 
-Un contrôle automatique vérifie l'ensemble : `python scripts/ci/check_mirror_setup.py`.
+Le sha a été vérifié **signé** (`verified: true`, `reason: valid`) avant
+d'être écrit ici. La porte de signature refuse les commits non signés : un
+pin non signé aurait rendu le miroir mort-né, et le diagnostic n'aurait
+parlé que de signature.
+
+Contrôle : `python scripts/ci/check_mirror_setup.py` refuse le pin
+d'amorçage et vérifie la forme du sha. La signature du commit épinglé,
+elle, est vérifiée par le workflow lui-même, à chaque exécution.
 
 ## 5. Écarts assumés depuis Ariad
 

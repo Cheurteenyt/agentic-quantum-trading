@@ -358,13 +358,20 @@ class TestAccordAvecLeWorkflow(unittest.TestCase):
         self.assertNotIn("Cheurteenyt/Ariad", self.wf)
 
     def test_pin_lu_dans_le_workflow(self):
-        """Aujourd'hui l'amorcage : le contrôleur doit le DIRE, pas l'avaler."""
+        """Le pin du workflow REEL doit etre pose, et non l'amorcage.
+
+        Ce test a exige l'inverse tant que le pin valait zero : le
+        contrôleur devait le DIRE au lieu de l'avaler. Depuis que le PR
+        du pin est passe, il exige l'inverse — sinon un retour a
+        l'amorcage passerait inapercu, et le miroir serait mort a
+        l'etape 1 sans que rien ne le signale avant le run.
+        """
         c = C.lire_constantes(self.wf)
         constat = C.controle_pin(c["pin"])
-        self.assertFalse(
+        self.assertTrue(
             constat.ok,
-            "tant que le pin vaut l'amorcage, le contrôle doit echouer. "
-            "S'il passait au vert ici, il ne detecterait jamais l'oubli")
+            "le pin du workflow est encore l'amorcage : poser le sha du "
+            "commit de fusion qui a introduit scripts/ci/ sur main")
 
     def test_le_workflow_ne_force_jamais_le_push(self):
         """L'invariant 5, verifie aussi sur le workflow (qui pourrait
