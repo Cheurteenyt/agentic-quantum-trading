@@ -138,29 +138,41 @@ mais il coûterait une reconstruction complète du projet pour rien.
 # 0. Si le token glab est expiré (l'API rend alors 401 invalid_token)
 glab auth login --hostname gitlab.com
 
-PROJ="cheurteen1%2Fagentic-quantum-trading"   # le / doit être encodé
+# Le projet vit dans le GROUPE cheurteen1, pas sous l'utilisateur : sans
+# `namespace_id`, `POST /projects` le crée dans `cheurteen/`, où le
+# workflow ne regarde pas.
+GID="$(glab api "namespaces?search=cheurteen1" \
+  | jq -r '.[] | select(.kind=="group") | .id')"
 
 # 1. Projet privé, SANS commit initial
 glab api projects -X POST \
   -F name=agentic-quantum-trading \
   -F path=agentic-quantum-trading \
+  -F namespace_id="$GID" \
   -F visibility=private \
   -F initialize_with_readme=false
+
+# PID : l'ID NUMÉRIQUE, jamais le chemin encodé. La forme
+# `projects/cheurteen1%2Fagentic-quantum-trading/…` rend par intermittence
+# un 404 `{"error":"404 Not Found"}` — un format qui n'est même pas celui
+# de GitLab — sur les POST comme sur les GET. L'ID, lui, répond toujours.
+PID="$(glab api "groups/$GID/projects" \
+  | jq -r '.[] | select(.path=="agentic-quantum-trading") | .id')"
 
 # 2. Paire de clés DÉDIÉE, sans phrase secrète (la CI ne peut pas en saisir)
 ssh-keygen -t ed25519 -f ~/.ssh/aqt-gitlab-mirror \
   -C "github-actions-aqt-mirror" -N ""
 
 # 3. Deploy key avec droit d'écriture
-glab api "$PROJ/deploy_keys" -X POST \
+glab api "$PID/deploy_keys" -X POST \
   -F title=github-actions-aqt-mirror \
   -F can_push=true \
   -F key="$(cat ~/.ssh/aqt-gitlab-mirror.pub)"
 
 # 4. Autoriser cette deploy key sur main protégé (l'étape qui échoue le plus)
-DID="$(glab api "$PROJ/deploy_keys" \
+DID="$(glab api "$PID/deploy_keys" \
   | jq -r '.[] | select(.title=="github-actions-aqt-mirror") | .id')"
-glab api "$PROJ/protected_branches" -X POST \
+glab api "$PID/protected_branches" -X POST \
   -F name=main \
   -F "allowed_to_push=[{\"access_level\":40},{\"deploy_key_id\":$DID}]" \
   -F 'allowed_to_merge=[{"access_level":40}]'
@@ -168,6 +180,11 @@ glab api "$PROJ/protected_branches" -X POST \
 # 5. L'empreinte de la clé CLIENT, pour l'environnement GitHub
 ssh-keygen -lf ~/.ssh/aqt-gitlab-mirror.pub
 ```
+
+Ces commandes ont été exécutées pour de vrai le 15/10/2026 : projet vide
+(`empty_repo: true`, zéro branche), deploy key `can_push: true`, et règle
+`main` listant `github-actions-aqt-mirror` **et** Maintainers, force push
+désactivé.
 
 L'étape 4 est **gratuite**, et la nuance mérite d'être écrite parce que la
 documentation de l'API prête à confusion : la page *Protected branches* est
@@ -178,9 +195,10 @@ le leur. Ce qui est payant, c'est d'autoriser des *groupes* ou des
 *utilisateurs nommés* ; une *deploy key* ne l'est pas.
 
 L'API, elle, annote `allowed_to_push` « Premium and Ultimate only » — cet
-avertissement vise les formes `user_id`/`group_id`. Si elle refuse malgré
-tout, faire l'étape 4 à la main : c'est le chemin qu'utilise le runbook
-d'Ariad, et il est éprouvé.
+avertissement vise les formes `user_id`/`group_id` : le 15/10/2026, GitLab
+a accepté `allowed_to_push` avec une deploy key, en Free. S'il refuse
+malgré tout — version plus ancienne, autre offre — faire l'étape 4 à la
+main : c'est le chemin qu'utilise le runbook d'Ariad, et il est éprouvé.
 
 ```
 GitLab → agentic-quantum-trading → Settings → Repository → Branch rules
@@ -295,6 +313,12 @@ Il contrôle l'existence et la restriction de branche de l'environnement, la
 présence du secret et des quatre variables, l'égalité **stricte** de l'URL
 avec celle du workflow, et surtout : il **recalcule** l'empreinte de la clé
 hôte épinglée au lieu de comparer les deux variables entre elles.
+
+Une chose lui échappe, et il le dit : il ne parle qu'à l'API GitHub.
+L'autorisation de la deploy key sur `main` protégé (§4.1, étape 4) sort
+donc en `[MANUEL]` — « à vérifier à la main » — et jamais en `OK`. C'est
+le point qui, mal fait, ne se manifeste qu'au premier push, sous la forme
+d'un refus `pre-receive`.
 
 ### 4.3 Le pin de confiance
 
