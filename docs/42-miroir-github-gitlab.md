@@ -1,6 +1,6 @@
 # 42 — Le miroir GitHub → GitLab (publication unidirectionnelle)
 
-Date : 2026-10-15 · Auteur : portage depuis le dépôt Ariad · Statut : **amorçage**
+Date : 2026-10-15 · Auteur : portage depuis le dépôt Ariad · Statut : **en service** (vérifié de bout en bout le 2026-10-15)
 
 ## Pourquoi ce document
 
@@ -404,6 +404,15 @@ GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes" \
 git ls-remote "$URL" refs/heads/main   # doit valoir $GH_MAIN
 ```
 
+⚠ **Un dry-run accepté ne prouve PAS que le push passera.** La règle de
+branche protégée et le `pre-receive` ne s'exercent qu'au vrai push : GitLab
+n'annonce jamais cette restriction à l'avance. Ariad a perdu un run
+d'amorçage exactement là-dessus — dry-run accepté, push refusé en
+`PROTECTED_BRANCH_REJECTED`. Le dry-run prouve la **joignabilité** et la
+**fast-forwardabilité**, rien de plus. C'est aussi ce qui le rend utile :
+dans la fenêtre entre notre lecture et notre push, c'est LUI qui refuse
+(voir `test_course_apres_la_lecture_initiale_est_detectee`).
+
 **À ne jamais faire** : `--force`, `--mirror` ; pousser un sha qui n'a pas
 passé la CI sur GitHub `main` ; pousser un sha qui n'est pas un ancêtre de
 `main` (rollback) ; désactiver la protection de branche ; réactiver la CI
@@ -426,19 +435,95 @@ sécurité qui fonctionne, pas une panne.
 
 Ne jamais désactiver `StrictHostKeyChecking`.
 
+### Rotation de la clé de déploiement
+
+La rotation se fait **sans coupure** : on ne révoque l'ancienne clé qu'après
+que la nouvelle a poussé pour de vrai (procédure du runbook Ariad, §7).
+
+1. Nouvelle paire ed25519 — ne jamais réutiliser une clé existante :
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/aqt-gitlab-mirror-2 \
+     -C "github-actions-aqt-mirror"
+   ```
+2. Ajouter la clé **publique** comme deploy key *write* sur le projet GitLab
+   `cheurteen1/agentic-quantum-trading`, limitée à ce projet.
+3. Poser la clé **privée** dans le secret `GITLAB_MIRROR_SSH_PRIVATE_KEY` de
+   l'environnement `gitlab-passive-mirror`, et la nouvelle empreinte dans
+   `GITLAB_MIRROR_KEY_FINGERPRINT` (le script la recomparaît avant de
+   pousser — un écart fait échouer le run, c'est le filet).
+4. **Prouver la nouvelle clé sur une branche-sonde, avant de révoquer
+   l'ancienne.** La protection de branche ne couvre que `main` : une deploy
+   key *write* peut donc pousser une sonde, et `-o ci.no_pipeline` garantit
+   qu'elle ne crée aucun pipeline.
+   ```bash
+   KEY=~/.ssh/aqt-gitlab-mirror-2
+   URL=git@gitlab.com:cheurteen1/agentic-quantum-trading.git
+   SONDE=automation/github-mirror-auth-probe
+   SHA="$(git ls-remote https://github.com/Cheurteenyt/agentic-quantum-trading.git \
+          refs/heads/main | awk '{print $1}')"
+
+   GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes" \
+     git push -o ci.no_pipeline "$URL" "$SHA:refs/heads/$SONDE"
+   GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes" \
+     git ls-remote "$URL" "refs/heads/$SONDE"     # la sonde est arrivée
+   GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes" \
+     git push "$URL" --delete "$SONDE"            # et on la retire
+   ```
+5. Attendre **un miroir réel réussi** sur `main` (résumé du job :
+   `result=mirrored`, `EXACT_PARITY=true`), *puis* révoquer l'ancienne clé
+   sur GitLab, la retirer de l'environnement GitHub, et effacer l'ancienne
+   clé privée de tout support qui la détient.
+
 ## 9. Ce qui est vérifié, et comment
 
-Le portage inclut les tests d'exécution d'Ariad, réécrits en `unittest` :
+Le dépôt teste le miroir sur quatre plans — deux de comportement, deux de
+contrat :
 
 | Fichier | Tests | Ce qu'il exerce |
 |---|---|---|
-| `tests/test_ci_mirror_runtime.py` | 23 | la machine à états contre de **vrais dépôts nus** |
-| `tests/test_ci_signature_gate.py` | 41 | le gate de signature contre un **faux GitHub** (serveur HTTP local) |
+| `tests/test_ci_mirror_runtime.py` | 27 | la machine à états contre de **vrais dépôts nus** |
+| `tests/test_ci_signature_gate.py` | 42 | le gate de signature contre un **faux GitHub** (serveur HTTP local) |
+| `tests/test_ci_mirror_contract.py` | 22 | le **contrat** des artefacts (voir plus bas) |
+| `tests/test_ci_check_mirror_setup.py` | 51 | le contrôleur de configuration, sur des configurations **cassées** |
 
 Les scénarios ne lisent pas le source pour y chercher des chaînes : ils
 exécutent le script et vérifient l'état du dépôt après coup. Un extrait :
 dépôt vide → pousse ; en avance → **ne rollback pas** ; divergent → échoue
 sans pousser ; 401 → **pas** de retry ; 500 → exactement 3 requêtes.
+
+### Le contrat, et ce qui ne doit jamais revenir
+
+Les deux premiers fichiers prouvent ce que le système **fait**. Ils ne
+peuvent pas prouver ce qu'il ne doit jamais **refaire** : un artefact de
+l'ancienne architecture recréé, une permission élargie, un workflow qui
+reprend le pouvoir de pousser — tout ça laisse le chemin heureux intact,
+donc tous les tests de comportement verts.
+
+`test_ci_mirror_contract.py` affirme le **texte** des artefacts, comme les
+97 cas du `r166` d'Ariad : moindre privilège (`actions: read` +
+`contents: read`), `persist-credentials: false` sur les **deux** checkouts,
+l'environnement `gitlab-passive-mirror`, le nettoyage `if: always()` et le
+verdict qui exige `steps.cleanup.outcome == success`,
+`StrictHostKeyChecking=yes`, `-o ci.no_pipeline` sur chaque push GitLab,
+l'absence de tout `git push` inline dans le workflow, et **l'absence** de
+`mirror-to-github`, `quota-check`, `mr-preflight`, `gitlab-mr-ci.yml`,
+`sync-graph-ui-to-gitlab.yml`. La doctrine « on ne rétablit jamais le
+bidirectionnel » est ainsi mécanisée : elle ne dépend plus de la mémoire du
+rédacteur.
+
+### Le contrôle après chaque run
+
+Le workflow se juge lui-même dans son résumé. Un run sain dit :
+`result=` ∈ {`mirrored`, `already-mirrored`, `newer-valid-mirror-present`},
+`POST_VERIFY_RESULT=success`, `EXACT_PARITY=true`. Côté GitLab, trois
+vérifications :
+
+```bash
+GIT_SSH_COMMAND="ssh -i ~/.ssh/aqt-gitlab-mirror -o IdentitiesOnly=yes" \
+  git ls-remote git@gitlab.com:cheurteen1/agentic-quantum-trading.git refs/heads/main
+#  → doit valoir exactement le sha de GitHub main
+#  → 0 pipeline (onglet CI/CD) · 0 merge request
+```
 
 ### Les mutations
 
@@ -459,6 +544,27 @@ détectées** :
 | S5 retenter un 401 | `test_401_et_404_ne_sont_pas_retentes` |
 | S6 autoriser le mode test sous `GITHUB_ACTIONS` | `test_github_actions_desactive_le_mode_test` |
 
+L'audit d'Ariad du 15/10 a ajouté **quatorze mutations** de plus — gardes
+statiques, outillage, et les deux scénarios nouveaux. Les quatorze ont été
+détectées :
+
+| Mutation | Détectée par |
+|---|---|
+| C1 laisser un token GitHub dans un checkout | `test_les_deux_checkouts_ne_persistent_pas_les_credentials` |
+| C2 accorder `contents: write` | `test_le_workflow_ne_demande_que_la_lecture` |
+| C3 nettoyage en `if: success()` au lieu d'`always()` | `test_le_nettoyage_tourne_toujours` |
+| C4 inliner un `git push` dans le workflow | `test_le_workflow_ne_pousse_jamais_lui_meme` |
+| C5 `StrictHostKeyChecking=no` | `test_l_hote_gitlab_est_verifie_strictement` |
+| C6 `.gitlab-ci.yml` en `when: always` | `test_gitlab_ci_ne_declenche_aucun_pipeline` |
+| C7 ressusciter un job `mirror-to-github` | `test_gitlab_ci_ne_declare_aucun_job_de_l_ancienne_architecture` |
+| C8 ShellCheck en `--severity=style` | `test_shellcheck_garde_les_scripts_du_miroir` |
+| C9 débrancher la sonde ShellCheck | `test_shellcheck_sonde_l_outil` |
+| C10 rendre à actionlint le shellcheck du runner | `test_actionlint_n_utilise_pas_le_shellcheck_du_runner` |
+| R1 débrancher le hook d'après-lecture | `test_course_apres_la_lecture_initiale_est_detectee` |
+| R2 classer une erreur GitHub en locale (branche explicite) | `test_une_erreur_github_est_classee` |
+| R3 idem sur le repli du classificateur | `test_un_github_sans_main_tombe_dans_le_repli` |
+| R4 renommer la phase `dry-run` en `push` | `test_course_apres_la_lecture_initiale_est_detectee` |
+
 **S4 a survécu à sa première version.** Le test envoyait
 `verified: true` avec une raison inconnue — mais le contrôle de cohérence
 (« `verified=true` exige `reason=valid` ») refusait **avant**, donc le test
@@ -470,15 +576,89 @@ mutation révèle et que la lecture ne voit pas.
 ### Ce qui n'est PAS testé
 
 - **Le workflow YAML lui-même** n'est pas exercé de bout en bout. Il est
-  validé par `actionlint` (vérifié : exit 0), ce qui couvre la syntaxe et
-  les expressions, pas la sémantique.
+  validé par `actionlint` **en CI** (palier `t1-cheap`, version épinglée
+  `1.7.7`, avec une sonde qui prouve que l'outil mesure) et par les tests de
+  contrat ci-dessus : syntaxe, expressions et structure, pas la sémantique
+  d'un run. Les blocs `run:` des workflows, eux, ne sont **pas** encore
+  lintés : l'intégration ShellCheck d'actionlint prend le binaire du PATH —
+  sur un runner GitHub, un `shellcheck` non épinglé, à la sévérité
+  « style » (constaté le 15/10 : deux `SC2166` préexistants dans le verdict
+  du miroir). L'étape passe donc `-shellcheck=` pour rester déterministe.
+  Chantier à part : épingler le binaire **et** prouver le verdict avant de
+  le toucher.
+- **Le shell n'est pas couvert par des tests unitaires** (il n'en a jamais
+  eu, et ça ne changerait rien : ShellCheck dit plus qu'un test de chaîne).
+  Il est couvert par ShellCheck en CI (`severity: warning`, version épinglée
+  `v0.10.0`, avec sa propre sonde) et, pour la machine à états, par les
+  scénarios d'exécution ci-dessus. C'était le trou de l'audit du 15/10 :
+  48 ko de shell détenant le seul secret d'écriture du dépôt, que ni
+  pyflakes ni bandit ne lisent.
 - **Le vrai GitLab** n'est jamais contacté par les tests. Ce qui est
   vérifié, c'est le comportement contre des dépôts nus locaux.
 - **Le comportement de GitLab sur `main` protégé** ne peut être reproduit
   localement : c'est le rôle du refus `pre-receive` simulé, et de
   `GITLAB_MIRROR_KEY_FINGERPRINT` côté configuration.
 
-## 10. Diagnostic
+## 10. Continuité — ce que GitLab peut sauver, et comment on le prouve
+
+GitLab n'est pas un second canon : c'est une **redondance de code**. Ce
+qu'il sauve n'est pas la CI (elle reste GitHub), c'est l'accès à `main` et à
+son historique si GitHub devient indisponible.
+
+### Les trois niveaux (d'après `CI_CONTINUITY` d'Ariad)
+
+| Niveau | Situation | Réponse |
+|---|---|---|
+| 1 | la CI GitHub est lente ou dégradée | attendre. Rien à basculer : le miroir suit la CI |
+| 2 | la CI GitHub est en panne (`main` ne bouge plus) | le miroir ne tourne plus, et c'est **correct** : GitLab reste sur le dernier sha validé |
+| 3 | GitHub est injoignable | GitLab sert à relire et cloner. La reprise manuelle de §7 ne traite qu'un **retard du miroir**, jamais une panne de GitHub |
+
+Dans les trois cas : on ne promeut pas GitLab canonique, on ne réactive pas
+la CI GitLab, on ne pousse pas un sha qui n'a pas passé la CI, même
+temporairement. Si l'un de ces gestes semble nécessaire, c'est un incident
+(voir « À ne jamais faire », §7).
+
+### L'exercice de reprise — une fois par trimestre
+
+C'est la seule preuve que le miroir vaut quelque chose comme reprise. Sans
+lui, « on a un miroir » reste une intention.
+
+```bash
+DEST="$(mktemp -d)"
+GIT_SSH_COMMAND="ssh -i ~/.ssh/aqt-gitlab-mirror -o IdentitiesOnly=yes" \
+  git clone --quiet \
+  git@gitlab.com:cheurteen1/agentic-quantum-trading.git "$DEST"
+
+git -C "$DEST" fsck --full --no-reflogs    # muet : aucun objet manquant
+git -C "$DEST" log -1 --format='%H'        # == le sha de GitHub main
+test -f "$DEST/.gitlab-ci.yml"             # le dépôt cloné est complet
+test -f "$DEST/.github/workflows/mirror-main-to-gitlab.yml"
+
+rm -rf "$DEST"
+```
+
+À comparer avec
+
+```bash
+git ls-remote https://github.com/Cheurteenyt/agentic-quantum-trading.git \
+  refs/heads/main
+```
+
+puis vérifier **0 pipeline** et **0 merge request** côté GitLab. Noter le
+résultat (date, sha, verdict). Un échec ne se « répare » pas en forçant
+GitLab : c'est un incident (§6).
+
+### Travaux futurs
+
+- **Une sentinelle de silence** : un workflow planifié qui vérifie qu'un run
+  de miroir **réussi** existe pour le sha courant de `main`. C'est
+  suffisant parce que le post-verify du miroir a déjà prouvé « GitLab ==
+  `main` » au moment du push : « un run réussi existe pour ce sha » ⇔
+  « GitLab est à jour ». Limite honnête : elle détecterait l'arrêt, pas une
+  réécriture ultérieure côté GitLab — celle-là demande une lecture GitLab,
+  donc la deploy key, et c'est l'exercice trimestriel qui la couvre.
+
+## 11. Diagnostic
 
 | Symptôme | Catégorie | Cause probable |
 |---|---|---|
@@ -489,10 +669,13 @@ mutation révèle et que la lecture ne voit pas.
 | `DIVERGENCE` | `DIVERGENCE` | commits GitLab absents de GitHub → **incident** |
 | Le job échoue à `not a valid 40-char hex SHA: 0` | config | `TRUSTED_VERIFIER_SHA` encore à l'amorçage |
 
-## 11. Références
+## 12. Références
 
 - `scripts/ci/mirror-main-to-gitlab.sh` — la machine à états (générique)
 - `scripts/ci/verify-github-commit-signature.sh` — le gate (générique)
 - `scripts/ci/check_mirror_setup.py` — le contrôle de configuration
 - `.gitlab-ci.yml` — désactive explicitement toute CI GitLab
 - Source : dépôt Ariad, `docs/operations/GITHUB_GITLAB_BRANCH_BRIDGE.md`
+- Source (§10, continuité) : dépôt Ariad, `docs/operations/CI_CONTINUITY.md`
+  — les trois niveaux de dégradation, l'exercice de reprise trimestriel, et
+  les limites du dry-run
