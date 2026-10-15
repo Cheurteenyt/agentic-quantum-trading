@@ -506,7 +506,8 @@ class TestEngineSha(unittest.TestCase):
 class TestRunWorker(unittest.TestCase):
     """La boucle complète avec le moteur mocké — skip/résumé/terminal."""
 
-    def _run(self, tmp: Path, fake, max_retries=3, body: str = SPEC_BODY):
+    def _run(self, tmp: Path, fake, max_retries=3, body: str = SPEC_BODY,
+             passes=lambda res, spec: False):
         patches = [
             mock.patch.object(rw, "RUNTIME", tmp / "rt"),
             mock.patch.object(rw, "CHECKPOINT",
@@ -520,7 +521,7 @@ class TestRunWorker(unittest.TestCase):
         from scripts import research_runner as rr
         patches += [
             mock.patch.object(rr, "run_discovery", fake),
-            mock.patch.object(rr, "_passes", lambda res, spec: False),
+            mock.patch.object(rr, "_passes", passes),
         ]
         q = _mk_queue(tmp, {"EXP-T1.json": body})
         for p in patches:
@@ -762,6 +763,60 @@ class TestRunWorker(unittest.TestCase):
                 (tmp / "rt" / "grind_checkpoint.json").read_text())
             self.assertEqual(ck["items"]["EXP-T1"]["state"],
                              "FAILED_PERMANENT")
+
+    def test_pass_discovery_porte_son_breakeven_au_ledger(self):
+        """P2 (R4) : le ledger REFUSE un DISCOVERY_* sans `--breakeven-bps`
+        (fail-closed). Le site du worker (posé par R2, #287) ne le passait
+        pas : tout PASS partait en RuntimeError → FAILED_RETRYABLE, et le
+        candidat n'existait JAMAIS — le « 0 candidat » de l'audit ad6e927
+        (§N6). Mutation négative : l'appel sans breakeven_bps (l'ancien
+        code) fait refuser l'écriture et échouer ce test."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            ck_path = tmp / "rt" / "grind_checkpoint.json"
+            led = tmp / "trials.jsonl"
+            arts = []
+
+            def fake(spec, db_path=None, n_perm=99):
+                return {"verdict": "DISCOVERY_PASS", "n": 100, "mean": 0.1,
+                        "se": 0.01, "snapshot": "s",
+                        "breakeven_cost_bps": 12.5}
+
+            def enregistre(spec_id, *_a, **_k):
+                arts.append(spec_id)
+                return tmp / "runs" / spec_id
+
+            # le ledger d'ESSAI : l'argv du worker ne connaît pas --ledger —
+            # on l'injecte au passage, lab_ledger reste le VRAI (le garde P2
+            # doit refuser l'écriture si le breakeven manque).
+            real_run = subprocess.run
+
+            def vers_ledger_de_test(cmd, *a, **k):
+                if (isinstance(cmd, list) and len(cmd) >= 2
+                        and str(cmd[1]).endswith("lab_ledger.py")):
+                    cmd = cmd[:2] + ["--ledger", str(led)] + cmd[2:]
+                return real_run(cmd, *a, **k)
+
+            from scripts import research_runner as rr
+            with mock.patch.object(rr.subprocess, "run", vers_ledger_de_test):
+                with mock.patch.object(rr, "write_artifacts", enregistre):
+                    rc = self._run(tmp, fake, max_retries=1,
+                                   passes=rr._passes)
+            self.assertEqual(rc, rw.EXIT_OK,
+                             "un PASS discovery doit se loguer — le REFUS P2 "
+                             "sur breakeven manquant repart sinon en "
+                             "FAILED_RETRYABLE, candidat perdu")
+            self.assertEqual(arts, ["EXP-T1"])
+            ck = json.loads(ck_path.read_text())
+            self.assertEqual(ck["items"]["EXP-T1"]["state"], "DONE")
+            self.assertEqual(ck["candidates"], ["EXP-T1"])
+            lignes = [l for l in led.read_text().splitlines() if l.strip()]
+            self.assertEqual(len(lignes), 1)
+            e = json.loads(lignes[0])
+            self.assertEqual(e["verdict"], "DISCOVERY_PASS")
+            self.assertEqual(e["mode"], "discovery")
+            self.assertEqual(e["n"], 100)
+            self.assertEqual(e["breakeven_cost_bps"], 12.5)
 
 
 class TestLedgerDedup(unittest.TestCase):
