@@ -349,8 +349,21 @@ def _token() -> str | None:
 
 
 def _get(chemin: str, token: str) -> dict:
+    """GET sur l'API GitHub. Le schema et l'hote sont verrouilles.
+
+    Ariad impose que le runtime ne parle qu'a une URL verifiee ; la meme
+    regle s'applique ici. Le `chemin` vient en partie d'une valeur LUE
+    dans le depot (`origin`), donc il n'est pas une constante : le garde
+    ci-dessous est ce qui rend l'appel sur par construction, et non par
+    confiance dans la provenance du chemin.
+    """
+    url = f"https://api.github.com{chemin}"
+    if not url.startswith("https://api.github.com/"):
+        raise Injoignable(
+            f"URL refusee : l'appel doit rester sur api.github.com, or "
+            f"le chemin produit {url!r}")
     req = urllib.request.Request(
-        f"https://api.github.com{chemin}",
+        url,
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
@@ -358,7 +371,11 @@ def _get(chemin: str, token: str) -> dict:
             "User-Agent": "aqt-check-mirror-setup",
         })
     try:
-        with urllib.request.urlopen(req, timeout=30) as r:
+        # L'URL est verrouillee sur https://api.github.com par le garde
+        # ci-dessus. Bandit ne peut pas le lire statiquement : le nosec
+        # est sur la MEME ligne que l'appel, ce que bandit exige (doctrine
+        # bandit du depot, cf. scripts/premerge_audit.py).
+        with urllib.request.urlopen(req, timeout=30) as r:  # nosec B310 — l'URL est verrouillee sur https://api.github.com par le garde ci-dessus
             return json.load(r)
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")[:300]
