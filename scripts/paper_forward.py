@@ -251,6 +251,10 @@ def main() -> int:
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'").fetchall()]
     fh = pd.read_sql_query("SELECT symbol, funding_time, rate FROM funding_history", con)
     btc = load_df(con, "BTCUSDT")
+    # Series close — le DataFrame entier rendait price_signals (n, n+5)
+    # (incident du 16/10 : ≈ 16 Go par appel × ~566 symboles, deux fois
+    # par nuit).
+    btc_close = None if btc is None else btc["close"]
 
     # FIX F-043 — la boucle était (candidat × symbole). Conséquences
     # mesurées sur le nightly : load_df rejoué 8 × 586 = 4 688 fois,
@@ -302,7 +306,7 @@ def main() -> int:
                 ev = funding_extreme_events(fh_sym)
             else:
                 if _sig is None:      # une seule fois par symbole (F-043)
-                    _sig = dict((n, (d, s)) for n, d, s in price_signals(df, btc))
+                    _sig = dict((n, (d, s)) for n, d, s in price_signals(df, btc_close))
                 if name not in _sig:
                     continue
                 ev = df.index[_sig[name][1].fillna(False)]
