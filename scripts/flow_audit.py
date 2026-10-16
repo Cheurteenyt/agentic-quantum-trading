@@ -128,7 +128,7 @@ def main() -> int:
     # ---- oi_history ----
     out["oi_history"] = {
         "total": one(c, "SELECT COUNT(*) FROM oi_history"),
-        "last_captured": ts(one(c, "SELECT MAX(captured_at) FROM oi_history")),
+        "last_captured": ts_ms(one(c, "SELECT MAX(captured_at_ms) FROM oi_history")),
         "symbols": one(c, "SELECT COUNT(DISTINCT symbol) FROM oi_history"),
         "sparsest": [
             dict(zip(("symbol", "n", "min_oi", "max_oi"), r))
