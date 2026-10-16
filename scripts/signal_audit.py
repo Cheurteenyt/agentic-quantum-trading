@@ -77,7 +77,10 @@ def audit_signal(con: sqlite3.Connection, name: str, symbols: list[str],
         if df is None:
             continue
         btc = load_df(con, "BTCUSDT")
-        sig = dict((n, (d, s)) for n, d, s in price_signals(df, btc))
+        # Series close — le DataFrame entier rendait (n, n+5) ≈ 16 Go
+        # (le SIGKILL à 31,5 Go du 16/10 venait d'ici).
+        btc_close = None if btc is None else btc["close"]
+        sig = dict((n, (d, s)) for n, d, s in price_signals(df, btc_close))
         if name not in sig:
             continue
         idx_ns = df.index.astype("datetime64[ns]").asi8
