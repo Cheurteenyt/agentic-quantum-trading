@@ -116,6 +116,14 @@ def load_df(con, symbol: str) -> pd.DataFrame | None:
 
 
 def price_signals(df: pd.DataFrame, btc_close: pd.Series | None = None) -> list[tuple[str, int, pd.Series]]:
+    # Incident du 16/10 — un DataFrame BTC ici faisait de `beta`/`btc_r` des
+    # DataFrames (5 colonnes) : `disloc = sym_r - beta * btc_r` alignait
+    # alors l'INDEX de la Series sur les COLONNES → (n, n+5) cellules
+    # (≈ 16 Go à n = 44 898 ; `signal_audit` tué à 31,5 Go RSS,
+    # `paper_forward` le passait à CHAQUE symbole du nocturne). Le contrat
+    # de `btc_close` est la série close : on normalise à la racine.
+    if isinstance(btc_close, pd.DataFrame):
+        btc_close = btc_close["close"]
     out: list[tuple[str, int, pd.Series]] = []
     close = df["close"]
     r = ta.rsi(close)
