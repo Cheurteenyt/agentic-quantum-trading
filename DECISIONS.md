@@ -109,6 +109,19 @@ pas son breakeven au ledger (REFUS fail-closed posé par P2) : oracle rouge
 `ENGINE_FILES`, engine_sha de la campagne inchangé. Le « 0 candidat »
 avait une cause mécanique, désormais fermée.
 
+Deuxième correctif sous gel : l'explosion n×n de `price_signals` — un
+DataFrame BTC (que `paper_forward`, `signal_audit` et `full_arsenal`
+passaient) transforme `disloc = sym_r - beta * btc_r` en soustraction
+Series − DataFrame dont l'alignement fait de l'index des COLONNES
+((n, n+5) ≈ 16 Go à n = 44 898 ; `signal_audit` tué à 31,5 Go RSS ;
+`paper_forward` : ~566 symboles à chaque nocturne). Même règle : oracle
+rouge écrit d'abord (il échoue sur le code d'avant), puis normalisation à
+la racine dans `price_signals` et les trois appelants corrigés.
+`backtest_indicators.py` et `paper_forward.py` étant dans `ENGINE_FILES`,
+l'engine_sha passe de `2dbcfd50a8ec64e4` à `b832ee6062eb7bf0` — le chemin
+Series (seul mesuré) est identique, prouvé par l'égalité de l'oracle ;
+aucun résultat de campagne rejoué.
+
 **Verdict** : à poser le 23/10.
 
 ## Historique des décisions antérieures (référencées, pas re-décidées)
