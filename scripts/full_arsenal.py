@@ -43,12 +43,15 @@ def collect_stream(con: sqlite3.Connection, name: str,
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h' ORDER BY symbol")]
     btc = load_df(con, "BTCUSDT")
+    # Series close — le DataFrame entier rendait price_signals (n, n+5)
+    # (même classe que l'incident du 16/10).
+    btc_close = None if btc is None else btc["close"]
     events: list[dict] = []
     for sym in symbols:
         df = load_df(con, sym)
         if df is None or len(df) < 500:
             continue
-        sig = dict((n, (d, s)) for n, d, s in price_signals(df, btc))
+        sig = dict((n, (d, s)) for n, d, s in price_signals(df, btc_close))
         if name not in sig:
             continue
         idx_ns = df.index.astype("datetime64[ns]").asi8
