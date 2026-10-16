@@ -165,7 +165,21 @@ def main(argv: list[str] | None = None) -> int:
                 run_fetch_range(sym, "1h", args.target_bars, db_path=SIDE_DB)
             except Exception as exc:  # noqa: BLE001 — un symbole ne doit pas
                 print(f"  !! {sym} : {exc}")  # tuer l'audit
+    # Sans --fetch sur un jour neuf, la side-DB n'existe pas encore : un
+    # sqlite3.connect nu la crée VIDE et la reprise plantait (16/10). Refus
+    # explicite plutôt qu'un crash — et jamais de rapport trompeur.
+    if not SIDE_DB.exists():
+        print(f"side-DB absente : {SIDE_DB}")
+        print("  rien à reprendre — relancez avec --fetch (audit complet du jour).")
+        return 2
     scon = sqlite3.connect(SIDE_DB, timeout=60)
+    if not scon.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='klines'"
+    ).fetchone():
+        scon.close()
+        print(f"side-DB sans table klines : {SIDE_DB}")
+        print("  rien à reprendre — relancez avec --fetch (audit complet du jour).")
+        return 2
     side_syms = {r[0] for r in scon.execute(
         "SELECT DISTINCT symbol FROM klines WHERE interval='1h'")}
     new_events = collect_meme(scon) if side_syms else []
